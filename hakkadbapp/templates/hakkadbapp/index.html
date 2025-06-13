@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title> Lexique Hakka </title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-8">
+
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold"> Vocabulaire  (<span id="word-count">{{ words|length }}</span> mots) </h1>
+            <input type="text" id="word-search" placeholder="Ex. 屋家 ou maison ou wuk ka ou wuk5ka1 " class="border rounded px-4 py-2 text-lg w-64" />
+            
+            <a href="/words/new"
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                + Nouveau mot
+            </a>
+            <a href="/words/export"
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                Export  
+            </a>
+        </div>
+
+        <!-- Table header -->
+        <div class="hidden sm:grid grid-cols-5 gap-4 px-3 py-2 text-gray-500 text-sm font-medium border-b border-gray-300">
+        <div>Word</div>
+        <div>Pinyin</div>
+        <div>Category</div>
+        <div>French</div>
+        <div>Tahitian</div>
+        </div>
+
+        <!-- Word rows -->
+<div id="word-list" class="divide-y divide-gray-100 text-sm" style="height: 300px; overflow-y: auto;">
+        {% for word in words %}
+<div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
+    data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}">
+
+
+            <!-- Word -->
+            <div class="font-semibold text-indigo-700 text-lg">
+                <a href="{% url 'edit_word' word.id %}">
+                {{ word }}
+            </a>
+            </div>
+
+            <!-- Pinyin -->
+            <div class="flex flex-wrap gap-1">
+                {% for wp in word.wordpronunciation_set.all %}
+                <a href="{% url 'edit_pronunciation' wp.pronunciation.id %}" class="bg-indigo-100 text-indigo-700 px-1 rounded hover:bg-indigo-200">
+                    {{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}
+                </a>
+                {% endfor %}
+            </div>
+
+            <!-- Category -->
+            <div>
+                {% if word.get_category_display %}
+                <span class="font-sm">{{ word.get_category_display }}</span>
+                {% endif %}
+            </div>
+
+            <!-- French -->
+            <div>
+                {% if word.french %}
+                {{ word.french }}
+                {% endif %}
+            </div>
+
+            <!-- Tahitian -->
+            <div>
+                {% if word.tahitian %}
+                {{ word.tahitian }}
+                {% endif %}
+            </div>
+            </div>
+        {% empty %}
+            <p class="text-gray-500 italic px-3 py-2">No words found.</p>
+        {% endfor %}
+        </div>
+
+
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">
+            Caractères (<span id="pron-count">{{ pronunciations|length }}</span>)
+            </h1>
+
+            <input type="text" id="search" placeholder="ex. 家 ou ga" class="border rounded px-5 py-5 text-lg w-64" />
+                
+            <a href="/pronunciation/new"
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                + Nouvelle prononciation
+            </a>
+            <a href="/pronunciations/export"
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                Export
+            </a>
+        </div>
+
+        <div id="word-list" class="divide-y divide-gray-100 text-sm" style="height: 300px; overflow-y: auto;">
+            <ul id="pron-list" class="flex flex-wrap gap-2">
+            {% for p in pronunciations %}
+                <li class="w-28" data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}">
+                <a href="{% url 'edit_pronunciation' p.id %}" class="block bg-white p-2 rounded-lg shadow text-center text-sm hover:shadow-md transition">
+                    <div class="text-indigo-600 font-semibold text-lg">{{ p.hanzi }}</div>
+                    <div class="text-gray-700">
+                    {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}
+                    </div>
+                </a>
+                </li>
+            {% empty %}
+                <li class="text-gray-500 italic">No pronunciations found.</li>
+            {% endfor %}
+            </ul>
+        </div>
+        <script>
+        function setupSearch({ inputId, itemSelector, containerId, countId }) {
+            const searchInput = document.getElementById(inputId);
+            const items = document.querySelectorAll(`${containerId} > ${itemSelector}`);
+            const countDisplay = document.getElementById(countId);
+
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                items.forEach(item => {
+                    const haystack = item.dataset.search?.toLowerCase() || '';
+                    const match = query.split(/\s+/).every(q => haystack.includes(q));
+                    item.style.display = match ? '' : 'none';
+                    if (match) visibleCount++;
+                });
+
+                if (countDisplay) {
+                    countDisplay.textContent = visibleCount;
+                }
+            });
+        }
+
+        // Initialize search for word list
+        setupSearch({
+            inputId: 'word-search',
+            itemSelector: 'div',
+            containerId: '#word-list',
+            countId: 'word-count'
+        });
+
+        // Initialize search for pronunciation/character list
+        setupSearch({
+            inputId: 'search', // your original input ID for chars
+            itemSelector: 'li',
+            containerId: '#pron-list',
+            countId: 'pron-count'
+        });
+        </script>
+
+
+
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+                <h2 class="text-xl font-semibold mb-2">Tones</h2>
+                <div class="bg-white p-4 rounded-xl shadow">
+                    {% for tone in tones %}
+                        <span class="inline-block bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full mr-2 mb-2">
+                            {{ tone.tone_number }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold mb-2">Initials</h2>
+                <div class="bg-white p-4 rounded-xl shadow">
+                    {% for i in initials %}
+                        <span class="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-2">
+                            {{ i.initial }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold mb-2">Finals</h2>
+                <div class="bg-white p-4 rounded-xl shadow">
+                    {% for i in finals %}
+                        <span class="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full mr-2 mb-2">
+                            {{ i.final }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

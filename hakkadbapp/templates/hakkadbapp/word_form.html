@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title> Mot </title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+<form method="POST" class="space-y-5">
+  {% csrf_token %}
+    <!-- Pronunciations (multi-select) -->
+  <div>
+    <!-- Hanzi input -->
+    <label for="id_hanzi_input" class="block text-gray-700 text-sm font-semibold mb-1">Word (Hanzi)</label>
+    <input type="text" name="hanzi_input" id="id_hanzi_input"
+          class="border rounded px-3 py-2 w-full"
+          value="{{ form.hanzi_input.value|default_if_none:'' }}">
+    {% if form.hanzi_input.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.hanzi_input.errors|striptags }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Pronunciation dropdowns -->
+  <div id="pronunciation-fields" class="mt-2 flex justify-center space-x-2">
+    <!-- JS will insert dropdowns here -->
+  </div>
+
+  <script>
+    const hanziInput = document.getElementById("id_hanzi_input");
+    const container = document.getElementById("pronunciation-fields");
+    const ALL_PRONUNCIATIONS = JSON.parse(`{{ all_pronunciations|safe }}`);
+    const INITIALS = JSON.parse(`{{ initials|safe }}`);
+    const FINALS = JSON.parse(`{{ finals|safe }}`);
+
+    console.log(INITIALS)
+    function createSelect(idx, char) {
+      const select = document.createElement("select");
+      select.name = `char_${idx}`;
+      select.id = `id_char_${idx}`;
+      select.className = "border rounded px-2 py-1 text-sm";
+
+      // Clear existing options just in case
+      select.innerHTML = "";
+
+      // Filter pronunciations matching this char
+      const options = ALL_PRONUNCIATIONS.filter(p => p.hanzi === char);
+      console.log(options)
+
+      // Add each option
+      options.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id; 
+        opt.textContent = INITIALS.find(i => i.id == p.initial).initial + FINALS.find(f => f.id == p.final).final;
+        select.appendChild(opt);
+      });
+
+      if (options.length === 0) {
+        // Create input to add new pronunciation
+        const input = document.createElement("input");
+        input.type = "text";
+        input.name = `new_pronunciation_${idx}`;
+        input.placeholder = "Add new pronunciation";
+        input.className = "border rounded px-2 py-1 text-sm";
+        
+        // Append input instead of select
+        return input
+      } else if (options.length === 1) {
+        select.disabled = true;
+        select.value = options[0].id;
+
+      } 
+      return select;
+    }
+
+
+    function updatePronunciationFields() {
+      const chars = hanziInput.value.trim().split("");
+      container.innerHTML = "";
+
+      chars.forEach((char, idx) => {
+        const span = document.createElement("span");
+        span.textContent = char;
+
+        const select = createSelect(idx, char);
+        container.appendChild(select);
+      });
+    }
+
+
+    hanziInput.addEventListener("input", updatePronunciationFields);
+
+    // Optional: run once on load if pre-filled
+    if (hanziInput.value.trim()) {
+      updatePronunciationFields();
+    }
+  </script>
+
+  <!-- French -->
+  <div>
+    <label for="id_french" class="block text-gray-700 text-sm font-semibold mb-1">French</label>
+    <input type="text" name="french" id="id_french" class="border rounded px-3 py-2 w-full" value="{{ form.french.value|default_if_none:'' }}">
+    {% if form.french.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.french.errors|striptags }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Tahitian -->
+  <div>
+    <label for="id_tahitian" class="block text-gray-700 text-sm font-semibold mb-1">Tahitian</label>
+    <input type="text" name="tahitian" id="id_tahitian" class="border rounded px-3 py-2 w-full" value="{{ form.tahitian.value|default_if_none:'' }}">
+    {% if form.tahitian.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.tahitian.errors|striptags }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Mandarin -->
+  <div>
+    <label for="id_mandarin" class="block text-gray-700 text-sm font-semibold mb-1">Mandarin</label>
+    <input type="text" name="mandarin" id="id_mandarin" class="border rounded px-3 py-2 w-full" value="{{ form.mandarin.value|default_if_none:'' }}">
+    {% if form.mandarin.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.mandarin.errors|striptags }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Category -->
+  <div>
+    <label for="id_category" class="block text-gray-700 text-sm font-semibold mb-1">Category</label>
+    <select name="category" id="id_category" class="border rounded px-3 py-2 w-full">
+      {% for key, label in form.fields.category.choices %}
+        <option value="{{ key }}" {% if form.category.value == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if form.category.errors %}
+      <p class="text-red-500 text-sm mt-1">{{ form.category.errors|striptags }}</p>
+    {% endif %}
+  </div>
+
+  <div class="flex gap-4">
+    <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-xl hover:bg-indigo-700 transition font-semibold">Submit</button>
+    <button type="button" onclick="history.back()" class="flex-1 bg-gray-300 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-400 transition font-semibold">Cancel</button>
+  </div>
+</form>
+
+</body>
+</html>
