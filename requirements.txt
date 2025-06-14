@@ -1,12 +1,12 @@
+click==8.1.7
+cryptography==45.0.4
 Django==5.1.4
-psycopg2-binary==2.9.10          # PostgreSQL driver
-python-dotenv==1.0.1             # .env support
-python-decouple==3.8             # alternative .env config helper
-django-cors-headers==4.7.0       # if using CORS in Django
-djangorestframework==3.15.2      # if you use DRF API
-supabase==2.11.0                 # Supabase client
-whitenoise==6.8.2                # static files for Django
-sqlparse==0.5.2                  # SQL parsing for Django
-typing_extensions==4.12.2        # typing backports (common dependency)
-tzdata==2024.2                   # timezone info
-requests==2.32.3                 # HTTP requests
+greenlet==3.1.1
+opencc_python_reimplemented==0.1.7
+pandas==2.3.0
+python-decouple==3.8
+python-dotenv==1.1.0
+setuptools==78.0.2
+simplejson==3.20.1
+thread==2.0.5
+watchdog==6.0.0
