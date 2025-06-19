@@ -10,6 +10,70 @@
 
     <div class="container mx-auto p-8">
 
+<div class="mt-10 flex flex-col items-center text-center p-30">
+    <label for="pinyin-input" class="text-xl font-bold mb-3 text-gray-800">
+       Conversion pinyin -> Hanzi
+    </label>
+
+    <input type="text" id="pinyin-input"
+           placeholder="Ex: wuk5 ka1 hao3 tai4"
+           class="w-full max-w-lg px-4 py-2 border border-gray-300 rounded-lg text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+
+    <div id="pinyin-sentence-results"
+         class="mt-6 text-2xl font-semibold text-indigo-700 break-words p-30"></div>
+</div>
+
+
+    <script>
+    function buildHanziSentence({ inputId, itemSelector, containerId, outputId }) {
+        const input = document.getElementById(inputId);
+        const output = document.getElementById(outputId);
+        const allItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
+
+        input.addEventListener('input', () => {
+            const sentence = input.value.trim().toLowerCase();
+            if (!sentence) {
+                output.textContent = '';
+                return;
+            }
+
+            const syllables =  sentence.match(/[a-z]+[0-9]?|[\u4e00-\u9fff]/gi) || [];
+            console.log(syllables)
+            const hanziList = syllables.map(syl => {
+                const matches = allItems.filter(el => {
+                    console.log(el.dataset.search);
+                    return el.dataset.search?.toLowerCase().includes(syl);
+                });
+
+                if (matches.length > 1) {
+                    const uniqueChars = [...new Set(matches.map(el => el.textContent.trim()[0]))];
+                    return '|' + uniqueChars.join(', ') + '|';
+                } else if (matches.length === 1)
+                {   
+                    return (matches[0].textContent.trim()[0])
+                } else 
+                {
+                    return '?';
+                }
+            });
+
+            const result = hanziList.join('');
+            output.textContent = result;
+        });
+    }
+
+    // Activate
+    document.addEventListener("DOMContentLoaded", () =>
+    buildHanziSentence({
+        inputId: 'pinyin-input',
+        itemSelector: 'li',
+        containerId: '#pron-list',
+        outputId: 'pinyin-sentence-results'
+    })
+    )
+
+</script>
+
         <div class="flex justify-between items-center mb-8">
             <h1 class="text-3xl font-bold"> Vocabulaire  (<span id="word-count">{{ words|length }}</span> mots) </h1>
             <input type="text" id="word-search" placeholder="Ex. 屋家 ou maison ou wuk ka ou wuk5ka1 " class="border rounded px-4 py-2 text-lg w-64" />
@@ -38,6 +102,7 @@
         {% for word in words %}
 <div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
     data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}">
+
 
 
             <!-- Word -->
@@ -152,8 +217,9 @@
             inputId: 'search', // your original input ID for chars
             itemSelector: 'li',
             containerId: '#pron-list',
-            countId: 'pron-count'
+            countId: 'pron-count',
         });
+
         </script>
 
 

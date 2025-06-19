@@ -13,7 +13,7 @@ INITIALS = [
     "j", "q", "x",
     "zh", "ch", "sh", "r",
     "z", "c", "s",
-    "y", "w"
+    "y", "w", "ng"
 ]
 
 def split_pinyin(pinyin):
@@ -39,16 +39,82 @@ class Command(BaseCommand):
     help = 'Populate Word and WordPronunciation from a google sheet'
 
     def handle(self, *args, **options):
-        sheet_id = '1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ'
-
         log_path = 'logs.html'  # or an absolute path
-        with open(log_path, 'w', encoding='utf-8') as f:
-            self.stdout = f
-            self.stderr = f 
-            self.parse_sheet(sheet_id, False)
+        # with open(log_path, 'w', encoding='utf-8') as f:
+        #     self.stdout = f
+        #     self.stderr = f 
+        self.populate_db()
 
+    def parse_sheet(self, sheet_name, excel_file):
+        df = pd.read_excel(excel_file, sheet_name=sheet_name, usecols="A:C")
+        csv_name = f"./hakkadbapp/data/{sheet_name}.csv"
+        df.to_csv(csv_name, index=False)
 
-    def parse_sheet(self, sheet_id, use_db=False):
+        self.stdout.write(f"📄 Processing sheet: {sheet_name}")
+
+        added = skipped = new_prons = 0
+
+        skipped = 0
+        added = 0
+
+        with open(csv_name, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader, None)
+
+            for line_num, row in enumerate(reader, start=1):
+                if len(row) < 3 or not row[1].strip() or not row[2].strip():
+                    skipped += 1
+                    continue
+
+                french = row[0].strip()
+                clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
+                pinyin = re.sub(clean_pattern, '', row[1]).strip()
+                hanzi = re.sub(clean_pattern, '', row[2]).strip()
+
+                syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
+                hanzi_chars = [c for c in hanzi]
+
+                if len(syllabes) != len(hanzi_chars):
+                    self.stderr.write(f"❌ Line {line_num}: mismatch between pinyin {pinyin} and hanzi {hanzi}.\n")
+                    skipped += 1
+                    continue
+
+                syllable_data = []
+                for s, h in zip(syllabes, hanzi_chars):
+                    initial, final, tone = split_pinyin(s)
+                    self.initial_set.add(initial)
+                    self.final_set.add(final)
+                    self.tone_set.add(tone)
+                    self.pron_set.add((h, initial, final, tone))
+                    syllable_data.append((h, initial, final, tone))
+
+                self.word_data.append((french, syllable_data))
+                # self.stdout.write(f"{hanzi} {str.join('', syllabes)} {french}")
+                added += 1
+
+        # Final log
+        self.stdout.write(
+            f"✅ Sheet '{sheet_name}': {added} words, {new_prons} new pronunciations, {skipped} skipped."
+        )
+
+    def parse_sheets(self, sheet_id):
+        sheet_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
+
+        # Load into pandas
+        excel_file = pd.ExcelFile(sheet_url)
+
+        self.initial_set = set()
+        self.final_set = set()
+        self.tone_set = set()
+        self.pron_set = set()
+        self.word_data = []
+
+        # Skip the first sheet
+        for sheet_name in excel_file.sheet_names[1:]:
+            self.parse_sheet(sheet_name, excel_file)
+        pass
+
+    def populate_db(self):
         Pronunciation.objects.all().delete()
         Initial.objects.all().delete()
         Final.objects.all().delete()
@@ -56,119 +122,72 @@ class Command(BaseCommand):
         Word.objects.all().delete()
         WordPronunciation.objects.all().delete()
 
-        sheet_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
+        self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ')
 
-        # Load into pandas
-        excel_file = pd.ExcelFile(sheet_url)
+        # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
+        Initial.objects.bulk_create(
+            [Initial(initial=i) for i in self.initial_set if i],
+            ignore_conflicts=True
+        )
+        initial_objs = {
+            i.initial: i for i in Initial.objects.filter(initial__in=self.initial_set)
+        }
 
-        # Skip the first sheet
-        for sheet_name in excel_file.sheet_names[1:]:
-            # Read only first 3 columns (A, B, C)
-            df = pd.read_excel(excel_file, sheet_name=sheet_name, usecols="A:C")
-            
-            # Export to CSV
-            csv_name = f"./hakkadbapp/data/{sheet_name}.csv"
-            df.to_csv(csv_name, index=False)
-            self.stdout.write(f"""
-                        <h1>{sheet_name}</h1>
-                        
-                        """)
+        # 2. Bulk insert and retrieve Finals
+        Final.objects.bulk_create(
+            [Final(final=f) for f in self.final_set if f],
+            ignore_conflicts=True
+        )
+        final_objs = {
+            f.final: f for f in Final.objects.filter(final__in=self.final_set)
+        }
 
-            added = 0
-            skipped = 0
-            new_prons = 0
+        # 3. Bulk insert and retrieve Tones
+        Tone.objects.bulk_create([Tone(tone_number=t) for t in range(1,7)])
+        tone_objs = { t.tone_number: t for t in Tone.objects.all()}
 
-            with open(csv_name, newline='', encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter=',')
-                # WordPronunciation.objects.all().delete()
-                # Word.objects.all().delete()
+        # Prepare Pronunciations
+        pron_map = {}
+        pron_objs = []
+        for h, i_str, f_str, t_num in self.pron_set:
+            i = initial_objs.get(i_str)
+            f = final_objs.get(f_str)
+            t = tone_objs.get(int(t_num or 0))
+            # Ensure all are saved (i.e. have .id)
+            if not all([i, f, t]):
+                continue  # or raise an error
 
-                next(reader, None)
+            key = (h, i.id, f.id, t.id)
 
-                for line_num, row in enumerate(reader, start=1):
-                    if len(row) < 3 or row[1].strip() == '' or row[2].strip() == '':
-                        # self.stdout.write(self.style.WARNING(f"Line {line_num}: Skipped (not enough fields)"))
-                        # skipped += 1
-                        continue
+            p = Pronunciation(hanzi=h, initial=i or '', final=f or '', tone=t or '')
+            pron_objs.append(p)
+            pron_map[key] = p
 
-                    # mandarin = row[0].strip()
-                    french = row[0].strip()
+        # Bulk create Pronunciations
+        created_prons = Pronunciation.objects.bulk_create(pron_objs)
 
-                    # Regex pattern to remove all punctuation and whitespace
-                    clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
+        # Prepare Words and WordPronunciations
+        word_objs = []
+        word_pron_objs = []
 
-                    py = re.sub(clean_pattern, '', row[1]).strip()
-                    chars = re.sub(clean_pattern, '', row[2]).strip()
+        for french, syllables in self.word_data:
+            word = Word(french=french, category="?")
+            word_objs.append(word)
 
-                    # if not mandarin or not french:
-                    #     self.stdout.write(self.style.WARNING(f"Line {line_num}: Skipped (missing mandarin or french)"))
-                    #     skipped += 1
-                    #     continue
+        # Create words to get IDs
+        Word.objects.bulk_create(word_objs)
 
-                    syllabes = [char.strip() for char in re.split(r'(?<=[0-6])', py) if char.strip() not in (')', '', ' ', ' ', '?')]
-                    hanzi_chars = [c.strip() for c in chars]
+        # Now associate pronunciations
+        for word, (_, syllables) in zip(word_objs, self.word_data):
+            for pos, (h, i_str, f_str, t_num) in enumerate(syllables):
+                i = initial_objs.get(i_str)
+                f = final_objs.get(f_str)
+                t = tone_objs.get(int(t_num or 0))
+                if not all([i, f, t]):
+                    continue  # or raise an error
+                key = (h, i.id, f.id, t.id)
+                p = pron_map[key]
+                word_pron_objs.append(WordPronunciation(word=word, pronunciation=p, position=pos))
 
-
-                    if len(syllabes) != len(hanzi_chars):
-                        self.stdout.write(f"""
-<div class="log error">
-  ❌ <strong>Line {line_num+1}</strong> <code>{sheet_name}</code>: 
-  <span class="status">Skipped</span> 
-  <em>(failed to match pinyin to hanzi)</em><br>
-  <span class="details">
-    <strong>Pinyin:</strong> {', '.join(syllabes)}<br>
-    <strong>Hanzi:</strong> {hanzi_chars}
-  </span>
-</div>
-""")
-                        skipped += 1
-                        continue
-
-                    # zip ,hanzi and syllaabes
-                    pronunciations = []
-                    # missing = False
-
-                    for (s,h) in zip(syllabes, hanzi_chars):
-                        initial, final, tone = split_pinyin(s)
-                        if (initial or final or tone):
-                            i, _ = Initial.objects.get_or_create(initial=initial)
-                            f, _ = Final.objects.get_or_create(final=final)
-                            t, _ = Tone.objects.get_or_create(tone_number=tone)
-                            if h:
-                                p, exists = Pronunciation.objects.get_or_create(hanzi=h, initial=i, final=f, tone=t)
-                                if not exists:
-                                    new_prons += 1
-                            pronunciations.append(p)
-                        pass
-
-                    word = Word.objects.create(
-                        french=french,
-                        category="?"
-                    )
-                    nw = ""
-                    wp = ""
-                    for pos, p in enumerate(pronunciations):
-                        nw += p.hanzi
-                        wp += p.initial.initial + p.final.final + str(p.tone.tone_number)
-                        WordPronunciation.objects.create(
-                            word=word,
-                            pronunciation=p,
-                        position=pos
-                        )
-#                     self.stdout.write(f"""
-# <div class="log ok">
-#   ✅ <strong>OK</strong> – <code>{nw}</code> – {french} – <span class="pinyin">{wp}</span>
-# </div>
-# """)
-                    added += 1  
-
-            self.stdout.write(f"""
-<div class="log summary">
-  ✅ <strong>Done</strong>: 
-  <span class="prons">{new_prons} pronunciations added</span>, 
-  <span class="words">{added} words added</span>, 
-  <span class="skipped">{skipped} skipped</span>.
-</div>
-""")
-
+        WordPronunciation.objects.bulk_create(word_pron_objs)
 
