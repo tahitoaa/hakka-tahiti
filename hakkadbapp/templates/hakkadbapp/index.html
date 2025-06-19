@@ -22,7 +22,7 @@
     <div id="pinyin-sentence-results"
          class="mt-6 text-2xl font-semibold text-indigo-700 break-words p-30"></div>
 </div>
-
+<hr>
 
     <script>
     function buildHanziSentence({ inputId, itemSelector, containerId, outputId }) {
@@ -39,26 +39,46 @@
 
             const syllables =  sentence.match(/[a-z]+[0-9]?|[\u4e00-\u9fff]/gi) || [];
             console.log(syllables)
-            const hanziList = syllables.map(syl => {
-                const matches = allItems.filter(el => {
-                    console.log(el.dataset.search);
-                    return el.dataset.search?.toLowerCase().includes(syl);
-                });
+            const hanziList = [];
+            const pinyinList = [];
 
-                if (matches.length > 1) {
-                    const uniqueChars = [...new Set(matches.map(el => el.textContent.trim()[0]))];
-                    return '|' + uniqueChars.join(', ') + '|';
-                } else if (matches.length === 1)
-                {   
-                    return (matches[0].textContent.trim()[0])
-                } else 
-                {
-                    return '?';
+            syllables.forEach(syl => {
+                    const matches = allItems.filter(el => {
+                    const parts = el.dataset.search?.toLowerCase().split(' ') || [];
+                    const hanzi = parts[0] || '';
+                    const pinyin = parts[1] || '';
+                    return pinyin.startsWith(syl) || hanzi === syl;
+                    });
+                const uniqueChars = [...new Set(matches.map(el => el.textContent.trim()[0]))];
+                if (uniqueChars.length > 1) {
+
+                    hanziList.push('|' + uniqueChars.join(', ') + '|');
+
+                    // Push all unique pinyin from matches (after space)
+                    const pinyins = [...new Set(matches.map(el =>
+                        el.textContent.trim().split(/\s+/)[1] || '?'
+                    ))];
+                    pinyinList.push('|' + pinyins.join(', ') + '|');
+
+                } else if (uniqueChars.length === 1) {
+                    const [char, pinyin] = matches[0].textContent.trim().split(/\s+/);
+                    hanziList.push(char || '?');
+                    pinyinList.push(pinyin || '?');
+
+                } else {
+                    hanziList.push(syl + '?');
                 }
             });
 
-            const result = hanziList.join('');
-            output.textContent = result;
+            output.innerHTML = `
+            <div class="text-2xl font-semibold mb-1">
+                ${hanziList.join('')}
+            </div>
+            <div class="text-lg text-gray-600">
+                ${pinyinList.join('')}
+            </div>
+            `;
+
         });
     }
 
