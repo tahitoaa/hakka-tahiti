@@ -6,6 +6,7 @@ from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, T
 import pandas as pd
 import string
 
+
 INITIALS = [
     "b", "p", "m", "f",
     "d", "t", "n", "l",
@@ -37,6 +38,25 @@ def split_pinyin(pinyin):
 
 class Command(BaseCommand):
     help = 'Populate Word and WordPronunciation from a google sheet'
+    def __init__(self):
+        super().__init__()
+        self.stdout.reconfigure(encoding='utf-8') 
+        self.stderr.reconfigure(encoding='utf-8') 
+        self.stream = ''
+
+    def stream(self,  str):
+        self.stream += str + '\n'
+        pass
+
+    def err_stream(self, str):
+        self.stderr.write(str)
+        self.stream(str)
+        pass
+
+    def log_stream(self, str):
+        self.stdout.write(str)
+        self.stream(str)
+        pass
 
     def handle(self, *args, **options):
         log_path = 'logs.html'  # or an absolute path
@@ -46,56 +66,62 @@ class Command(BaseCommand):
         self.populate_db()
 
     def parse_sheet(self, sheet_name, excel_file):
+        # Read Excel file directly into memory
         df = pd.read_excel(excel_file, sheet_name=sheet_name, usecols="A:C")
-        csv_name = f"./hakkadbapp/data/{sheet_name}.csv"
-        df.to_csv(csv_name, index=False)
 
-        self.stdout.write(f"📄 Processing sheet: {sheet_name}")
+        self.log_stream(f"📄 Processing sheet: {sheet_name}")
 
         added = skipped = new_prons = 0
 
-        skipped = 0
-        added = 0
+        for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
+            self.log_stream(row)
+            french_raw, pinyin_raw, hanzi_raw = row
 
-        with open(csv_name, newline='', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            next(reader, None)
+            if not pinyin_raw or not hanzi_raw:
+                skipped += 1
+                continue
 
-            for line_num, row in enumerate(reader, start=1):
-                if len(row) < 3 or not row[1].strip() or not row[2].strip():
-                    skipped += 1
-                    continue
+            # Clean inputs
+            clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
+            french = str(french_raw).strip()
+            pinyin = re.sub(clean_pattern, '', str(pinyin_raw)).strip()
+            hanzi = re.sub(clean_pattern, '', str(hanzi_raw)).strip()
 
-                french = row[0].strip()
-                clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
-                pinyin = re.sub(clean_pattern, '', row[1]).strip()
-                hanzi = re.sub(clean_pattern, '', row[2]).strip()
+            # Split into syllables and hanzi chars
+            syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
+            hanzi_chars = list(hanzi)
 
-                syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
-                hanzi_chars = [c for c in hanzi]
+            if len(syllabes) != len(hanzi_chars):
+                self.err_stream(
+                    f"❌ Line {line_num}: mismatch between pinyin '{pinyin}' ({len(syllabes)} syll) "
+                    f"and hanzi '{hanzi}' ({len(hanzi_chars)} chars).\n"
+                )
+                skipped += 1
+                continue
 
-                if len(syllabes) != len(hanzi_chars):
-                    self.stderr.write(f"❌ Line {line_num}: mismatch between pinyin {pinyin} and hanzi {hanzi}.\n")
-                    skipped += 1
-                    continue
+            # Process each syllable-character pair
+            syllable_data = []
+            for s, h in zip(syllabes, hanzi_chars):
+                initial, final, tone = split_pinyin(s)
+                self.initial_set.add(initial)
+                self.final_set.add(final)
+                self.tone_set.add(tone)
 
-                syllable_data = []
-                for s, h in zip(syllabes, hanzi_chars):
-                    initial, final, tone = split_pinyin(s)
-                    self.initial_set.add(initial)
-                    self.final_set.add(final)
-                    self.tone_set.add(tone)
-                    self.pron_set.add((h, initial, final, tone))
-                    syllable_data.append((h, initial, final, tone))
+                data = (h, initial, final, tone)
+                if data not in self.pron_set:
+                    new_prons += 1
+                self.pron_set.add(data)
+                syllable_data.append(data)
 
-                self.word_data.append((french, syllable_data))
-                # self.stdout.write(f"{hanzi} {str.join('', syllabes)} {french}")
-                added += 1
+            self.word_data.append((french, syllable_data))
+            self.log_stream(f"{hanzi} {syllabes} {french}")
+            added += 1
 
         # Final log
-        self.stdout.write(
+        self.log_stream(
             f"✅ Sheet '{sheet_name}': {added} words, {new_prons} new pronunciations, {skipped} skipped."
         )
+
 
     def parse_sheets(self, sheet_id):
         sheet_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
@@ -126,7 +152,7 @@ class Command(BaseCommand):
 
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
-            [Initial(initial=i) for i in self.initial_set if i],
+            [Initial(initial=i) for i in self.initial_set],
             ignore_conflicts=True
         )
         initial_objs = {

@@ -85,7 +85,7 @@ DATABASES = {
         'USER': config('SUPABASE_DB_USER'),
         'PASSWORD': config('SUPABASE_DB_PASSWORD'),
         'PORT': config('SUPABASE_DB_PORT', '5432'),
-    }
+    },
 }
 
 

@@ -1,3 +1,4 @@
+from io import StringIO
 import json
 from django.db.models import Prefetch
 from django.http import HttpResponse
@@ -6,6 +7,8 @@ from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
 from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
 import csv
+
+from .management.commands import import_lexique
 
 def static(request):
     context = {
@@ -21,6 +24,7 @@ def static(request):
 
 
 def index(request):
+    print("coucou")
     # Optimize WordPronunciation → Pronunciation → (Initial, Final, Tone)
     word_pron_qs = WordPronunciation.objects.select_related(
         'pronunciation__initial',
@@ -198,3 +202,61 @@ def pronunciation_csv(request):
 
     return response
 
+def reports(request):
+    """ Generates several reports about the lexicon.
+    - Stats : number of words, number of caracters, number of vocab lists etc.
+    - Caracters check : 
+        * list of homophones (same py for many cars)
+        * sort cars by initial
+        * sort cars by final
+        * sort cars by tone ?
+    - List all parsing errors (py mismatch etc.)
+    Args:
+        request (_type_): _description_
+    """
+    context = {}
+    context["stats"] = []
+    context["stats"].append({
+        'title' : 'Mots',
+        'value' :  Word.objects.count(),
+        'description' : "Nombre de mots qui ont été correctement analysés à partir du lexique."
+    })
+    context["stats"].append({
+        'title' : 'Caractères',
+        'value' : Pronunciation.objects.count(),
+        'description' : "Nombre de lectures différentes de caractères."
+    })
+
+    context['title'] = "Rapports"
+    # cmd = import_lexique.Command()
+    # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
+    # context['logs'] = cmd.stream
+    return render(request, "hakkadbapp/reports.html", context)
+
+
+def search(request):
+    context = {"page": "search"}
+    context['title'] = "Recherche"
+    return render(request, "hakkadbapp/search.html", context)
+
+def browse(request):
+    context = {"page": "browse"}
+    return render(request, "hakkadbapp/browse.html", context)
+
+def pinyin_converter(request):
+    context = {"title": "Méthode de saisie",
+        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'tones': Tone.objects.all(),
+        'initials': Initial.objects.all(),
+        'finals': Final.objects.all(),}
+    return render(request, "hakkadbapp/converter.html", context)
+
+def caracters(request):
+    context = {"page": "caracters"}
+    all_prons = Pronunciation.objects.select_related('initial', 'final', 'tone').order_by('initial', 'final', 'tone')
+    context["all_prons"] = all_prons
+    return render(request, "hakkadbapp/caracters.html", context)
+
+def flashcards(request):
+    context = {"page": "flashcards"}
+    return render(request, "hakkadbapp/flashcards.html", context)

@@ -1,0 +1,86 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="bg-black text-white">
+<head>
+    <meta charset="UTF-8">
+    <title> {{ title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+    <!-- Optional custom styles -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body class="bg-gray-100 text-black min-h-screen flex flex-col font-sans">
+
+<!-- Header -->
+<header class="bg-red-600 text-white p-4 shadow-md">
+  <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+    <!-- Site Title -->
+    <h1 class="text-2xl font-bold tracking-wide">
+       Lexique Hakka - 
+    {{ title }}
+    </h1>
+
+
+
+
+    <!-- Navigation Menu -->
+    <nav>
+      <ul class="flex space-x-4 text-sm sm:text-base font-medium">
+        <li>
+          <a href="{% url 'pinyin_converter' %}"
+             class="{% if page == 'converter' %}underline text-black{% else %}hover:text-black{% endif %}">
+             Méthode de saisie
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'search' %}"
+             class="{% if page == 'search' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Recherche
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'browse' %}"
+             class="{% if page == 'browse' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Parcourir le lexique
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'caracters' %}"
+             class="{% if page == 'caracters' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Caratères
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'flashcards' %}"
+             class="{% if page == 'flashcards' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Flashcards
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'reports' %}"
+             class="{% if page == 'reports' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Analyse du lexique 
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-6">
+        {% block content %}
+        <!-- Child templates insert content here -->
+        {% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white text-black text-sm text-center p-4 shadow-inner">
+        &copy; {{ now|date:"Y" }} Lexique Hakka par l'association Wenfa.
+    </footer>
+
+</body>
+</html>

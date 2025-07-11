@@ -1,0 +1,25 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %} 
+
+{% for s in stats %}
+    <div class="bg-white text-black rounded-lg shadow-md p-4 w-full sm:w-1/3">
+        <h3 class="text-lg font-semibold text-red-600">{{ s.title }}</h3>
+        <p class="text-3xl font-bold mt-2">{{ s.value }}</p>
+        {% if s.description %}
+            <p class="text-sm text-gray-600 mt-1">{{ s.description }}</p>
+        {% endif %}
+    </div>
+{% endfor %}
+
+
+
+
+{{ stdout }}
+
+{{ stderr }}
+
+
+
+
+{% endblock %}

@@ -6,13 +6,13 @@ s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
 
 class Initial(models.Model):
-    initial = models.CharField(max_length=10)  # Adjust this as per your requirements
+    initial = models.CharField(max_length=10, null=True)  # Adjust this as per your requirements
 
     def __str__(self):
         return self.initial
 
 class Final(models.Model):
-    final = models.CharField(max_length=10)  # Adjust this as per your requirements
+    final = models.CharField(max_length=10, null=True)  # Adjust this as per your requirements
 
     def __str__(self):
         return self.final
@@ -37,8 +37,16 @@ class Pronunciation(models.Model):
     def __str__(self):
         trad = s2t.convert(self.hanzi)     # Simplified to Traditional
         simp = t2s.convert(self.hanzi)     # Traditional to Simplified
+        if (simp != trad):
+            return f'{simp} ({trad})  {self.pinyin()}'
+        else:
+            return f'{simp}           {self.pinyin()}'
         
-        return f'{simp} ({trad})  {self.pinyin()}'
+    def simp(self):
+        return t2s.convert(self.hanzi) 
+    
+    def trad(self):
+        return s2t.convert(self.hanzi)
     
     def pinyin(self):
         return ''.join([str(self.initial or ''), str(self.final or ''), str(self.tone or '')])

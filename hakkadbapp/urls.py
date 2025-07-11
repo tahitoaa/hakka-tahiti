@@ -28,5 +28,12 @@ urlpatterns = [
     path('words/<int:pk>/edit/', views.edit_word, name='edit_word'),
     path('pronunciations/export', views.pronunciation_csv, name='pronunciation_csv'),
     path('words/export', views.word_csv, name='word_csv'),
-    path('static', views.static, name='static')
+    path('static', views.static, name='static'),
+    # 
+    path('reports', views.reports, name='reports'),
+    path("search", views.search, name="search"),
+    path("browse", views.browse, name="browse"),
+    path("converter", views.pinyin_converter, name="pinyin_converter"),
+    path("caracters", views.caracters, name="caracters"),
+    path("flashcards", views.flashcards, name="flashcards"),
     ]
