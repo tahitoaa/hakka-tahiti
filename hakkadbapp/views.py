@@ -238,9 +238,9 @@ def reports(request):
     })
 
     context['title'] = "Rapports"
-    # cmd = import_lexique.Command()
-    # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
-    # context['logs'] = cmd.stream
+    cmd = import_lexique.Command()
+    cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
+    context['logs'] = cmd.traces
     return render(request, "hakkadbapp/reports.html", context)
 
 

@@ -12,65 +12,63 @@
 <body class="bg-gray-100 text-black min-h-screen flex flex-col font-sans">
 
 <!-- Header -->
-<header class="bg-red-600 text-white p-4 shadow-md">
-  <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-    <!-- Site Title -->
+<header class="bg-red-600 text-white shadow-md">
+  <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+    <!-- Logo & Title -->
+    <div class="flex items-center space-x-4">
+      <span class="text-3xl font-extrabold text-rose-600 tracking-tight">文化</span>
+      <h1 class="text-lg sm:text-2xl font-bold tracking-wide">
+        Lexique Hakka - {{ title }}
+      </h1>
+    </div>
 
-        <!-- Wenhua Logo as Text -->
-    <span class="text-3xl font-extrabold text-rose-600 tracking-tight">
-      文化
-    </span>
-
-    <h1 class="text-2xl font-bold tracking-wide">
-      Lexique Hakka - 
-    {{ title }}
-    </h1>
-
-
-
-
-    <!-- Navigation Menu -->
-    <nav>
-      <ul class="flex space-x-4 text-sm sm:text-base font-medium">
-        <li>
-          <a href="{% url 'pinyin_converter' %}"
-             class="{% if page == 'converter' %}underline text-black{% else %}hover:text-black{% endif %}">
-             Écrire en Hakka
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'search' %}"
-             class="{% if page == 'search' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Recherche
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'caracters' %}"
-             class="{% if page == 'caracters' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Caractères
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'flashcards' %}"
-             class="{% if page == 'flashcards' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Flashcards
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'reports' %}"
-             class="{% if page == 'reports' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Analyse du lexique 
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'phonemes' %}"
-             class="{% if page == 'phonemes' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Phonèmes
-          </a>
-      </ul>
-    </nav>
+    <!-- Mobile menu button -->
+    <button id="menu-toggle" class="sm:hidden focus:outline-none text-white">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+    </button>
   </div>
+
+  <!-- Navigation Menu -->
+  <nav id="menu" class="hidden sm:block px-4 pb-4 sm:pb-0">
+    <ul class="flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0 text-sm sm:text-base font-medium">
+      <li>
+        <a href="{% url 'pinyin_converter' %}" class="{% if page == 'converter' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Écrire en Hakka
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'search' %}" class="{% if page == 'search' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Recherche
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'caracters' %}" class="{% if page == 'caracters' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Caractères
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'flashcards' %}" class="{% if page == 'flashcards' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Flashcards
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'reports' %}" class="{% if page == 'reports' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Analyse du lexique
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'phonemes' %}" class="{% if page == 'phonemes' %}underline text-black{% else %}hover:text-black{% endif %}">
+          Phonèmes
+        </a>
+      </li>
+    </ul>
+  </nav>
 </header>
+
 
     <!-- Main Content -->
     <main class="flex-grow container mx-auto px-4 py-6">
@@ -83,6 +81,15 @@
     <footer class="bg-white text-black text-sm text-center p-4 shadow-inner">
         &copy; {{ now|date:"Y" }} Lexique Hakka par l'association Wenfa.
     </footer>
+
+    <script>
+  const toggle = document.getElementById("menu-toggle");
+  const menu = document.getElementById("menu");
+
+  toggle.addEventListener("click", () => {
+    menu.classList.toggle("hidden");
+  });
+</script>
 
 </body>
 </html>

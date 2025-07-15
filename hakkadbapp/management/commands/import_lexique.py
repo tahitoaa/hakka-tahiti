@@ -42,20 +42,20 @@ class Command(BaseCommand):
         super().__init__()
         self.stdout.reconfigure(encoding='utf-8') 
         self.stderr.reconfigure(encoding='utf-8') 
-        self.stream = ''
+        self.traces = ''
 
-    def stream(self,  str):
-        self.stream += str + '\n'
+    def stream(self,  s):
+        self.traces += s + '\n'
         pass
 
-    def err_stream(self, str):
-        self.stderr.write(str)
-        self.stream(str)
+    def err_stream(self, s):
+        self.stderr.write(s)
+        self.stream(s)
         pass
 
-    def log_stream(self, str):
-        self.stdout.write(str)
-        self.stream(str)
+    def log_stream(self, s):
+        self.stdout.write(s)
+        self.stream(s)
         pass
 
     def handle(self, *args, **options):
@@ -74,7 +74,6 @@ class Command(BaseCommand):
         added = skipped = new_prons = 0
 
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
-            self.log_stream(row)
             french_raw, pinyin_raw, hanzi_raw = row
 
             if not pinyin_raw or not hanzi_raw:
