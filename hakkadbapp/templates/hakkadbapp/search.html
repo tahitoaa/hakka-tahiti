@@ -1,3 +1,141 @@
 {% extends "hakkadbapp/base.html" %}
 
-{% block content %} {% endblock %}
+{% block content %} 
+<div class="max-w-4xl mx-auto px-4 py-6 space-y-12">
+
+  <!-- 🟩 Vocabulaire Section -->
+  <section>
+    <!-- Title and Search -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
+        Vocabulaire
+        <span class="text-gray-500 text-base font-normal">(<span id="word-count">{{ words|length }}</span> mots)</span>
+      </h1>
+      <input
+        type="text"
+        id="word-search"
+        placeholder="Ex. 屋家 ou maison ou wuk ka ou wuk5ka1"
+        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500"
+      />
+    </div>
+
+    <!-- Table header -->
+    <div class="hidden sm:grid grid-cols-5 gap-4 px-3 py-2 text-gray-500 text-sm font-medium border-b border-gray-300">
+      <div>Word</div><div>Pinyin</div><div>Category</div><div>French</div><div>Tahitian</div>
+    </div>
+
+    <!-- Word rows -->
+    <div id="word-list" class="divide-y divide-gray-100 text-sm max-h-80 overflow-y-auto">
+      {% for word in words %}
+        <div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
+          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}">
+          <!-- Word -->
+          <div class="font-semibold text-gray-700 text-lg">
+            {{ word }}</div>
+
+          <!-- Pinyin -->
+          <div class="flex flex-wrap gap-1">
+            {% for wp in word.wordpronunciation_set.all %}
+              {{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}
+            {% endfor %}
+          </div>
+
+          <!-- Category -->
+          <div>
+            {% if word.get_category_display %}
+              <span class="font-sm">{{ word.get_category_display }}</span>
+            {% endif %}
+          </div>
+
+          <!-- French -->
+          <div>{{ word.french|default:"" }}</div>
+
+          <!-- Tahitian -->
+          <div>{{ word.tahitian|default:"" }}</div>
+        </div>
+      {% empty %}
+        <p class="text-gray-500 italic px-3 py-2">No words found.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- 🟦 Caractères Section -->
+  <section>
+    <!-- Title and Search -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
+        Caractères
+        <span class="text-gray-500 text-base font-normal">(<span id="pron-count">{{ pronunciations|length }}</span> caractères)</span>
+      </h1>
+      <input
+        type="text"
+        id="char-search"
+        placeholder="Ex. 家 ou ka ou ka1 ou siong"
+        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500"
+      />
+    </div>
+
+    <!-- Pronunciation list -->
+    <ul id="pron-list" class="flex flex-wrap gap-3">
+      {% for p in pronunciations %}
+        <li
+          class="w-28 cursor-pointer"
+          onclick="window.location.href='/hanzi/{{ p.hanzi }}'"
+          data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}"
+        >
+          <div class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 text-center rounded-lg px-3 py-2">
+            <div class="font-semibold text-lg">{{ p.hanzi }}</div>
+            <div class="text-sm">
+              {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}
+            </div>
+          </div>
+        </li>
+      {% empty %}
+        <li class="text-gray-500 italic">No pronunciations found.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+</div>
+
+<!-- 🔍 JS Search Script -->
+<script>
+function setupSearch({ inputId, itemSelector, containerId, countId }) {
+  const searchInput = document.getElementById(inputId);
+  const items = document.querySelectorAll(`${containerId} > ${itemSelector}`);
+  const countDisplay = document.getElementById(countId);
+
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    items.forEach(item => {
+      const haystack = item.dataset.search?.toLowerCase() || '';
+      const match = query.split(/\s+/).every(q => haystack.includes(q));
+      item.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+
+    if (countDisplay) {
+      countDisplay.textContent = visibleCount;
+    }
+  });
+}
+
+// Initialize search
+setupSearch({
+  inputId: 'word-search',
+  itemSelector: 'div',
+  containerId: '#word-list',
+  countId: 'word-count'
+});
+
+setupSearch({
+  inputId: 'char-search',
+  itemSelector: 'li',
+  containerId: '#pron-list',
+  countId: 'pron-count',
+});
+</script>
+
+{% endblock %}

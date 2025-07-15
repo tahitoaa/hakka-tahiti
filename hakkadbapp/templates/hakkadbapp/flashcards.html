@@ -1,0 +1,101 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+<div class="w-full max-w-md mx-auto mt-10">
+  <!-- Flashcard container -->
+  <div class="relative group perspective">
+    <div id="flashcard" class="transition-transform duration-500 transform-style-preserve-3d relative w-full h-64">
+      
+      <!-- Front Side -->
+      <div class="absolute w-full h-full backface-hidden bg-white border border-gray-300 rounded-lg flex flex-col justify-center items-center shadow-md">
+        <div class="text-5xl font-bold text-gray-800 mb-4">{{ word }}</div>
+        <div class="text-xl text-gray-600">
+          {% for wp in word.wordpronunciation_set.all %}
+            {{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}
+          {% endfor %}
+        </div>
+        <img id="flashcard-img" class="w-full h-48 object-cover rounded mt-4" src="" alt="illustration" />
+        <button onclick="flipCard()" class="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retourner</button>
+      </div>
+
+      <!-- Back Side -->
+      <div class="absolute w-full h-full backface-hidden bg-gray-100 border border-gray-300 rounded-lg transform rotate-y-180 flex flex-col justify-center items-center shadow-md p-4 text-center">
+        <div class="mb-2">
+          <span class="font-semibold text-gray-700">Français :</span>
+          <span class="text-gray-800">{{ word.french }}</span>
+        </div>
+        <div class="mb-2">
+          <span class="font-semibold text-gray-700">Tahitien :</span>
+          <span class="text-gray-800">{{ word.tahitian }}</span>
+        </div>
+        <div class="mb-2">
+          <span class="font-semibold text-gray-700">Mandarin :</span>
+          <span class="text-gray-800">{{ word.mandarin }}</span>
+        </div>
+              <button onclick="flipCard()" class="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retourner</button>
+        <button onclick="nextCard()" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Suivant</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .perspective {
+    perspective: 1000px;
+  }
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // Set the image source dynamically
+    const img = document.getElementById('flashcard-img');
+    fetch("https://libretranslate.de/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        q: "maison",
+        source: "fr",
+        target: "en",
+        format: "text"
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log(data.translatedText); // "house"
+      fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(data.translatedText)}&client_id=YOUR_ACCESS_KEY`)
+        .then(res => res.json())
+        .then(data => {
+          const imgUrl = data.results[0]?.urls.small;
+          if (imgUrl) {
+            document.getElementById("flashcard-img").src = imgUrl;
+          }
+        });
+    });
+
+
+
+  });
+  let flipped = false;
+
+  function flipCard() {
+    flipped = !flipped;
+    const card = document.getElementById('flashcard');
+    card.style.transform = flipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+  }
+
+  function nextCard() {
+    location.reload(); // Reloads the page to get a new random word
+  }
+</script>
+
+
+{% endblock %}

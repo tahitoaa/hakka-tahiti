@@ -8,9 +8,6 @@
 
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
-    <!-- Optional custom styles -->
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body class="bg-gray-100 text-black min-h-screen flex flex-col font-sans">
 
@@ -38,19 +35,13 @@
         <li>
           <a href="{% url 'pinyin_converter' %}"
              class="{% if page == 'converter' %}underline text-black{% else %}hover:text-black{% endif %}">
-             Méthode de saisie
+             Écrire en Hakka
           </a>
         </li>
         <li>
           <a href="{% url 'search' %}"
              class="{% if page == 'search' %}underline text-black{% else %}hover:text-black{% endif %}">
             Recherche
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'browse' %}"
-             class="{% if page == 'browse' %}underline text-black{% else %}hover:text-black{% endif %}">
-            Parcourir le lexique
           </a>
         </li>
         <li>

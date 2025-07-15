@@ -3,9 +3,12 @@
 {% block content %} 
 <div class="mt-10 flex flex-col items-center text-center p-30">
     <label for="pinyin-input" class="text-xl font-bold mb-3 text-gray-800">
-       Méthode de saisie en Hakka
+       Saisie en Hakka 
     </label>
-
+    
+    <small class="text-gray-600">
+    Tapez le pinyin (ex. <code>wuk5ka1</code>), utilisez <kbd>TAB</kbd> pour choisir un caractère.
+    </small>
     <textarea type="text" id="pinyin-input"
            placeholder="Ex: wuk5 ka1 hao3 tai4"
            class="w-full max-w-lg px-4 py-2 border border-gray-300 rounded-lg text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -16,6 +19,37 @@
 </div>
 
     <script>
+        function selectHanzi(event) {
+            const input = document.getElementById('pinyin-input');
+            if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
+
+            const selectedHanzi = event.target.value;
+            const inputText = input.value.trim();
+            if (!inputText) return;
+
+            // Match syllables or hanzi in input
+            const syllables = inputText.match(/[a-z]+[0-9]?/gi) || [];
+
+            // Try to find the first match based on hanzi OR pinyin that aligns with clicked button
+            const clickedValue = selectedHanzi.replace(/\|/g, '').split(',')[0].trim(); // e.g., '我' from '|我, 他|'
+
+            for (let i = 0; i < syllables.length; i++) {
+                const syl = syllables[i];
+                // Replace the first pinyin match or hanzi match
+                if (/^[a-z]/i.test(syl)) {
+                    // Replace pinyin syllable
+                    input.value = inputText.replace(syl, clickedValue);
+                    break;
+                } else if (/[\u4e00-\u9fff]/.test(syl) && syl === clickedValue) {
+                    // Optional: skip if hanzi already present
+                    break;
+                }
+            }
+
+            input.dispatchEvent(new Event('input')); // trigger UI refresh
+            input.focus(); // keep focus on input
+        }
+        
     function buildHanziSentence({ inputId, itemSelector, containerId, outputId }) {
         const input = document.getElementById(inputId);
         const output = document.getElementById(outputId);
@@ -28,7 +62,7 @@
                 return;
             }
 
-            const syllables =  sentence.match(/[a-z]+[0-9]?|[\u4e00-\u9fff]/gi) || [];
+            const syllables =  sentence.match(/[a-z]+[0-9]?/gi) || [];
             console.log(syllables)
             const hanziList = [];
             const pinyinList = [];
@@ -43,9 +77,7 @@
                 const uniqueChars = [...new Set(matches.map(el => el.textContent.trim()[0]))];
                 if (uniqueChars.length > 1) {
 
-                    hanziList.push('(');
                     hanziList.push(...uniqueChars);
-                    hanziList.push(')');
                     
 
                     // Push all unique pinyin from matches (after space)
@@ -64,52 +96,79 @@
                 }
             });
 
-            output.innerHTML = `
-                ${hanziList.map((h, i) => {return `<button class="text-2xl font-semibold mb-1 space-x-1" value="${h}">${h}</button>`;}).join('')}
-            <div class="text-lg text-gray-600">
-                ${pinyinList.join('')}
-            </div>
-            `;
+output.innerHTML = `
+  <div class="flex gap-2 flex-wrap mb-2">
+    ${hanziList.map((h, i) => {
+      const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
+      return `
+        <div class="flex flex-col items-center border">
+          <span class="text-xs text-gray-500">${keyHint}</span>
+          <button id="suggested-${keyHint}" class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" value="${h}">
+            ${h}
+          </button>
+        </div>`;
+    }).join('')}
+  </div>
+  <div class="text-lg text-gray-600">
+    ${pinyinList.join('')}
+  </div>
+`;
+
         });
 
-output.addEventListener('click', function (event) {
-    if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
 
-    const selectedHanzi = event.target.value;
-    const inputText = input.value.trim();
-    if (!inputText) return;
+        // After rendering buttons, enable keyboard navigation
+        let currentBtnIndex = -1;
+        const buttons = output.querySelectorAll('button');
 
-    // Match syllables or hanzi in input
-    const syllables = inputText.match(/[a-z]+[0-9]?|[\u4e00-\u9fff]/gi) || [];
-
-    // Try to find the first match based on hanzi OR pinyin that aligns with clicked button
-    const clickedValue = selectedHanzi.replace(/\|/g, '').split(',')[0].trim(); // e.g., '我' from '|我, 他|'
-
-    for (let i = 0; i < syllables.length; i++) {
-        const syl = syllables[i];
-        // Replace the first pinyin match or hanzi match
-        if (/^[a-z]/i.test(syl)) {
-            // Replace pinyin syllable
-            input.value = inputText.replace(syl, clickedValue);
-            break;
-        } else if (/[\u4e00-\u9fff]/.test(syl) && syl === clickedValue) {
-            // Optional: skip if hanzi already present
-            break;
+        function highlightButton(index) {
+            buttons.forEach((btn, i) => {
+                if (i === index) {
+                    btn.classList.add('ring-2', 'ring-blue-400');
+                    btn.focus();
+                } else {
+                    btn.classList.remove('ring-2', 'ring-blue-400');
+                }
+            });
         }
-    }
 
-    input.dispatchEvent(new Event('input')); // trigger UI refresh
-});
+        // Listen for key navigation
+        document.addEventListener('keydown', (e) => {
+            if (!buttons.length) return;
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                currentBtnIndex = (currentBtnIndex + 1) % buttons.length;
+                highlightButton(currentBtnIndex);
+            }
+
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                currentBtnIndex = (currentBtnIndex - 1 + buttons.length) % buttons.length;
+                highlightButton(currentBtnIndex);
+            }
+
+            if (e.key === 'Enter' && currentBtnIndex >= 0) {
+                e.preventDefault();
+                buttons[currentBtnIndex].click(); // Trigger button action
+                console.log('Button clicked:', buttons[currentBtnIndex].value);
+            }
+
+            
+        });
+
+
+        output.addEventListener('click', selectHanzi);
     }
 
     // Activate
     document.addEventListener("DOMContentLoaded", () =>
-    buildHanziSentence({
-        inputId: 'pinyin-input',
-        itemSelector: 'li',
-        containerId: '#pron-list',
-        outputId: 'pinyin-sentence-results'
-    })
+        buildHanziSentence({
+            inputId: 'pinyin-input',
+            itemSelector: 'li',
+            containerId: '#pron-list',
+            outputId: 'pinyin-sentence-results'
+        })
     )
 
 </script>
@@ -117,12 +176,10 @@ output.addEventListener('click', function (event) {
         <ul id="pron-list" class="flex flex-wrap gap-2">
         {% for p in pronunciations %}
             <li class="w-28" data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}">
-            <a href="{% url 'edit_pronunciation' p.id %}" class="block bg-white p-2 rounded-lg shadow text-center text-sm hover:shadow-md transition">
                 <div class="text-indigo-600 font-semibold text-lg">{{ p.hanzi }}</div>
                 <div class="text-gray-700">
                 {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}
                 </div>
-            </a>
             </li>
         {% empty %}
             <li class="text-gray-500 italic">No pronunciations found.</li>

@@ -11,6 +11,7 @@ from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
 import csv
 from collections import defaultdict
 
+import random
 
 from opencc import OpenCC
 
@@ -34,7 +35,6 @@ def static(request):
 
 
 def index(request):
-    print("coucou")
     # Optimize WordPronunciation → Pronunciation → (Initial, Final, Tone)
     word_pron_qs = WordPronunciation.objects.select_related(
         'pronunciation__initial',
@@ -245,8 +245,26 @@ def reports(request):
 
 
 def search(request):
-    context = {"page": "search"}
-    context['title'] = "Recherche"
+    word_pron_qs = WordPronunciation.objects.select_related(
+        'pronunciation__initial',
+        'pronunciation__final',
+        'pronunciation__tone'
+    )
+
+    # Prefetch the optimized WordPronunciation set into Word
+    words = Word.objects.prefetch_related(
+        Prefetch('wordpronunciation_set', queryset=word_pron_qs)
+    )
+
+    context = {
+        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'tones': Tone.objects.all(),
+        'initials': Initial.objects.all(),
+        'finals': Final.objects.all(),
+        'words': words,
+        'title': "Recherche de mots",
+    }
+
     return render(request, "hakkadbapp/search.html", context)
 
 def browse(request):
@@ -267,9 +285,27 @@ def caracters(request):
     context["all_prons"] = all_prons
     return render(request, "hakkadbapp/caracters.html", context)
 
+
 def flashcards(request):
-    context = {"page": "flashcards"}
+    # Get all word IDs
+    word_ids = Word.objects.values_list('id', flat=True)
+
+    if not word_ids:
+        return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot"})
+
+    # Pick a random one
+    random_id = random.choice(word_ids)
+
+    word = Word.objects.get(id=random_id)
+
+    context = {
+        "page": "flashcards",
+        "word": word,
+        "title": f"{word}",
+    }
+    print(word)
     return render(request, "hakkadbapp/flashcards.html", context)
+
 
 def hanzi(request, hanzi_char):
     context = {}
@@ -307,9 +343,6 @@ def phonemes(request):
         'combo_set': combo_set,
         'title': "Tableau des phonèmes"
     }
-
-    print(combo_set)
-
     return render(request, 'hakkadbapp/phonemes.html', context)
 
 
