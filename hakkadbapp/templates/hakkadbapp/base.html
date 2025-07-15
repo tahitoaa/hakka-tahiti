@@ -23,7 +23,7 @@
     <span class="text-3xl font-extrabold text-rose-600 tracking-tight">
       文化
     </span>
-    
+
     <h1 class="text-2xl font-bold tracking-wide">
       Lexique Hakka - 
     {{ title }}
@@ -71,6 +71,11 @@
             Analyse du lexique 
           </a>
         </li>
+        <li>
+          <a href="{% url 'phonemes' %}"
+             class="{% if page == 'phonemes' %}underline text-black{% else %}hover:text-black{% endif %}">
+            Phonèmes
+          </a>
       </ul>
     </nav>
   </div>

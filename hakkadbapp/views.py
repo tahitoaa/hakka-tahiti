@@ -5,8 +5,12 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
+from django.db.models import F, Value, CharField
+from django.db.models.functions import Concat
 from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
 import csv
+from collections import defaultdict
+
 
 from opencc import OpenCC
 
@@ -285,3 +289,61 @@ def hanzi(request, hanzi_char):
         'title': f"{hanzi_char}"
     }
     return render(request, "hakkadbapp/hanzi.html", context)
+
+def phonemes(request):
+    # All unique initials and finals in use
+    initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
+    finals = Final.objects.filter(pronunciations__isnull=False).distinct().order_by('final')
+
+    # Get all unique (initial, final) pairs
+    combos = Pronunciation.objects.values_list('initial_id', 'final_id').distinct()
+
+    # Convert to set of tuples for fast lookup
+    combo_set = set(combos)
+
+    context = {
+        'initials': initials,
+        'finals': finals,
+        'combo_set': combo_set,
+        'title': "Tableau des phonèmes"
+    }
+
+    print(combo_set)
+
+    return render(request, 'hakkadbapp/phonemes.html', context)
+
+
+def hanzi_by_pinyin(request, syllable):
+    # Filter all relevant pronunciations
+    prons = Pronunciation.objects.annotate(
+        combined=Concat(
+            F('initial__initial'),
+            F('final__final'),
+            output_field=CharField()
+        )
+    ).filter(combined=syllable)
+
+    # Group by hanzi character
+    hanzi_map = defaultdict(list)
+    for p in prons:
+        hanzi_map[p.hanzi].append(p)
+
+    # Prepare full data per hanzi
+    hanzi_data = []
+    for hanzi_char, prons_list in hanzi_map.items():
+        words = Word.objects.filter(pronunciations__in=prons_list).distinct()
+        hanzi_data.append({
+            'hanzi': hanzi_char,
+            'simp': t2s.convert(hanzi_char),
+            'trad': s2t.convert(hanzi_char),
+            'pronunciations': prons_list,
+            'related_words': words,
+        })
+
+    context = {
+        'syllable': syllable,
+        'title': f"{syllable}",
+        'hanzi_data': hanzi_data
+    }
+
+    return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)

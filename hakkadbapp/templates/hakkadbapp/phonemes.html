@@ -1,0 +1,41 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+<div class="overflow-x-auto w-full max-w-full">
+  <table class="table-auto border-collapse w-full text-sm">
+    <thead>
+      <tr class="bg-gray-700 text-white text-center">
+        <th class="border p-2 sticky left-0 bg-gray-700 z-20 text-left">Initial \ Final</th>
+        {% for final in finals %}
+          <th class="border p-2 whitespace-nowrap">{{ final.final }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% load pronunciation_tags %}
+      {% for initial in initials %}
+        <tr class="{% cycle 'bg-white' 'bg-gray-50' %}">
+          <td class="border p-2 font-semibold sticky left-0 bg-gray-700 z-10 whitespace-nowrap text-white">
+            {{ initial.initial }}
+          </td>
+          {% for final in finals %}
+            <td class="border p-2 text-center">
+              {% combo_exists initial.id final.id combo_set as exists %}
+              {% if exists %}
+                    <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
+                        <span class=" font-bold px-1 py-0.5 rounded">
+                        {{ initial.initial }}{{ final.final }}
+                        </span>
+                    </a>
+              {% else %}
+                <span class="bg-gray-100 text-gray-800 font-bold px-2 py-0.5 rounded">–</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

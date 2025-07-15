@@ -1,0 +1,5 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+{% include "hakkadbapp/components/hanzi_block.html" with hanzi=hanzi simp=simp trad=trad pronunciations=pronunciations related_words=related_words %}
+{% endblock %}
