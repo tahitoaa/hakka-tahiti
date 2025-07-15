@@ -5,16 +5,21 @@
 <section>
     <h1> Liste des caractères </h1>
 
+<div class="y-overflow">
     {% for p in all_prons %}
-        <div class="bg-white shadow-sm rounded p-3 border border-gray-200">
+        <div class="bg-white shadow-sm rounded border border-gray-200 p-3">
 <div class="text-xl font-semibold text-black text-centered">
     {{ p.simp }}
     {% if p.trad != p.simp %}
         ({{ p.trad }})
     {% endif %}
 </div>
+
             <div class="text-sm text-gray-700">{{ p.pinyin }}</div>
         </div>
     {% endfor %}
+</div>
 </section>
+
+
 {% endblock %}
