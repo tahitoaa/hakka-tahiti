@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
+# urls.py
+from django.urls import path, re_path
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
@@ -36,7 +38,8 @@ urlpatterns = [
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
     path("caracters", views.caracters, name="caracters"),
     path("flashcards/", views.flashcards, name="flashcards"),
-    path("hanzi/<str:hanzi_char>", views.hanzi, name="hanzi"),
+    # path("hanzi/<str:hanzi_char>", views.hanzi, name="hanzi"),
+    re_path(r'^hanzi/(?P<hanzi_char>[^/]+)/$', views.hanzi, name='hanzi'),
     path("phonemes/", views.phonemes, name="phonemes"),
     path('hanzi_by_pinyin/<str:syllable>', views.hanzi_by_pinyin, name='hanzi_by_pinyin'),
     ]

@@ -8,7 +8,7 @@
             {% for p in all_prons %}
                 <div class="bg-white shadow-sm rounded border border-gray-200 p-3 text-center">
                     <div class="text-xl font-semibold text-black">
-                        <a href="{% url 'hanzi' p.simp %}" class="hover:underline text-blue-700">
+                        <a href="{% url 'hanzi' p.simp|urlencode %}" class="hover:underline text-blue-700">
                             {{ p.simp }}
                             {% if p.trad != p.simp %}
                                 ({{ p.trad }})

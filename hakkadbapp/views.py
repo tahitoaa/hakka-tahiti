@@ -7,9 +7,10 @@ from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
 from django.db.models import F, Value, CharField
 from django.db.models.functions import Concat
-from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
+from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word, Traces
 import csv
 from collections import defaultdict
+from urllib.parse import unquote
 
 import random
 
@@ -238,9 +239,11 @@ def reports(request):
     })
 
     context['title'] = "Rapports"
-    cmd = import_lexique.Command()
-    cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
-    context['logs'] = cmd.traces
+    # cmd = import_lexique.Command()
+    # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
+    traces = Traces.objects.all().order_by('-timestamp').first()
+    context['traces'] = traces
+    context['errors'] = traces.details.count('❌')    
     return render(request, "hakkadbapp/reports.html", context)
 
 
@@ -308,6 +311,7 @@ def flashcards(request):
 
 
 def hanzi(request, hanzi_char):
+    hanzi_char = unquote(hanzi_char)
     context = {}
     # Get all pronunciations for this character
     prons = Pronunciation.objects.filter(hanzi=hanzi_char)

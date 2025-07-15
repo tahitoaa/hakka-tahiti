@@ -2,7 +2,7 @@
 import csv
 import re
 from django.core.management.base import BaseCommand
-from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final
+from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final, Traces
 import pandas as pd
 import string
 
@@ -149,6 +149,8 @@ class Command(BaseCommand):
 
         self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ')
 
+        Traces.objects.create(timestamp=pd.Timestamp.now(), details=self.traces)
+        
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
             [Initial(initial=i) for i in self.initial_set],
