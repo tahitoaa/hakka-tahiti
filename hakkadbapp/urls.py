@@ -20,7 +20,7 @@ from . import views
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
-    path('', views.search, name='search'),
+    path('', views.flashcards, name='flashcards'),
     # path('pronunciation/new/', views.newPronunciation, name='new_pronunciation'),
     # path('pronunciation/<int:pk>/edit/', views.edit_pronunciation, name='edit_pronunciation'),
     # path('pronunciation/<int:pk>/delete/', views.delete_pronunciation, name='delete_pronunciation'),
