@@ -8,6 +8,12 @@ from .forms import PronunciationForm, WordForm
 from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
 import csv
 
+from opencc import OpenCC
+
+# Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
+s2t = OpenCC('s2t')
+t2s = OpenCC('t2s')
+
 from .management.commands import import_lexique
 
 def static(request):
@@ -260,3 +266,22 @@ def caracters(request):
 def flashcards(request):
     context = {"page": "flashcards"}
     return render(request, "hakkadbapp/flashcards.html", context)
+
+def hanzi(request, hanzi_char):
+    context = {}
+    # Get all pronunciations for this character
+    prons = Pronunciation.objects.filter(hanzi=hanzi_char)
+
+    # Get all related words that include one of those pronunciations
+    related_words = Word.objects.filter(pronunciations__in=prons).distinct()
+
+    # Prepare data
+    context = {
+        'hanzi': hanzi_char,
+        'simp': t2s.convert(hanzi_char),
+        'trad': s2t.convert(hanzi_char),
+        'pronunciations': prons,
+        'related_words': related_words,
+        'title': f"{hanzi_char}"
+    }
+    return render(request, "hakkadbapp/hanzi.html", context)

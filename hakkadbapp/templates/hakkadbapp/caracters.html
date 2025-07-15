@@ -2,23 +2,28 @@
 
 {% block content %} 
 
-<section>
-    <h1> Liste des caractères </h1>
+    <h1> Liste des caractères rangés par pinyin </h1>
+    <div class="y-overflow max-h-[80vh] overflow-y-auto">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 p-2">
+            {% for p in all_prons %}
+                <div class="bg-white shadow-sm rounded border border-gray-200 p-3 text-center">
+                    <div class="text-xl font-semibold text-black">
+                        <a href="{% url 'hanzi' p.simp %}" class="hover:underline text-blue-700">
+                            {{ p.simp }}
+                            {% if p.trad != p.simp %}
+                                ({{ p.trad }})
+                            {% endif %}
+                        </a>
+                    </div>
 
-<div class="y-overflow">
-    {% for p in all_prons %}
-        <div class="bg-white shadow-sm rounded border border-gray-200 p-3">
-<div class="text-xl font-semibold text-black text-centered">
-    {{ p.simp }}
-    {% if p.trad != p.simp %}
-        ({{ p.trad }})
-    {% endif %}
-</div>
-
-            <div class="text-sm text-gray-700">{{ p.pinyin }}</div>
+                    <div class="text-gray-600 text-base mt-1">
+                        {{ p.pinyin }}
+                    </div>
+                </div>
+            {% endfor %}
         </div>
-    {% endfor %}
-</div>
+    </div>
+
 </section>
 
 

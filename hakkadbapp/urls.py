@@ -36,4 +36,5 @@ urlpatterns = [
     path("converter", views.pinyin_converter, name="pinyin_converter"),
     path("caracters", views.caracters, name="caracters"),
     path("flashcards", views.flashcards, name="flashcards"),
+    path("hanzi/<str:hanzi_char>", views.hanzi, name="hanzi")
     ]
