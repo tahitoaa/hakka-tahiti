@@ -79,11 +79,17 @@
       {% for p in pronunciations %}
         <li
           class="w-28 cursor-pointer"
-          onclick="window.location.href='/hanzi/{{ p.hanzi }}'"
           data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}"
         >
           <div class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 text-center rounded-lg px-3 py-2">
-            <div class="font-semibold text-lg">{{ p.hanzi }}</div>
+            <div class="font-semibold text-lg">
+              <a href="{% url 'hanzi' p.simp %}">
+                {{ p.simp }}
+                {% if p.trad != p.simp %}
+                  ({{ p.trad }})
+                {% endif %}
+
+              </a></div>
             <div class="text-sm">
               {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}
             </div>
