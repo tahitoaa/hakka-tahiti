@@ -286,6 +286,10 @@ def caracters(request):
     context = {"page": "caracters"}
     all_prons = Pronunciation.objects.select_related('initial', 'final', 'tone').order_by('initial', 'final', 'tone')
     context["all_prons"] = all_prons
+
+        # Query all pronunciations ordered by character and reading
+    all_prons_by_car = Pronunciation.objects.select_related('initial', 'final', 'tone').order_by('hanzi', 'initial', 'final', 'tone')
+    context["all_prons_by_car"] = all_prons_by_car
     return render(request, "hakkadbapp/caracters.html", context)
 
 
