@@ -109,6 +109,8 @@ class VocabList(models.Model):
 class Traces(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     details = models.TextField(null=True, blank=True)  # Additional details about the action
-
+    char_count = models.IntegerField(default=0)  # Count of characters processed
+    word_count = models.IntegerField(default=0)  # Count of words processed
+        
     def __str__(self):
         return f"{self.timestamp} - {self.details or 'No Details'}"

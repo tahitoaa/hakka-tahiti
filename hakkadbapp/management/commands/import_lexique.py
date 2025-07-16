@@ -76,7 +76,11 @@ class Command(BaseCommand):
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
             french_raw, pinyin_raw, hanzi_raw = row
 
-            if not pinyin_raw or not hanzi_raw:
+            if pd.isna(pinyin_raw):
+                self.err_stream(f"❌ Line {line_num}: Missing pinyin {french_raw, pinyin_raw, hanzi_raw }")
+            elif pd.isna(hanzi_raw):
+                self.err_stream(f"❌ Line {line_num}: Missing hanzi {french_raw, pinyin_raw, hanzi_raw }")
+            if pd.isna(pinyin_raw) or pd.isna(hanzi_raw):
                 skipped += 1
                 continue
 
@@ -149,8 +153,6 @@ class Command(BaseCommand):
 
         self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ')
 
-        Traces.objects.create(timestamp=pd.Timestamp.now(), details=self.traces)
-        
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
             [Initial(initial=i) for i in self.initial_set],
@@ -162,7 +164,7 @@ class Command(BaseCommand):
 
         # 2. Bulk insert and retrieve Finals
         Final.objects.bulk_create(
-            [Final(final=f) for f in self.final_set if f],
+            [Final(final=f) for f in self.final_set],
             ignore_conflicts=True
         )
         final_objs = {
@@ -206,6 +208,7 @@ class Command(BaseCommand):
 
         # Now associate pronunciations
         for word, (_, syllables) in zip(word_objs, self.word_data):
+
             for pos, (h, i_str, f_str, t_num) in enumerate(syllables):
                 i = initial_objs.get(i_str)
                 f = final_objs.get(f_str)
@@ -217,4 +220,11 @@ class Command(BaseCommand):
                 word_pron_objs.append(WordPronunciation(word=word, pronunciation=p, position=pos))
 
         WordPronunciation.objects.bulk_create(word_pron_objs)
+        
+        Traces.objects.create(timestamp=pd.Timestamp.now(), 
+                              details=self.traces,
+                              char_count=Pronunciation.objects.distinct('hanzi').count(),
+                              word_count=Word.objects.count(),
+                              )
+        return 
 

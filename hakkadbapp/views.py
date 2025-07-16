@@ -241,9 +241,48 @@ def reports(request):
     context['title'] = "Rapports"
     # cmd = import_lexique.Command()
     # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
-    traces = Traces.objects.all().order_by('-timestamp').first()
-    context['traces'] = traces
-    context['errors'] = traces.details.count('❌')    
+    traces = Traces.objects.order_by('-timestamp')[:2]
+    context['traces'] = {
+        'last': traces[0] if traces else None,
+        'errors': traces[0].details.count('❌') if traces else 0,
+        'previous': traces[1] if len(traces) > 1 else None,
+        'diff' : {
+            'words': traces[1].word_count - traces[0].word_count,
+            'chars': traces[1].char_count - traces[0].char_count,
+            'errors': traces[1].details.count('❌') - traces[0].details.count('❌') if len(traces) > 1 else 0
+        }
+    }
+
+    context["stats"].append({
+        "title" : 'Dernière importation',
+        "value" : traces[0].timestamp,
+        "description" : "Date et heure de la dernière importation du lexique."
+    })
+
+    context["stats"].append({
+        "title" : 'Nouveaux mots',
+        "value" : context['traces']['diff']['words'],
+        "description" : "Nombre de mots importés lors de la dernière importation."
+    })
+
+    context["stats"].append({
+        "title" : 'Nouveaux caractères',
+        "value" : context['traces']['diff']['chars'],
+        "description" : "Nombre de caractères importés lors de la dernière importation."
+    })
+
+    context["stats"].append({
+        "title" : 'Erreurs de parsing',
+        "value" : context['traces']['errors'],
+        "description" : "Nombre d'erreurs de parsing lors de la dernière importation."
+    })
+
+    context["stats"].append({
+        "title" : 'Erreurs corrigées',
+        "value" : context['traces']['diff']['errors'],
+        "description" : "Nombre d'erreurs de parsing corrigées lors de la dernière importation."
+    })
+
     return render(request, "hakkadbapp/reports.html", context)
 
 
@@ -284,11 +323,11 @@ def pinyin_converter(request):
 
 def caracters(request):
     context = {"page": "caracters"}
-    all_prons = Pronunciation.objects.select_related('initial', 'final', 'tone').order_by('initial', 'final', 'tone')
+    all_prons = Pronunciation.objects.order_by('initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
     context["all_prons"] = all_prons
 
         # Query all pronunciations ordered by character and reading
-    all_prons_by_car = Pronunciation.objects.select_related('initial', 'final', 'tone').order_by('hanzi', 'initial', 'final', 'tone')
+    all_prons_by_car = Pronunciation.objects.order_by('hanzi', 'initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
     context["all_prons_by_car"] = all_prons_by_car
     return render(request, "hakkadbapp/caracters.html", context)
 
