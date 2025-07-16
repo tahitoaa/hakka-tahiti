@@ -10,8 +10,11 @@
     <div class="columns-2 sm:columns-3 md:columns-6 lg:columns-7 gap-6">
         {% for p in all_prons %}
             <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="text-black font-semibold">
-                    {{ p.simp }}
+                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+                    <span class="hanzi-block">
+                    <span class="simp">{{ p.simp }}</span>
+                    <span class="trad hidden">{{ p.trad }}</span>
+                    </span>
                 </a>
                 <span class="text-gray-600"> {{ p.pinyin }} </span>
             </div>
@@ -28,8 +31,11 @@
     <div class="columns-2 sm:columns-3 md:columns-6 lg:columns-7 gap-6">
         {% for p in all_prons_by_car %}
             <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="text-black font-semibold">
-                    {{ p.simp }}
+                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+                    <span class="hanzi-block">
+  <span class="simp">{{ p.simp }}</span>
+  <span class="trad hidden">{{ p.trad }}</span>
+</span>
                 </a>
                 <span class="text-gray-600"> {{ p.pinyin }} </span>
             </div>

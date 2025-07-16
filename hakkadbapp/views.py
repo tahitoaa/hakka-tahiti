@@ -339,15 +339,21 @@ def flashcards(request):
     if not word_ids:
         return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot"})
 
-    # Pick a random one
-    random_id = random.choice(word_ids)
+    max_attempts = 10  # Prevent infinite loop
+    word = None
 
-    word = Word.objects.get(id=random_id)
+    for _ in range(max_attempts):
+        random_id = random.choice(word_ids)
+        word = Word.objects.get(id=random_id)
+        if str(word).strip():  # Check that __str__() is not empty
+            break
+    else:
+        word = None  # No valid word found after N tries
 
     context = {
         "page": "flashcards",
         "word": word,
-        "title": f"{word}",
+        "title": f"Flashcard - {word}",
     }
     print(word)
     return render(request, "hakkadbapp/flashcards.html", context)

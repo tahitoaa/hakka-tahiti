@@ -8,60 +8,74 @@
 
     <!-- Tailwind CSS -->
      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+     <style>
+  /* Global Hanzi font style */
+  .hanzi {
+    font-family: "KaiTi", "STKaiti", "SimSun-ExtB", "SimSun", "Songti SC", "Noto Sans SC", "Noto Serif SC", serif;
+    font-weight: 500;
+  }
+</style>
 </head>
-<body class="bg-gray-100 text-black min-h-screen flex flex-col font-sans">
+<body class="bg-gray-200 text-black min-h-screen flex flex-col font-sans">
 
 <!-- Header -->
 <header class="bg-red-600 text-white shadow-md">
-  <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-    <!-- Logo & Title -->
-    <div class="flex items-center space-x-4">
-      <span class="text-3xl font-extrabold text-rose-600 tracking-tight">文化</span>
-      <h1 class="text-lg sm:text-2xl font-bold tracking-wide">
-        Lexique Hakka - {{ title }}
-      </h1>
-    </div>
-
-    <!-- Mobile menu button -->
-    <button id="menu-toggle" class="sm:hidden focus:outline-none text-white">
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
-           viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path stroke-linecap="round" stroke-linejoin="round"
-              d="M4 6h16M4 12h16M4 18h16"></path>
-      </svg>
+<div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
+  
+  <!-- Logo & Title Block -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-center sm:text-left">
+    <span class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-grey-800 tracking-tight hanzi leading-tight">
+      文化協會大溪地客家話辭典
+    </span>
+    <h1 class="text-base sm:text-lg lg:text-2xl font-bold tracking-wide">
+      {{ title }}
+    </h1>
+    <button id="toggle-hanzi" class="bg-gray-200 text-sm text-black px-2 py-1 rounded hover:bg-gray-300">
+      Trad. / Simp.
     </button>
   </div>
+
+
+  <!-- Mobile Menu Button -->
+  <button id="menu-toggle" class="sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white bg-red-600 hover:bg-red-700 text-white">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
+         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+</div>
 
   <!-- Navigation Menu -->
   <nav id="menu" class="hidden sm:block px-4 pb-4 sm:pb-0">
     <ul class="flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0 text-sm sm:text-base font-medium">
       <li>
-        <a href="{% url 'pinyin_converter' %}" class="{% if page == 'converter' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'pinyin_converter' %}" class="{% if page == 'converter' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Écrire en Hakka
         </a>
       </li>
       <li>
-        <a href="{% url 'search' %}" class="{% if page == 'search' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'search' %}" class="{% if page == 'search' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Recherche
         </a>
       </li>
       <li>
-        <a href="{% url 'caracters' %}" class="{% if page == 'caracters' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'caracters' %}" class="{% if page == 'caracters' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Caractères
         </a>
       </li>
       <li>
-        <a href="{% url 'flashcards' %}" class="{% if page == 'flashcards' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'flashcards' %}" class="{% if page == 'flashcards' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Flashcards
         </a>
       </li>
       <li>
-        <a href="{% url 'reports' %}" class="{% if page == 'reports' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'reports' %}" class="{% if page == 'reports' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Analyse du lexique
         </a>
       </li>
       <li>
-        <a href="{% url 'phonemes' %}" class="{% if page == 'phonemes' %}underline text-black{% else %}hover:text-black{% endif %}">
+        <a href="{% url 'phonemes' %}" class="{% if page == 'phonemes' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Phonèmes
         </a>
       </li>
@@ -90,6 +104,25 @@
     menu.classList.toggle("hidden");
   });
 </script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const toggleButton = document.getElementById('toggle-hanzi');
+    let showingTrad = false;
+
+    toggleButton.addEventListener('click', () => {
+      showingTrad = !showingTrad;
+
+      document.querySelectorAll('.hanzi-block').forEach(el => {
+        el.querySelector('.simp').classList.toggle('hidden', showingTrad);
+        el.querySelector('.trad').classList.toggle('hidden', !showingTrad);
+      });
+
+      toggleButton.textContent = showingTrad ? 'Afficher simplifié' : 'Afficher traditionnel';
+    });
+  });
+</script>
+
 
 </body>
 </html>

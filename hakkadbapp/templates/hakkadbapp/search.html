@@ -30,8 +30,19 @@
         <div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
           data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}">
           <!-- Word -->
-          <div class="font-semibold text-gray-700 text-lg">            {{ word }}</div>
-
+          <div class="hanzi text-2xl font-bold text-black">           
+                    <span class="hanzi-block">
+                    <span class="simp">
+                  {% for wp in word.wordpronunciation_set.all %}
+                    {{ wp.pronunciation.simp }}
+                  {% endfor %}
+                    </span>
+                    <span class="trad hidden">                  
+                  {% for wp in word.wordpronunciation_set.all %}
+                    {{ wp.pronunciation.trad }}
+                  {% endfor %}</span>
+                    </span>
+            </div>
           <!-- Pinyin -->
           <div class="flex flex-wrap gap-1">
             {% for wp in word.wordpronunciation_set.all %}
@@ -82,12 +93,12 @@
           data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}"
         >
           <div class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 text-center rounded-lg px-3 py-2">
-            <div class="font-semibold text-lg">
+            <div class="hanzi font-semibold text-lg">
               <a href="{% url 'hanzi' p.simp %}">
-                {{ p.simp }}
-                {% if p.trad != p.simp %}
-                  ({{ p.trad }})
-                {% endif %}
+                    <span class="hanzi-block">
+                    <span class="simp">{{ p.simp }}</span>
+                    <span class="trad hidden">{{ p.trad }}</span>
+                    </span>
 
               </a></div>
             <div class="text-sm">
