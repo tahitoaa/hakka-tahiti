@@ -1,6 +1,6 @@
 from io import StringIO
 import json
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Count
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -305,6 +305,7 @@ def search(request):
         'finals': Final.objects.all(),
         'words': words,
         'title': "Recherche de mots",
+        "categories": Word.objects.values_list('category', flat=True).distinct(),
     }
 
     return render(request, "hakkadbapp/search.html", context)
@@ -326,15 +327,29 @@ def caracters(request):
     all_prons = Pronunciation.objects.order_by('initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
     context["all_prons"] = all_prons
 
-        # Query all pronunciations ordered by character and reading
-    all_prons_by_car = Pronunciation.objects.order_by('hanzi', 'initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
+    multi_pron_hanzi = (
+        Pronunciation.objects
+        .values('hanzi')
+        .annotate(count=Count('id'))
+        .filter(count__gt=1)
+        .values_list('hanzi', flat=True)
+    )
+    all_prons_by_car = (
+        Pronunciation.objects
+        .filter(hanzi__in=multi_pron_hanzi)
+        .order_by('hanzi', 'initial__initial', 'final__final', 'tone__tone_number')
+        .select_related('initial', 'final', 'tone')
+    )
     context["all_prons_by_car"] = all_prons_by_car
     return render(request, "hakkadbapp/caracters.html", context)
 
 
-def flashcards(request):
+def flashcards(request, category=None):
     # Get all word IDs
-    word_ids = Word.objects.values_list('id', flat=True)
+    if category:
+        word_ids = Word.objects.filter(category=category).values_list('id', flat=True)
+    else:
+        word_ids = Word.objects.values_list('id', flat=True)
 
     if not word_ids:
         return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot"})
@@ -353,8 +368,11 @@ def flashcards(request):
     context = {
         "page": "flashcards",
         "word": word,
-        "title": f"Flashcard - {word}",
+        "title": f"Flashcard - {category}" if category else "Flashcard",
+        "categories": Word.objects.values_list('category', flat=True).distinct(),
+        "category": category,
     }
+
     print(word)
     return render(request, "hakkadbapp/flashcards.html", context)
 

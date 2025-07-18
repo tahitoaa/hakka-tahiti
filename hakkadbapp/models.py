@@ -67,18 +67,11 @@ class Pronunciation(models.Model):
         ]
 
 class Word(models.Model):
-    class Category(models.TextChoices):
-        NOUN = "noun", "Noun"
-        VERB = "verb", "Verb"
-        ADJECTIVE = "adjective", "Adjective"
-        EXPRESSION = "expression", "Expression"
-        OTHER = "other", "Other"
-
     pronunciations = models.ManyToManyField(Pronunciation, through='WordPronunciation')
     french = models.TextField()
     tahitian = models.TextField()
     mandarin = models.TextField()
-    category = models.CharField(max_length=20, choices=Category.choices, default=None)
+    category = models.CharField(max_length=20, default=None, null=True, blank=True)  # Category of the word (e.g., "HSK 1", "Beginner Vocabulary")
 
     def __str__(self):
         return f'{self.char()}'
@@ -88,6 +81,12 @@ class Word(models.Model):
     
     def pinyin(self):
         return ''.join([wp.pronunciation.pinyin() for wp in self.wordpronunciation_set.all()])
+    
+    def simp(self):
+        return ''.join([wp.pronunciation.simp() for wp in self.wordpronunciation_set.all()])
+    
+    def trad(self):
+        return ''.join([wp.pronunciation.trad() for wp in self.wordpronunciation_set.all()])
     
     
 class WordPronunciation(models.Model):

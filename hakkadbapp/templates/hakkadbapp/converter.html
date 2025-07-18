@@ -12,7 +12,7 @@
     </small>
 <textarea id="pinyin-input"
           placeholder="Ex: wuk5 ka1 hao3 tai4"
-          class="w-full max-w-lg px-3 py-1.5 border border-gray-300 rounded text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+          class="bg-white w-full max-w-lg px-3 py-1.5 border border-gray-300 rounded text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
 </textarea>
 
 <label for="suggested-hanzi" class="mt-4 text-lg font-semibold text-gray-800">
@@ -26,7 +26,7 @@
     Pinyin :    
 </label>
 <div id="pinyin-sentence-results"
-     class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal">
+     class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal bg-white p-2 rounded shadow-sm">
 </div>
 
 </div>
@@ -59,7 +59,7 @@
                 }
             }
 
-            input.dispatchEvent(new Event('input')); // trigger UI refresh
+            input.dispatchEvent(new Event('change')); // trigger UI refresh
             input.focus(); // keep focus on input
         }
         
@@ -79,8 +79,6 @@
             }
 
             const syllables = sentence.match(/[a-z]+[0-9]?/gi) || [];
-            console.log(syllables);
-
             const hanziList = [];
             const pinyinList = [];
 
@@ -151,7 +149,7 @@
         });
 
 
-        input.addEventListener('keydown', () => {
+        input.addEventListener('change', () => {
             function getMatchesForHanzi(char, allItems) {
                 if (!char || char.length !== 1 || !/[\u4e00-\u9fff]/.test(char)) {
                     return [char]
@@ -200,31 +198,6 @@
                 }
             });
         }
-
-        // Listen for key navigation
-        document.addEventListener('keydown', (e) => {
-            if (!buttons.length) return;
-
-            if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                currentBtnIndex = (currentBtnIndex + 1) % buttons.length;
-                highlightButton(currentBtnIndex);
-            }
-
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                currentBtnIndex = (currentBtnIndex - 1 + buttons.length) % buttons.length;
-                highlightButton(currentBtnIndex);
-            }
-
-            if (e.key === 'Enter' && currentBtnIndex >= 0) {
-                e.preventDefault();
-                buttons[currentBtnIndex].click(); // Trigger button action
-                console.log('Button clicked:', buttons[currentBtnIndex].value);
-            }
-
-            
-        });
 
 
         output.addEventListener('click', selectHanzi);

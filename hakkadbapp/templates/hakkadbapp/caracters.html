@@ -2,45 +2,45 @@
 
 {% block content %} 
 
+
 <h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-    Liste des caractères rangés par pinyin
+  Liste des caractères rangés par pinyin
 </h1>
-<div class="max-h-[80vh] overflow-y-auto bg-white p-6 text-gray-800">
-    <!-- Multi-column layout flowing top-to-bottom -->
-    <div class="columns-2 sm:columns-3 md:columns-6 lg:columns-7 gap-6">
-        {% for p in all_prons %}
-            <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-                    <span class="hanzi-block">
-                    <span class="simp">{{ p.simp }}</span>
-                    <span class="trad hidden">{{ p.trad }}</span>
-                    </span>
-                </a>
-                <span class="text-gray-600"> {{ p.pinyin }} </span>
-            </div>
-        {% endfor %}
-    </div>
+
+<div class="no-print-overflow bg-white p-6 text-gray-800">
+  <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
+    {% for p in all_prons %}
+      <div class="break-inside-avoid">
+        <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+          <span class="hanzi-block">
+            <span class="simp">{{ p.simp }}</span>
+            <span class="trad hidden">{{ p.trad }}</span>
+          </span>
+        </a>
+        <span class="text-gray-600"> {{ p.pinyin }} </span>
+      </div>
+    {% endfor %}
+  </div>
 </div>
 
 <h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-    Liste des lectures par caractères
+  Caractères à plusieurs lectures (多音字)
 </h1>
 
-<div class="max-h-[80vh] overflow-y-auto bg-white p-6 text-gray-800">
-    <!-- Multi-column layout flowing top-to-bottom -->
-    <div class="columns-2 sm:columns-3 md:columns-6 lg:columns-7 gap-6">
-        {% for p in all_prons_by_car %}
-            <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-                    <span class="hanzi-block">
-  <span class="simp">{{ p.simp }}</span>
-  <span class="trad hidden">{{ p.trad }}</span>
-</span>
-                </a>
-                <span class="text-gray-600"> {{ p.pinyin }} </span>
-            </div>
-        {% endfor %}
-    </div>
+<div class="no-print-overflow bg-white p-6 text-gray-800">
+  <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
+    {% for p in all_prons_by_car %}
+      <div class="break-inside-avoid">
+        <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+          <span class="hanzi-block">
+            <span class="simp">{{ p.simp }}</span>
+            <span class="trad hidden">{{ p.trad }}</span>
+          </span>
+        </a>
+        <span class="text-gray-600"> {{ p.pinyin }} </span>
+      </div>
+    {% endfor %}
+  </div>
 </div>
 
 

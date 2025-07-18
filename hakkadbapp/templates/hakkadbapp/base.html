@@ -15,6 +15,61 @@
     font-weight: 500;
   }
 </style>
+
+<style>
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12px;
+  }
+
+  h1 {
+    font-size: 18px !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:columns-6 {
+    column-count: 6 !important;
+  }
+
+  .no-print-overflow {
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .compact-grid div {
+    margin-bottom: 0.2rem !important;
+  }
+
+  .text-3xl {
+    font-size: 1.25rem !important; /* reduce character size */
+  }
+
+  .text-gray-600 {
+    font-size: 0.8rem !important;
+  }
+
+  .bg-white {
+    background: white !important;
+  }
+
+  .p-6 {
+    padding: 0.5rem !important;
+  }
+
+  .mb-6 {
+    margin-bottom: 0.5rem !important;
+  }
+}
+</style>
+
+
 </head>
 <body class="bg-gray-200 text-black min-h-screen flex flex-col font-sans">
 
@@ -24,20 +79,28 @@
   
   <!-- Logo & Title Block -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-6 text-center sm:text-left">
-  <!-- Main Hanzi Title -->
-  <span class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-800 tracking-tight hanzi leading-snug">
-    文化協會大溪地客家話辭典
-  </span>
+<span class="text-2xl sm:text-2xl lg:text-2xl font-extrabold tracking-widest text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.85)] leading-tight hanzi">
+  文化協會大溪地客家話辭典
+</span>
 
   <!-- Subtitle -->
-  <h1 class="text-sm sm:text-base lg:text-lg font-semibold tracking-wide">
+  <h1 class="text-lg sm:text-base lg:text-xl font-semibold tracking-wide">
     {{ title }}
   </h1>
 
-  <!-- Toggle Button -->
-  <button id="toggle-hanzi" class="bg-gray-200 text-xs sm:text-sm text-black px-2 py-1 rounded hover:bg-gray-300 whitespace-nowrap mt-2 sm:mt-0">
+<!-- Unified Style for Both Buttons -->
+<button id="toggle-hanzi"
+    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
+           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
     Trad. / Simp.
-  </button>
+</button>
+
+<button onclick="window.print()"
+    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
+           hover:bg-red-800 active:bg-red-900 transition duration-200 print:hidden mt-4 ml-2">
+    🖨️ Imprimer
+</button>
+
 </div>
 
 

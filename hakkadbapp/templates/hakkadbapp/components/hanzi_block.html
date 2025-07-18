@@ -9,15 +9,11 @@
     <!-- Pronunciations Section -->
     <section class="mb-10">
         {% if pronunciations %}
+        <div>{{pronunciations|length}} prononciations trouvées </div>
         <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for p in pronunciations %}
             <li class="bg-white shadow-sm rounded-lg border p-4">
                 <p class="text-xl font-medium text-gray-800">{{ p.pinyin }}</p>
-                <p class="text-sm text-gray-500">
-                    Initial: {{ p.initial }}<br>
-                    Final: {{ p.final }}<br>
-                    Tone: {{ p.tone }}
-                </p>
             </li>
             {% endfor %}
         </ul>
@@ -38,8 +34,7 @@
                 <p class="text-xl font-semibold text-gray-800">{{ word.char }} — {{ word.pinyin }}</p>
                 <div class="text-sm text-gray-600 mt-2">
                     <p><strong>fr.</strong> {{ word.french }}</p>
-                    <p><strong>tah.</strong> {{ word.tahitian }}</p>
-                    <p><strong>mand.</strong> {{ word.mandarin }}</p>
+                    <p><strong>cat.</strong> {{ word.category }}</p>
                 </div>
             </li>
             {% endfor %}

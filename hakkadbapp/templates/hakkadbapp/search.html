@@ -15,8 +15,15 @@
         type="text"
         id="word-search"
         placeholder="Ex. 屋家 ou maison ou wuk ka ou wuk5ka1"
-        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500"
+        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
       />
+      <select id="category-select" name="category" class="block w-full max-w-xs rounded-md border border-gray-300 bg-white py-2 px-3
+        text-base font-semibold text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500">
+        <option value="">-- Sélectionner --</option>
+        {% for category in categories %}
+          <option value="{{ category }}">{{ category }}</option>
+        {% endfor %}
+      </select>
     </div>
 
     <!-- Table header -->
@@ -28,7 +35,8 @@
     <div id="word-list" class="divide-y divide-gray-100 text-sm max-h-80 overflow-y-auto">
       {% for word in words %}
         <div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
-          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}">
+          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}"
+          data-category="{{ word.category|default:'' }}">
           <!-- Word -->
           <div class="hanzi text-2xl font-bold text-black">           
                     <span class="hanzi-block">
@@ -52,9 +60,7 @@
 
           <!-- Category -->
           <div>
-            {% if word.get_category_display %}
-              <span class="font-sm">{{ word.get_category_display }}</span>
-            {% endif %}
+              <span class="font-sm">{{ word.category }}</span>
           </div>
 
           <!-- French -->
@@ -81,7 +87,7 @@
         type="text"
         id="char-search"
         placeholder="Ex. 家 ou ka ou ka1 ou siong"
-        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500"
+        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
       />
     </div>
 
@@ -152,6 +158,19 @@ setupSearch({
   containerId: '#pron-list',
   countId: 'pron-count',
 });
-</script>
+
+document.getElementById('category-select').addEventListener('change', function() {
+  const selectedCategory = this.value.toLowerCase();
+  const items = document.querySelectorAll('#word-list > div');
+
+  items.forEach(item => {
+    const category = item.dataset.category?.toLowerCase() || '';
+    item.style.display = selectedCategory === '' || category.includes(selectedCategory) ? '' : 'none';
+  });
+
+  // Update count
+  const visibleCount = Array.from(items).filter(item => item.style.display !== 'none').length;
+  document.getElementById('word-count').textContent = visibleCount;
+});</script>
 
 {% endblock %}

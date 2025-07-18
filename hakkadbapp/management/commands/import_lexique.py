@@ -1,6 +1,7 @@
 # your_app/management/commands/populate.py
 import csv
 import re
+from unicodedata import category
 from django.core.management.base import BaseCommand
 from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final, Traces
 import pandas as pd
@@ -116,7 +117,8 @@ class Command(BaseCommand):
                 self.pron_set.add(data)
                 syllable_data.append(data)
 
-            self.word_data.append((french, syllable_data))
+            category = sheet_name
+            self.word_data.append((french, syllable_data, category))
             self.log_stream(f"{hanzi} {syllabes} {french}")
             added += 1
 
@@ -199,15 +201,15 @@ class Command(BaseCommand):
         word_objs = []
         word_pron_objs = []
 
-        for french, syllables in self.word_data:
-            word = Word(french=french, category="?")
+        for french, syllables, category in self.word_data:
+            word = Word(french=french, category=category)
             word_objs.append(word)
 
         # Create words to get IDs
         Word.objects.bulk_create(word_objs)
 
         # Now associate pronunciations
-        for word, (_, syllables) in zip(word_objs, self.word_data):
+        for word, (_, syllables, category) in zip(word_objs, self.word_data):
 
             for pos, (h, i_str, f_str, t_num) in enumerate(syllables):
                 i = initial_objs.get(i_str)
