@@ -23,17 +23,23 @@
 <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
   
   <!-- Logo & Title Block -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-center sm:text-left">
-    <span class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-grey-800 tracking-tight hanzi leading-tight">
-      文化協會大溪地客家話辭典
-    </span>
-    <h1 class="text-base sm:text-lg lg:text-2xl font-bold tracking-wide">
-      {{ title }}
-    </h1>
-    <button id="toggle-hanzi" class="bg-gray-200 text-sm text-black px-2 py-1 rounded hover:bg-gray-300">
-      Trad. / Simp.
-    </button>
-  </div>
+<div class="flex flex-col sm:flex-row sm:items-center sm:space-x-6 text-center sm:text-left">
+  <!-- Main Hanzi Title -->
+  <span class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-800 tracking-tight hanzi leading-snug">
+    文化協會大溪地客家話辭典
+  </span>
+
+  <!-- Subtitle -->
+  <h1 class="text-sm sm:text-base lg:text-lg font-semibold tracking-wide">
+    {{ title }}
+  </h1>
+
+  <!-- Toggle Button -->
+  <button id="toggle-hanzi" class="bg-gray-200 text-xs sm:text-sm text-black px-2 py-1 rounded hover:bg-gray-300 whitespace-nowrap mt-2 sm:mt-0">
+    Trad. / Simp.
+  </button>
+</div>
+
 
 
   <!-- Mobile Menu Button -->

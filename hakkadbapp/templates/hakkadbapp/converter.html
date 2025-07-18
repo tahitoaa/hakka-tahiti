@@ -9,13 +9,19 @@
     <small class="text-gray-600">
     Tapez le pinyin (ex. <code>wuk5ka1</code>), utilisez <kbd>TAB</kbd> pour choisir un caractère.
     </small>
-    <textarea type="text" id="pinyin-input"
-           placeholder="Ex: wuk5 ka1 hao3 tai4"
-           class="w-full max-w-lg px-4 py-2 border border-gray-300 rounded-lg text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    </textarea>
+<textarea id="pinyin-input"
+          placeholder="Ex: wuk5 ka1 hao3 tai4"
+          class="w-full max-w-lg px-3 py-1.5 border border-gray-300 rounded text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+</textarea>
 
-    <div id="pinyin-sentence-results"
-         class="mt-6 text-2xl font-semibold text-indigo-700 break-words p-30"></div>
+<div id="suggested-hanzi"
+     class="mt-3 text-base font-medium text-indigo-800 leading-tight break-words">
+</div>
+
+<div id="pinyin-sentence-results"
+     class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal">
+</div>
+
 </div>
 
     <script>
@@ -50,72 +56,128 @@
             input.focus(); // keep focus on input
         }
         
-    function buildHanziSentence({ inputId, itemSelector, containerId, outputId }) {
+    function buildHanziSentence({ inputId, itemSelector, containerId, outputId, pinyinOutputId }) {
         const input = document.getElementById(inputId);
         const output = document.getElementById(outputId);
-        const allItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
+        const pinyinOutput = document.getElementById(pinyinOutputId);
 
+        const allItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
+        
         input.addEventListener('input', () => {
+
             const sentence = input.value.trim().toLowerCase();
             if (!sentence) {
                 output.textContent = '';
                 return;
             }
 
-            const syllables =  sentence.match(/[a-z]+[0-9]?/gi) || [];
-            console.log(syllables)
+            const syllables = sentence.match(/[a-z]+[0-9]?/gi) || [];
+            console.log(syllables);
+
             const hanziList = [];
             const pinyinList = [];
 
-            syllables.forEach(syl => {
-                    const matches = allItems.filter(el => {
-                    const parts = el.dataset.search?.toLowerCase().split(' ') || [];
-                    const hanzi = parts[0] || '';
-                    const pinyin = parts[1] || '';
+            function parseItemData(el) {
+                const parts = el.dataset.search?.toLowerCase().split(' ') || [];
+                return {
+                    hanzi: parts[0] || '',
+                    pinyin: parts[1] || ''
+                };
+            }
+
+            function getMatchesForSyllable(syl) {
+                return allItems.filter(el => {
+                    const { hanzi, pinyin } = parseItemData(el);
                     return pinyin.startsWith(syl) || hanzi === syl;
-                    });
-                const uniqueChars = [...new Set(matches.map(el => el.textContent.trim()[0]))];
-                if (uniqueChars.length > 1) {
+                });
+            }
 
-                    hanziList.push(...uniqueChars);
-                    
+            function extractUniqueChars(matches) {
+                return [...new Set(matches.map(el => el.textContent.trim()[0]))];
+            }
 
-                    // Push all unique pinyin from matches (after space)
-                    const pinyins = [...new Set(matches.map(el =>
-                        el.textContent.trim().split(/\s+/)[1] || '?'
-                    ))];
-                    pinyinList.push('|' + pinyins.join(', ') + '|');
+            function extractUniquePinyins(matches) {
+                return [...new Set(matches.map(el =>
+                    el.textContent.trim().split(/\s+/)[1] || '?'
+                ))];
+            }
 
-                } else if (uniqueChars.length === 1) {
-                    const [char, pinyin] = matches[0].textContent.trim().split(/\s+/);
-                    hanziList.push(char || '?');
-                    pinyinList.push(pinyin || '?');
+        syllables.forEach(syl => {
+            const matches = getMatchesForSyllable(syl);
+            const uniqueChars = extractUniqueChars(matches);
 
-                } else {
-                    hanziList.push(syl + '?');
-                }
-            });
+            if (uniqueChars.length > 1) {
+                hanziList.push(...uniqueChars);
+                const pinyins = extractUniquePinyins(matches);
+                pinyinList.push('|' + pinyins.join(', ') + '|');
 
-output.innerHTML = `
-  <div class="flex gap-2 flex-wrap mb-2">
-    ${hanziList.map((h, i) => {
-      const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
-      return `
-        <div class="flex flex-col items-center border">
-          <span class="text-xs text-gray-500">${keyHint}</span>
-          <button id="suggested-${keyHint}" class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" value="${h}">
-            ${h}
-          </button>
-        </div>`;
-    }).join('')}
-  </div>
-  <div class="text-lg text-gray-600">
-    ${pinyinList.join('')}
-  </div>
-`;
+            } else if (uniqueChars.length === 1) {
+                const [char, pinyin] = matches[0].textContent.trim().split(/\s+/);
+                hanziList.push(char || '?');
+                pinyinList.push(pinyin || '?');
+
+            } else {
+                hanziList.push(syl + '?');
+                pinyinList.push('?');
+            }
+        });
+
+
+        output.innerHTML = `
+        <div class="flex gap-2 flex-wrap mb-2">
+            ${hanziList.map((h, i) => {
+            const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
+            return `
+                <div class="flex flex-col items-center border">
+                <span class="text-xs text-gray-500">${keyHint}</span>
+                <button id="suggested-${keyHint}" class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" value="${h}">
+                    ${h}
+                </button>
+                </div>`;
+            }).join('')}
+        </div>
+        <div class="text-lg text-gray-600">
+            ${pinyinList.join('')}
+        </div>
+        `;
 
         });
 
+
+        input.addEventListener('keydown', () => {
+            function getMatchesForHanzi(char, allItems) {
+                if (!char || char.length !== 1 || !/[\u4e00-\u9fff]/.test(char)) {
+                    return [char]
+                }
+
+                const matches = allItems.filter(el => {
+                    const hanzi = el.dataset.search?.split(' ')[0];
+                    return hanzi === char;
+                });
+
+                // Extract unique pinyins
+                const pinyins = [...new Set(matches.map(el => {
+                    return el.dataset.search?.split(' ')[1] || '?';
+                }))];
+                console.log('Pinyins for', char, pinyins);
+
+                return pinyins;
+        }
+            // Build rich pinyin output
+            const inputHanzi = Array.from(input.value.trim());
+            const pinyinRich = inputHanzi.map(h => {
+                const matches = getMatchesForHanzi(h, allItems);
+                const pinyinText = matches.length === 0 ? '?' : matches.join(', ');
+
+                return `
+                    <span class="inline-block mr-2 text-center align-bottom">
+                        <span class="block text-xs text-gray-500">${pinyinText}</span>
+                        <span class="block text-base font-semibold text-black">${h}</span>
+                    </span>
+                `;
+            }).join('');
+            pinyinOutput.innerHTML = pinyinRich;
+        });
 
         // After rendering buttons, enable keyboard navigation
         let currentBtnIndex = -1;
@@ -167,7 +229,8 @@ output.innerHTML = `
             inputId: 'pinyin-input',
             itemSelector: 'li',
             containerId: '#pron-list',
-            outputId: 'pinyin-sentence-results'
+            outputId: 'suggested-hanzi',
+            pinyinOutputId: 'pinyin-sentence-results'
         })
     )
 
