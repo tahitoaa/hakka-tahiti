@@ -48,14 +48,14 @@
   }
 
   .text-3xl {
-    font-size: 1.25rem !important; /* reduce character size */
+    font-size: 1.25rem !important;
   }
 
   .text-gray-600 {
     font-size: 0.8rem !important;
   }
 
-  .bg-white {
+  .bg-white, .bg-gray-50 {
     background: white !important;
   }
 
@@ -66,9 +66,20 @@
   .mb-6 {
     margin-bottom: 0.5rem !important;
   }
+
+  th, td {
+    padding: 2px !important;
+    font-size: 10px !important;
+    border: 1px solid black !important;
+  }
+
+  .sticky {
+    position: static !important;
+    background: white !important;
+    z-index: auto !important;
+  }
 }
 </style>
-
 
 </head>
 <body class="bg-gray-200 text-black min-h-screen flex flex-col font-sans">

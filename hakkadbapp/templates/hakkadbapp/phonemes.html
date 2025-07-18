@@ -1,13 +1,21 @@
 {% extends "hakkadbapp/base.html" %}
+{% extends "hakkadbapp/base.html" %}
 
 {% block content %}
-<div class="overflow-x-auto w-full max-w-full">
+
+
+
+<div class="overflow-x-auto w-full max-w-full no-print-overflow">
   <table class="table-auto border-collapse w-full text-sm">
     <thead>
       <tr class="bg-gray-700 text-white text-center">
-        <th class="border p-2 sticky left-0 bg-gray-700 z-20 text-left">Initial \ Final</th>
+        <th class="border p-2 sticky left-0 bg-gray-700 z-20 text-left">
+          Initial \ Final
+        </th>
         {% for final in finals %}
-          <th class="border p-2 whitespace-nowrap">{{ final.final }}</th>
+          <th class="border p-2 whitespace-nowrap">
+            {{ final.final }}
+          </th>
         {% endfor %}
       </tr>
     </thead>
@@ -22,11 +30,11 @@
             <td class="border p-2 text-center">
               {% combo_exists initial.id final.id combo_set as exists %}
               {% if exists %}
-                    <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
-                        <span class=" font-bold px-1 py-0.5 rounded">
-                        {{ initial.initial }}{{ final.final }}
-                        </span>
-                    </a>
+                <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
+                  <span class="font-bold px-1 py-0.5 rounded">
+                    {{ initial.initial }}{{ final.final }}
+                  </span>
+                </a>
               {% endif %}
             </td>
           {% endfor %}
