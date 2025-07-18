@@ -11,6 +11,8 @@ from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word
 import csv
 from collections import defaultdict
 from urllib.parse import unquote
+from django.db.models import Case, When, IntegerField, Value
+
 
 import random
 
@@ -398,9 +400,60 @@ def hanzi(request, hanzi_char):
     return render(request, "hakkadbapp/hanzi.html", context)
 
 def phonemes(request):
+
+    custom_order = ['b', 'p', 'm', 'f',
+                'd', 't', 'n', 'l',
+                'g', 'k', 'h',
+                'j', 'q', 'x',
+                'zh', 'ch', 'sh', 'r',
+                'z', 'c', 's',
+                '']  # for null initial
+
+    cantonese_finals = [
+        'a', 'aa', 'e', 'i', 'o', 'u', 'yu',
+        'ai', 'aai', 'ei', 'oi', 'ui', 'iu', 'eu', 'ou', 'eoi', 'oei',
+        'am', 'aam', 'em', 'im', 'om', 'um', 'eom', 'eum',
+        'an', 'aan', 'in', 'un', 'eon', 'oen',
+        'ang', 'aang', 'eng', 'ing', 'ung', 'ong',
+        'ap', 'aap', 'ip', 'up', 'eop', 'eup',
+        'at', 'aat', 'it', 'ut', 'eot', 'eut',
+        'ak', 'aak', 'ek', 'ik', 'uk', 'ok', 'eok', 'euk'
+    ]
+
+    # Build a Case/When expression for ordering
+    order_cases = Case(
+        *[When(initial=val, then=Value(idx)) for idx, val in enumerate(custom_order)],
+        default=Value(len(custom_order)),  # Items not in list go last
+        output_field=IntegerField()
+    )
+
+    # Apply the custom order in the query
+    initials = (
+        Initial.objects
+        .filter(pronunciations__isnull=False)
+        .distinct()
+        .annotate(ordering=order_cases)
+        .order_by('ordering')
+    )
+
+    # Build the ordering Case
+    ordering_case = Case(
+        *[When(final=val, then=Value(idx)) for idx, val in enumerate(cantonese_finals)],
+        default=Value(len(cantonese_finals)),  # Place unknown finals last
+        output_field=IntegerField()
+    )
+
+    # Query with custom ordering
+    finals = (
+        Final.objects
+        .filter(pronunciations__isnull=False)
+        .distinct()
+        .annotate(ordering=ordering_case)
+        .order_by('ordering')
+    )
     # All unique initials and finals in use
-    initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
-    finals = Final.objects.filter(pronunciations__isnull=False).distinct().order_by('final')
+    # initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
+    # finals = Final.objects.filter(pronunciations__isnull=False).distinct().order_by('final')
 
     # Get all unique (initial, final) pairs
     combos = Pronunciation.objects.values_list('initial_id', 'final_id').distinct()
