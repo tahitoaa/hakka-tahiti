@@ -3,21 +3,28 @@
 {% block content %} 
 <div class="mt-10 flex flex-col items-center text-center p-30">
     <label for="pinyin-input" class="text-xl font-bold mb-3 text-gray-800">
-       Saisie en Hakka 
+        Ecrire en hakka
     </label>
     
     <small class="text-gray-600">
-    Tapez le pinyin (ex. <code>wuk5ka1</code>), utilisez <kbd>TAB</kbd> pour choisir un caractère.
+    Tapez le pinyin (ex. <code>wuk5ka1</code>), utilisez <kbd>TAB</kbd> pour sélectionner le caractère, puis 
+    <kbd>ENTER</kbd> pour l'insérer dans le champ de saisie.
     </small>
 <textarea id="pinyin-input"
           placeholder="Ex: wuk5 ka1 hao3 tai4"
           class="w-full max-w-lg px-3 py-1.5 border border-gray-300 rounded text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
 </textarea>
 
+<label for="suggested-hanzi" class="mt-4 text-lg font-semibold text-gray-800">
+    Caractères suggérés :
+</label>
 <div id="suggested-hanzi"
      class="mt-3 text-base font-medium text-indigo-800 leading-tight break-words">
 </div>
 
+<label for="pinyin-sentence-results" class="mt-4 text-lg font-semibold text-gray-800">
+    Pinyin :    
+</label>
 <div id="pinyin-sentence-results"
      class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal">
 </div>
