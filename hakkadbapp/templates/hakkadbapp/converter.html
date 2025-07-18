@@ -14,18 +14,14 @@
           placeholder="Ex: wuk5 ka1 hao3 tai4"
           class="bg-white w-full max-w-lg px-3 py-1.5 border border-gray-300 rounded text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
 </textarea>
-
-<label for="suggested-hanzi" class="mt-4 text-lg font-semibold text-gray-800">
-    Caractères suggérés :
-</label>
 <div id="suggested-hanzi"
      class="mt-3 text-base font-medium text-indigo-800 leading-tight break-words">
 </div>
-
-<label for="pinyin-sentence-results" class="mt-4 text-lg font-semibold text-gray-800">
-    Pinyin :    
-</label>
 <div id="pinyin-sentence-results"
+     class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal bg-white p-2 rounded shadow-sm">
+</div>
+
+<div id="pinyin-only"
      class="mt-2 text-sm text-gray-700 leading-snug text-left whitespace-normal bg-white p-2 rounded shadow-sm">
 </div>
 
@@ -63,10 +59,11 @@
             input.focus(); // keep focus on input
         }
         
-    function buildHanziSentence({ inputId, itemSelector, containerId, outputId, pinyinOutputId }) {
+    function buildHanziSentence({ inputId, itemSelector, containerId, outputId, pinyinOutputId, pinyinOnlyId }) {
         const input = document.getElementById(inputId);
         const output = document.getElementById(outputId);
         const pinyinOutput = document.getElementById(pinyinOutputId);
+        const pinyinOnlyOutput = document.getElementById('pinyin-only');
 
         const allItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
         
@@ -148,8 +145,7 @@
 
         });
 
-
-        input.addEventListener('change', () => {
+        function updatePinyinOutput() {
             function getMatchesForHanzi(char, allItems) {
                 if (!char || char.length !== 1 || !/[\u4e00-\u9fff]/.test(char)) {
                     return [char]
@@ -181,8 +177,16 @@
                     </span>
                 `;
             }).join('');
+            pinyinOnlyOutput.innerHTML = inputHanzi.map(h => {
+                const matches = getMatchesForHanzi(h, allItems);
+                return matches.length > 0 ? matches.join(', ') : '?';
+            }).join(' ');
+
             pinyinOutput.innerHTML = pinyinRich;
-        });
+        }
+        input.addEventListener('paste', updatePinyinOutput);
+        input.addEventListener('input', updatePinyinOutput);
+        input.addEventListener('change', updatePinyinOutput);
 
         // After rendering buttons, enable keyboard navigation
         let currentBtnIndex = -1;
