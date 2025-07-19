@@ -3,7 +3,12 @@
     
     <!-- Main Character -->
     <header class="mb-8">
-        <h1 class="text-5xl font-extrabold text-center text-gray-800"> {{ hanzi }}</h1>
+        <h1 class="hanzi text-5xl font-extrabold text-center text-gray-800">
+            <span class="hanzi-block">
+                <span class="simp">{{simp }}</span>
+                <span class="trad hidden">{{ trad }}</span>
+            </span>
+        </h1>
     </header>
 
     <!-- Pronunciations Section -->
@@ -31,7 +36,12 @@
         <ul class="space-y-4">
             {% for word in related_words %}
             <li class="bg-gray-50 rounded-lg p-4 shadow-sm border">
-                <p class="text-xl font-semibold text-gray-800">{{ word.char }} — {{ word.pinyin }}</p>
+                <p class="font-semibold text-gray-800">
+                    <span class="hanzi hanzi-block text-xl">
+                        <span class="simp">{{ word.simp }}</span>
+                        <span class="trad hidden">{{ word.trad }}</span>
+                    </span>
+                    — {{ word.pinyin }}</p>
                 <div class="text-sm text-gray-600 mt-2">
                     <p><strong>fr.</strong> {{ word.french }}</p>
                     <p><strong>cat.</strong> {{ word.category }}</p>

@@ -88,7 +88,7 @@ class Command(BaseCommand):
             # Clean inputs
             clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
             french = str(french_raw).strip()
-            pinyin = re.sub(clean_pattern, '', str(pinyin_raw)).strip()
+            pinyin = re.sub(clean_pattern, '', str(pinyin_raw).lower()).strip()
             hanzi = re.sub(clean_pattern, '', str(hanzi_raw)).strip()
 
             # Split into syllables and hanzi chars
