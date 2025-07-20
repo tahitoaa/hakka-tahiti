@@ -1,0 +1,184 @@
+ {% extends 'hakkadbapp/base.html' %}
+
+ {% block content %}
+ 
+<h2>Possible Initials and Finals</h2>
+<div class="flex flex-col gap-8 my-6">
+    <div class="w-full bg-white rounded-lg shadow p-6">
+        <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span class="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+            Initials
+        </h3>
+
+        <table class="table-auto mb-4 w-full text-center border border-red-200 shadow-lg rounded-lg overflow-hidden">
+            <thead class="bg-gradient-to-r from-red-200 to-white">
+                <tr>
+                    <th class="px-4 py-2 border-b font-semibold text-red-800">Consonnes simples</th>
+                    <th class="px-4 py-2 border-b font-semibold text-red-800">Aspirée</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="hover:bg-red-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">b</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">p</td>
+                </tr>
+                <tr class="hover:bg-red-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">d</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">t</td>
+                </tr>
+                <tr class="hover:bg-red-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">g</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">k</td>
+                </tr>
+                <tr class="hover:bg-red-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">f</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-red-700">h</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="table-auto mb-4 w-full text-center border border-gray-200 shadow-lg rounded-lg overflow-hidden">
+            <thead class="bg-gradient-to-r from-blue-200 to-blue-100">
+                <tr>
+                    <th class="px-4 py-2 border-b font-semibold text-blue-800">Consonne</th>
+                    <th class="px-4 py-2 border-b font-semibold text-blue-800">Consonne aspirée</th>
+                    <th class="px-4 py-2 border-b font-semibold text-blue-800">Consonne mouillée</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="hover:bg-blue-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">z</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">zh</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">j</td>
+                </tr>
+                <tr class="hover:bg-blue-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">c</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">ch</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">q</td>
+                </tr>
+                <tr class="hover:bg-blue-50 transition">
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">s</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">sh</td>
+                    <td class="px-4 py-2 border-b text-lg font-medium text-blue-700">x</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="table-auto w-full text-center border border-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-4 py-2 border-b">Comme en français</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="px-4 py-2 border-b">
+                        <div>l, m, n, y, w</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="w-full bg-white rounded-lg shadow p-6"></div>
+        <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span class="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+            Finals
+        </h3>
+        <ul class="grid grid-cols-3 gap-3">
+            {% for final in finals %}
+                <li class="bg-green-50 hover:bg-green-100 rounded px-3 py-2 text-center font-medium transition">
+                    {{ final.final }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="w-full bg-white rounded-lg shadow p-6">
+        <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span class="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
+            Tones
+        </h3>
+
+        <style>
+            svg {
+                max-width: 100%;
+            }
+            .bg-line:nth-child(even) {
+                fill: #e0e0e0;
+            }
+            .bg-line:nth-child(odd) {
+                fill: #f8f8f8;
+            }
+            .arrow {
+                fill: #ff0000;
+                stroke: #ff0000;
+                stroke-width: 10;
+            }
+            .axis-text {
+                font-weight: bold;
+                fill: #000;
+            }
+            .tone-label {
+                fill: red;
+                font-weight: bold;
+            }
+        </style>
+  <svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background pitch lines -->
+    <g>
+      <rect class="bg-line" x="0" y="0" width="600" height="50"/>
+      <rect class="bg-line" x="0" y="50" width="600" height="50"/>
+      <rect class="bg-line" x="0" y="100" width="600" height="50"/>
+      <rect class="bg-line" x="0" y="150" width="600" height="50"/>
+      <rect class="bg-line" x="0" y="200" width="600" height="50"/>
+    </g>
+
+    <!-- Tone 1: (4,4) horizontal -->
+    <line class="arrow" x1="30" y1="70" x2="100" y2="70" />
+
+    <!-- Tone 2: (1,1) horizontal -->
+    <line class="arrow" x1="120" y1="220" x2="190" y2="220" />
+
+    <!-- Tone 3: (3,1) falling -->
+    <line class="arrow" x1="210" y1="120" x2="280" y2="220" />
+
+    <!-- Tone 4: (5,2) steep falling -->
+    <line class="arrow" x1="300" y1="20" x2="370" y2="170" />
+
+    <!-- Tone 5: (1,stop) horizontal at low -->
+    <line class="arrow" x1="390" y1="220" x2="460" y2="220" />
+
+    <!-- Tone 6: (5,stop) horizontal at top -->
+    <line class="arrow" x1="480" y1="20" x2="550" y2="20" />
+
+    <!-- Tone Numbers -->
+    <g font-size="14">
+      <text class="tone-label" x="55" y="290">1</text>
+      <text class="tone-label" x="145" y="290">2</text>
+      <text class="tone-label" x="235" y="290">3</text>
+      <text class="tone-label" x="325" y="290">4</text>
+      <text class="tone-label" x="415" y="290">5</text>
+      <text class="tone-label" x="505" y="290">6</text>
+      <text x="270" y="280" class="axis-text">TONE</text>
+    </g>
+
+    <!-- Pitch Labels -->
+    <g font-size="14">
+      <text x="0" y="20" class="axis-text">5</text>
+      <text x="0" y="70" class="axis-text">4</text>
+      <text x="0" y="120" class="axis-text">3</text>
+      <text x="0" y="170" class="axis-text">2</text>
+      <text x="0" y="220" class="axis-text">1</text>
+      <text x="0" y="270" class="axis-text">PITCH</text>
+    </g>
+  </svg>
+        <ul class="grid grid-cols-3 gap-3">
+            {% for tone in tones %}
+                <li class="bg-yellow-50 hover:bg-yellow-100 rounded px-3 py-2 text-center font-medium transition">
+                    {{ tone.tone_number }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+</div>
+ {% endblock %}
