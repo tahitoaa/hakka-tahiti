@@ -505,9 +505,9 @@ def hanzi_by_pinyin(request, syllable):
 
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
 
-def hanzi_by_tone(request, tone_number):
+def hanzi_by_tone(request, tone):
     # Filter all relevant pronunciations
-    prons = Pronunciation.objects.filter(tone__tone_number=tone_number)
+    prons = Pronunciation.objects.filter(tone__tone_number=tone)
 
     # Group by hanzi character
     hanzi_map = defaultdict(list)
@@ -527,8 +527,8 @@ def hanzi_by_tone(request, tone_number):
         })
 
     context = {
-        'tone_number': tone_number,
-        'title': f"Tone {tone_number}",
+        'tone_number': tone,
+        'title': f"Tone {tone}",
         'hanzi_data': hanzi_data
     }
 
