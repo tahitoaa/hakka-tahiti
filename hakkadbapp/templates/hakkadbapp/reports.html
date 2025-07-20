@@ -2,6 +2,11 @@
 
 {% block content %} 
 
+
+<p class="mb-6 text-gray-700">
+    Cette page présente une synthèse de l’état du lexique analysé automatiquement pour la création de ce site. 
+    Consultez également l’onglet <a class="text-blue-600 hover:underline" href="{% url 'caracters' %}"> Caractères </a>, en particulier la section sur les caractères à plusieurs prononciations, afin de détecter d’éventuelles incohérences dans les données.
+</p>
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for s in stats %}
         <div class="bg-white text-black rounded-lg shadow-md p-4">

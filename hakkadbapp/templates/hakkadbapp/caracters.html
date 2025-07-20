@@ -2,46 +2,69 @@
 
 {% block content %} 
 
-
 <h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-  Liste des caractères rangés par pinyin
+    <button type="button" class="toggle-section focus:outline-none">
+        Liste des caractères rangés par pinyin
+    </button>
 </h1>
 
-<div class="no-print-overflow bg-white p-6 text-gray-800">
-  <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
-    {% for p in all_prons %}
-      <div class="break-inside-avoid">
-        <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-          <span class="hanzi-block">
-            <span class="simp">{{ p.simp }}</span>
-            <span class="trad hidden">{{ p.trad }}</span>
-          </span>
-        </a>
-        <span class="text-gray-600"> {{ p.pinyin }} </span>
-      </div>
-    {% endfor %}
-  </div>
+<div class="no-print-overflow bg-white p-6 text-gray-800 foldable-section max-h-96 overflow-y-auto transition-all duration-300">
+    <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
+        {% for p in all_prons %}
+            <div class="break-inside-avoid">
+                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+                    <span class="hanzi-block">
+                        <span class="simp">{{ p.simp }}</span>
+                        <span class="trad hidden">{{ p.trad }}</span>
+                    </span>
+                </a>
+                <span class="text-gray-600"> {{ p.pinyin }} </span>
+            </div>
+        {% endfor %}
+    </div>
 </div>
 
 <h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-  Caractères à plusieurs lectures (多音字)
+    <button type="button" class="toggle-section focus:outline-none">
+        Caractères à plusieurs lectures (多音字)
+    </button>
 </h1>
 
-<div class="no-print-overflow bg-white p-6 text-gray-800">
-  <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
-    {% for p in all_prons_by_car %}
-      <div class="break-inside-avoid">
-        <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-          <span class="hanzi-block">
-            <span class="simp">{{ p.simp }}</span>
-            <span class="trad hidden">{{ p.trad }}</span>
-          </span>
-        </a>
-        <span class="text-gray-600"> {{ p.pinyin }} </span>
-      </div>
-    {% endfor %}
-  </div>
+<div class="no-print-overflow bg-white p-6 text-gray-800 foldable-section max-h-96 overflow-y-auto transition-all duration-300">
+    <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
+        {% for p in all_prons_by_car %}
+            <div class="break-inside-avoid">
+                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
+                    <span class="hanzi-block">
+                        <span class="simp">{{ p.simp }}</span>
+                        <span class="trad hidden">{{ p.trad }}</span>
+                    </span>
+                </a>
+                <span class="text-gray-600"> {{ p.pinyin }} </span>
+            </div>
+        {% endfor %}
+    </div>
 </div>
+
+<script>
+document.querySelectorAll('.toggle-section').forEach((btn, idx) => {
+    btn.addEventListener('click', function() {
+        const section = document.querySelectorAll('.foldable-section')[idx];
+        if (section.style.maxHeight && section.style.maxHeight !== '0px') {
+            section.style.maxHeight = '0px';
+            section.style.overflowY = 'hidden';
+        } else {
+            section.style.maxHeight = '24rem';
+            section.style.overflowY = 'auto';
+        }
+    });
+});
+// Initialize folded state
+document.querySelectorAll('.foldable-section').forEach(section => {
+    section.style.maxHeight = '24rem';
+    section.style.overflowY = 'auto';
+});
+</script>
 
 
 {% endblock %}

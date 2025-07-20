@@ -23,6 +23,7 @@ s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
 
 from .management.commands import import_lexique
+from django.db.models import Case, When, Value, IntegerField
 
 def static(request):
     context = {
@@ -400,7 +401,6 @@ def hanzi(request, hanzi_char):
     return render(request, "hakkadbapp/hanzi.html", context)
 
 def phonemes(request):
-
     custom_order = ['b', 'p', 'm', 'f',
                 'd', 't', 'n', 'l',
                 'g', 'k', 'h',
@@ -504,3 +504,106 @@ def hanzi_by_pinyin(request, syllable):
     }
 
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
+
+def hanzi_by_tone(request, tone_number):
+    # Filter all relevant pronunciations
+    prons = Pronunciation.objects.filter(tone__tone_number=tone_number)
+
+    # Group by hanzi character
+    hanzi_map = defaultdict(list)
+    for p in prons:
+        hanzi_map[p.hanzi].append(p)
+
+    # Prepare full data per hanzi
+    hanzi_data = []
+    for hanzi_char, prons_list in hanzi_map.items():
+        words = Word.objects.filter(pronunciations__in=prons_list).distinct()
+        hanzi_data.append({
+            'hanzi': hanzi_char,
+            'simp': t2s.convert(hanzi_char),
+            'trad': s2t.convert(hanzi_char),
+            'pronunciations': prons_list,
+            'related_words': words,
+        })
+
+    context = {
+        'tone_number': tone_number,
+        'title': f"Tone {tone_number}",
+        'hanzi_data': hanzi_data
+    }
+
+    return render(request, "hakkadbapp/hanzi_by_tone.html", context)
+
+def pronunciation(request):
+    custom_order = ['b', 'p', 'm', 'f',
+            'd', 't', 'n', 'l',
+            'g', 'k', 'h',
+            'j', 'q', 'x',
+            'zh', 'ch', 'sh', 'r',
+            'z', 'c', 's',
+            '']  # for null initial
+
+    cantonese_finals = [
+        'a', 'aa', 'e', 'i', 'o', 'u', 'yu',
+        'ai', 'aai', 'ei', 'oi', 'ui', 'iu', 'eu', 'ou', 'eoi', 'oei',
+        'am', 'aam', 'em', 'im', 'om', 'um', 'eom', 'eum',
+        'an', 'aan', 'in', 'un', 'eon', 'oen',
+        'ang', 'aang', 'eng', 'ing', 'ung', 'ong',
+        'ap', 'aap', 'ip', 'up', 'eop', 'eup',
+        'at', 'aat', 'it', 'ut', 'eot', 'eut',
+        'ak', 'aak', 'ek', 'ik', 'uk', 'ok', 'eok', 'euk'
+    ]
+
+    # Build a Case/When expression for ordering
+    order_cases = Case(
+        *[When(initial=val, then=Value(idx)) for idx, val in enumerate(custom_order)],
+        default=Value(len(custom_order)),  # Items not in list go last
+        output_field=IntegerField()
+    )
+
+    # Apply the custom order in the query
+    initials = (
+        Initial.objects
+        .filter(pronunciations__isnull=False)
+        .distinct()
+        .annotate(ordering=order_cases)
+        .order_by('ordering')
+    )
+
+    # Build the ordering Case
+    ordering_case = Case(
+        *[When(final=val, then=Value(idx)) for idx, val in enumerate(cantonese_finals)],
+        default=Value(len(cantonese_finals)),  # Place unknown finals last
+        output_field=IntegerField()
+    )
+
+    # Query with custom ordering
+    finals = (
+        Final.objects
+        .filter(pronunciations__isnull=False)
+        .distinct()
+        .annotate(ordering=ordering_case)
+        .order_by('ordering')
+    )
+    # All unique initials and finals in use
+    # initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
+    # finals = Final.objects.filter(pronunciations__isnull=False).distinct().order_by('final')
+
+    tones = (
+        Tone.objects.all()
+    )
+
+    # Get all unique (initial, final) pairs
+    combos = Pronunciation.objects.values_list('initial_id', 'final_id').distinct()
+
+    # Convert to set of tuples for fast lookup
+    combo_set = set(combos)
+
+    context = {  
+        'initials': initials,
+        'finals': finals,
+        'combo_set': combo_set,
+        'tones': tones,
+        'title': "Prononciation",
+    }
+    return render(request, "hakkadbapp/pronunciation.html", context)
