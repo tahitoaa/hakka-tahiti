@@ -30,37 +30,37 @@
 </div>
 
     <script>
-        function selectHanzi(event) {
-            const input = document.getElementById('pinyin-input');
-            if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
+    function selectHanzi(event) {
+        const input = document.getElementById('pinyin-input');
+        if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
 
-            const selectedHanzi = event.target.value;
-            const inputText = input.value.trim();
-            if (!inputText) return;
+        const selectedHanzi = event.target.value;
+        const inputText = input.value.trim();
+        if (!inputText) return;
 
-            // Match syllables or hanzi in input
-            const syllables = inputText.match(/[a-z]+[0-9]?/gi) || [];
+        // Match syllables or hanzi in input
+        const syllables = inputText.match(/[a-z]+[0-9]?/gi) || [];
 
-            // Try to find the first match based on hanzi OR pinyin that aligns with clicked button
-            const clickedValue = selectedHanzi.replace(/\|/g, '').split(',')[0].trim(); // e.g., '我' from '|我, 他|'
+        // Try to find the first match based on hanzi OR pinyin that aligns with clicked button
+        const clickedValue = selectedHanzi.replace(/\|/g, '').split(',')[0].trim(); // e.g., '我' from '|我, 他|'
 
-            for (let i = 0; i < syllables.length; i++) {
-                const syl = syllables[i];
-                // Replace the first pinyin match or hanzi match
-                if (/^[a-z]/i.test(syl)) {
-                    // Replace pinyin syllable
-                    input.value = inputText.replace(syl, clickedValue);
-                    break;
-                } else if (/[\u4e00-\u9fff]/.test(syl) && syl === clickedValue) {
-                    // Optional: skip if hanzi already present
-                    break;
-                }
+        for (let i = 0; i < syllables.length; i++) {
+            const syl = syllables[i];
+            // Replace the first pinyin match or hanzi match
+            if (/^[a-z]/i.test(syl)) {
+                // Replace pinyin syllable
+                input.value = inputText.replace(syl, clickedValue);
+                break;
+            } else if (/[\u4e00-\u9fff]/.test(syl) && syl === clickedValue) {
+                // Optional: skip if hanzi already present
+                break;
             }
-
-            input.dispatchEvent(new Event('change')); // trigger UI refresh
-            input.focus(); // keep focus on input
         }
-        
+
+        input.dispatchEvent(new Event('change')); // trigger UI refresh
+        input.focus(); // keep focus on input
+    }
+    
     function buildHanziSentence({ inputId, itemSelector, containerId, outputId, pinyinOutputId, pinyinOnlyId }) {
         const input = document.getElementById(inputId);
         const output = document.getElementById(outputId);
@@ -95,56 +95,39 @@
                     return pinyin.startsWith(syl) || hanzi === syl;
                 });
             }
-
-            function extractUniqueChars(matches) {
-                return [...new Set(matches.map(el => el.textContent.trim()[0]))];
-            }
-
-            function extractUniquePinyins(matches) {
-                return [...new Set(matches.map(el =>
-                    el.textContent.trim().split(/\s+/)[1] || '?'
-                ))];
-            }
-
+        const hanziPinyinPairs = [];
         syllables.forEach(syl => {
             const matches = getMatchesForSyllable(syl);
-            const uniqueChars = extractUniqueChars(matches);
-
-            if (uniqueChars.length > 1) {
-                hanziList.push(...uniqueChars);
-                const pinyins = extractUniquePinyins(matches);
-                pinyinList.push('|' + pinyins.join(', ') + '|');
-
-            } else if (uniqueChars.length === 1) {
-                const [char, pinyin] = matches[0].textContent.trim().split(/\s+/);
-                hanziList.push(char || '?');
-                pinyinList.push(pinyin || '?');
-
+            if (matches.length > 0) {
+                matches.forEach(match => {
+                    const [char, pinyin] = match.textContent.trim().split(/\s+/);
+                    hanziPinyinPairs.push([char || '?', pinyin || '?']);
+                });
             } else {
-                hanziList.push(syl + '?');
-                pinyinList.push('?');
+                hanziPinyinPairs.push([syl + '?', '?']);
             }
+            console.log('Matches for syllable', syl, hanziPinyinPairs);
         });
-
 
         output.innerHTML = `
         <div class="flex gap-2 flex-wrap mb-2">
-            ${hanziList.map((h, i) => {
-            const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
-            return `
-                <div class="flex flex-col items-center border">
-                <span class="text-xs text-gray-500">${keyHint}</span>
-                <button id="suggested-${keyHint}" class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" value="${h}">
-                    ${h}
-                </button>
-                </div>`;
-            }).join('')}
-        </div>
-        <div class="text-lg text-gray-600">
-            ${pinyinList.join('')}
-        </div>
-        `;
-
+            ${hanziPinyinPairs.map((pair, i) => {
+                const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
+                return `
+                    <div class="flex flex-col items-center border">
+                        <span class="text-xs text-gray-500">${keyHint}</span>
+                        <button 
+                            id="suggested-${keyHint}" 
+                            class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" 
+                            value="${pair[0] || '?'}">
+                            ${pair[0] || '?'}
+                        </button>
+                        <div class="text-lg text-gray-600">
+                            ${pair[1] || '?'}
+                        </div>
+                    </div>`;
+                }).join('')}
+        </div>`
         });
 
         function updatePinyinOutput() {
@@ -169,14 +152,8 @@
             // Build rich pinyin output
             const inputHanzi = Array.from(input.value.trim());
             const pinyinRich = inputHanzi.map(h => {
-                if (h === '\n') {
-                    return '<br>';
-                }
-
-                if (h == ' ') {
-                    return '<span class="inline-block w-4"></span>';
-                }
-
+                if (h === '\n') return '<br>';
+                if (h == ' ') return '<span class="inline-block w-4"></span>';
                 const matches = getMatchesForHanzi(h, allItems);
                 const pinyinText = matches.length === 0 ? '?' : matches.join(', ');
 
@@ -199,7 +176,7 @@
                 
 
                 const matches = getMatchesForHanzi(h, allItems);
-                return matches.length > 0 ? matches.join(', ') : '?';
+                return matches.length > 1 ? '(' + matches.join(', ') + ')' : matches[0] || '?';
             }).join(' ');
 
             pinyinOutput.innerHTML = pinyinRich;
@@ -239,6 +216,7 @@
     )
 
 </script>
+
     <div id="word-list" hidden>
         <ul id="pron-list" class="flex flex-wrap gap-2">
         {% for p in pronunciations %}
