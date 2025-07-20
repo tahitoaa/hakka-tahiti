@@ -1,0 +1,15 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+  {% for p in pronunciations %}
+            <a href="{% url 'hanzi' p.simp %}">
+              <span class="hanzi-block">
+                <span class="simp">{{ p.simp }}</span>
+                <span class="trad hidden">{{ p.trad }}</span>
+              </span>
+              <span class="text-sm">
+                {{ p.pinyin }}
+              </span>
+            </a>
+  {% endfor %}
+{% endblock %}

@@ -98,6 +98,22 @@
             Tones
         </h3>
 
+        <p>
+            Cliquez sur un ton pour voir les caractères associés.
+        </p>
+        <ul class="grid grid-cols-3 gap-3">
+            {% for tone in tones %}
+                    <a href="{% url 'hanzi_by_tone' tone.tone_number %}" class="text-yellow-800 hover:text-yellow-900">
+
+                <li class="bg-yellow-50 hover:bg-yellow-100 rounded px-3 py-2 text-center font-medium transition">
+                    {{ tone.tone_number }}
+                </li>
+                    </a>
+
+                {% endfor %}
+        </ul>
+
+
         <style>
             svg {
                 max-width: 100%;
@@ -171,13 +187,7 @@
       <text x="0" y="270" class="axis-text">PITCH</text>
     </g>
   </svg>
-        <ul class="grid grid-cols-3 gap-3">
-            {% for tone in tones %}
-                <li class="bg-yellow-50 hover:bg-yellow-100 rounded px-3 py-2 text-center font-medium transition">
-                    {{ tone.tone_number }}
-                </li>
-            {% endfor %}
-        </ul>
+
     </div>
 </div>
 </div>
