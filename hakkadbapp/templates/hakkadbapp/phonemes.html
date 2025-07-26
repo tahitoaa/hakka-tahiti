@@ -1,7 +1,36 @@
 {% extends "hakkadbapp/base.html" %}
 {% block content %}
 <div class="overflow-x-auto w-full max-w-full no-print-overflow">
-  <p>Cliquez sur un phonème pour voir les caractères associés.</p>
+  <p class="print:text-black print:bg-white print:shadow-none print:p-0">
+    Cliquez sur un phonème pour voir les caractères associés.
+  </p>
+  <style>
+    @media print {
+      .no-print-overflow {
+        overflow-x: visible !important;
+        max-width: none !important;
+      }
+      table {
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+      thead {
+        display: table-header-group;
+      }
+      tfoot {
+        display: table-footer-group;
+      }
+      .sticky {
+        position: static !important;
+        background: #374151 !important; /* fallback for sticky bg */
+        color: #fff !important;
+        z-index: 0 !important;
+      }
+    }
+  </style>
   <table class="table-auto border-collapse w-full text-sm">
     <thead>
       <tr class="bg-gray-700 text-white text-center">
