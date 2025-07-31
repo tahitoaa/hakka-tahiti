@@ -209,5 +209,60 @@
 </script>
 
 
+
+
+<script>
+function downloadTableAsCSV(table) {
+    const rows = table.querySelectorAll("tr");
+    const csv = [];
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll("th, td");
+        const rowData = Array.from(cells).map(cell => {
+            let text = cell.textContent.trim().replace(/"/g, '""');
+            return `"${text}"`;
+        });
+        csv.push(rowData.join(","));
+    });
+
+    const csvString = csv.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "table_export.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function attachExportButtons() {
+    document.querySelectorAll("table").forEach((table, index) => {
+        const button = document.createElement("button");
+        button.textContent = "Export CSV";
+        button.className = "export-csv-btn";
+        button.style.margin = "10px 0";
+        button.onclick = () => downloadTableAsCSV(table);
+        
+        table.parentNode.insertBefore(button, table);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", attachExportButtons);
+</script>
+
+<style>
+  .export-csv-btn {
+  background-color: #e60023;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+</style>
+
+
 </body>
 </html>
