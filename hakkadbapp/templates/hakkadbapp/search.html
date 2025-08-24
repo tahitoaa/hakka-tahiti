@@ -28,7 +28,7 @@
 
     <!-- Table header -->
     <div class="hidden sm:grid grid-cols-5 gap-4 px-3 py-2 text-gray-500 text-sm font-medium border-b border-gray-300">
-      <div>Word</div><div>Pinyin</div><div>Category</div><div>French</div><div>Tahitian</div>
+      <div>Word</div><div>Pinyin</div><div>Category</div><div>French</div><div>Statut</div>
     </div>
 
     <!-- Word rows -->
@@ -66,8 +66,7 @@
           <!-- French -->
           <div>{{ word.french|default:"" }}</div>
 
-          <!-- Tahitian -->
-          <div>{{ word.tahitian|default:"" }}</div>
+          <div>{{ word.status|default:"" }}</div>
         </div>
       {% empty %}
         <p class="text-gray-500 italic px-3 py-2">No words found.</p>

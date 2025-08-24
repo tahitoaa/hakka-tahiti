@@ -72,6 +72,7 @@ class Word(models.Model):
     tahitian = models.TextField()
     mandarin = models.TextField()
     category = models.CharField(max_length=20, default=None, null=True, blank=True)  # Category of the word (e.g., "HSK 1", "Beginner Vocabulary")
+    status = models.CharField(max_length=20, default=None, null=True, blank=True)  # Status of the word (e.g., "common", "rare", etc.)
 
     def __str__(self):
         return f'{self.char()}'

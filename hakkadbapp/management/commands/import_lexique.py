@@ -68,14 +68,23 @@ class Command(BaseCommand):
 
     def parse_sheet(self, sheet_name, excel_file):
         # Read Excel file directly into memory
-        df = pd.read_excel(excel_file, sheet_name=sheet_name, usecols="A:C")
+        df = pd.read_excel(excel_file, sheet_name=sheet_name)
 
         self.log_stream(f"📄 Processing sheet: {sheet_name}")
 
         added = skipped = new_prons = 0
 
+        # Find the STATUT column if present
+        statut_col = None
+        for col in df.columns:
+            if str(col).strip().upper() == "STATUT":
+                statut_col = col
+                break
+
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
-            french_raw, pinyin_raw, hanzi_raw = row
+            french_raw, pinyin_raw, hanzi_raw = row[0], row[1], row[2]
+            if statut_col:
+                statut_val = row[df.columns.get_loc(statut_col)]
 
             if pd.isna(pinyin_raw):
                 self.err_stream(f"❌ Line {line_num}: Missing pinyin {french_raw, pinyin_raw, hanzi_raw }")
@@ -87,10 +96,11 @@ class Command(BaseCommand):
 
             # Clean inputs
             clean_pattern = rf"[{re.escape(string.punctuation)}\s]+"
-            french = str(french_raw).strip()
+            french = str(french_raw).strip() 
+            status = f"{statut_val}"
             pinyin = re.sub(clean_pattern, '', str(pinyin_raw).lower()).strip()
             hanzi = re.sub(clean_pattern, '', str(hanzi_raw)).strip()
-
+            
             # Split into syllables and hanzi chars
             syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
             hanzi_chars = list(hanzi)
@@ -118,7 +128,7 @@ class Command(BaseCommand):
                 syllable_data.append(data)
 
             category = sheet_name
-            self.word_data.append((french, syllable_data, category))
+            self.word_data.append((french, syllable_data, category, status))
             self.log_stream(f"{hanzi} {syllabes} {french}")
             added += 1
 
@@ -141,7 +151,12 @@ class Command(BaseCommand):
         self.word_data = []
 
         # Skip the first sheet
-        for sheet_name in excel_file.sheet_names[1:]:
+        # Define sheet names to ignore
+        ignore_sheets = {"TABLE DES MATIÈRES", "Gros mots", "Expressions", "Phrases", "Légendes", "Mots de liaison"}
+
+        for sheet_name in excel_file.sheet_names:
+            if sheet_name in ignore_sheets:
+                continue
             self.parse_sheet(sheet_name, excel_file)
         pass
 
@@ -201,15 +216,15 @@ class Command(BaseCommand):
         word_objs = []
         word_pron_objs = []
 
-        for french, syllables, category in self.word_data:
-            word = Word(french=french, category=category)
+        for french, syllables, category, status in self.word_data:
+            word = Word(french=french, category=category, status=status)
             word_objs.append(word)
 
         # Create words to get IDs
         Word.objects.bulk_create(word_objs)
 
         # Now associate pronunciations
-        for word, (_, syllables, category) in zip(word_objs, self.word_data):
+        for word, (_, syllables, category, status) in zip(word_objs, self.word_data):
 
             for pos, (h, i_str, f_str, t_num) in enumerate(syllables):
                 i = initial_objs.get(i_str)

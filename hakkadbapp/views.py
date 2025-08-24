@@ -409,16 +409,12 @@ def phonemes(request):
                 'z', 'c', 's',
                 '']  # for null initial
 
-    cantonese_finals = [
-        'a', 'aa', 'e', 'i', 'o', 'u', 'yu',
-        'ai', 'aai', 'ei', 'oi', 'ui', 'iu', 'eu', 'ou', 'eoi', 'oei',
-        'am', 'aam', 'em', 'im', 'om', 'um', 'eom', 'eum',
-        'an', 'aan', 'in', 'un', 'eon', 'oen',
-        'ang', 'aang', 'eng', 'ing', 'ung', 'ong',
-        'ap', 'aap', 'ip', 'up', 'eop', 'eup',
-        'at', 'aat', 'it', 'ut', 'eot', 'eut',
-        'ak', 'aak', 'ek', 'ik', 'uk', 'ok', 'eok', 'euk'
-    ]
+    # hakka_finals = sorted([
+    #     'a', 'e', 'i', 'o', 'u', 'ai', 'oi', 'ui', 'iu', 'eu', 'am', 'em', 'im', 'an', 'in', 'un',
+    #     'ang', 'ing', 'ung', 'ong', 'ap', 'ip', 'at', 'it', 'ut', 'ak', 'uk', 'ok', 'et', 'on',
+    #     'iap', 'iung', 'ot', 'iong', 'au', 'ao', 'io', 'uo', 'iuk', 'en', 'iok', 'iun', 'ia',
+    #     'iang', 'ep', 'ian', 'iam', 'iao', 'iak'
+    # ])
 
     # Build a Case/When expression for ordering
     order_cases = Case(
@@ -436,20 +432,19 @@ def phonemes(request):
         .order_by('ordering')
     )
 
-    # Build the ordering Case
-    ordering_case = Case(
-        *[When(final=val, then=Value(idx)) for idx, val in enumerate(cantonese_finals)],
-        default=Value(len(cantonese_finals)),  # Place unknown finals last
-        output_field=IntegerField()
-    )
+    # # Build the ordering Case
+    # ordering_case = Case(
+    #     *[When(final=val, then=Value(idx)) for idx, val in enumerate(hakka_finals)],
+    #     default=Value(len(hakka_finals)),  # Place unknown finals last
+    #     output_field=IntegerField()
+    # )
 
     # Query with custom ordering
     finals = (
         Final.objects
         .filter(pronunciations__isnull=False)
         .distinct()
-        .annotate(ordering=ordering_case)
-        .order_by('ordering')
+        .order_by('final')
     )
     # All unique initials and finals in use
     # initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
@@ -526,17 +521,12 @@ def pronunciation(request):
             'z', 'c', 's',
             '']  # for null initial
 
-    cantonese_finals = [
-        'a', 'aa', 'e', 'i', 'o', 'u', 'yu',
-        'ai', 'aai', 'ei', 'oi', 'ui', 'iu', 'eu', 'ou', 'eoi', 'oei',
-        'am', 'aam', 'em', 'im', 'om', 'um', 'eom', 'eum',
-        'an', 'aan', 'in', 'un', 'eon', 'oen',
-        'ang', 'aang', 'eng', 'ing', 'ung', 'ong',
-        'ap', 'aap', 'ip', 'up', 'eop', 'eup',
-        'at', 'aat', 'it', 'ut', 'eot', 'eut',
-        'ak', 'aak', 'ek', 'ik', 'uk', 'ok', 'eok', 'euk'
-    ]
-
+    hakka_finals = sorted([
+        'a', 'e', 'i', 'o', 'u', 'ai', 'oi', 'ui', 'iu', 'eu', 'am', 'em', 'im', 'an', 'in', 'un',
+        'ang', 'ing', 'ung', 'ong', 'ap', 'ip', 'at', 'it', 'ut', 'ak', 'uk', 'ok', 'et', 'on',
+        'iap', 'iung', 'ot', 'iong', 'au', 'ao', 'io', 'uo', 'iuk', 'en', 'iok', 'iun', 'ia',
+        'iang', 'ep', 'ian', 'iam', 'iao', 'iak'
+    ])
     # Build a Case/When expression for ordering
     order_cases = Case(
         *[When(initial=val, then=Value(idx)) for idx, val in enumerate(custom_order)],
@@ -555,8 +545,8 @@ def pronunciation(request):
 
     # Build the ordering Case
     ordering_case = Case(
-        *[When(final=val, then=Value(idx)) for idx, val in enumerate(cantonese_finals)],
-        default=Value(len(cantonese_finals)),  # Place unknown finals last
+        *[When(final=val, then=Value(idx)) for idx, val in enumerate(hakka_finals)],
+        default=Value(len(hakka_finals)),  # Place unknown finals last
         output_field=IntegerField()
     )
 
@@ -565,8 +555,7 @@ def pronunciation(request):
         Final.objects
         .filter(pronunciations__isnull=False)
         .distinct()
-        .annotate(ordering=ordering_case)
-        .order_by('ordering')
+        .order_by('final')
     )
     # All unique initials and finals in use
     # initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
