@@ -18,7 +18,8 @@
                         <span class="trad hidden">{{ p.trad }}</span>
                     </span>
                 </a>
-                <span class="text-gray-600"> {{ p.pinyin }} </span>
+                <span class="text-gray-600">
+                    {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number%}</span>
             </div>
         {% endfor %}
     </div>
@@ -40,7 +41,9 @@
                         <span class="trad hidden">{{ p.trad }}</span>
                     </span>
                 </a>
-                <span class="text-gray-600"> {{ p.pinyin }} </span>
+                <span class="text-gray-600"> 
+                    {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
+                </span>
             </div>
         {% endfor %}
     </div>

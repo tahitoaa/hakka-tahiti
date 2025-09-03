@@ -49,15 +49,15 @@
       {% for initial in initials %}
         <tr class="{% cycle 'bg-white' 'bg-gray-50' %}">
           <td class="border p-2 font-semibold sticky left-0 bg-gray-700 z-10 whitespace-nowrap text-white">
-            {{ initial.initial }}
+            {% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=""%}
           </td>
           {% for final in finals %}
             <td class="border p-2 text-center">
               {% combo_exists initial.id final.id combo_set as exists %}
               {% if exists %}
                 <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
-                  <span class="font-bold px-1 py-0.5 rounded">
-                    {{ initial.initial }}{{ final.final }}
+                  <span class="font-bold px-1 py-0.5 rounded">  
+                    {% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=final.final%}
                   </span>
                 </a>
               {% endif %}

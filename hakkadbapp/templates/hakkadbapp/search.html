@@ -54,7 +54,7 @@
           <!-- Pinyin -->
           <div class="flex flex-wrap gap-1">
             {% for wp in word.wordpronunciation_set.all %}
-              {{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}
+              {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
             {% endfor %}
           </div>
 
@@ -107,7 +107,7 @@
 
               </a></div>
             <div class="text-sm">
-              {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}
+              {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
             </div>
           </div>
         </li>
