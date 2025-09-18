@@ -139,10 +139,8 @@ class Command(BaseCommand):
 
 
     def parse_sheets(self, sheet_id):
-        sheet_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
-
-        # Load into pandas
-        excel_file = pd.ExcelFile(sheet_url)
+        # Use a local file path instead of downloading from Google Sheets
+        excel_file = pd.ExcelFile('../lexique/lexique.xlsx')
 
         self.initial_set = set()
         self.final_set = set()
@@ -152,7 +150,12 @@ class Command(BaseCommand):
 
         # Skip the first sheet
         # Define sheet names to ignore
-        ignore_sheets = {"TABLE DES MATIÈRES", "Gros mots", "Expressions", "Phrases", "Légendes", "Mots de liaison"}
+        ignore_sheets = {"TABLE DES MATIÈRES", 
+                         "Gros mots", 
+                         "Expressions", 
+                         "Phrases", 
+                         "Légendes", 
+                         "Mots de liaison"}
 
         for sheet_name in excel_file.sheet_names:
             if sheet_name in ignore_sheets:
@@ -169,7 +172,6 @@ class Command(BaseCommand):
         WordPronunciation.objects.all().delete()
 
         self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ')
-
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
             [Initial(initial=i) for i in self.initial_set],

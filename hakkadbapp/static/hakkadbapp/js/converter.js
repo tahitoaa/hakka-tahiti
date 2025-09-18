@@ -11,6 +11,7 @@ class Dictionary {
     constructor ({containerId, itemSelector}) {
         this.items = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
         this.pronunciations = this.items.map(el => this.parsePronunciation(el));
+        this.unknowns = new Set()
     }
 
     parsePronunciation(el) {
@@ -37,13 +38,20 @@ class Dictionary {
     }
 
     getMatchesForHanzi(char) {
+        if (!isHanzi(char)) {
+            return [new NoHanziToken({text:char})]
+        }
+        if (isPunctuation(char)) {
+            return [new Punctuation({text:char})]
+        }
         if (!char || char.length !== 1 || !isHanzi(char)) {
             return [new NoHanziToken({text:char})]
         }
         const matches = this.pronunciations.filter(p => {
             return p.simp == char || p.trad == char;
         });
-        console.log(matches);
+
+        if (matches.length == 0) this.unknowns.add(char);
         return matches;
     }
 }
@@ -112,25 +120,29 @@ class TextModel {
                                             return p;
                                         }));
         });
+        console.log(this.syllables)
         this.text = text;
     }
 
     select(selectionIndex){
         const selection = this.suggestions[selectionIndex];
         const toReplace = this.syllables[selection.for];
-        this.text = this.text.replace(toReplace+'_', selection.simp);
-        this.text = this.text.replace(toReplace, selection.simp);
+        const replaced = this.text.replace(toReplace + '_', selection.simp);
+        if (replaced !== this.text) {this.text = replaced;}
+        else {this.text = this.text.replace(toReplace, selection.simp);}
         this.update(this.text);
     }
 }
 
 class View {
-    constructor ({inputId, outputId, pinyinOutputId, pinyinOnlyId, hanziOnlyOutput, dico}) {
-        this.input = document.getElementById(inputId);
-        this.output = document.getElementById(outputId);
-        this.pinyinOutput = document.getElementById(pinyinOutputId);
-        this.pinyinOnlyOutput = document.getElementById(pinyinOnlyId);
-        this.hanziOnlyOutput = document.getElementById(hanziOnlyOutput);
+    constructor ({dico}) {
+        this.input = document.getElementById('pinyin-input');
+        this.output = document.getElementById('suggested-hanzi');
+        this.furiganaOutput = document.getElementById('pinyin-sentence-results');
+        this.pinyinOnlyOutput = document.getElementById('pinyin-only');
+        this.hanziOnlyOutput = document.getElementById('hanzi-only-output');
+        this.expressionOutput = document.getElementById('expression-output');
+        this.unknownChars = document.getElementById('unknown-chars');
         this.dico = dico;
     }
 
@@ -160,21 +172,21 @@ class View {
     renderKana(kana){return `<span class="block text-sm">${kana}</span>`}
     renderBlock(content){return `<span class="inline-block mr-2 text-center align-center">${content}</span>`;}
     renderFurigana(char, kana){return this.renderBlock(`${this.renderKana(kana)}${this.renderChar(char)}`)}
-
+    renderUnknownChars() { this.unknownChars.innerHTML = Array.from(this.dico.unknowns.values()).join(" ");}
     render(text) {
         this.input.value = text
         // Build rich pinyin output
         const inputHanzi = Array.from(text);
-        this.pinyinOutput.innerHTML = inputHanzi
+        this.furiganaOutput.innerHTML = inputHanzi
             .filter(e => e != "_")
             .map(h => {
                 if (h === '\n') return '<br>';
                 if (h == ' ') return '<span class="inline-block w-4"></span>';
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
-                if (!isHanzi(h)) {return this.renderBlock(this.renderChar(h))}
+                if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana(" ",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
                 const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-                return this.renderBlock(`${this.renderKana(matchedPinyin)}${this.renderChar(h)}`)
+                return this.renderFurigana(h, matchedPinyin)
             })
             .join('');
 
@@ -199,14 +211,28 @@ class View {
             })
             .join('');
         this.input.focus(); // keep focus on input
+
+        this.expressionOutput.innerHTML = inputHanzi
+            .filter(e => e != "_")
+            .map(h => {
+                if (h === '\n') return '<br>';
+                if (h == ' ') return '<span class="inline-block w-4"></span>';
+                if (isPunctuation(h)) {return h;}
+                if (!isHanzi(h)) {return h;}
+                const matches = this.dico.getMatchesForHanzi(h);
+                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
+                return `${matchedPinyin}${h} `
+            })
+            .join('');
     }
 }
 
 class Controller{
-    constructor ({ inputId, itemSelector, containerId, outputId, pinyinOutputId, pinyinOnlyId, hanziOnlyOutput }) {
+    constructor ({itemSelector, containerId }) {
         const dico = new Dictionary({containerId, itemSelector});
         this.model = new TextModel(dico);
-        this.view = new View({inputId, outputId, pinyinOutputId, pinyinOnlyId, hanziOnlyOutput, dico});
+        this.view = new View({dico});
+        this.dico = dico;
         this.view.input.addEventListener("input", (event) => this.handleInput(event));
         this.view.input.addEventListener("paste", (event) => this.handleInput(event));
         this.view.input.addEventListener("change", (event) => this.handleInput(event));
@@ -218,6 +244,7 @@ class Controller{
 
     // Input change
     handleInput(event) {
+        this.dico.unknowns.clear();
         const text = this.view
                          .input
                          .value
@@ -228,6 +255,7 @@ class Controller{
         this.model.update(text);
         this.view.renderSuggestions(this.model.suggestions);
         this.view.render(this.model.text);
+        this.view.renderUnknownChars();
     }
 
     // Select one Hanzi
@@ -235,7 +263,7 @@ class Controller{
         if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
         this.model.select(event.target.value);
         this.view.render(this.model.text);
-        this.view.renderSuggestions(this.model.suggestions);    
+        this.view.renderSuggestions(this.model.suggestions); 
     }
 }
 
@@ -243,13 +271,8 @@ class Controller{
 document.addEventListener("DOMContentLoaded", () =>
     {
         const converter = new Controller({
-            inputId: 'pinyin-input',
             itemSelector: 'li',
             containerId: '#pron-list',
-            outputId: 'suggested-hanzi',
-            pinyinOutputId: 'pinyin-sentence-results',
-            pinyinOnlyId:'pinyin-only',
-            hanziOnlyOutput:'hanzi-only-output',
         });
     }
 )
