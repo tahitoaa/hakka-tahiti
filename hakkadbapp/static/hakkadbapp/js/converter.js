@@ -144,7 +144,7 @@ class View {
                         <span class="text-xs text-gray-500">${keyHint}</span>
                         <button 
                             id="suggested-${keyHint}" 
-                            class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200" 
+                            class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200 hover:shadow-xs" 
                             value="${i}">
                             ${pron.simp || '?'}
                         </button>
