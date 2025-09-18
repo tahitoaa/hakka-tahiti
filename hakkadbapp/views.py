@@ -12,12 +12,7 @@ import csv
 from collections import defaultdict
 from urllib.parse import unquote
 from django.db.models import Case, When, IntegerField, Value
-from PIL import Image
-
-
-
 import random
-
 from opencc import OpenCC
 
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
