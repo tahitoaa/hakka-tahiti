@@ -1,6 +1,5 @@
 *.env
 *.sqlite3
-/staticfiles/
 hakkadbapp/data/
 __pycache__/
 *.__pycache__
