@@ -137,22 +137,22 @@ def sagart_py(initial, final, tone=""):
         "zh": "ts",
         "ch": "ts'",
         "sh": "s",
-        "j": "tsj",
-        "q": "tsj'",
+        "j": "ts",
+        "q": "ts'",
         "x": "s",
         "y": "j",
         "w": "v",
         "h": "h",
+        "ng" : "ŋ"
     }
-    map_f = {
-    }
+    map_f = {}
         
     if final == "i" and initial in ["z", "c", "s", "zh", "ch", "sh"]:
         final = "u"
     
-    final = final.replace("ian", "ien")
-    if final.startswith('i') and initial in ["k", "ng"] and len(final) > 1:
-        final = final.replace("i", "j", 1)
+    if final.startswith('i') and initial in ["q","k", "g", "ng"] and len(final) > 1:
+        initial = map_i.get(initial, initial) + 'j'
+        initial = initial.replace("'j","j'")
 
     final = final.replace("e", "ε")
     final = final.replace("εu", "eu")
@@ -161,5 +161,8 @@ def sagart_py(initial, final, tone=""):
     final = final.replace("ao", "au")
     initial = initial.replace("ng", "ŋ")
     final = final.replace("o", "ɔ")
+
+    if initial == "y" and final == "u":
+        final = "iu"
 
     return map_i.get(initial, initial)+ map_f.get(final, final) + superscript_map.get(str(tone),str(tone) )

@@ -98,21 +98,34 @@
   <h1 class="text-lg sm:text-base lg:text-xl font-semibold tracking-wide">
     {{ title }}
   </h1>
+<button id="toggle-hanzi"
+    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
+           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
+    Trad. / Simp.
+</button> 
 
-<!-- Unified Style for Both Buttons -->
+  <!-- Unified Style for Both Buttons -->
 <!-- Pinyin Dropdown Menu -->
-<select id="pinyin-menu" class="absolute left-0 mt-2 w-40 bg-white rounded shadow-lg z-10 text-black py-2 px-3">
-  <option value="">Choisir un Pinyin</option>
-  <option value="wenfa_py">Guide Wenfa</option>
+ <div class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
+           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
+ <label for="pinyin-menu">Système de transcription</label>
+<select id="pinyin-menu" class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
+           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
+  <option value="wenfa_py"selected>Guide de prononciation de l'association Wenfa</option>
   <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
   <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
   <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
+  <option value="">Chinese English dictionary, the Hakka Dialect</option>
+  <option value="">Ernest Sin Chan</option>
+  <option value="">Manuel de Hakka de Francine Laufatte</option>
   <!-- Add more pinyins as needed -->
 </select>
+ </div>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const menu = document.getElementById('pinyin-menu');
-    menu.addEventListener('change', function () {
+    menu.value = "wenfa_py";
+    function selectPinyin () {
       if (menu.value) {
         // Hide all pinyin classes
         document.querySelectorAll('.wenfa_py, .hakka_dict_py, .chappell_py, .sagart_py').forEach(el => {
@@ -123,26 +136,12 @@
           el.style.display = '';
         });
       }
-    });
+    }
+    selectPinyin();
+    menu.addEventListener('change', selectPinyin);
   });
 </script>
-
-<button id="toggle-hanzi"
-    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
-           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
-    Trad. / Simp.
-</button> </ul>
-
-<button onclick="window.print()"
-    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
-           hover:bg-red-800 active:bg-red-900 transition duration-200 print:hidden mt-4 ml-2">
-    🖨️ Imprimer
-</button>
-
 </div>
-
-
-
   <!-- Mobile Menu Button -->
   <button id="menu-toggle" class="sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white bg-red-600 hover:bg-red-700 text-white">
     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"

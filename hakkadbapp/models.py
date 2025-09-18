@@ -49,7 +49,8 @@ class Pronunciation(models.Model):
         return s2t.convert(self.hanzi)
     
     def pinyin(self):
-        return ''.join([str(self.initial or ''), str(self.final or ''), str(self.tone or '')])
+        superscript_map = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "":""}
+        return ''.join([str(self.initial or ''), str(self.final or ''), superscript_map[str(self.tone.tone_number) if self.tone else '']])
 
     def latex(self):
         # Compose pinyin from initial, final, and tone
