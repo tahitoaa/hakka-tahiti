@@ -12,7 +12,6 @@ import csv
 from collections import defaultdict
 from urllib.parse import unquote
 from django.db.models import Case, When, IntegerField, Value
-import pytesseract
 from PIL import Image
 
 
