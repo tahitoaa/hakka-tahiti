@@ -172,7 +172,10 @@ class View {
     renderKana(kana){return `<span class="block text-sm">${kana}</span>`}
     renderBlock(content){return `<span class="inline-block mr-2 text-center align-center">${content}</span>`;}
     renderFurigana(char, kana){return this.renderBlock(`${this.renderKana(kana)}${this.renderChar(char)}`)}
-    renderUnknownChars() { this.unknownChars.innerHTML = Array.from(this.dico.unknowns.values()).join(" ");}
+    renderUnknownChars() { 
+        this.unknownChars.innerHTML = Array.from(this.dico.unknowns.values()).join("");
+    }
+
     render(text) {
         this.input.value = text
         // Build rich pinyin output
