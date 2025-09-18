@@ -3,6 +3,7 @@
     {
       "src": "/(.*)",
       "dest": "api/index.py"
-    }
+    },
+    { "src": "/static/(.*)", "dest": "/staticfiles/$1" }
   ]
 }
