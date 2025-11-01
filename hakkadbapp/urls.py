@@ -36,6 +36,7 @@ urlpatterns = [
     path("search/", views.search, name="search"),
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
+    path("transcripter/", views.transcripter, name="transcripter"),
     path("caracters", views.caracters, name="caracters"),
     path("flashcards/", views.flashcards, name="flashcards"),
     path("flashcards/<str:category>", views.flashcards, name="flashcards"),

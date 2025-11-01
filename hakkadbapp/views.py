@@ -322,6 +322,14 @@ def pinyin_converter(request):
         'finals': Final.objects.all(),}
     return render(request, "hakkadbapp/converter.html", context)
 
+def transcripter(request):
+    context = {"title": "Méthode de saisie",
+        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'tones': Tone.objects.all(),
+        'initials': Initial.objects.all(),
+        'finals': Final.objects.all(),}
+    return render(request, "hakkadbapp/transcripter.html", context)
+
 def caracters(request):
     context = {"page": "caracters"}
     all_prons = Pronunciation.objects.order_by('initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')

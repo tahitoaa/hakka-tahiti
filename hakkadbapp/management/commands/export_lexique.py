@@ -26,15 +26,15 @@ class Command(BaseCommand):
 
             for word in Word.objects.prefetch_related('wordpronunciation_set__pronunciation'):
                 char_sequence = word.char()
-                french = word.french
+                french = word.french.lower()
                 pinyin = word.pinyin()
                 hanzi = word.simp()  # or word.trad() depending on your preference
-                target = f"{pinyin}{hanzi}"
+                target = f"{pinyin} {hanzi}"
                 theme = word.category or ''
                 # Reverse map all chars of pinyin using superscript_map
                 pinyin_sup = ''.join(reverse_superscript_map.get(ch, ch) for ch in pinyin)
                 audio = f"{pinyin_sup}.wav"
-                
+                    
                 theme = word.category or ''
                 audio_path = os.path.join(settings.BASE_DIR, "..","lexique", "audio", theme, audio)
                 audio = audio if os.path.isfile(audio_path) else ""

@@ -13,38 +13,69 @@
     Utiliser <kbd>TAB</kbd> pour sélectionner le caractère, <br>
     puis <kbd>ENTRER</kbd> pour l'insérer dans le champ de saisie.
   </small>
+     <button id="import-prons" class="rounded shadow text-center border">Importer un répertoire de prononciations</button>        
+
 
   <textarea id="pinyin-input"
             placeholder="Ex: wuk5 ka1 hao3 tai4"
-            class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-y min-h-[100px] max-h-[300px]">
+            class="w-full 
+            px-4 py-2 border border-gray-300 rounded-md shadow-sm text-base 
+            focus:outline-none focus:ring-2 focus:ring-indigo-400 
+            resize-y 
+            min-h-[300px] 
+            max-h-[600px]">
   </textarea>
 
+  <!-- <div id="new-hanzi">
+     <input id="insert-hanzi" class="bg-white" type="text">
+     <button id="insert-" class="button"> Insérer </button>
+  </div> -->
   <div id="suggested-hanzi"
        class="mt-4 text-base text-indigo-800 leading-tight break-words">
   </div>
 
+  <section>
   <div id="pinyin-sentence-results"
        class="mt-4 text-sm text-gray-700 leading-none text-left bg-white p-3 rounded-md shadow border border-gray-100">
   </div>
+  </section>
 
   <div id="hanzi-only-output" hidden
        class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
   </div>
 
-  <label>Caractères inconnus. </label>
-  <div id="unknown-chars"
-       class="mt-4 text-sm leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
-</div>
-
+  <section>
+     <h3> Pinyin seul </h3>
   <div id="pinyin-only"
        class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
   </div>
+  </section>
 
-  <div id="expression-output"
-       class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
-  </div>
+  <section>
+     <h3> Rendu sous forme d'expression pour E-reo. </h3>
+     <div id="expression-output"
+          class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
+     </div>
+  </section>
+
+  <section>
+     <div class="flex flex-col md:flex-row gap-4">
+          <div class="flex-1">
+               <h3> Caractères sans prononciation </h3>
+               <ul id="unknown-chars"
+                          class="mt-4 text-sm leading-snug text-left p-3 rounded-md shadow border border-gray-100">
+               </ul>
+               <button id="export-new" class="rounded shadow text-center border">Exporter</button>
+          </div>
+          <div class="flex-1">
+               <h3> Phonèmes sans caractères </h3>
+               <ul id="unknown-prons"
+                          class="mt-4 text-sm leading-snug text-left p-3 rounded-md shadow border border-gray-100">
+               </ul>
+          </div>
+     </div>
+</section>
 </div>
-
     <div id="word-list" hidden>
         <ul id="pron-list" class="flex flex-wrap gap-2">
         {% for p in pronunciations %}

@@ -17,6 +17,33 @@
 </style>
 
 <style>
+/* PRINT MODE: always show all columns expanded */
+@media print {
+    .collapsed {
+        /* Force expand on print */
+        flex-grow: 1 !important;
+        flex: 1 1 auto !important;
+    }
+    .hidden {
+        display: block !important;
+    }
+    .print-expand {
+        flex-grow: 1 !important;
+        flex: 1 1 auto !important;
+    }
+    /* Remove fixed heights & enable full content display */
+    .no-print-height {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .no-print {
+        display: none;
+    }
+}
+</style>
+
+<style>
 @media print {
   body {
     background: white !important;
@@ -89,38 +116,46 @@
 <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
   
   <!-- Logo & Title Block -->
-<div class="flex flex-col sm:flex-row sm:items-center sm:space-x-6 text-center sm:text-left">
-<span class="text-2xl sm:text-2xl lg:text-2xl font-extrabold tracking-widest text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.85)] leading-tight hanzi">
-  文化協會大溪地客家話辭典
-</span>
+<div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+  <div class="text-center sm:text-left">
+    <span class="hidden sm:inline text-2xl font-extrabold tracking-widest text-white drop-shadow hanzi leading-tight">
+      文化協會大溪地客家話辭典
+    </span>
+    <span class="inline sm:hidden text-lg font-bold text-white hanzi">
+      大溪地客家話辭典
+    </span>
+    <h1 class="text-lg font-semibold text-white mt-1">
+      {{ title }}
+    </h1>
+  </div>
 
-  <!-- Subtitle -->
-  <h1 class="text-lg sm:text-base lg:text-xl font-semibold tracking-wide">
-    {{ title }}
-  </h1>
-<button id="toggle-hanzi"
-    class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
-           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
-    Trad. / Simp.
-</button> 
+  <div class="no-print flex items-center gap-3">
+    <button
+      id="toggle-hanzi"
+      class="bg-red-700 text-white font-semibold text-sm px-3 py-2 rounded-full hover:bg-red-800 transition-colors"
+      aria-pressed="false"
+    >
+      Trad. / Simp.
+    </button>
 
-  <!-- Unified Style for Both Buttons -->
-<!-- Pinyin Dropdown Menu -->
- <div class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
-           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
- <label for="pinyin-menu">Système de transcription</label>
-<select id="pinyin-menu" class="bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-full shadow-md 
-           hover:bg-red-800 active:bg-red-900 transition duration-200 mt-2 sm:mt-0">
-  <option value="wenfa_py"selected>Guide de prononciation de l'association Wenfa</option>
-  <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
-  <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
-  <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
-  <option value="">Chinese English dictionary, the Hakka Dialect</option>
-  <option value="">Ernest Sin Chan</option>
-  <option value="">Manuel de Hakka de Francine Laufatte</option>
-  <!-- Add more pinyins as needed -->
-</select>
- </div>
+    <div class="no-print flex items-center bg-red-700 text-white rounded-full px-3 py-1">
+      <label for="pinyin-menu" class="sr-only">Système de transcription</label>
+      <select
+        id="pinyin-menu"
+        class="bg-transparent text-black text-sm focus:outline-none"
+        aria-label="Système de transcription"
+      >
+        <option value="wenfa_py" selected>Guide de prononciation de l'association Wenfa</option>
+        <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
+        <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
+        <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
+        <option value="">Chinese English dictionary, the Hakka Dialect</option>
+        <option value="">Ernest Sin Chan</option>
+        <option value="">Manuel de Hakka de Francine Laufatte</option>
+      </select>
+    </div>
+  </div>
+</div>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const menu = document.getElementById('pinyin-menu');
@@ -143,7 +178,7 @@
 </script>
 </div>
   <!-- Mobile Menu Button -->
-  <button id="menu-toggle" class="sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white bg-red-600 hover:bg-red-700 text-white">
+  <button id="menu-toggle" class="no-print sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white bg-red-600 hover:bg-red-700 text-white">
     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
          viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path stroke-linecap="round" stroke-linejoin="round"
@@ -153,8 +188,13 @@
 </div>
 
   <!-- Navigation Menu -->
-  <nav id="menu" class="hidden sm:block px-4 pb-4 sm:pb-0">
-    <ul class="flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0 text-sm sm:text-base font-medium">
+  <nav id="menu" class="no-print hidden sm:block px-4 pb-4 sm:pb-0">
+    <ul class="no-print flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0 text-sm sm:text-base font-medium">
+      <li>
+        <a href="{% url 'transcripter' %}" class="{% if page == 'transcripter' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
+          Transcrire
+        </a>
+      </li>
       <li>
         <a href="{% url 'pinyin_converter' %}" class="{% if page == 'converter' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
           Écrire en Hakka

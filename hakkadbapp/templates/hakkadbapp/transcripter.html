@@ -1,0 +1,74 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+<div class="mt-4"></div>
+    <div class="no-print flex flex-wrap justify-center gap-3">
+        <button id="import-prons" class="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
+            Prononciations
+        </button>
+        <!-- <button id="import-labels" class="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            Etiquettes
+        </button>
+        <button id="import-audios" class="px-4 py-2 bg-gray-700 text-white rounded-md shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400">
+            Audios
+        </button> -->
+        <button id="import-project" class="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">
+            Ouvrir📁
+        </button>
+        <button id="export-project" class="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">
+            Sauvegarder 💾
+        </button>
+    </div>
+</div>
+
+<div class="no-print mt-6 flex items-center justify-center gap-3">
+    <!-- <button id="prev-button" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200" title="Précédent">
+        ⏮️
+    </button> -->
+
+    <div class="flex items-center gap-2">
+        <label for="label-index" class="sr-only">Index de l'étiquette</label>
+        <input id="label-index" type="number" min="1" step="1" value="1" inputmode="numeric" pattern="\d*" aria-label="Index de l'étiquette" title="Numéro d'étiquette"
+            class="w-20 text-center bg-white rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+    </div>
+
+    <!-- <button id="play-button" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-200" title="Lire">
+        ▶️
+    </button>
+
+    <button id="pause-button" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-200" title="Pause">
+        ⏸️
+    </button>
+
+    <button id="auto-button" data-auto="false" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-200" title="Auto">
+        ⏩
+    </button>
+
+    <button id="loop-button" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-200" title="Boucle">
+        🔁
+    </button>
+
+    <button id="next-button" class="p-2 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200" title="Suivant">
+        ⏭️
+    </button> -->
+</div>
+
+<style>
+    /* hide all rendered chunks by default, show only the one with .visible */
+    div[id^="chunk-"] { display: none; }
+    div[id^="chunk-"].visible { display: block; }
+</style>
+
+<div id="viewer">
+</div>
+
+
+<div>
+{% include  "hakkadbapp/components/pronunciations.html" with pronunciations=pronunciations %}
+</div>
+    <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/transcripter.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/AudioController.js' %}"></script>
+{% endblock %}

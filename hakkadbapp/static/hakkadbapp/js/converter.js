@@ -4,7 +4,8 @@ function isPunctuation(ch) {
 }
 
 function isHanzi(ch) {
-    return /[\u4e00-\u9fff]/.test(ch);
+    // Covers CJK Unified Ideographs, Extension A, and B (including \u3400-\u4DBF, \u4E00-\u9FFF, \u20000-\u2A6DF)
+    return /[\u3400-\u4DBF\u4E00-\u9FFF]/.test(ch);
 }
 
 class Dictionary {
@@ -25,15 +26,33 @@ class Dictionary {
         });
     }
 
+    addPronunciations(newProns){
+        newProns.forEach(newPron => {
+            const exists = this.pronunciations.some(p =>
+                p.simp === newPron.simp &&
+                p.trad === newPron.trad &&
+                p.initial === newPron.initial &&
+                p.final === newPron.final &&
+                p.tone === newPron.tone
+            );
+            if (!exists) {
+                this.pronunciations.push(newPron);
+            }
+        });
+    }
+
     getMatchesForSyllable(syl) {
         return this.pronunciations.filter(p => {
             const pinyin = p.abstractPinyin();
             const lowerTone = p.initial + p.final + p.tone;
             return syl == [p.initial, p.final].join('') 
+                    // || syl == [p.initial+'h', p.final].join('') 
+                    // || syl == [p.initial.replace('h',''), p.final].join('') 
                     || syl == pinyin
                     || syl == lowerTone
                     || p.simp === syl
-                    || p.trad === syl ; 
+                    || p.trad === syl 
+                    ; 
         });
     }
 
@@ -66,6 +85,7 @@ class Pronunciation {
         this.initial = initial;
         this.final = final;
         this.tone = tone;
+        this.origin = "lexique-wenfa"
     }
 
     abstractPinyin() {
@@ -110,13 +130,17 @@ class TextModel {
     }
 
     update(text){
-        this.syllables = text.match(/[a-z]+[0-9]?/gi) || [];
+        // Remove all substrings between two * (including the *)
+        const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
+        this.syllables = textWithoutStars.match(/[a-z]+[_0-6]?/gi) || [];
         this.suggestions = [] 
         this.syllables.forEach((syl, i) => {
             this.suggestions.push(...this.dico
-                                          .getMatchesForSyllable(syl)
+                                          .getMatchesForSyllable(syl.split("_")[0])
                                           .map(p => {
                                             p.for = i;
+                                            p.start = 0;
+                                            p.end = 0;
                                             return p;
                                         }));
         });
@@ -126,11 +150,20 @@ class TextModel {
 
     select(selectionIndex){
         const selection = this.suggestions[selectionIndex];
-        const toReplace = this.syllables[selection.for];
-        const replaced = this.text.replace(toReplace + '_', selection.simp);
-        if (replaced !== this.text) {this.text = replaced;}
-        else {this.text = this.text.replace(toReplace, selection.simp);}
+        this.replace(selection.for, selection.simp);
         this.update(this.text);
+    }
+
+    replace(sylIndex, replaceValue) {
+        const toReplace = this.syllables[sylIndex];
+        console.log(toReplace, replaceValue)
+        const replaced = this.text.replace(toReplace, replaceValue);
+        // if (replaced !== this.text) {this.text = replaced;}
+        // else {
+        console.log(this.text, replaced);
+
+        this.text = replaced;
+        // }
     }
 }
 
@@ -143,6 +176,11 @@ class View {
         this.hanziOnlyOutput = document.getElementById('hanzi-only-output');
         this.expressionOutput = document.getElementById('expression-output');
         this.unknownChars = document.getElementById('unknown-chars');
+        this.unknownProns = document.getElementById('unknown-prons');
+        this.exportNew = document.getElementById('export-new');
+        this.importProns = document.getElementById('import-prons');
+        this.insertButton = document.getElementById('insert-button');
+        this.insertHanzi = document.getElementById('insert-hanzi');
         this.dico = dico;
     }
 
@@ -152,15 +190,14 @@ class View {
             ${suggestions.map((pron, i) => {
                 const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
                 return `
-                    <div class="flex flex-col items-center border rounded">
-                        <span class="text-xs text-gray-500">${keyHint}</span>
+                    <div class="flex flex-col items-center rounded hover:bg-gray-200 hover:shadow">
                         <button 
                             id="suggested-${keyHint}" 
-                            class="text-2xl font-semibold px-2 py-1 rounded hover:bg-gray-200 hover:shadow-xs" 
+                            class="text-small font-semibold" 
                             value="${i}">
                             ${pron.simp || '?'}
                         </button>
-                        <div class="text-lg text-gray-600">
+                        <div class="text-xs text-gray-600">
                             ${pron.abstractPinyin() || '?'}
                         </div>
                     </div>`;
@@ -170,14 +207,40 @@ class View {
 
     renderChar(char){return `<span class="block text-base font-semibold text-black">${char}</span>`}
     renderKana(kana){return `<span class="block text-sm">${kana}</span>`}
-    renderBlock(content){return `<span class="inline-block mr-2 text-center align-center">${content}</span>`;}
+    renderBlock(content){return `<span class="inline-block text-center align-center">${content}</span>`;}
     renderFurigana(char, kana){return this.renderBlock(`${this.renderKana(kana)}${this.renderChar(char)}`)}
     renderUnknownChars() { 
-        this.unknownChars.innerHTML = Array.from(this.dico.unknowns.values()).join("");
+        this.unknownChars.innerHTML = Array
+                                        .from(this.dico.unknowns.values())
+                                        .map(char => {
+                                            return `
+                                            <li>
+                                                <label>${char}</label>
+                                                <input class="bg-white w-4" type="text" id="initial-for-${char}">
+                                                <input class="bg-white w-6" type="text" id="final-for-${char}">
+                                                <input class="bg-white w-3" type="text" id="tone-for-${char}">
+                                            </li>
+                                            `
+                                          });
+    }
+
+    renderUnknownProns(syllables){
+        this.unknownProns.innerHTML = Array
+                                        .from(syllables)
+                                        .map((syl,i) => {
+                                            return `
+                                            <tr>
+                                                <td>${syl}</td>
+                                                <td>
+                                                <input id="char-for-syl-${i}" class="bg-white" type="text">
+                                                </td>
+                                            </tr>
+                                            `
+                                          }).join('');
     }
 
     render(text) {
-        this.input.value = text
+        this.input.value = text;
         // Build rich pinyin output
         const inputHanzi = Array.from(text);
         this.furiganaOutput.innerHTML = inputHanzi
@@ -186,7 +249,7 @@ class View {
                 if (h === '\n') return '<br>';
                 if (h == ' ') return '<span class="inline-block w-4"></span>';
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
-                if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana(" ",h))}
+                if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
                 const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
                 return this.renderFurigana(h, matchedPinyin)
@@ -213,7 +276,6 @@ class View {
                 return h;
             })
             .join('');
-        this.input.focus(); // keep focus on input
 
         this.expressionOutput.innerHTML = inputHanzi
             .filter(e => e != "_")
@@ -236,29 +298,114 @@ class Controller{
         this.model = new TextModel(dico);
         this.view = new View({dico});
         this.dico = dico;
+        this.view.unknownProns.addEventListener("input", (event) => this.handleInsertHanzi(event));
+        // this.view.unknownProns.addEventListener("click", (event) => this.handleInsertChar(event));
         this.view.input.addEventListener("input", (event) => this.handleInput(event));
         this.view.input.addEventListener("paste", (event) => this.handleInput(event));
         this.view.input.addEventListener("change", (event) => this.handleInput(event));
         this.view.output.addEventListener("click", (event) => this.handleClick(event));
+        this.view.exportNew.addEventListener('click', (event) => this.handleExportNew(event));
+        this.view.importProns.addEventListener('click', (event) => {this.handleImportProns(event)});
         this.view.input.value = '大家hao';
         this.view.input.dispatchEvent(new Event('change'));
         this.suggestions = [];
     }
 
+    // handleInsertChar(event) {
+    //     if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
+    //     const i = event.target.id.split('insert-');
+    //     this.model.insert(document.getElementById('char-for-syl-'+i));
+    //     this.model.update(this.model.text);
+    //     this.view.render(this.model.text);
+    //     this.view.renderSuggestions(this.model.suggestions); 
+    //     this.view.renderUnknownProns(this.model.syllables);
+    // }
+
+    handleInsertHanzi(event){
+        if (event.target.tagName !== 'INPUT') return; // only react to button clicks
+        const sylIndex = event.target.id.split('char-for-syl-')[1];
+        console.log(event.target);
+        console.log(sylIndex)
+        this.model.replace(sylIndex, event.target.value);
+        this.view.render(this.model.text);
+        this.view.renderSuggestions(this.model.suggestions); 
+        this.view.renderUnknownProns(this.model.syllables);
+    }
+
+    handleImportProns(event){
+        if (!window.showDirectoryPicker) {
+            alert("Your browser does not support the File System Access API required for folder picking.");
+            return;
+        }
+        (async () => {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                const pronunciations = [];
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.csv')) {
+                        const file = await entry.getFile();
+                        const text = await file.text();
+                        const lines = text.split('\n').filter(line => line.trim());
+                        // Skip header if present
+                        let start = 0;
+                        if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
+                        for (let i = start; i < lines.length; i++) {
+                            const [char, initial, final, tone] = lines[i].split(',');
+                            const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
+                            console.log(p);
+                            pronunciations.push(p);
+                        }
+                        console.log(this.dico.pronunciations.length)
+                        console.log(pronunciations.length)
+
+                        this.dico.addPronunciations(pronunciations);
+                        console.log(this.dico.pronunciations.length)
+                        // Output or use the array as needed
+                        console.log('Compiled pronunciations:', pronunciations);
+                        console.log(this.dico);
+                        alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
+                        this.view.input.dispatchEvent(new Event('change'));
+                    }
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to import pronunciations.");
+            }
+        })();
+
+    }
+
+    handleExportNew(event){
+        let csv = "char,initial,final,tone\n";
+        this.dico.unknowns
+            .values()
+            .forEach(char => {
+                const initial = document.getElementById(`initial-for-${char}`).value;
+                const final = document.getElementById(`final-for-${char}`).value;
+                const tone = document.getElementById(`tone-for-${char}`).value;
+                csv += `${char},${initial},${final},${tone}\n`;
+            })
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "new_char_pron_pairs.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     // Input change
     handleInput(event) {
         this.dico.unknowns.clear();
-        const text = this.view
-                         .input
-                         .value
-                         .toLowerCase()
-                        //  .split('')
-                        //  .map(c => c == "_"? "" : c)
-                        //  .join('');
+        const text = this.view.input.value;
         this.model.update(text);
         this.view.renderSuggestions(this.model.suggestions);
         this.view.render(this.model.text);
         this.view.renderUnknownChars();
+        // this.view.renderUnknownProns(this.model.syllables);
     }
 
     // Select one Hanzi
@@ -267,6 +414,7 @@ class Controller{
         this.model.select(event.target.value);
         this.view.render(this.model.text);
         this.view.renderSuggestions(this.model.suggestions); 
+        // this.view.renderUnknownProns(this.model.syllables);
     }
 }
 
