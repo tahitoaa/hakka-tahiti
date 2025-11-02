@@ -2,7 +2,10 @@ const dico = new Dictionary({itemSelector: 'li',containerId: '#pron-list'});
 
 class Transcription {
     constructor () {
-        this.labels = [{start : 0, end:0, model: new HakkaText(dico, "toto")}];
+        this.labels = [
+            {start : 0, end:1, model: new HakkaText(dico, "hakka1")},
+            {start : 1, end:2, model: new HakkaText(dico, "hakka2")},
+        ];
         this.suggestions = [];
     }
 
@@ -39,7 +42,6 @@ class Transcription {
 class LabelView {
     constructor(label, e){
         this.dico = dico;
-        console.log(label);
         const wrapper = document.createElement('div');
         wrapper.className = 'mt-2 text-center';
         wrapper.id = `chunk-${e}`;
@@ -269,20 +271,32 @@ class View {
         }
         this.views.forEach((labelView, e) => { 
             for (const [key, value] of Object.entries(this.outputs)) {
-                this.outputs[key] += `<div class="inline-block rounded px-3 print:px-1 print:py-1 py-2" id="${key}-${e}">`+ labelView[key].innerHTML + '</div>';
+
+                this.outputs[key] += `<span class="rounded px-3 print:px-1 print:py-1 py-1" id="${key}-${e}">`+ labelView[key].innerHTML + '</span>';
             }
         });
 
         // Clear the container and make it a flex row
         this.displays.textContent = ''; 
         const container = document.createElement('div'); // Or wherever you want to place 
-        container.className = "flex print:block"
+        container.className = `
+            flex flex-wrap justify-stretch items-start gap-2
+            print:grid print:grid-cols-1
+        `;
         container.innerHTML = ''; // reset
 
         Object.entries(this.outputs).forEach(([key, output], i) => {
-
             const col = document.createElement('div');
-            col.className = 'justify-items-end flex-grow rounded m-1 transition-all duration-200 bg-white break-after: page;';
+            col.className = `
+                flex flex-col flex-1
+                print:flex-none
+                max-w-[50%]
+                print:max-w-[100%]
+                bg-white rounded-md shadow-sm
+                m-1 transition-all duration-200
+                break-inside-avoid-page
+                print:w-full print:break-after-page
+            `;
 
             const header = document.createElement('div');
             header.className = '';
@@ -341,7 +355,7 @@ class Controller {
                         this.view.index.dispatchEvent(new Event("change"));
                     })
                 });
-        this.view.container.addEventListener('focusout', e => this.handleInput(e));
+        this.view.container.addEventListener('keyup', e => this.handleInput(e));
         // document.getElementById('import-labels').addEventListener('click', e => this.handleImportLabels(e));
         // document.getElementById('import-audios').addEventListener('click', e => this.handleImportAudios(e));
         document.getElementById('import-project').addEventListener('click', e => this.handleImportProject(e));
@@ -363,77 +377,90 @@ class Controller {
     handleClick(event) {
         const e = event;
         const input = document.getElementById('label-index');
-        console.log(event)
         let v = Math.max(1, parseInt(input.value || '1', 10));
         // if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
         this.model.labels[v-1].model.select(event.target.value);
         this.view.render(this.model);
         this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
+        document.getElementById('label-index').dispatchEvent(new Event("change"));
         e.preventDefault();
+    }
+
+    getMax(){
+        return window.app && app.model && Array.isArray(app.model.labels) ? app.model.labels.length : 1;
     }
 
     handlePaging(event){
         const e = event;
-        const input = document.getElementById('label-index');
-        if (e.key !== 'PageDown' && e.key !== 'PageUp') return;
-        // avoid interfering when typing in a text field
-        const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+        if (e.key == 'PageDown' || e.key == 'PageUp') {
+            e.preventDefault();
+            const input = document.getElementById('label-index');
+            let v = Math.max(1, parseInt(input.value || '1', 10));
 
-        e.preventDefault();
-        let v = Math.max(1, parseInt(input.value || '1', 10));
-        if (e.key === 'PageDown') v += 1;
-        else if (e.key === 'PageUp') v = Math.max(1, v - 1);
+            if (e.key === 'PageDown') v += 1;
+            else if (e.key === 'PageUp') v = Math.max(1, v - 1);
 
-        // clamp to number of labels if available
-        const max = window.app && app.model && Array.isArray(app.model.labels) ? app.model.labels.length : null;
-        if (max) v = Math.min(v, max);
+            // clamp to number of labels if available
+            // v = Math.min(v, this.getMax());
 
-        input.value = v;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    handleIndexChange(event){
-        const v = Math.max(1, parseInt(event.target.value || '1', 10));
-        const idx = v - 1;
-        const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
-        nodes.forEach(n => {
-            if (n.id === `chunk-${idx}`) n.classList.add('visible');
-            else n.classList.remove('visible');
-        });
-
-        for (var key in this.view.outputs) {
-            const spans = document.getElementById("viewer").querySelectorAll(`[id^="${key}-"]`);
-            spans.forEach(n => {
-                const highlight = 'bg-violet-300';
-                if (n.id === `${key}-${idx}`) {
-                    n.classList.add(highlight);
-                    n.scrollIntoView({
-                        behavior: 'smooth', // smooth scrolling
-                        block: 'nearest'    // scroll just enough to show it
-                    });
-                }
-                else n.classList.remove(highlight);
-            });
+            input.value = v;
+            input.dispatchEvent(new Event('change'));
         }
     }
 
+handleIndexChange(event){
+    const v = Math.max(1, parseInt(event.target.value || '1', 10));
+    const idx = v - 1;
+    const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
+    nodes.forEach(n => {
+        if (n.id === `chunk-${idx}`) n.classList.add('visible');
+        else n.classList.remove('visible');
+    });
+
+    for (var key in this.view.outputs) {
+        const spans = document.getElementById("viewer").querySelectorAll(`[id^="${key}-"]`);
+        spans.forEach(n => {
+            const highlight = 'bg-violet-300';
+            if (n.id === `${key}-${idx}`) {
+                n.classList.add(highlight);
+                n.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+            else n.classList.remove(highlight);
+        });
+    }
+
+    // Focus same type of element in the new index
+    const focusedId = document.activeElement?.id;
+    if (focusedId) {
+        const type = focusedId.split('-')[0]; // e.g., 'hanzi', 'french', etc.
+        const newFocusId = `${type}-${idx}`;   // Use new idx instead of i+1
+        const newFocusEl = document.getElementById(newFocusId);
+        if (newFocusEl) newFocusEl.focus();
+    }
+}
+
+
     handleInput(event){
-        console.log(event)
-        const target = event.target;
-        const i = parseInt(target.id.split('-')[1]);
-        if (!this.model.labels[i]) return;
-        const update = {};
-        if (target.id.includes("french-")) 
-            update["french"] = target.value;
-        if (target.id.includes("hanzi-"))
-            update["hanzi"] = target.value;
-        this.model.labels[i].model.update(update);
-        this.view.views[i].render(this.model.labels[i])
-        this.view.renderDisplays(this.model);
-        this.view.index.value = i+1;
-        this.view.index.dispatchEvent(new Event("change"));
-        event.preventDefault();
+        {
+            const target = event.target;
+            const i = parseInt(target.id.split('-')[1]);
+            if (!this.model.labels[i]) return;
+            const update = {};
+            if (target.id.includes("french-")) 
+                update["french"] = target.value;
+            if (target.id.includes("hanzi-"))
+                update["hanzi"] = target.value;
+            this.model.labels[i].model.update(update);
+            this.view.views[i].render(this.model.labels[i])
+            this.view.renderDisplays(this.model);
+            // this.view.index.value = i+1;
+            // this.view.index.dispatchEvent(new Event("change"));
+            event.preventDefault();
+        }
+
     }
 
     // handleImportAudios(event){
@@ -511,7 +538,6 @@ class Controller {
             for await (const [name, handle] of dirHandle.entries()) {
                 if (handle.kind !== 'file') continue;
                 if (name.toLowerCase() === 'hakka.txt') {
-                    console.log(name);
                     const file = await handle.getFile();
                     const text = await file.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
@@ -531,7 +557,6 @@ class Controller {
                 if (handle.kind !== 'file') continue;
                 if (name.toLowerCase() === 'french.txt') {
                     const file = await handle.getFile();
-                    console.log(name);
                     const text = await file.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
                     lines.forEach((l, i) => {
@@ -544,7 +569,6 @@ class Controller {
 
             for await (const [name, handle] of dirHandle.entries()) {
                 if (handle.kind !== 'file') continue;
-                console.log(name);
                 const lower = name.toLowerCase();
                 const file = await handle.getFile();
                 const url = URL.createObjectURL(file);

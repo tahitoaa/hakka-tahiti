@@ -16,6 +16,7 @@ class AudioController {
         this.autoButton?.addEventListener("click",  e => this.toggleAuto());
         document.getElementById('label-index').addEventListener('change', e => this.playCurrent());
         window.addEventListener("keyup", (e) => this.handlePaging.bind(this)(e));
+        window.addEventListener("keyup", (e) => {if (e.key === " " && e.target.tagName != "TEXTAREA") this.playCurrent(false)});
     }
 
     handlePaging(event){
