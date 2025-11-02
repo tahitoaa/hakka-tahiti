@@ -33,7 +33,6 @@ class HakkaText {
             });
             this.text = text;
         }
-        console.log(this)
     }
 
     select(selectionIndex){
@@ -44,12 +43,9 @@ class HakkaText {
 
     replace(sylIndex, replaceValue) {
         const toReplace = this.syllables[sylIndex];
-        console.log(toReplace, replaceValue)
         const replaced = this.text.replace(toReplace, replaceValue);
         // if (replaced !== this.text) {this.text = replaced;}
         // else {
-        console.log(this.text, replaced);
-
         this.text = replaced;
         // }
     }
