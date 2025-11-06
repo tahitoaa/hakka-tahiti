@@ -3,7 +3,7 @@ const dico = new Dictionary({itemSelector: 'li',containerId: '#pron-list'});
 class Transcription {
     constructor () {
         this.labels = [
-            {start : 0, end:1, model: new HakkaText(dico, "hakka1")},
+            {start : 0, end:1, model: new HakkaText(dico, " 客家話")},
             {start : 1, end:2, model: new HakkaText(dico, "hakka2")},
         ];
         this.suggestions = [];
@@ -40,6 +40,7 @@ class Transcription {
 }
 
 class LabelView {
+    static audios = {};
     constructor(label, e){
         this.dico = dico;
         const wrapper = document.createElement('div');
@@ -60,6 +61,12 @@ class LabelView {
         ta.id = `hanzi-${e}`;
         this.ta = ta;
         this.hanzi = this.ta;
+        ta.addEventListener('keyup', (event)=>{
+            const target = event.target;
+            console.log(event);
+            label.model.update({hanzi:target.value});
+            this.render(label);
+        })
         wrapper.appendChild(ta);
 
         this.suggestions = document.createElement('div');
@@ -88,11 +95,16 @@ class LabelView {
             title.textContent = a.name;
             title.className = 'text-sm text-gray-700';
 
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = a.url;
-            audio.preload = 'metadata';
-            audio.className = 'w-full mt-1';
+            var audio = LabelView.audios[e];
+            if (!audio) {
+                audio = document.createElement('audio');
+                audio.id = "audio-"+e;
+                audio.controls = true;
+                audio.src = a.url;
+                audio.preload = 'metadata';
+                audio.className = 'w-full mt-1';
+                LabelView.audios[e] = audio;
+            }
 
             row.appendChild(title);
             row.appendChild(audio);
@@ -118,13 +130,17 @@ class LabelView {
 
         this.french = document.createElement('div');
 
+
+        this.mixed = document.createElement('div');
+
         this.render(label);
     }
 
     render(label){
         const inputHanzi = Array.from(label.model.text);
-        this.french.innerHTML = this.taFrench.value;
+        this.french.innerHTML = this.taFrench.value + ' ';
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
+        
         this.furigana.innerHTML = inputHanzi
             .filter(e => e != "_")
             .map(h => {
@@ -134,7 +150,7 @@ class LabelView {
                 if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
                 const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-                return this.renderFurigana(h, matchedPinyin)
+                return this.renderFurigana(matches.length > 0 ?  matches[0].char() :h, matchedPinyin)
             })
             .join('');
 
@@ -156,7 +172,8 @@ class LabelView {
             .map(h => {
                 if (h === '\n') return '<br>';
                 if (h == ' ') return '<span class="inline-block w-4"></span>';
-                return h;
+                const matches = this.dico.getMatchesForHanzi(h);
+                return matches.length > 0 ? matches[0].char() :h;
             })
             .join('');
 
@@ -171,7 +188,24 @@ class LabelView {
                 const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
                 return `${matchedPinyin}${h}`
             })
-            .join('');
+            .join('');      
+
+
+        const ul = document.createElement('ul');
+        ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all';
+        [this.furigana, this.french].forEach((e) => {
+            const li = document.createElement('li');
+            li.className = `
+                flex-col gap-1 px-3 py-2 
+                odd:rounded-xl
+                text-center
+            `;
+            li.innerHTML = e.innerHTML;
+            ul.appendChild(li);
+        });
+        this.mixed.innerHTML = '';
+        this.mixed.appendChild(ul);
+
 
     }
 
@@ -180,12 +214,12 @@ class LabelView {
                     ${suggestions.map((pron, i) => {
                         const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
                         return `
-                            <div class="flex flex-col items-center rounded hover:bg-gray-200 hover:shadow">
+                            <div class="flex flex-col items-center rounded text-indigo-800 hover:bg-gray-200 hover:shadow">
                                 <button 
                                     id="suggested-${keyHint}" 
                                     class="text-small font-semibold" 
                                     value="${i}">
-                                    ${pron.simp || '?'}
+                                    ${pron.char() || '?'}
                                 </button>
                                 <div class="text-xs text-gray-600">
                                     ${pron.abstractPinyin() || '?'}
@@ -230,6 +264,7 @@ class LabelView {
 class View {
     constructor() {
         this.container = document.getElementById("viewer");
+        this.container.innerHTML = '';
         this.importProns = document.getElementById("import-prons");
         this.importLabels = document.getElementById("import-labels");
         this.index = document.getElementById("label-index");
@@ -253,6 +288,7 @@ class View {
         // 2. Rebuild views from scratch
         this.views = data.labels.map((label, i) => {
             const labelView = new LabelView(label, i);
+
             this.forms.appendChild(labelView.wrapper);
             return labelView;
         });
@@ -263,22 +299,48 @@ class View {
     renderDisplays(data){
         // 3. Update display info
         this.displays.textContent = `La transcription contient ${data.labels.length} étiquettes.`;
+
         this.outputs = {
             "hanzi":"", 
             "furigana":"",
             "french":"", 
-            "pinyin":""
+            "pinyin":"",
+            "mixed":""
         }
         this.views.forEach((labelView, e) => { 
             for (const [key, value] of Object.entries(this.outputs)) {
-
-                this.outputs[key] += `<span class="rounded px-3 print:px-1 print:py-1 py-1" id="${key}-${e}">`+ labelView[key].innerHTML + '</span>';
+                const el = document.createElement('span');
+                el.classList.add("rounded px-3 print:px-1 print:py-1 py-1 hover:bg-violet-200".split(' '))
+                el.id =`${key}-${e}`
+                el.innerHTML = labelView[key].innerHTML
+                this.outputs[key] += el.outerHTML;
             }
         });
 
         // Clear the container and make it a flex row
         this.displays.textContent = ''; 
         const container = document.createElement('div'); // Or wherever you want to place 
+
+        if (this.audio) {
+            const row = document.createElement('div');
+            row.className = 'mt-2';
+
+            const title = document.createElement('div');
+            title.textContent = a.name;
+            title.className = 'text-sm text-gray-700';
+
+            const element = document.createElement('audio');
+            element.id = "audio";
+            element.controls = true;
+            element.src = this.audio.url;
+            element.preload = 'metadata';
+            element.className = 'w-full mt-1';
+
+            row.appendChild(title);
+            row.appendChild(element);
+            wrapper.appendChild(row);
+        }
+
         container.className = `
             flex flex-wrap justify-stretch items-start gap-2
             print:grid print:grid-cols-1
@@ -290,7 +352,7 @@ class View {
             col.className = `
                 flex flex-col flex-1
                 print:flex-none
-                max-w-[50%]
+                max-w-[75%]
                 print:max-w-[100%]
                 bg-white rounded-md shadow-sm
                 m-1 transition-all duration-200
@@ -306,7 +368,7 @@ class View {
             toggleBtn.className = 'no-print text-sm hover:shadow';
 
             const body = document.createElement('div');
-            body.className = 'text-justify p-2 overflow-y-auto h-120 no-print-height';
+            body.className = 'text-justify p-2 overflow-y-auto h-100 no-print-height';
             body.innerHTML = output;
 
             toggleBtn.addEventListener('click', () => {
@@ -355,21 +417,52 @@ class Controller {
                         this.view.index.dispatchEvent(new Event("change"));
                     })
                 });
-        this.view.container.addEventListener('keyup', e => this.handleInput(e));
+        this.view.container.addEventListener('change', e => this.handleInput(e));
         // document.getElementById('import-labels').addEventListener('click', e => this.handleImportLabels(e));
         // document.getElementById('import-audios').addEventListener('click', e => this.handleImportAudios(e));
         document.getElementById('import-project').addEventListener('click', e => this.handleImportProject(e));
         document.getElementById('export-project').addEventListener('click', e => this.model.export());
         document.getElementById('label-index').addEventListener('change', e => this.handleIndexChange(e));
-        document.getElementById('viewer-displays').addEventListener('click', e => this.handleClickOnDisplays(e));
+        document.getElementById('viewer-displays').addEventListener('click', this.handleClickOnDisplays.bind(this));
         window.addEventListener("keydown", e => this.handlePaging(e));
+        window.addEventListener("keyup", this.handleCtrlS);
+        this.view.index.dispatchEvent(new Event("change"));
+        this.mode = document.getElementById('toogle-hanzi')
+        document.getElementById('toggle-hanzi').addEventListener('click', this.handleToggleTrad.bind(this))
+        
+    }
+
+    handleCtrlS(event){
+        if (event.key === "s" && event.ctrlKey){
+            event.preventDefault();
+            this.model.export();
+        }
+    }
+
+    handleToggleTrad(event){
+        this.view.views.forEach((v,i) => {
+            console.log(event)
+            v.suggestions.addEventListener("click", event=> this.handleClick(event));
+            v.render(this.model.labels[i]);
+        });
         this.view.index.dispatchEvent(new Event("change"));
     }
 
     handleClickOnDisplays(event) {
-        const i = parseInt(event.target.id.split("-")[1]);
+        console.log(event)
+        const el = event.target.closest('span[id]');
+        if (!el) return;
+
+        // Match IDs ending with a dash-number like "xxx-0"
+        const match = el.id.match(/^(.*-\d+)$/);
+        if (match) {
+            console.log('Clicked element group:', match[1]);
+        }
+        const i = parseInt(match[0].split('-')[1]);
+
+        console.log("Clicked on display", i,event)
         if (!isNaN(i)){
-            this.view.index.value = i+1;
+            this.view.index.value = (i+1);
             this.view.index.dispatchEvent(new Event("change"));
         }
     }
@@ -384,6 +477,7 @@ class Controller {
         this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
         document.getElementById('label-index').dispatchEvent(new Event("change"));
         e.preventDefault();
+        document.getElementById('hanzi-'+(v-1)).focus();
     }
 
     getMax(){
@@ -408,59 +502,56 @@ class Controller {
         }
     }
 
-handleIndexChange(event){
-    const v = Math.max(1, parseInt(event.target.value || '1', 10));
-    const idx = v - 1;
-    const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
-    nodes.forEach(n => {
-        if (n.id === `chunk-${idx}`) n.classList.add('visible');
-        else n.classList.remove('visible');
-    });
-
-    for (var key in this.view.outputs) {
-        const spans = document.getElementById("viewer").querySelectorAll(`[id^="${key}-"]`);
-        spans.forEach(n => {
-            const highlight = 'bg-violet-300';
-            if (n.id === `${key}-${idx}`) {
-                n.classList.add(highlight);
-                n.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest'
-                });
-            }
-            else n.classList.remove(highlight);
+    handleIndexChange(event){
+        const v = Math.max(1, parseInt(event.target.value || '1', 10));
+        const idx = v - 1;
+        const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
+        nodes.forEach(n => {
+            if (n.id === `chunk-${idx}`) n.classList.add('visible');
+            else n.classList.remove('visible');
         });
-    }
 
-    // Focus same type of element in the new index
-    const focusedId = document.activeElement?.id;
-    if (focusedId) {
-        const type = focusedId.split('-')[0]; // e.g., 'hanzi', 'french', etc.
-        const newFocusId = `${type}-${idx}`;   // Use new idx instead of i+1
-        const newFocusEl = document.getElementById(newFocusId);
-        if (newFocusEl) newFocusEl.focus();
+        for (var key in this.view.outputs) {
+            const spans = document.getElementById("viewer").querySelectorAll(`span[id^="${key}-"]`);
+            spans.forEach(n => {
+                const highlight = 'bg-violet-300';
+                if (n.id === `${key}-${idx}`) {
+                    n.classList.add(highlight);
+                    n.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest'
+                    });
+                } else {
+                    n.classList.remove(highlight);
+                }
+            });
+        }
+
+        // Focus same type of element in the new index
+        const focusedId = document.activeElement?.id;
+        if (focusedId) {
+            const type = focusedId.split('-')[0]; // e.g., 'hanzi', 'french', etc.
+            const newFocusId = `${type}-${idx}`;   // Use new idx instead of i+1
+            const newFocusEl = document.getElementById(newFocusId);
+            if (newFocusEl) newFocusEl.focus();
+        }
     }
-}
 
 
     handleInput(event){
-        {
-            const target = event.target;
-            const i = parseInt(target.id.split('-')[1]);
-            if (!this.model.labels[i]) return;
-            const update = {};
-            if (target.id.includes("french-")) 
-                update["french"] = target.value;
-            if (target.id.includes("hanzi-"))
-                update["hanzi"] = target.value;
-            this.model.labels[i].model.update(update);
-            this.view.views[i].render(this.model.labels[i])
-            this.view.renderDisplays(this.model);
-            // this.view.index.value = i+1;
-            // this.view.index.dispatchEvent(new Event("change"));
-            event.preventDefault();
-        }
-
+        const target = event.target;
+        const i = parseInt(target.id.split('-')[1]);
+        if (!this.model.labels[i]) return;
+        const update = {};
+        if (target.id.includes("french-")) 
+            update["french"] = target.value;
+        if (target.id.includes("hanzi-"))
+            update["hanzi"] = target.value;
+        this.model.labels[i].model.update(update);
+        this.view.views[i].render(this.model.labels[i])
+        this.view.renderDisplays(this.model);
+        this.view.index.value = i+1;
+        this.view.index.dispatchEvent(new Event("change"));
     }
 
     // handleImportAudios(event){
@@ -529,10 +620,12 @@ handleIndexChange(event){
         }
         try {
             alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")
+
             const dirHandle = await window.showDirectoryPicker();
             const audios = [];
 
             this.model = new Transcription();
+            this.view = new View();
 
             // find and read hanzi.txt first (if present) to populate labels
             for await (const [name, handle] of dirHandle.entries()) {
@@ -567,6 +660,17 @@ handleIndexChange(event){
                 }
             }
 
+
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind == 'file' && name == 'audio.wav')
+                {
+                    const lower = name.toLowerCase();
+                    const file = await handle.getFile();
+                    const url = URL.createObjectURL(file);
+                    this.view.audio = {name,file,url}
+                }
+            }
+
             for await (const [name, handle] of dirHandle.entries()) {
                 if (handle.kind !== 'file') continue;
                 const lower = name.toLowerCase();
@@ -579,10 +683,31 @@ handleIndexChange(event){
                     if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
                 } 
             }
+
+            const pronunciations = [];
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name == 'prononciations.csv' ) {
+                    const file = await entry.getFile();
+                    const text = await file.text();
+                    const lines = text.split('\n').filter(line => line.trim());
+                    // Skip header if present
+                    let start = 0;
+                    if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
+                    for (let i = start; i < lines.length; i++) {
+                        const [char, initial, final, tone] = lines[i].split(',');
+                        const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
+                        console.log(p);
+                        pronunciations.push(p);
+                    }
+                    this.dico.addPronunciations(pronunciations);
+                    alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
+                }
+            }
             this.view.render(this.model);
             this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
-            
+            this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
             this.view.index.dispatchEvent(new Event("change"));
+
         } catch (err) {
             console.error(err);
             alert("Failed to import audios.");

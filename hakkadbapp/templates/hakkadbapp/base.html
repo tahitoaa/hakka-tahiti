@@ -262,6 +262,8 @@
     let showingTrad = false;
 
     toggleButton.addEventListener('click', () => {
+      toggleButton.toggleAttribute("aria-pressed");
+
       showingTrad = !showingTrad;
 
       document.querySelectorAll('.hanzi-block').forEach(el => {
