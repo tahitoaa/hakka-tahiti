@@ -3,6 +3,8 @@ class AudioController {
         this.playingAudio = null;
         this.autoMode = false;
 
+        this.full = document.getElementById('audio');
+
         // Buttons
         this.playButton  = document.getElementById("play-button");
         this.pauseButton = document.getElementById("pause-button");
@@ -14,9 +16,12 @@ class AudioController {
         this.pauseButton?.addEventListener("click", () => this.stop());
         this.loopButton?.addEventListener("click",  e => this.playCurrent(true));
         this.autoButton?.addEventListener("click",  e => this.toggleAuto());
+
+
         document.getElementById('label-index').addEventListener('change', e => this.playCurrent());
         window.addEventListener("keyup", (e) => this.handlePaging.bind(this)(e));
         window.addEventListener("keyup", (e) => {if (e.key === " " && e.target.tagName != "TEXTAREA") this.playCurrent(false)});
+        window.addEventListener("keyup", (e) => {if (e.ctrlKey && e.key === " ") this.playCurrent(false)});
     }
 
     handlePaging(event){
@@ -70,13 +75,12 @@ class AudioController {
         this.playingAudio.loop = loop;
         this.playingAudio.currentTime = 0;
         this.playingAudio.onended = null;
-        this.playingAudio.play().catch(console.warn);
+        this.playingAudio.play().catch(console.warn)
     }
 
     /** Toggle auto mode on/off */
     toggleAuto() {
         this.autoMode = !this.autoMode;
-        console.log(this.autoMode ? "▶️ Auto mode ON" : "⏹️ Auto mode OFF");
         if (this.autoMode) this.playSequential(this.getCurrentIndex());
         else this.stop();
     }

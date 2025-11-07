@@ -13,6 +13,14 @@ class Pronunciation {
     abstractPinyin() {
         return this.initial + this.final + Pronunciation.toneMap[this.tone];
     }
+
+    char() {
+        if (document.getElementById('toggle-hanzi').hasAttribute('aria-pressed')){
+            return this.trad;
+        } else {
+            return this.simp;
+        }
+    }
 }
 
 class NoHanziToken extends Pronunciation {

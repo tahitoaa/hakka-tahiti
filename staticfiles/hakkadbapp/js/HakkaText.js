@@ -13,10 +13,10 @@ class HakkaText {
 
     update(update){
         // Remove all substrings between two * (including the *)
-        if (update["french"]) {
+        if (update["french"] != undefined) {
             this.french = update["french"]
         }
-        if (update["hanzi"]){
+        if (update["hanzi"] != undefined){
             const text = update["hanzi"];
             const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
             this.syllables = textWithoutStars.match(/[a-z]+[_0-6]?/gi) || [];

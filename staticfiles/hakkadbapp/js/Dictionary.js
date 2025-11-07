@@ -83,7 +83,7 @@ class Dictionary {
             const dirHandle = await window.showDirectoryPicker();
             const pronunciations = [];
             for await (const entry of dirHandle.values()) {
-                if (entry.kind === 'file' && entry.name.endsWith('.csv')) {
+                if (entry.kind === 'file' && entry.name == 'prons.csv' ) {
                     const file = await entry.getFile();
                     const text = await file.text();
                     const lines = text.split('\n').filter(line => line.trim());
