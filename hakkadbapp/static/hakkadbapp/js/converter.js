@@ -8,117 +8,6 @@ function isHanzi(ch) {
     return /[\u3400-\u4DBF\u4E00-\u9FFF]/.test(ch);
 }
 
-class Dictionary {
-    constructor ({containerId, itemSelector}) {
-        this.items = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
-        this.pronunciations = this.items.map(el => this.parsePronunciation(el));
-        this.unknowns = new Set()
-    }
-
-    parsePronunciation(el) {
-        const parts = el.dataset.search?.toLowerCase().split(',') || [];
-        return new Pronunciation({
-            simp: parts[0],
-            trad: parts[1],
-            initial: parts[2],
-            final: parts[3],
-            tone:parts[4]
-        });
-    }
-
-    addPronunciations(newProns){
-        newProns.forEach(newPron => {
-            const exists = this.pronunciations.some(p =>
-                p.simp === newPron.simp &&
-                p.trad === newPron.trad &&
-                p.initial === newPron.initial &&
-                p.final === newPron.final &&
-                p.tone === newPron.tone
-            );
-            if (!exists) {
-                this.pronunciations.push(newPron);
-            }
-        });
-    }
-
-    getMatchesForSyllable(syl) {
-        return this.pronunciations.filter(p => {
-            const pinyin = p.abstractPinyin();
-            const lowerTone = p.initial + p.final + p.tone;
-            return syl == [p.initial, p.final].join('') 
-                    // || syl == [p.initial+'h', p.final].join('') 
-                    // || syl == [p.initial.replace('h',''), p.final].join('') 
-                    || syl == pinyin
-                    || syl == lowerTone
-                    || p.simp === syl
-                    || p.trad === syl 
-                    ; 
-        });
-    }
-
-    getMatchesForHanzi(char) {
-        if (!isHanzi(char)) {
-            return [new NoHanziToken({text:char})]
-        }
-        if (isPunctuation(char)) {
-            return [new Punctuation({text:char})]
-        }
-        if (!char || char.length !== 1 || !isHanzi(char)) {
-            return [new NoHanziToken({text:char})]
-        }
-        const matches = this.pronunciations.filter(p => {
-            return p.simp == char || p.trad == char;
-        });
-
-        if (matches.length == 0) this.unknowns.add(char);
-        return matches;
-    }
-}
-
-
-class Pronunciation {
-    static toneMap = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "":""};
-
-    constructor ({simp, trad, initial, final, tone}){
-        this.simp = simp;
-        this.trad = trad;
-        this.initial = initial;
-        this.final = final;
-        this.tone = tone;
-        this.origin = "lexique-wenfa"
-    }
-
-    abstractPinyin() {
-        return this.initial + this.final + Pronunciation.toneMap[this.tone];
-    }
-}
-
-class NoHanziToken extends Pronunciation {
-    constructor ({text}) {
-        super({simp:text, trad:text, initial:"", final:"", tone:""})
-        this.text = text;
-    }
-
-    abstractPinyin() {
-        return this.text;
-    }
-}
-
-class Punctuation extends NoHanziToken {
-    constructor ({text}) {
-        super({text});
-    }
-}
-
-class UnknownHanzi extends Pronunciation {
-    constructor ({initial, final, tone}) {
-        super({simp:"", trad:"", initial:"", final:"", tone:""})
-        this.text = text;
-        this.simp = ["(",initial, final, tone, ")"].join('');
-        this.trad = this.simp;
-    }
-}
-
 class TextModel {
     constructor (dico) {
         // A text model is a list of Tokens
@@ -251,7 +140,7 @@ class View {
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
                 if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
+                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.diacriticsPinyin()).join('/');
                 return this.renderFurigana(h, matchedPinyin)
             })
             .join('');

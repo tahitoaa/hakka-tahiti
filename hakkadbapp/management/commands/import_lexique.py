@@ -70,6 +70,9 @@ class Command(BaseCommand):
         # Read Excel file directly into memory
         df = pd.read_excel(excel_file, sheet_name=sheet_name)
 
+        if sheet_name[0] == 'x':
+            return
+
         self.log_stream(f"📄 Processing sheet: {sheet_name}")
 
         added = skipped = new_prons = 0
@@ -81,16 +84,30 @@ class Command(BaseCommand):
                 statut_col = col
                 break
 
+        english_col = None
+        for col in df.columns:
+            if str(col).strip().upper() == "ANGLAIS":
+                english_col = col
+                break
+
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
             french_raw, pinyin_raw, hanzi_raw = row[0], row[1], row[2]
+
+            english = ""
+            if english_col:
+                english = row[df.columns.get_loc(english_col)] 
             if statut_col:
                 statut_val = row[df.columns.get_loc(statut_col)]
 
+            if pd.isna(french_raw) and pd.isna(pinyin_raw) and pd.isna(hanzi_raw):
+                continue
+            if pd.isna(statut_col):
+                self.err_stream(f"❌ Line {line_num}: Missing status {french_raw, pinyin_raw, hanzi_raw }")
             if pd.isna(pinyin_raw):
                 self.err_stream(f"❌ Line {line_num}: Missing pinyin {french_raw, pinyin_raw, hanzi_raw }")
             elif pd.isna(hanzi_raw):
                 self.err_stream(f"❌ Line {line_num}: Missing hanzi {french_raw, pinyin_raw, hanzi_raw }")
-            if pd.isna(pinyin_raw) or pd.isna(hanzi_raw):
+            if pd.isna(statut_col) or pd.isna(pinyin_raw) or pd.isna(hanzi_raw):
                 skipped += 1
                 continue
 
@@ -128,8 +145,8 @@ class Command(BaseCommand):
                 syllable_data.append(data)
 
             category = sheet_name
-            self.word_data.append((french, syllable_data, category, status))
-            self.log_stream(f"{hanzi} {syllabes} {french}")
+            self.word_data.append((french, syllable_data, category, status, english))
+            self.log_stream(f"{hanzi} {syllabes} {french} {english}")
             added += 1
 
         # Final log
@@ -139,26 +156,14 @@ class Command(BaseCommand):
 
 
     def parse_sheets(self, sheet_id):
+        sheet_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx'
+
         # Use a local file path instead of downloading from Google Sheets
-        excel_file = pd.ExcelFile('../lexique/lexique.xlsx')
-
-        self.initial_set = set()
-        self.final_set = set()
-        self.tone_set = set()
-        self.pron_set = set()
-        self.word_data = []
-
-        # Skip the first sheet
-        # Define sheet names to ignore
-        ignore_sheets = {"TABLE DES MATIÈRES", 
-                         "Gros mots", 
-                         "Expressions", 
-                         "Phrases", 
-                         "Légendes", 
-                         "Mots de liaison"}
+        excel_file = pd.ExcelFile(sheet_url)
 
         for sheet_name in excel_file.sheet_names:
-            if sheet_name in ignore_sheets:
+            self.log_stream('Parsing sheet '+sheet_name)
+            if '*' in sheet_name:
                 continue
             self.parse_sheet(sheet_name, excel_file)
         pass
@@ -171,7 +176,17 @@ class Command(BaseCommand):
         Word.objects.all().delete()
         WordPronunciation.objects.all().delete()
 
-        self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ')
+        self.initial_set = set()
+        self.final_set = set()
+        self.tone_set = set()
+        self.pron_set = set()
+        self.word_data = []
+
+        # Previous worksheet
+        # self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ') 
+        self.parse_sheets('1kWOkXIUfxj6q-TjzT-2CQygI1KfPJOfr0d6npHdfc6A')
+        self.parse_sheets('1Dxjb849-AJCQL0e9p_9Zvl7bafbz9mJwGNmHubgnGyU')
+
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
             [Initial(initial=i) for i in self.initial_set],
@@ -218,15 +233,15 @@ class Command(BaseCommand):
         word_objs = []
         word_pron_objs = []
 
-        for french, syllables, category, status in self.word_data:
-            word = Word(french=french, category=category, status=status)
+        for french, syllables, category, status, english in self.word_data:
+            word = Word(french=french, category=category, status=status, tahitian=english)
             word_objs.append(word)
 
         # Create words to get IDs
         Word.objects.bulk_create(word_objs)
 
         # Now associate pronunciations
-        for word, (_, syllables, category, status) in zip(word_objs, self.word_data):
+        for word, (_, syllables, category, status, english) in zip(word_objs, self.word_data):
 
             for pos, (h, i_str, f_str, t_num) in enumerate(syllables):
                 i = initial_objs.get(i_str)
