@@ -14,6 +14,18 @@ class Pronunciation {
         return this.initial + this.final + Pronunciation.toneMap[this.tone];
     }
 
+    diacriticsPinyin() {
+        const pron =  this.initial + this.final + this.tone;
+
+        return pron.replace(
+            /(\D*[aeo]|\D*i(?=u\d)|\D*u(?=i\d)|\D*[iu]|\D*[mn])(\D*)(\d)/g,
+            (_, nucleus, tail, tone) => {
+                // Convert tone number (string) → integer index
+                return nucleus +  " ́̄̆̀̆̀"[+tone] + tail + "\u{2009}";
+            }
+        );
+    }
+
     char() {
         if (document.getElementById('toggle-hanzi').hasAttribute('aria-pressed')){
             return this.trad;

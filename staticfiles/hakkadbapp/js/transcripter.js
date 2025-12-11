@@ -40,7 +40,6 @@ class Transcription {
 }
 
 class LabelView {
-    static audios = {};
     constructor(label, e){
         this.dico = dico;
         const wrapper = document.createElement('div');
@@ -51,6 +50,7 @@ class LabelView {
         const title = document.createElement('label');
         title.textContent = `${label.start} : ${label.end}`;
         title.htmlFor = `chunk-${e}`;
+        title.id = `start-stop-${e}`
         this.title = title;
         wrapper.appendChild(title);
 
@@ -87,29 +87,29 @@ class LabelView {
         wrapper.appendChild(this.taFrench);
 
         const a = label.audio;
-        if (a) {
-            const row = document.createElement('div');
-            row.className = 'mt-2';
+        // if (a) {
+        //     const row = document.createElement('div');
+        //     row.className = 'mt-2';
 
-            const title = document.createElement('div');
-            title.textContent = a.name;
-            title.className = 'text-sm text-gray-700';
+        //     const title = document.createElement('div');
+        //     title.textContent = a.name;
+        //     title.className = 'text-sm text-gray-700';
 
-            var audio = LabelView.audios[e];
-            if (!audio) {
-                audio = document.createElement('audio');
-                audio.id = "audio-"+e;
-                audio.controls = true;
-                audio.src = a.url;
-                audio.preload = 'metadata';
-                audio.className = 'w-full mt-1';
-                LabelView.audios[e] = audio;
-            }
+        //     var audio = LabelView.audios[e];
+        //     if (!audio) {
+        //         audio = document.createElement('audio');
+        //         audio.id = "audio-"+e;
+        //         audio.controls = true;
+        //         audio.src = a.url;
+        //         audio.preload = 'metadata';
+        //         audio.className = 'w-full mt-1';
+        //         LabelView.audios[e] = audio;
+        //     }
 
-            row.appendChild(title);
-            row.appendChild(audio);
-            wrapper.appendChild(row);
-        }
+        //     row.appendChild(title);
+        //     row.appendChild(audio);
+        //     wrapper.appendChild(row);
+        // }
         this.a = a;
 
         const pinyinOutput =document.createElement('div');
@@ -149,7 +149,7 @@ class LabelView {
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
                 if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
+                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.diacriticsPinyin()).join('/');
                 return this.renderFurigana(matches.length > 0 ?  matches[0].char() :h, matchedPinyin)
             })
             .join('');
@@ -278,6 +278,8 @@ class View {
         this.container.appendChild(this.forms);
         this.container.appendChild(this.displays);
         this.outputs = {};
+
+        new CopyButton('#output-hanzi-body');   
     }
 
     render(data){
@@ -322,11 +324,12 @@ class View {
         const container = document.createElement('div'); // Or wherever you want to place 
 
         if (this.audio) {
+            console.log(this.audio)
             const row = document.createElement('div');
             row.className = 'mt-2';
 
             const title = document.createElement('div');
-            title.textContent = a.name;
+            title.textContent = this.audio.name;
             title.className = 'text-sm text-gray-700';
 
             const element = document.createElement('audio');
@@ -338,7 +341,7 @@ class View {
 
             row.appendChild(title);
             row.appendChild(element);
-            wrapper.appendChild(row);
+            this.container.appendChild(row);
         }
 
         container.className = `
@@ -368,6 +371,7 @@ class View {
             toggleBtn.className = 'no-print text-sm hover:shadow';
 
             const body = document.createElement('div');
+            body.id = 'output-'+key+'-body';
             body.className = 'text-justify p-2 overflow-y-auto h-100 no-print-height';
             body.innerHTML = output;
 
@@ -613,106 +617,251 @@ class Controller {
     //     })();
     // }
 
-    async handleImportProject(event){
-        if (!window.showDirectoryPicker) {
-            alert("Your browser does not support the File System Access API required for folder picking.");
+async handleImportProject() {
+    try {
+        const vercelStorageDir = ""
+        const files = {}
+        files.hakka   = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/hakka.txt"
+        files.french  = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/french.txt"
+        files.audio   = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/audio.wav"
+        files.pron    = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/prononciations.csv"
+
+        if (!files) {
+            alert("No file paths provided.");
             return;
         }
-        try {
-            alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")
 
-            const dirHandle = await window.showDirectoryPicker();
-            const audios = [];
+        this.model = new Transcription();
+        this.view = new View();
 
-            this.model = new Transcription();
-            this.view = new View();
-
-            // find and read hanzi.txt first (if present) to populate labels
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                if (name.toLowerCase() === 'hakka.txt') {
-                    const file = await handle.getFile();
-                    const text = await file.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-                    this.model.labels = lines.map(l => {
-                        const line = l.split('\t');
-                        return {
-                            start: parseFloat(line[0]),
-                            end: parseFloat(line[1]),
-                            model: new HakkaText(dico, line[2] || ''),
-                        };
-                    });
-                    break;
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                if (name.toLowerCase() === 'french.txt') {
-                    const file = await handle.getFile();
-                    const text = await file.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-                    lines.forEach((l, i) => {
-                        const line = l.split('\t');
-                        if (this.model?.labels[i]) this.model.labels[i].model.french = line[2];
-                    });
-                    break;
-                }
-            }
-
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind == 'file' && name == 'audio.wav')
-                {
-                    const lower = name.toLowerCase();
-                    const file = await handle.getFile();
-                    const url = URL.createObjectURL(file);
-                    this.view.audio = {name,file,url}
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                const lower = name.toLowerCase();
-                const file = await handle.getFile();
-                const url = URL.createObjectURL(file);
-                if (/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) {
-                    const audio = {name,file,url}
-                    audios.push(audio);
-                    const i = parseInt(name.split("-")[1]);
-                    if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
-                } 
-            }
-
-            const pronunciations = [];
-            for await (const entry of dirHandle.values()) {
-                if (entry.kind === 'file' && entry.name == 'prononciations.csv' ) {
-                    const file = await entry.getFile();
-                    const text = await file.text();
-                    const lines = text.split('\n').filter(line => line.trim());
-                    // Skip header if present
-                    let start = 0;
-                    if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
-                    for (let i = start; i < lines.length; i++) {
-                        const [char, initial, final, tone] = lines[i].split(',');
-                        const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
-                        console.log(p);
-                        pronunciations.push(p);
-                    }
-                    this.dico.addPronunciations(pronunciations);
-                    alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
-                }
-            }
-            this.view.render(this.model);
-            this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
-            this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
-            this.view.index.dispatchEvent(new Event("change"));
-
-        } catch (err) {
-            console.error(err);
-            alert("Failed to import audios.");
+        // --- Load hakka.txt ---
+        if (files.hakka) {
+            const text = await fetch(files.hakka).then(r => r.text());
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            this.model.labels = lines.map(line => {
+                const [start, end, content] = line.split("\t");
+                return {
+                    start: parseFloat(start),
+                    end: parseFloat(end),
+                    model: new HakkaText(dico, content || "")
+                };
+            });
         }
+
+        // --- Load french.txt ---
+        if (files.french) {
+            const text = await fetch(files.french).then(r => r.text());
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            lines.forEach((l, i) => {
+                const parts = l.split("\t");
+                if (this.model.labels?.[i]) {
+                    this.model.labels[i].model.french = parts[2];
+                }
+            });
+        }
+
+        // --- Load audio file ---
+        if (files.audio) {
+            this.view.audio = {
+                name: "audio",
+                url: files.audio
+            };
+        }
+
+        // --- Load prononciations.csv ---
+        if (files.pron) {
+            const text = await fetch(files.pron).then(r => r.text());
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            const pronunciations = [];
+
+            const start = lines[0].includes("char") ? 1 : 0;
+
+            for (let i = start; i < lines.length; i++) {
+                const [char, initial, final, tone] = lines[i].split(",");
+                pronunciations.push(
+                    new Pronunciation({ simp: char, trad: char, initial, final, tone })
+                );
+            }
+            this.dico.addPronunciations(pronunciations);
+        }
+
+        // --- Render UI ---
+        this.view.render(this.model);
+        this.view.views.forEach(v =>
+            v.suggestions.addEventListener("click", event => this.handleClick(event))
+        );
+        this.view.displays.addEventListener("click", this.handleClickOnDisplays.bind(this));
+        this.view.index.dispatchEvent(new Event("change"));
+
+        alert("Project successfully loaded!");
+
+    } catch (err) {
+        console.error(err);
+        alert("Failed to import project.");
     }
+}
+
+
+    // async handleImportProject(event){
+    //     if (!window.showDirectoryPicker) {
+    //         alert("Your browser does not support the File System Access API required for folder picking.");
+    //         return;
+    //     }
+    //     try {
+    //         alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")
+
+    //         // const dirHandle = await window.showDirectoryPicker();
+
+    //         const prefix = "annette_levin/"
+    //         const response = await fetch(`https://api.vercel.com/v2/blobs?prefix=${prefix}`, {
+    //             headers: { Authorization: `Bearer ${YOUR_VERCEL_TOKEN}` }
+    //         });
+    //         const { blobs } = await response.json();
+
+    //         // Convert response to a map: { "hakka.txt" : url, ... }
+    //         const files = {};
+    //         for (const blob of blobs) {
+    //             const filename = blob.pathname.split("/").pop();
+    //             files[filename] = blob.url;
+    //         }
+
+    //         this.model = new Transcription();
+    //         this.view = new View();
+
+    //         // find and read hanzi.txt first (if present) to populate labels
+    //         // for await (const [name, handle] of dirHandle.entries()) {
+    //         //     if (handle.kind !== 'file') continue;
+    //         //     if (name.toLowerCase() === 'hakka.txt') {
+    //         //         const file = await handle.getFile();
+    //         //         const text = await file.text();
+    //         //         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    //         //         this.model.labels = lines.map(l => {
+    //         //             const line = l.split('\t');
+    //         //             return {
+    //         //                 start: parseFloat(line[0]),
+    //         //                 end: parseFloat(line[1]),
+    //         //                 model: new HakkaText(dico, line[2] || ''),
+    //         //             };
+    //         //         });
+    //         //         break;
+    //         //     }
+    //         // }
+
+    //         if (files["hakka.txt"]) {
+    //             const text = await fetch(files["hakka.txt"]).then(r => r.text());
+    //             const lines = text.split(/\r?\n/).filter(l => l.trim());
+    //             this.model.labels = lines.map(l => {
+    //                 const [start, end, hakka] = l.split("\t");
+    //                 return {
+    //                     start: parseFloat(start),
+    //                     end: parseFloat(end),
+    //                     model: new HakkaText(dico, hakka || "")
+    //                 };
+    //             });
+    //         }
+
+    //         // for await (const [name, handle] of dirHandle.entries()) {
+    //         //     if (handle.kind !== 'file') continue;
+    //         //     if (name.toLowerCase() === 'french.txt') {
+    //         //         const file = await handle.getFile();
+    //         //         const text = await file.text();
+    //         //         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    //         //         lines.forEach((l, i) => {
+    //         //             const line = l.split('\t');
+    //         //             if (this.model?.labels[i]) this.model.labels[i].model.french = line[2];
+    //         //         });
+    //         //         break;
+    //         //     }
+    //         // }
+
+    //         if (files["french.txt"]) {
+    //             const text = await fetch(files["french.txt"]).then(r => r.text());
+    //             const lines = text.split(/\r?\n/).filter(l => l.trim());
+    //             lines.forEach((l, i) => {
+    //                 const cols = l.split("\t");
+    //                 if (this.model.labels[i]) this.model.labels[i].model.french = cols[2];
+    //             });
+    //         }
+
+    //         if (files["audio.wav"]) {
+    //             this.view.audio = {
+    //                 name: "audio.wav",
+    //                 url: files["audio.wav"],
+    //                 file: null      // remote, no local File object
+    //             };
+    //         }
+
+    //         // for await (const [name, handle] of dirHandle.entries()) {
+    //         //     if (handle.kind == 'file' && name == 'audio.wav')
+    //         //     {
+    //         //         console.log("Audio file found")
+    //         //         const lower = name.toLowerCase();
+    //         //         const file = await handle.getFile();
+    //         //         const url = URL.createObjectURL(file);
+    //         //         this.view.audio = {name,file,url}
+    //         //     }
+    //         // }
+
+    //         const pronunciations = [];
+    //         if (files["prononciations.csv"]) {
+    //             const text = await fetch(files["prononciations.csv"]).then(r => r.text());
+    //             const lines = text.split('\n').filter(l => l.trim());
+    //             let start = 0;
+
+    //             if (lines[0].toLowerCase().includes('char') &&
+    //                 lines[0].toLowerCase().includes('initial'))
+    //                 start = 1;
+
+    //             const pronunciations = [];
+    //             for (let i = start; i < lines.length; i++) {
+    //                 const [char, initial, final, tone] = lines[i].split(',');
+    //                 pronunciations.push(
+    //                     new Pronunciation({ simp: char, trad: char, initial, final, tone })
+    //                 );
+    //             }
+    //             this.dico.addPronunciations(pronunciations);
+    //         }
+    //         // for await (const [name, handle] of dirHandle.entries()) {
+    //         //     if (handle.kind !== 'file') continue;
+    //         //     const lower = name.toLowerCase();
+    //         //     const file = await handle.getFile();
+    //         //     const url = URL.createObjectURL(file);
+    //         //     if (/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) {
+    //         //         const audio = {name,file,url}
+    //         //         audios.push(audio);
+    //         //         const i = parseInt(name.split("-")[1]);
+    //         //         if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
+    //         //     } 
+    //         // }
+
+    //         // for await (const entry of dirHandle.values()) {
+    //         //     if (entry.kind === 'file' && entry.name == 'prononciations.csv' ) {
+    //         //         const file = await entry.getFile();
+    //         //         const text = await file.text();
+    //         //         const lines = text.split('\n').filter(line => line.trim());
+    //         //         // Skip header if present
+    //         //         let start = 0;
+    //         //         if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
+    //         //         for (let i = start; i < lines.length; i++) {
+    //         //             const [char, initial, final, tone] = lines[i].split(',');
+    //         //             const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
+    //         //             console.log(p);
+    //         //             pronunciations.push(p);
+    //         //         }
+    //         //         this.dico.addPronunciations(pronunciations);
+    //         //         alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
+    //         //     }
+    //         // }
+    //         this.view.render(this.model);
+    //         this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
+    //         this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
+    //         this.view.index.dispatchEvent(new Event("change"));
+
+    //     } catch (err) {
+    //         console.error(err);
+    //         alert("Failed to import audios.");
+    //     }
+    // }
 }
 
 const app = new Controller();

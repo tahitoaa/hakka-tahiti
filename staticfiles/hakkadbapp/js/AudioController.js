@@ -64,18 +64,38 @@ class AudioController {
         this.autoMode = false;
     }
 
+    getStartStop(idx) {
+        const startStop = document.getElementById(`start-stop-${idx}`).innerText.split(' : ');
+        const start = parseFloat(startStop[0]);
+        const stop = parseFloat(startStop[1]);
+        return {start, stop}
+    }
+
     /** Play current index, with optional looping */
     playCurrent(loop = false) {
         this.stop(); // clear previous state
         const idx = this.getCurrentIndex();
-        const audio = this.getAudioForIndex(idx);
-        if (!audio) return;
+        // const audio = this.getAudioForIndex(idx);
+        // if (!audio) return;
+        const audioElement = document.getElementById("audio");
+        audioElement.loop = loop;
+        const startStop = this.getStartStop(idx); // { start: x, stop: y }
 
-        this.playingAudio = audio;
-        this.playingAudio.loop = loop;
-        this.playingAudio.currentTime = 0;
-        this.playingAudio.onended = null;
-        this.playingAudio.play().catch(console.warn)
+        audioElement.currentTime = startStop.start;
+
+        // Clear previous handlers if needed
+        audioElement.onended = null;
+        audioElement.ontimeupdate = null;
+
+        // Define stop-limit manually
+        audioElement.ontimeupdate = () => {
+            if (audioElement.currentTime >= startStop.stop) {
+                audioElement.pause();
+                audioElement.currentTime = startStop.start; // optional reset
+            }
+        };
+        audioElement.onended = null;
+        audioElement.play().catch(console.warn)
     }
 
     /** Toggle auto mode on/off */
