@@ -78,24 +78,26 @@ class AudioController {
         // const audio = this.getAudioForIndex(idx);
         // if (!audio) return;
         const audioElement = document.getElementById("audio");
-        audioElement.loop = loop;
-        const startStop = this.getStartStop(idx); // { start: x, stop: y }
+        if (audioElement) {
+            audioElement.loop = loop;
+            const startStop = this.getStartStop(idx); // { start: x, stop: y }
 
-        audioElement.currentTime = startStop.start;
+            audioElement.currentTime = startStop.start;
 
-        // Clear previous handlers if needed
-        audioElement.onended = null;
-        audioElement.ontimeupdate = null;
+            // Clear previous handlers if needed
+            audioElement.onended = null;
+            audioElement.ontimeupdate = null;
 
-        // Define stop-limit manually
-        audioElement.ontimeupdate = () => {
-            if (audioElement.currentTime >= startStop.stop) {
-                audioElement.pause();
-                audioElement.currentTime = startStop.start; // optional reset
-            }
-        };
-        audioElement.onended = null;
-        audioElement.play().catch(console.warn)
+            // Define stop-limit manually
+            audioElement.ontimeupdate = () => {
+                if (audioElement.currentTime >= startStop.stop) {
+                    audioElement.pause();
+                    audioElement.currentTime = startStop.start; // optional reset
+                }
+            };
+            audioElement.onended = null;
+            audioElement.play().catch(console.warn)
+        }
     }
 
     /** Toggle auto mode on/off */

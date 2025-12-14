@@ -23,30 +23,27 @@ class HakkaText {
             this.suggestions = [] 
             this.syllables.forEach((syl, i) => {
                 this.suggestions.push(...this.dico
-                                            .getMatchesForSyllable(syl.split("_")[0])
-                                            .map(p => {
-                                                p.for = i;
-                                                p.start = 0;
-                                                p.end = 0;
-                                                return p;
-                                            }));
+                    .getMatchesForSyllable(syl.split("_")[0])
+                    .map(p => ({
+                        pron: p,      // original pronunciation
+                        for: i,       // syllable index
+                        start: 0,
+                        end: 0
+                    })));
             });
             this.text = text;
         }
     }
 
     select(selectionIndex){
-        const selection = this.suggestions[selectionIndex];
-        this.replace(selection.for, selection.simp);
-        this.update(this.text);
+        const suggestion = this.suggestions[selectionIndex];
+        this.replace(suggestion.for, suggestion.pron.simp);
+        this.update({"hanzi": this.text});
     }
 
     replace(sylIndex, replaceValue) {
         const toReplace = this.syllables[sylIndex];
         const replaced = this.text.replace(toReplace, replaceValue);
-        // if (replaced !== this.text) {this.text = replaced;}
-        // else {
         this.text = replaced;
-        // }
     }
 }

@@ -3,8 +3,8 @@ const dico = new Dictionary({itemSelector: 'li',containerId: '#pron-list'});
 class Transcription {
     constructor () {
         this.labels = [
-            {start : 0, end:1, model: new HakkaText(dico, " 客家話")},
-            {start : 1, end:2, model: new HakkaText(dico, "hakka2")},
+            {start : 1, end:2, model: new HakkaText(dico, "hak_ga_")},
+            {start : 0, end:1, model: new HakkaText(dico, "客家話")},
         ];
         this.suggestions = [];
     }
@@ -40,17 +40,19 @@ class Transcription {
 }
 
 class LabelView {
-    constructor(label, e){
+    constructor(label, index){
+        this.label = label;
+        this.index = index;
         this.dico = dico;
         const wrapper = document.createElement('div');
         wrapper.className = 'mt-2 text-center';
-        wrapper.id = `chunk-${e}`;
+        wrapper.id = `chunk-${this.index}`;
         this.wrapper = wrapper;
 
         const title = document.createElement('label');
         title.textContent = `${label.start} : ${label.end}`;
-        title.htmlFor = `chunk-${e}`;
-        title.id = `start-stop-${e}`
+        title.htmlFor = `chunk-${this.index}`;
+        title.id = `start-stop-${this.index}`
         this.title = title;
         wrapper.appendChild(title);
 
@@ -58,15 +60,28 @@ class LabelView {
         ta.className = 'w-full rounded p-1 bg-white';
         ta.rows = 1;
         ta.value = label.model.text || '';
-        ta.id = `hanzi-${e}`;
+        ta.id = `hanzi-${this.index}`;
         this.ta = ta;
         this.hanzi = this.ta;
-        ta.addEventListener('keyup', (event)=>{
-            const target = event.target;
-            console.log(event);
-            label.model.update({hanzi:target.value});
-            this.render(label);
+        ta.addEventListener("change", (event) => {
+            // Recompute suggestions
+            this.label.model.update(this.ta.value);
+            // update only this labelView visuals, fast
+            this.render(this.label);
         })
+        ta.addEventListener("keydown", (event) => {
+            // SHIFT + ENTER → new line
+            if (event.key === "Enter" && event.shiftKey) {
+                return; // let textarea insert a newline
+            }
+
+            // ENTER without shift → validate
+            if (event.key === "Enter") {
+                event.preventDefault();               // stop newline
+                
+                this.handleValidate(this.label);           // validate changes
+            }
+        });
         wrapper.appendChild(ta);
 
         this.suggestions = document.createElement('div');
@@ -82,7 +97,7 @@ class LabelView {
         this.taFrench.className = 'w-full rounded p-1 bg-white mt-1';
         this.taFrench.rows = 1;
         this.taFrench.placeholder = 'Français';
-        this.taFrench.id = `french-${e}`;
+        this.taFrench.id = `french-${this.index}`;
         this.taFrench.value = label.model.french;
         wrapper.appendChild(this.taFrench);
 
@@ -113,14 +128,14 @@ class LabelView {
         this.a = a;
 
         const pinyinOutput =document.createElement('div');
-        pinyinOutput.id = `pinyin-output-${e}`;
+        pinyinOutput.id = `pinyin-output-${this.index}`;
         this.pinyinOutput = pinyinOutput;
 
         const furigana = document.createElement('span');
         this.furigana = furigana;
 
         const hanziOnly = document.createElement('div');
-        hanziOnly.id = `hanzi-only-${e}`;
+        hanziOnly.id = `hanzi-only-${this.index}`;
         this.hanziOnly = hanziOnly;
         this.hanzi = this.hanziOnly;
 
@@ -137,6 +152,7 @@ class LabelView {
     }
 
     render(label){
+        this.label = label;
         const inputHanzi = Array.from(label.model.text);
         this.french.innerHTML = this.taFrench.value + ' ';
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
@@ -211,23 +227,29 @@ class LabelView {
 
     renderSuggestions(suggestions){
         return `<div class="flex gap-2 flex-wrap mb-2">
-                    ${suggestions.map((pron, i) => {
+                    ${suggestions.map((s, i) => {
                         const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9); // 1–9, A–Z
                         return `
-                            <div class="flex flex-col items-center rounded text-indigo-800 hover:bg-gray-200 hover:shadow">
+                            <div class="suggestion-btn flex p-3 flex-col items-center rounded text-indigo-800 hover:bg-white hover:shadow"
+                                    data-label="${this.index}"
+                                    data-suggestion="${i}">
+                                <div class="text-xs text-gray-600">
+                                    ${ keyHint || '?'}
+                                </div>
                                 <button 
                                     id="suggested-${keyHint}" 
                                     class="text-small font-semibold" 
                                     value="${i}">
-                                    ${pron.char() || '?'}
+                                    ${s.pron.char() || '?'}
                                 </button>
                                 <div class="text-xs text-gray-600">
-                                    ${pron.abstractPinyin() || '?'}
+                                    ${s.pron.abstractPinyin() || '?'}
                                 </div>
                             </div>`;
                         }).join('')}
                 </div>`
     }
+
     renderChar(char){return `<span class="block text-base font-semibold text-black">${char}</span>`}
     renderKana(kana){return `<span class="block text-sm">${kana}</span>`}
     renderBlock(content){return `<span class="inline-block text-center align-center">${content}</span>`;}
@@ -259,6 +281,23 @@ class LabelView {
                             `
                         }).join('');
     }
+
+    handleValidate(label) {
+        this.label = label;
+        // update the model with the current textarea content
+        label.model.update(this.ta.value);
+
+        // update only this labelView visuals, fast
+        this.render(label);
+
+        console.log(this.index)
+        document.getElementById("label-index").value = this.index + 2;
+        document.getElementById("label-index").dispatchEvent(new Event("change"));
+        // let the controller know displays must be recomputed
+        document.dispatchEvent(new CustomEvent("label-updated", {
+            detail: { index: this.index }
+    }));
+}
 }
 
 class View {
@@ -278,6 +317,9 @@ class View {
         this.container.appendChild(this.forms);
         this.container.appendChild(this.displays);
         this.outputs = {};
+        this.audio = null;
+        this.audioEl = document.createElement('audio');
+        this.container.appendChild(this.audioEl);
 
         new CopyButton('#output-hanzi-body');   
     }
@@ -285,17 +327,25 @@ class View {
     render(data){
         // 1. Clear previous content
         this.forms.textContent = '';  // safer than innerHTML if just removing children
-        this.views = [];              // reset the array explicitly
+        this.views = new Array(data.labels.length);              // reset the array explicitly
 
+        this.renderAudio();
         // 2. Rebuild views from scratch
-        this.views = data.labels.map((label, i) => {
-            const labelView = new LabelView(label, i);
-
-            this.forms.appendChild(labelView.wrapper);
-            return labelView;
-        });
+        data.labels.forEach((label, i) => {
+            this.renderLabel(label, i);
+        })
         // 4. Re-render display section if necessary
         this.renderDisplays(data);
+    }
+
+    renderAudio() {
+        if (this.audio) {
+            this.audioEl.id = "audio";
+            this.audioEl.controls = true;
+            this.audioEl.src = this.audio.url;
+            this.audioEl.preload = 'metadata';
+            this.audioEl.className = 'w-full mt-1';
+        }
     }
 
     renderDisplays(data){
@@ -323,26 +373,6 @@ class View {
         this.displays.textContent = ''; 
         const container = document.createElement('div'); // Or wherever you want to place 
 
-        if (this.audio) {
-            console.log(this.audio)
-            const row = document.createElement('div');
-            row.className = 'mt-2';
-
-            const title = document.createElement('div');
-            title.textContent = this.audio.name;
-            title.className = 'text-sm text-gray-700';
-
-            const element = document.createElement('audio');
-            element.id = "audio";
-            element.controls = true;
-            element.src = this.audio.url;
-            element.preload = 'metadata';
-            element.className = 'w-full mt-1';
-
-            row.appendChild(title);
-            row.appendChild(element);
-            this.container.appendChild(row);
-        }
 
         container.className = `
             flex flex-wrap justify-stretch items-start gap-2
@@ -405,6 +435,14 @@ class View {
 
         this.displays.appendChild(container);
     }
+
+    renderLabel(label, i){
+        const labelView = new LabelView(label, i);
+        if (this.forms.children[i]) {
+            this.forms.replaceChild(labelView.wrapper,  this.forms.children[i]);
+        } else this.forms.appendChild(labelView.wrapper);
+        this.views[i] = labelView;
+    }
 }
 
 class Controller {
@@ -412,19 +450,21 @@ class Controller {
         this.model = new Transcription();
         this.view = new View();
         this.view.render(this.model);
-        this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
+        // this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleSelection(event))});
         this.dico = dico;
         this.view.importProns.addEventListener('click', e => {
                     this.dico.handleImportProns(e).then(() => {
                         this.view.render(this.model);
-                        this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
-                        this.view.index.dispatchEvent(new Event("change"));
+                        // this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleSelection(event))});                
+                        // this.view.index.dispatchEvent(new Event("change"));
                     })
                 });
-        this.view.container.addEventListener('change', e => this.handleInput(e));
+        // this.view.container.addEventListener('change', e => this.handleInput(e));
         // document.getElementById('import-labels').addEventListener('click', e => this.handleImportLabels(e));
         // document.getElementById('import-audios').addEventListener('click', e => this.handleImportAudios(e));
-        document.getElementById('import-project').addEventListener('click', e => this.handleImportProject(e));
+        this.view.container.addEventListener("click", e => this.handleSelection(e));
+        document.getElementById('import-project').addEventListener('click', e => this.handleImportLocalProject(e));
+        document.getElementById('select-project').addEventListener('change', e => this.handleImportHostedProject(e));
         document.getElementById('export-project').addEventListener('click', e => this.model.export());
         document.getElementById('label-index').addEventListener('change', e => this.handleIndexChange(e));
         document.getElementById('viewer-displays').addEventListener('click', this.handleClickOnDisplays.bind(this));
@@ -434,6 +474,10 @@ class Controller {
         this.mode = document.getElementById('toogle-hanzi')
         document.getElementById('toggle-hanzi').addEventListener('click', this.handleToggleTrad.bind(this))
         
+        document.addEventListener("label-updated", (e) => {
+            // console.log("Label updated:", e.detail.index);
+            this.view.renderDisplays(this.model); // fast refresh of right panel
+        });
     }
 
     handleCtrlS(event){
@@ -444,16 +488,16 @@ class Controller {
     }
 
     handleToggleTrad(event){
+        // console.log("handleToggleTrad", event)
         this.view.views.forEach((v,i) => {
-            console.log(event)
-            v.suggestions.addEventListener("click", event=> this.handleClick(event));
-            v.render(this.model.labels[i]);
+            // console.log(event) 
+            // v.suggestions.addEventListener("click", event=> this.handleSelection(event));    v.render(this.model.labels[i]);
         });
         this.view.index.dispatchEvent(new Event("change"));
     }
 
     handleClickOnDisplays(event) {
-        console.log(event)
+        console.log("handleClickOnDisplays", event)
         const el = event.target.closest('span[id]');
         if (!el) return;
 
@@ -464,7 +508,7 @@ class Controller {
         }
         const i = parseInt(match[0].split('-')[1]);
 
-        console.log("Clicked on display", i,event)
+        // console.log("Clicked on display", i,event)
         if (!isNaN(i)){
             this.view.index.value = (i+1);
             this.view.index.dispatchEvent(new Event("change"));
@@ -472,16 +516,40 @@ class Controller {
     }
 
     handleClick(event) {
-        const e = event;
-        const input = document.getElementById('label-index');
-        let v = Math.max(1, parseInt(input.value || '1', 10));
-        // if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
-        this.model.labels[v-1].model.select(event.target.value);
-        this.view.render(this.model);
-        this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
-        document.getElementById('label-index').dispatchEvent(new Event("change"));
-        e.preventDefault();
-        document.getElementById('hanzi-'+(v-1)).focus();
+        console.log("handleclick", event)
+        // const e = event;
+        // const input = document.getElementById('label-index');
+        // let v = Math.max(1, parseInt(input.value || '1', 10));
+        // // if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
+        // this.model.labels[v-1].model.select(event.target.value);
+        // this.view.render(this.model) 
+        // // this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleSelection(event))});document.getElementById('label-index').dispatchEvent(new Event("change"));
+        // e.preventDefault();
+        // document.getElementById('hanzi-'+(v-1)).focus();
+    }
+
+    handleSelection(event) {
+        const btn = event.target.closest(".suggestion-btn");
+        if (!btn) return; // click outside suggestions
+
+        const labelIndex = parseInt(btn.dataset.label, 10);
+        const suggestionIndex = parseInt(btn.dataset.suggestion, 10);
+
+        const label = this.model.labels[labelIndex];
+        if (!label) return;
+        // Apply the selection: update only this model
+        label.model.select(suggestionIndex);
+
+        // Re-render ONLY the corresponding LabelView
+        this.view.renderLabel(label, labelIndex)
+
+        const labelView = this.view.views[labelIndex];
+        labelView.wrapper.classList.add('visible');
+
+        // Restore focus (nice usability)
+        const ta = document.getElementById(`hanzi-${labelIndex}`);
+        if (ta) ta.focus();
+        this.view.index.dispatchEvent(new Event("change"));
     }
 
     getMax(){
@@ -491,6 +559,7 @@ class Controller {
     handlePaging(event){
         const e = event;
         if (e.key == 'PageDown' || e.key == 'PageUp') {
+            // console.log("handlePaging", event)
             e.preventDefault();
             const input = document.getElementById('label-index');
             let v = Math.max(1, parseInt(input.value || '1', 10));
@@ -507,6 +576,7 @@ class Controller {
     }
 
     handleIndexChange(event){
+        // console.log("handleIndexChange", event)
         const v = Math.max(1, parseInt(event.target.value || '1', 10));
         const idx = v - 1;
         const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
@@ -541,90 +611,14 @@ class Controller {
         }
     }
 
-
-    handleInput(event){
-        const target = event.target;
-        const i = parseInt(target.id.split('-')[1]);
-        if (!this.model.labels[i]) return;
-        const update = {};
-        if (target.id.includes("french-")) 
-            update["french"] = target.value;
-        if (target.id.includes("hanzi-"))
-            update["hanzi"] = target.value;
-        this.model.labels[i].model.update(update);
-        this.view.views[i].render(this.model.labels[i])
-        this.view.renderDisplays(this.model);
-        this.view.index.value = i+1;
-        this.view.index.dispatchEvent(new Event("change"));
-    }
-
-    // handleImportAudios(event){
-    //     if (!window.showDirectoryPicker) {
-    //         alert("Your browser does not support the File System Access API required for folder picking.");
-    //         return;
-    //     }
-    //     (async () => {
-    //         try {
-    //             const dirHandle = await window.showDirectoryPicker();
-    //             const audios = [];
-
-    //             for await (const [name, handle] of dirHandle.entries()) {
-    //                 if (handle.kind !== 'file') continue;
-    //                 const lower = name.toLowerCase();
-    //                 if (!/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) continue;
-
-    //                 const file = await handle.getFile();
-    //                 const url = URL.createObjectURL(file);
-    //                 const audio = {name,file,url}
-    //                 audios.push(audio);
-    //                 const i = parseInt(name.split("-")[1]);
-    //                 if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
-    //             }
-    //             this.view.render(this.model)
-    //         } catch (err) {
-    //             console.error(err);
-    //             alert("Failed to import audios.");
-    //         }
-    //     })();
-    // }
-
-    // handleImportLabels(event){
-    //     if (!window.showDirectoryPicker) {
-    //         alert("Your browser does not support the File System Access API required for folder picking.");
-    //         return;
-    //     }
-    //     (async () => {
-    //         try {
-    //             const fileHandle = await window.showOpenFilePicker();
-    //             const file = await fileHandle[0].getFile();
-    //             const text = await file.text();
-    //             const lines = text.split("\n");
-    //             this.model.labels = lines.map(l => {
-    //                 const line = l.split('\t');
-    //                 const data =  {
-    //                     start: parseFloat(line[0]),
-    //                     end: parseFloat(line[1]),
-    //                     model: new HakkaText(dico, line[2]),
-    //                 }
-    //                 return data;
-    //             })
-
-    //             this.view.render(this.model)
-    //         } catch (err) {
-    //             console.error(err);
-    //             alert("Failed to import.");
-    //         }
-    //     })();
-    // }
-
-async handleImportProject() {
+async handleImportHostedProject(event) {
     try {
-        const vercelStorageDir = ""
+        const projectPath = event.target.value;
         const files = {}
-        files.hakka   = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/hakka.txt"
-        files.french  = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/french.txt"
-        files.audio   = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/audio.wav"
-        files.pron    = "https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/prononciations.csv"
+        files.hakka   = projectPath + "hakka.txt";
+        files.french  = projectPath + "french.txt";
+        files.audio   = projectPath + "audio.wav";
+        files.pron    = projectPath + "prononciations.csv";
 
         if (!files) {
             alert("No file paths provided.");
@@ -636,28 +630,33 @@ async handleImportProject() {
 
         // --- Load hakka.txt ---
         if (files.hakka) {
-            const text = await fetch(files.hakka).then(r => r.text());
-            const lines = text.split(/\r?\n/).filter(Boolean);
-            this.model.labels = lines.map(line => {
-                const [start, end, content] = line.split("\t");
-                return {
-                    start: parseFloat(start),
-                    end: parseFloat(end),
-                    model: new HakkaText(dico, content || "")
-                };
-            });
+            const text = await fetch(files.hakka).then(r => r.text()).catch(e => alert("Fichier introuvable : hakka.txt"));
+            if (text) {
+                const lines = text.split(/\r?\n/).filter(Boolean);
+                this.model.labels = lines.map(line => {
+                    const [start, end, content] = line.split("\t");
+                    return {
+                        start: parseFloat(start),
+                        end: parseFloat(end),
+                        model: new HakkaText(dico, content || "")
+                    };
+                });
+            }
         }
 
         // --- Load french.txt ---
         if (files.french) {
-            const text = await fetch(files.french).then(r => r.text());
-            const lines = text.split(/\r?\n/).filter(Boolean);
-            lines.forEach((l, i) => {
-                const parts = l.split("\t");
-                if (this.model.labels?.[i]) {
-                    this.model.labels[i].model.french = parts[2];
-                }
-            });
+            const text = await fetch(files.french).then(r => r.text()).catch(e => alert("Fichier introuvable : french.txt"));
+            if (text) {
+                const lines = text.split(/\r?\n/).filter(Boolean);
+                lines.forEach((l, i) => {
+                    const parts = l.split("\t");
+                    if (this.model.labels?.[i]) {
+                        this.model.labels[i].model.french = parts[2];
+                    }
+                });
+            }
+
         }
 
         // --- Load audio file ---
@@ -670,26 +669,26 @@ async handleImportProject() {
 
         // --- Load prononciations.csv ---
         if (files.pron) {
-            const text = await fetch(files.pron).then(r => r.text());
-            const lines = text.split(/\r?\n/).filter(Boolean);
-            const pronunciations = [];
+            const text = await fetch(files.pron).then(r => r.text()).catch(e => alert("Fichier introuvable : prononciation.txt"));
+            if (text) {
+                const lines = text.split(/\r?\n/).filter(Boolean);
+                const pronunciations = [];
 
-            const start = lines[0].includes("char") ? 1 : 0;
+                const start = lines[0].includes("char") ? 1 : 0;
 
-            for (let i = start; i < lines.length; i++) {
-                const [char, initial, final, tone] = lines[i].split(",");
-                pronunciations.push(
-                    new Pronunciation({ simp: char, trad: char, initial, final, tone })
-                );
+                for (let i = start; i < lines.length; i++) {
+                    const [char, initial, final, tone] = lines[i].split(",");
+                    pronunciations.push(
+                        new Pronunciation({ simp: char, trad: char, initial, final, tone })
+                    );
+                }
+                this.dico.addPronunciations(pronunciations);
             }
-            this.dico.addPronunciations(pronunciations);
         }
 
         // --- Render UI ---
         this.view.render(this.model);
-        this.view.views.forEach(v =>
-            v.suggestions.addEventListener("click", event => this.handleClick(event))
-        );
+        // this.view.views.forEach(v => v.suggestions.addEventListener("click", event => this.handleSelection(event)));
         this.view.displays.addEventListener("click", this.handleClickOnDisplays.bind(this));
         this.view.index.dispatchEvent(new Event("change"));
 
@@ -702,166 +701,106 @@ async handleImportProject() {
 }
 
 
-    // async handleImportProject(event){
-    //     if (!window.showDirectoryPicker) {
-    //         alert("Your browser does not support the File System Access API required for folder picking.");
-    //         return;
-    //     }
-    //     try {
-    //         alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")
+    async handleImportLocalProject(event){
+        if (!window.showDirectoryPicker) {
+            alert("Your browser does not support the File System Access API required for folder picking.");
+            return;
+        }
+        try {
+            alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")
 
-    //         // const dirHandle = await window.showDirectoryPicker();
+            const dirHandle = await window.showDirectoryPicker();
+            const audios = [];
 
-    //         const prefix = "annette_levin/"
-    //         const response = await fetch(`https://api.vercel.com/v2/blobs?prefix=${prefix}`, {
-    //             headers: { Authorization: `Bearer ${YOUR_VERCEL_TOKEN}` }
-    //         });
-    //         const { blobs } = await response.json();
+            this.model = new Transcription();
+            this.view = new View();
 
-    //         // Convert response to a map: { "hakka.txt" : url, ... }
-    //         const files = {};
-    //         for (const blob of blobs) {
-    //             const filename = blob.pathname.split("/").pop();
-    //             files[filename] = blob.url;
-    //         }
+            // find and read hanzi.txt first (if present) to populate labels
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind !== 'file') continue;
+                if (name.toLowerCase() === 'hakka.txt') {
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+                    this.model.labels = lines.map(l => {
+                        const line = l.split('\t');
+                        return {
+                            start: parseFloat(line[0]),
+                            end: parseFloat(line[1]),
+                            model: new HakkaText(dico, line[2] || ''),
+                        };
+                    });
+                    break;
+                }
+            }
 
-    //         this.model = new Transcription();
-    //         this.view = new View();
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind !== 'file') continue;
+                if (name.toLowerCase() === 'french.txt') {
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+                    lines.forEach((l, i) => {
+                        const line = l.split('\t');
+                        if (this.model?.labels[i]) this.model.labels[i].model.french = line[2];
+                    });
+                    break;
+                }
+            }
 
-    //         // find and read hanzi.txt first (if present) to populate labels
-    //         // for await (const [name, handle] of dirHandle.entries()) {
-    //         //     if (handle.kind !== 'file') continue;
-    //         //     if (name.toLowerCase() === 'hakka.txt') {
-    //         //         const file = await handle.getFile();
-    //         //         const text = await file.text();
-    //         //         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-    //         //         this.model.labels = lines.map(l => {
-    //         //             const line = l.split('\t');
-    //         //             return {
-    //         //                 start: parseFloat(line[0]),
-    //         //                 end: parseFloat(line[1]),
-    //         //                 model: new HakkaText(dico, line[2] || ''),
-    //         //             };
-    //         //         });
-    //         //         break;
-    //         //     }
-    //         // }
 
-    //         if (files["hakka.txt"]) {
-    //             const text = await fetch(files["hakka.txt"]).then(r => r.text());
-    //             const lines = text.split(/\r?\n/).filter(l => l.trim());
-    //             this.model.labels = lines.map(l => {
-    //                 const [start, end, hakka] = l.split("\t");
-    //                 return {
-    //                     start: parseFloat(start),
-    //                     end: parseFloat(end),
-    //                     model: new HakkaText(dico, hakka || "")
-    //                 };
-    //             });
-    //         }
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind == 'file' && name == 'audio.wav')
+                {
+                    const lower = name.toLowerCase();
+                    const file = await handle.getFile();
+                    const url = URL.createObjectURL(file);
+                    this.view.audio = {name,file,url}
+                }
+            }
 
-    //         // for await (const [name, handle] of dirHandle.entries()) {
-    //         //     if (handle.kind !== 'file') continue;
-    //         //     if (name.toLowerCase() === 'french.txt') {
-    //         //         const file = await handle.getFile();
-    //         //         const text = await file.text();
-    //         //         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-    //         //         lines.forEach((l, i) => {
-    //         //             const line = l.split('\t');
-    //         //             if (this.model?.labels[i]) this.model.labels[i].model.french = line[2];
-    //         //         });
-    //         //         break;
-    //         //     }
-    //         // }
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind !== 'file') continue;
+                const lower = name.toLowerCase();
+                const file = await handle.getFile();
+                const url = URL.createObjectURL(file);
+                if (/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) {
+                    const audio = {name,file,url}
+                    audios.push(audio);
+                    const i = parseInt(name.split("-")[1]);
+                    if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
+                } 
+            }
 
-    //         if (files["french.txt"]) {
-    //             const text = await fetch(files["french.txt"]).then(r => r.text());
-    //             const lines = text.split(/\r?\n/).filter(l => l.trim());
-    //             lines.forEach((l, i) => {
-    //                 const cols = l.split("\t");
-    //                 if (this.model.labels[i]) this.model.labels[i].model.french = cols[2];
-    //             });
-    //         }
+            const pronunciations = [];
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name == 'prononciations.csv' ) {
+                    const file = await entry.getFile();
+                    const text = await file.text();
+                    const lines = text.split('\n').filter(line => line.trim());
+                    // Skip header if present
+                    let start = 0;
+                    if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
+                    for (let i = start; i < lines.length; i++) {
+                        const [char, initial, final, tone] = lines[i].split(',');
+                        const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
+                        // console.log(p);
+                        pronunciations.push(p);
+                    }
+                    this.dico.addPronunciations(pronunciations);
+                    alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
+                }
+            }
+            this.view.render(this.model); 
+            // this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});    
+            this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
+            this.view.index.dispatchEvent(new Event("change"));
 
-    //         if (files["audio.wav"]) {
-    //             this.view.audio = {
-    //                 name: "audio.wav",
-    //                 url: files["audio.wav"],
-    //                 file: null      // remote, no local File object
-    //             };
-    //         }
-
-    //         // for await (const [name, handle] of dirHandle.entries()) {
-    //         //     if (handle.kind == 'file' && name == 'audio.wav')
-    //         //     {
-    //         //         console.log("Audio file found")
-    //         //         const lower = name.toLowerCase();
-    //         //         const file = await handle.getFile();
-    //         //         const url = URL.createObjectURL(file);
-    //         //         this.view.audio = {name,file,url}
-    //         //     }
-    //         // }
-
-    //         const pronunciations = [];
-    //         if (files["prononciations.csv"]) {
-    //             const text = await fetch(files["prononciations.csv"]).then(r => r.text());
-    //             const lines = text.split('\n').filter(l => l.trim());
-    //             let start = 0;
-
-    //             if (lines[0].toLowerCase().includes('char') &&
-    //                 lines[0].toLowerCase().includes('initial'))
-    //                 start = 1;
-
-    //             const pronunciations = [];
-    //             for (let i = start; i < lines.length; i++) {
-    //                 const [char, initial, final, tone] = lines[i].split(',');
-    //                 pronunciations.push(
-    //                     new Pronunciation({ simp: char, trad: char, initial, final, tone })
-    //                 );
-    //             }
-    //             this.dico.addPronunciations(pronunciations);
-    //         }
-    //         // for await (const [name, handle] of dirHandle.entries()) {
-    //         //     if (handle.kind !== 'file') continue;
-    //         //     const lower = name.toLowerCase();
-    //         //     const file = await handle.getFile();
-    //         //     const url = URL.createObjectURL(file);
-    //         //     if (/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) {
-    //         //         const audio = {name,file,url}
-    //         //         audios.push(audio);
-    //         //         const i = parseInt(name.split("-")[1]);
-    //         //         if (this.model?.labels[i]) this.model.labels[i-1].audio = audio;
-    //         //     } 
-    //         // }
-
-    //         // for await (const entry of dirHandle.values()) {
-    //         //     if (entry.kind === 'file' && entry.name == 'prononciations.csv' ) {
-    //         //         const file = await entry.getFile();
-    //         //         const text = await file.text();
-    //         //         const lines = text.split('\n').filter(line => line.trim());
-    //         //         // Skip header if present
-    //         //         let start = 0;
-    //         //         if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
-    //         //         for (let i = start; i < lines.length; i++) {
-    //         //             const [char, initial, final, tone] = lines[i].split(',');
-    //         //             const p = new Pronunciation({ simp: char, trad: char, initial, final, tone })
-    //         //             console.log(p);
-    //         //             pronunciations.push(p);
-    //         //         }
-    //         //         this.dico.addPronunciations(pronunciations);
-    //         //         alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
-    //         //     }
-    //         // }
-    //         this.view.render(this.model);
-    //         this.view.views.forEach(v=> { v.suggestions.addEventListener("click", event=> this.handleClick(event))});
-    //         this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
-    //         this.view.index.dispatchEvent(new Event("change"));
-
-    //     } catch (err) {
-    //         console.error(err);
-    //         alert("Failed to import audios.");
-    //     }
-    // }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to import audios.");
+        }
+    }
 }
 
 const app = new Controller();
