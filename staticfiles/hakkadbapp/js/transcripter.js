@@ -63,9 +63,9 @@ class LabelView {
         ta.id = `hanzi-${this.index}`;
         this.ta = ta;
         this.hanzi = this.ta;
-        ta.addEventListener("change", (event) => {
+        ta.addEventListener("input", (event) => {
             // Recompute suggestions
-            this.label.model.update(this.ta.value);
+            this.label.model.update({"hanzi": this.ta.value});
             // update only this labelView visuals, fast
             this.render(this.label);
         })
@@ -156,7 +156,7 @@ class LabelView {
         const inputHanzi = Array.from(label.model.text);
         this.french.innerHTML = this.taFrench.value + ' ';
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
-        
+
         this.furigana.innerHTML = inputHanzi
             .filter(e => e != "_")
             .map(h => {
@@ -478,6 +478,35 @@ class Controller {
             // console.log("Label updated:", e.detail.index);
             this.view.renderDisplays(this.model); // fast refresh of right panel
         });
+
+        document.addEventListener("keydown", (event) => {
+            console.log(event)
+            if (event.shiftKey) {
+                event.preventDefault();
+                console.log(event)
+                const key = event.key;
+
+                // Only allow digits 1–9
+                if (!/^[1-9]$/.test(key)) return;
+
+                // Convert key to index (1 → 0, 2 → 1 ...)
+                const suggestionIndex = parseInt(key, 10) - 1;
+
+                // Get current label index from input
+                const currentIndex = parseInt(this.view.index.value, 10) - 1;
+
+                const view = this.view.views[currentIndex];
+                if (!view) return;
+
+                console.log(view.suggestions)
+                if (suggestionIndex >= view.suggestions.length) return; // nothing to click
+                
+                const el = view.suggestions.querySelector(`[data-suggestion="${suggestionIndex}"]`);
+                if (el)el.click();
+            }
+
+        });
+
     }
 
     handleCtrlS(event){
