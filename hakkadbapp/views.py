@@ -314,21 +314,35 @@ def browse(request):
     context = {"page": "browse"}
     return render(request, "hakkadbapp/browse.html", context)
 
-def pinyin_converter(request):
-    context = {"title": "Méthode de saisie",
+
+def get_all_data():
+    word_pron_qs = WordPronunciation.objects.select_related(
+        'pronunciation__initial',
+        'pronunciation__final',
+        'pronunciation__tone'
+    )
+
+    # Prefetch the optimized WordPronunciation set into Word
+    words = Word.objects.prefetch_related(
+        Prefetch('wordpronunciation_set', queryset=word_pron_qs)
+    )
+
+    context = {
         'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
         'tones': Tone.objects.all(),
         'initials': Initial.objects.all(),
-        'finals': Final.objects.all(),}
-    return render(request, "hakkadbapp/converter.html", context)
+        'finals': Final.objects.all(),
+        'words': words,
+        'title': "Recherche de mots",
+        "categories": Word.objects.values_list('category', flat=True).distinct(),
+    }
+    return context 
+
+def pinyin_converter(request):
+    return render(request, "hakkadbapp/converter.html", get_all_data())
 
 def transcripter(request):
-    context = {"title": "Méthode de saisie",
-        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
-        'tones': Tone.objects.all(),
-        'initials': Initial.objects.all(),
-        'finals': Final.objects.all(),}
-    return render(request, "hakkadbapp/transcripter.html", context)
+    return render(request, "hakkadbapp/transcripter.html", get_all_data())
 
 def caracters(request):
     context = {"page": "caracters"}

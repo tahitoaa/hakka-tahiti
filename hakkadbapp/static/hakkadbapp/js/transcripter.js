@@ -5,6 +5,8 @@ class Transcription {
         this.labels = [
             {start : 1, end:2, model: new HakkaText(dico, "hak_ga_")},
             {start : 0, end:1, model: new HakkaText(dico, "客家話")},
+            {start : 0, end:1, model: new HakkaText(dico, "我 唔 食 猪 肉")},
+            
         ];
         this.suggestions = [];
     }
@@ -68,6 +70,7 @@ class LabelView {
             this.label.model.update({"hanzi": this.ta.value});
             // update only this labelView visuals, fast
             this.render(this.label);
+            new Sentence(this.ta.value);
         })
         ta.addEventListener("keydown", (event) => {
             // SHIFT + ENTER → new line
@@ -87,6 +90,11 @@ class LabelView {
         this.suggestions = document.createElement('div');
         this.suggestions.id= "suggested-hanzi"
         wrapper.appendChild(this.suggestions);
+
+        this.sentence = new Sentence(this.dico, this.ta.value);
+        this.sentenceView = document.createElement('div');
+        wrapper.appendChild(this.sentenceView)
+
         // const ta2 = document.createElement('textarea');
         // ta2.className = 'w-full border rounded p-1 bg-white mt-1';
         // ta2.rows = 1;
@@ -157,11 +165,13 @@ class LabelView {
         this.french.innerHTML = this.taFrench.value + ' ';
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
 
+        this.sentence.update(label.model.text)
+        this.sentenceView.innerHTML = this.sentence.render()
         this.furigana.innerHTML = inputHanzi
             .filter(e => e != "_")
             .map(h => {
                 if (h === '\n') return '<br>';
-                if (h == ' ') return '<span class="inline-block w-4"></span>';
+                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
                 if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
@@ -187,7 +197,7 @@ class LabelView {
             .filter(e => e != "_")
             .map(h => {
                 if (h === '\n') return '<br>';
-                if (h == ' ') return '<span class="inline-block w-4"></span>';
+                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
                 const matches = this.dico.getMatchesForHanzi(h);
                 return matches.length > 0 ? matches[0].char() :h;
             })
@@ -197,7 +207,7 @@ class LabelView {
             .filter(e => e != "_")
             .map(h => {
                 if (h === '\n') return '<br>';
-                if (h == ' ') return '<span class="inline-block w-4"></span>';
+                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
                 if (isPunctuation(h)) {return h;}
                 if (!isHanzi(h)) {return h;}
                 const matches = this.dico.getMatchesForHanzi(h);
@@ -209,7 +219,7 @@ class LabelView {
 
         const ul = document.createElement('ul');
         ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all';
-        [this.furigana, this.french].forEach((e) => {
+        [this.furigana, this.french, this.sentenceView].forEach((e) => {
             const li = document.createElement('li');
             li.className = `
                 flex-col gap-1 px-3 py-2 

@@ -10,9 +10,11 @@ function isHanzi(ch) {
 
 class Dictionary {
     constructor ({containerId, itemSelector}) {
-        this.items = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
-        this.pronunciations = this.items.map(el => this.parsePronunciation(el));
-        this.unknowns = new Set()
+        this.pronItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
+        this.pronunciations = this.pronItems.map(el => this.parsePronunciation(el));
+        this.unknowns = new Set();
+        this.wordItems = Array.from(document.querySelectorAll(`#word-list > ${itemSelector}`))
+        this.words = this.wordItems.map(el => new Word  (el.dataset));
     }
 
     parsePronunciation(el) {

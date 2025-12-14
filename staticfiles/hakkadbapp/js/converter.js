@@ -166,18 +166,21 @@ class View {
             })
             .join('');
 
-        this.expressionOutput.innerHTML = inputHanzi
-            .filter(e => e != "_")
-            .map(h => {
-                if (h === '\n') return '<br>';
-                if (h == ' ') return '<span class="inline-block w-4"></span>';
-                if (isPunctuation(h)) {return h;}
-                if (!isHanzi(h)) {return h;}
-                const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-                return `${matchedPinyin}${h} `
-            })
-            .join('');
+        const sentences = text.split('。').map((s) => new Sentence(this.dico, s));
+        this.expressionOutput.innerHTML = sentences.map(s => s.render()).join('<br>');
+        
+        // inputHanzi
+        //     .filter(e => e != "_")
+        //     .map(h => {
+        //         if (h === '\n') return '<br>';
+        //         if (h == ' ') return '<span class="inline-block w-4"></span>';
+        //         if (isPunctuation(h)) {return h;}
+        //         if (!isHanzi(h)) {return h;}
+        //         const matches = this.dico.getMatchesForHanzi(h);
+        //         const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
+        //         return `${matchedPinyin}${h} `
+        //     })
+        //     .join('');
     }
 }
 
@@ -195,7 +198,7 @@ class Controller{
         this.view.output.addEventListener("click", (event) => this.handleClick(event));
         this.view.exportNew.addEventListener('click', (event) => this.handleExportNew(event));
         this.view.importProns.addEventListener('click', (event) => {this.handleImportProns(event)});
-        this.view.input.value = '大家hao';
+        this.view.input.value = '若 爸爸 在 屋家 摩';
         this.view.input.dispatchEvent(new Event('change'));
         this.suggestions = [];
     }

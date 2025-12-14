@@ -67,10 +67,9 @@
 <div id="viewer">
 </div>
 
-
-<div>
-{% include  "hakkadbapp/components/pronunciations.html" with pronunciations=pronunciations %}
-</div>
+{% include  "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words%}
+    <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>

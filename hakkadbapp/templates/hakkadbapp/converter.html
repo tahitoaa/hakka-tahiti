@@ -26,6 +26,13 @@
             max-h-[600px]">
   </textarea>
 
+<section>
+     <h3> Rendu sous forme d'expression pour E-reo. </h3>
+     <div id="expression-output"
+          class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
+     </div>
+  </section>
+
   <!-- <div id="new-hanzi">
      <input id="insert-hanzi" class="bg-white" type="text">
      <button id="insert-" class="button"> Insérer </button>
@@ -40,8 +47,7 @@
   </div>
   </section>
 
-  <div id="hanzi-only-output" hidden
-       class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
+  <div id="hanzi-only-output" class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
   </div>
 
   <section>
@@ -51,12 +57,7 @@
   </div>
   </section>
 
-  <section>
-     <h3> Rendu sous forme d'expression pour E-reo. </h3>
-     <div id="expression-output"
-          class="mt-4 text-sm text-gray-700 leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100">
-     </div>
-  </section>
+
 
   <section>
      <div class="flex flex-col md:flex-row gap-4">
@@ -76,21 +77,9 @@
      </div>
 </section>
 </div>
-    <div id="word-list" hidden>
-        <ul id="pron-list" class="flex flex-wrap gap-2">
-        {% for p in pronunciations %}
-            <li class="w-28" data-search="{{ p.simp }},{{ p.trad }},{{ p.initial.initial }},{{ p.final.final }},{{ p.tone.tone_number|default:'' }}">
-                <div class="text-indigo-600 font-semibold text-lg">{{ p.simp }}</div>
-                <div class="text-indigo-600 font-semibold text-lg">{{ p.trad }}</div>
-                <div class="text-gray-700">
-                  {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
-                </div>
-            </li>
-        {% empty %}
-            <li class="text-gray-500 italic">No pronunciations found.</li>
-        {% endfor %}
-        </ul>
-    </div>
+{% include  "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words%}
+    <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/converter.js' %}"></script>
