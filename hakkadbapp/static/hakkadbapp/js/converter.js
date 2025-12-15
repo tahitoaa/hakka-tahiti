@@ -166,7 +166,7 @@ class View {
             })
             .join('');
 
-        const sentences = text.split('。').map((s) => new Sentence(this.dico, s));
+        const sentences = text.split('\n').map((s) => new Sentence(this.dico, s));
         this.expressionOutput.innerHTML = sentences.map(s => s.render()).join('<br>');
         
         // inputHanzi

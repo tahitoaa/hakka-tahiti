@@ -91,7 +91,7 @@ class LabelView {
         this.suggestions.id= "suggested-hanzi"
         wrapper.appendChild(this.suggestions);
 
-        this.sentence = new Sentence(this.dico, this.ta.value);
+        this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
         this.sentenceView = document.createElement('div');
         wrapper.appendChild(this.sentenceView)
 
@@ -165,8 +165,9 @@ class LabelView {
         this.french.innerHTML = this.taFrench.value + ' ';
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
 
-        this.sentence.update(label.model.text)
-        this.sentenceView.innerHTML = this.sentence.render()
+        this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
+        console.log(this.sentences);
+        this.sentenceView.innerHTML = this.sentences.map(s => s.render()).join('<br>')
         this.furigana.innerHTML = inputHanzi
             .filter(e => e != "_")
             .map(h => {
