@@ -101,31 +101,18 @@ class View {
     renderUnknownChars() { 
         this.unknownChars.innerHTML = Array
                                         .from(this.dico.unknowns.values())
-                                        .map(char => {
-                                            return `
-                                            <li>
-                                                <label>${char}</label>
-                                                <input class="bg-white w-4" type="text" id="initial-for-${char}">
-                                                <input class="bg-white w-6" type="text" id="final-for-${char}">
-                                                <input class="bg-white w-3" type="text" id="tone-for-${char}">
-                                            </li>
-                                            `
-                                          });
+                                        .map(char => `<li>${char}</li>`);
     }
 
     renderUnknownProns(syllables){
         this.unknownProns.innerHTML = Array
                                         .from(syllables)
-                                        .map((syl,i) => {
-                                            return `
-                                            <tr>
-                                                <td>${syl}</td>
-                                                <td>
-                                                <input id="char-for-syl-${i}" class="bg-white" type="text">
-                                                </td>
-                                            </tr>
-                                            `
-                                          }).join('');
+                                        .map((syl,i) => `<tr><td>${syl}</td></tr>`)
+                                        .join('');
+    }
+
+    renderUnknownWords(sentences){
+
     }
 
     render(text) {
@@ -168,19 +155,6 @@ class View {
 
         const sentences = text.split('\n').map((s) => new Sentence(this.dico, s));
         this.expressionOutput.innerHTML = sentences.map(s => s.render()).join('<br>');
-        
-        // inputHanzi
-        //     .filter(e => e != "_")
-        //     .map(h => {
-        //         if (h === '\n') return '<br>';
-        //         if (h == ' ') return '<span class="inline-block w-4"></span>';
-        //         if (isPunctuation(h)) {return h;}
-        //         if (!isHanzi(h)) {return h;}
-        //         const matches = this.dico.getMatchesForHanzi(h);
-        //         const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-        //         return `${matchedPinyin}${h} `
-        //     })
-        //     .join('');
     }
 }
 
@@ -198,20 +172,10 @@ class Controller{
         this.view.output.addEventListener("click", (event) => this.handleClick(event));
         this.view.exportNew.addEventListener('click', (event) => this.handleExportNew(event));
         this.view.importProns.addEventListener('click', (event) => {this.handleImportProns(event)});
-        this.view.input.value = '若 爸爸 在 屋家 摩';
+        this.view.input.value = '若 爸爸 在 屋家 麽?';
         this.view.input.dispatchEvent(new Event('change'));
         this.suggestions = [];
     }
-
-    // handleInsertChar(event) {
-    //     if (event.target.tagName !== 'BUTTON') return; // only react to button clicks
-    //     const i = event.target.id.split('insert-');
-    //     this.model.insert(document.getElementById('char-for-syl-'+i));
-    //     this.model.update(this.model.text);
-    //     this.view.render(this.model.text);
-    //     this.view.renderSuggestions(this.model.suggestions); 
-    //     this.view.renderUnknownProns(this.model.syllables);
-    // }
 
     handleInsertHanzi(event){
         if (event.target.tagName !== 'INPUT') return; // only react to button clicks
@@ -297,7 +261,7 @@ class Controller{
         this.view.renderSuggestions(this.model.suggestions);
         this.view.render(this.model.text);
         this.view.renderUnknownChars();
-        // this.view.renderUnknownProns(this.model.syllables);
+        this.view.renderUnknownProns(this.model.syllables);
     }
 
     // Select one Hanzi
@@ -306,7 +270,7 @@ class Controller{
         this.model.select(event.target.value);
         this.view.render(this.model.text);
         this.view.renderSuggestions(this.model.suggestions); 
-        // this.view.renderUnknownProns(this.model.syllables);
+        this.view.renderUnknownProns(this.model.syllables);
     }
 }
 

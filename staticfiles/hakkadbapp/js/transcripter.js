@@ -93,7 +93,6 @@ class LabelView {
 
         this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
         this.sentenceView = document.createElement('div');
-        wrapper.appendChild(this.sentenceView)
 
         // const ta2 = document.createElement('textarea');
         // ta2.className = 'w-full border rounded p-1 bg-white mt-1';
@@ -108,31 +107,9 @@ class LabelView {
         this.taFrench.id = `french-${this.index}`;
         this.taFrench.value = label.model.french;
         wrapper.appendChild(this.taFrench);
+        wrapper.appendChild(this.sentenceView)
 
         const a = label.audio;
-        // if (a) {
-        //     const row = document.createElement('div');
-        //     row.className = 'mt-2';
-
-        //     const title = document.createElement('div');
-        //     title.textContent = a.name;
-        //     title.className = 'text-sm text-gray-700';
-
-        //     var audio = LabelView.audios[e];
-        //     if (!audio) {
-        //         audio = document.createElement('audio');
-        //         audio.id = "audio-"+e;
-        //         audio.controls = true;
-        //         audio.src = a.url;
-        //         audio.preload = 'metadata';
-        //         audio.className = 'w-full mt-1';
-        //         LabelView.audios[e] = audio;
-        //     }
-
-        //     row.appendChild(title);
-        //     row.appendChild(audio);
-        //     wrapper.appendChild(row);
-        // }
         this.a = a;
 
         const pinyinOutput =document.createElement('div');
@@ -143,6 +120,7 @@ class LabelView {
         this.furigana = furigana;
 
         const hanziOnly = document.createElement('div');
+        hanziOnly.classList.add("hanzi");
         hanziOnly.id = `hanzi-only-${this.index}`;
         this.hanziOnly = hanziOnly;
         this.hanzi = this.hanziOnly;
@@ -166,7 +144,7 @@ class LabelView {
         this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
 
         this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
-        console.log(this.sentences);
+        // console.log(this.sentences);
         this.sentenceView.innerHTML = this.sentences.map(s => s.render()).join('<br>')
         this.furigana.innerHTML = inputHanzi
             .filter(e => e != "_")
@@ -176,7 +154,14 @@ class LabelView {
                 if (isPunctuation(h)) {this.renderFurigana(h,"");}
                 if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
                 const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.diacriticsPinyin()).join('/');
+                const matchedPinyin = (matches.length === 0) ? '?' :
+                     matches.map(p => {
+                        if (getToneMode())
+                            return p.abstractPinyin();
+                        else 
+                            return p.diacriticsPinyin();
+                     }
+                    ).join('/');
                 return this.renderFurigana(matches.length > 0 ?  matches[0].char() :h, matchedPinyin)
             })
             .join('');
@@ -198,9 +183,19 @@ class LabelView {
             .filter(e => e != "_")
             .map(h => {
                 if (h === '\n') return '<br>';
-                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
                 const matches = this.dico.getMatchesForHanzi(h);
-                return matches.length > 0 ? matches[0].char() :h;
+                const el = document.createElement('span')
+                el.innerText = (matches.length > 0) ? matches[0].char() : h;
+                if (isHanzi(el.innerText)) 
+                {
+                    el.classList.add("hanzi");
+                    el.classList.add("text-2xl");
+                }
+                else {
+                    el.classList.add("font-serif");
+                    el.classList.add("font-serif");
+                } 
+                return el.outerHTML;
             })
             .join('');
 
@@ -213,27 +208,28 @@ class LabelView {
                 if (!isHanzi(h)) {return h;}
                 const matches = this.dico.getMatchesForHanzi(h);
                 const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-                return `${matchedPinyin}${h}`
+                return `${matchedPinyin} `
             })
             .join('');      
 
 
-        const ul = document.createElement('ul');
-        ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all';
-        [this.furigana, this.french, this.sentenceView].forEach((e) => {
-            const li = document.createElement('li');
-            li.className = `
-                flex-col gap-1 px-3 py-2 
-                odd:rounded-xl
-                text-center
-            `;
-            li.innerHTML = e.innerHTML;
-            ul.appendChild(li);
-        });
+        // const ul = document.createElement('ul');
+        // ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all rounded-xxlborder';
+        // [this.furigana, this.french, this.sentenceView].forEach((e) => {
+        //     const li = document.createElement('li');
+        //     li.className = `
+        //         flex-col gap-1 px-3 py-4 
+        //         odd:rounded-xl
+        //         text-center
+        //     `;
+        //     li.innerHTML = e.innerHTML;
+        //     ul.appendChild(li);
+        // });
         this.mixed.innerHTML = '';
-        this.mixed.appendChild(ul);
-
-
+        // this.mixed.appendChild(ul);
+        const span = document.createElement('span');
+        span.innerHTML = this.sentenceView.innerHTML;
+        this.mixed.appendChild(span);
     }
 
     renderSuggestions(suggestions){
@@ -261,8 +257,28 @@ class LabelView {
                 </div>`
     }
 
-    renderChar(char){return `<span class="block text-base font-semibold text-black">${char}</span>`}
-    renderKana(kana){return `<span class="block text-sm">${kana}</span>`}
+    renderChar(char) {
+        return `
+            <span 
+                class="hanzi block text-[1.8rem] leading-[2.4rem] text-black"
+                style="letter-spacing: 0.02em;"
+            >
+                ${char}
+            </span>
+        `;
+    }
+
+    renderKana(kana) {
+        return `
+            <span 
+                class="pinyin block font-serif text-[1.05rem] leading-[1.4rem] text-gray-800 mt-1"
+                style="letter-spacing: 0.01em;"
+            >
+                ${kana}
+            </span>
+        `;
+    }
+
     renderBlock(content){return `<span class="inline-block text-center align-center">${content}</span>`;}
     renderFurigana(char, kana){return this.renderBlock(`${this.renderKana(kana)}${this.renderChar(char)}`)}
     renderUnknownChars() { 
@@ -301,7 +317,7 @@ class LabelView {
         // update only this labelView visuals, fast
         this.render(label);
 
-        console.log(this.index)
+        // console.log(this.index)
         document.getElementById("label-index").value = this.index + 2;
         document.getElementById("label-index").dispatchEvent(new Event("change"));
         // let the controller know displays must be recomputed
@@ -309,6 +325,11 @@ class LabelView {
             detail: { index: this.index }
     }));
 }
+}
+
+
+function getToneMode(){
+    return document.getElementById('tone-digital').ariaChecked;
 }
 
 class View {
@@ -331,7 +352,95 @@ class View {
         this.audio = null;
         this.audioEl = document.createElement('audio');
         this.container.appendChild(this.audioEl);
+        // Create button
+        const toneWrapper = document.createElement("div");
+        toneWrapper.className = "flex items-center gap-3 p-2";
+        toneWrapper.innerHTML = `
+            <label class="flex items-center gap-1 text-sm cursor-pointer">
+                <input type="radio" name="toneMode" id="tone-digital" value="digital" checked>
+                Digital
+            </label>
 
+            <label class="flex items-center gap-1 text-sm cursor-pointer">
+                <input type="radio" name="toneMode" id="tone-diacritic" value="diacritic">
+                Diacritic
+            </label>
+        `;
+        
+        // Clear the container and make it a flex row
+        this.displays.textContent = ''; 
+        const container = document.createElement('div'); // Or wherever you want to place 
+
+        container.className = `
+            flex flex-wrap justify-stretch items-start gap-2
+            print:grid print:grid-cols-1
+        `;
+        container.innerHTML = ''; // reset  
+
+        const tabsBar = document.createElement('div');
+        tabsBar.className = `
+            flex flex-wrap gap-1 p-2 sticky top-0 z-20 bg-white shadow
+        `;
+        container.appendChild(tabsBar);
+        const panels = document.createElement('div');
+        panels.className = 'w-full';
+        this.container.appendChild(toneWrapper);
+        container.appendChild(panels);
+
+        this.outputs = {
+            "hanzi":"", 
+            "furigana":"",
+            "french":"", 
+            "pinyin":"",
+            "mixed":""
+        }
+        Object.entries(this.outputs).forEach(([key, output], i) => {
+            // --- Create tab button ---
+            const tabBtn = document.createElement('button');
+            tabBtn.textContent = key;
+            tabBtn.className = `
+                px-3 py-1 text-sm rounded 
+                bg-gray-200 hover:bg-gray-300 
+                transition
+            `;
+            tabsBar.appendChild(tabBtn);
+
+            // --- Create panel ---
+            const panel = document.createElement('div');
+            panel.id = 'panel-' + key;
+            panel.className = `
+                p-6 text-justify leading-relaxed
+                h-[calc(100vh-90px)]
+                overflow-y-auto
+                print:overflow-visible
+                bg-white
+                ${i === 0 ? "" : "hidden"}
+            `;
+            panels.appendChild(panel);
+
+            // --- Tab switching ---
+            tabBtn.addEventListener('click', () => {
+                // hide all
+                panels.querySelectorAll('div').forEach(p => p.classList.add('hidden'));
+                // show selected
+                panel.classList.remove('hidden');
+
+                // visual active state
+                tabsBar.querySelectorAll('button').forEach(b => {
+                    b.classList.remove('bg-blue-500', 'text-white');
+                    b.classList.add('bg-gray-200');
+                });
+                tabBtn.classList.remove('bg-gray-200');
+                tabBtn.classList.add('bg-blue-500', 'text-white');
+            });
+
+            // Default: first tab is selected visually
+            if (i === 0) {
+                tabBtn.classList.remove('bg-gray-200');
+                tabBtn.classList.add('bg-blue-500', 'text-white');
+            }
+        });
+        this.displays.appendChild(container);
         new CopyButton('#output-hanzi-body');   
     }
 
@@ -346,7 +455,7 @@ class View {
             this.renderLabel(label, i);
         })
         // 4. Re-render display section if necessary
-        this.renderDisplays(data);
+        this.renderDisplays()
     }
 
     renderAudio() {
@@ -359,10 +468,7 @@ class View {
         }
     }
 
-    renderDisplays(data){
-        // 3. Update display info
-        this.displays.textContent = `La transcription contient ${data.labels.length} étiquettes.`;
-
+    renderDisplays(){
         this.outputs = {
             "hanzi":"", 
             "furigana":"",
@@ -370,81 +476,22 @@ class View {
             "pinyin":"",
             "mixed":""
         }
+
         this.views.forEach((labelView, e) => { 
             for (const [key, value] of Object.entries(this.outputs)) {
                 const el = document.createElement('span');
-                el.classList.add("rounded px-3 print:px-1 print:py-1 py-1 hover:bg-violet-200".split(' '))
+                el.classList.add("rounded px-3 py-1 hover:bg-violet-200".split(' '))
                 el.id =`${key}-${e}`
                 el.innerHTML = labelView[key].innerHTML
                 this.outputs[key] += el.outerHTML;
             }
         });
 
-        // Clear the container and make it a flex row
-        this.displays.textContent = ''; 
-        const container = document.createElement('div'); // Or wherever you want to place 
-
-
-        container.className = `
-            flex flex-wrap justify-stretch items-start gap-2
-            print:grid print:grid-cols-1
-        `;
-        container.innerHTML = ''; // reset
-
         Object.entries(this.outputs).forEach(([key, output], i) => {
-            const col = document.createElement('div');
-            col.className = `
-                flex flex-col flex-1
-                print:flex-none
-                max-w-[75%]
-                print:max-w-[100%]
-                bg-white rounded-md shadow-sm
-                m-1 transition-all duration-200
-                break-inside-avoid-page
-                print:w-full print:break-after-page
-            `;
-
-            const header = document.createElement('div');
-            header.className = '';
-
-            const toggleBtn = document.createElement('button');
-            toggleBtn.textContent ='➖';
-            toggleBtn.className = 'no-print text-sm hover:shadow';
-
-            const body = document.createElement('div');
-            body.id = 'output-'+key+'-body';
-            body.className = 'text-justify p-2 overflow-y-auto h-100 no-print-height';
-            body.innerHTML = output;
-
-            toggleBtn.addEventListener('click', () => {
-                const isCollapsed = col.classList.contains('collapsed');
-
-                if (isCollapsed) {
-                    // Expand
-                    col.classList.remove('collapsed', 'flex-none');
-                    col.classList.add('flex-grow');
-                    body.classList.remove('hidden');
-                    toggleBtn.textContent = '➖';
-                } else {
-                    // Collapse
-                    col.classList.add('collapsed', 'flex-none', 'print:hidden');
-                    col.classList.remove('flex-grow');
-                    body.classList.add('hidden');
-                    toggleBtn.textContent = '➕';
-                }
-            });
-
-            if (i === 0 || i == 3)
-                toggleBtn.dispatchEvent(new Event("click"))
-
-            header.appendChild(toggleBtn);
-            col.appendChild(header);
-            col.appendChild(body);
-            container.appendChild(col);
+            const panel = document.getElementById('panel-'+key);
+            panel.innerHTML = output;
         });
 
-
-        this.displays.appendChild(container);
     }
 
     renderLabel(label, i){
@@ -491,10 +538,10 @@ class Controller {
         });
 
         document.addEventListener("keydown", (event) => {
-            console.log(event)
+            // console.log(event)
             if (event.shiftKey) {
                 event.preventDefault();
-                console.log(event)
+                // console.log(event)
                 const key = event.key;
 
                 // Only allow digits 1–9
@@ -509,7 +556,7 @@ class Controller {
                 const view = this.view.views[currentIndex];
                 if (!view) return;
 
-                console.log(view.suggestions)
+                // console.log(view.suggestions)
                 if (suggestionIndex >= view.suggestions.length) return; // nothing to click
                 
                 const el = view.suggestions.querySelector(`[data-suggestion="${suggestionIndex}"]`);
@@ -537,14 +584,14 @@ class Controller {
     }
 
     handleClickOnDisplays(event) {
-        console.log("handleClickOnDisplays", event)
+        // console.log("handleClickOnDisplays", event)
         const el = event.target.closest('span[id]');
         if (!el) return;
 
         // Match IDs ending with a dash-number like "xxx-0"
         const match = el.id.match(/^(.*-\d+)$/);
         if (match) {
-            console.log('Clicked element group:', match[1]);
+            // console.log('Clicked element group:', match[1]);
         }
         const i = parseInt(match[0].split('-')[1]);
 
@@ -556,7 +603,7 @@ class Controller {
     }
 
     handleClick(event) {
-        console.log("handleclick", event)
+        // console.log("handleclick", event)
         // const e = event;
         // const input = document.getElementById('label-index');
         // let v = Math.max(1, parseInt(input.value || '1', 10));
@@ -633,7 +680,7 @@ class Controller {
                     n.classList.add(highlight);
                     n.scrollIntoView({
                         behavior: 'smooth',
-                        block: 'nearest'
+                        block: 'nearest'    
                     });
                 } else {
                     n.classList.remove(highlight);
