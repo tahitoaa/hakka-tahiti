@@ -675,15 +675,19 @@ class Controller {
         for (var key in this.view.outputs) {
             const spans = document.getElementById("viewer").querySelectorAll(`span[id^="${key}-"]`);
             spans.forEach(n => {
+                n.classList.add('rounded-xl')
+                const margin = "m-10"
                 const highlight = 'bg-violet-300';
                 if (n.id === `${key}-${idx}`) {
                     n.classList.add(highlight);
+                    n.classList.add(margin)
                     n.scrollIntoView({
                         behavior: 'smooth',
                         block: 'nearest'    
                     });
                 } else {
                     n.classList.remove(highlight);
+                    n.classList.remove(margin)
                 }
             });
         }
