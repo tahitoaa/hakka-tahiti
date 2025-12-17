@@ -1,0 +1,32 @@
+    <div hidden>
+        <ul id="pron-list" class="flex flex-wrap gap-2" >
+        {% for p in pronunciations %}
+            <li class="w-28" data-search="{{ p.simp }},{{ p.trad }},{{ p.initial.initial }},{{ p.final.final }},{{ p.tone.tone_number|default:'' }}">
+                <div class="text-indigo-600 font-semibold text-lg">{{ p.simp }}</div>
+                <div class="text-indigo-600 font-semibold text-lg">{{ p.trad }}</div>
+                <div class="text-gray-700">
+                  {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
+                </div>
+            </li>
+        {% empty %}
+            <li class="text-gray-500 italic">No pronunciations found.</li>
+        {% endfor %}
+        </ul>
+        <ul id="word-list">
+          {% for word in words %}
+               <li
+               data-mandarin="{{ word.mandarin|default:'' }}"
+               data-french="{{ word.french|default:'' }}"
+               data-pinyin="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %}"
+               data-initials="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }} {% endfor %}"
+               data-finals="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }} {% endfor %}"
+               data-tones="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone_number|default:'' }} {% endfor %}"
+               data-simp="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.simp }}{% endfor %}"
+               data-trad="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.trad }}{% endfor %}"
+               data-tahitian="{{ word.tahitian|default:'' }}"
+               data-category="{{ word.category|default:'' }}"
+               data-status="{{ word.status|default:'' }}"
+               ></li>
+          {% endfor %}
+        </ul>
+    </div>
