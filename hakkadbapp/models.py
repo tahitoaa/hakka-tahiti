@@ -95,6 +95,7 @@ class Expression(models.Model):
     A multi-word expression (phrase, idiom, sentence fragment…)
     composed of an ordered list of Words.
     """
+    text = models.TextField(help_text="space separated words simp", blank=True, null=True)
     french = models.TextField(help_text="French translation of the expression")
     notes = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=50, blank=True, null=True)
@@ -107,15 +108,7 @@ class Expression(models.Model):
     )
 
     def __str__(self):
-        return self.text()
-
-    def text(self):
-        """Returns the expression as concatenated words (skip NULL placeholders)."""
-        return ' '.join(
-            ew.word.simp()
-            for ew in self.expressionword_set.all()
-            if ew.word is not None
-        )
+        return self.text
 
     def pinyin(self):
         """Full pinyin of the expression (skip NULL placeholders)."""

@@ -33,7 +33,7 @@ def import_expressions_from_df(df):
         print(tokens)
 
         # Create expression
-        expr = Expression.objects.create(french=french)
+        expr = Expression.objects.create(french=french, text=phrase)
 
         with transaction.atomic():
             for pos, token in enumerate(tokens):
