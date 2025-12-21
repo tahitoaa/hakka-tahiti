@@ -7,8 +7,9 @@ class HakkaText {
         this.text = '';
         this.matches = '';
         this.dico = dico;
-        this.update({"hanzi" : text, "french": ''});
+        this.pinyin = '';
         this.french = '';
+        this.update({"hanzi" : text});
     }
 
     update(update){
@@ -32,6 +33,16 @@ class HakkaText {
                     })));
             });
             this.text = text;
+            this.pinyin = Array.from(this.text)
+                                .filter(e => e != "_")
+                                .map(h => {
+                                    if (h == '。') return '.';
+                                    if (h == '、') return ',';
+                                    const matches = this.dico.getMatchesForHanzi(h).map(p => p.abstractPinyin());
+                                    return matches.length > 1 ? '(' + matches.join('/') + ')' : matches[0];
+                                })
+                                .join(' ');
+            console.log(this.pinyin);
         }
     }
 

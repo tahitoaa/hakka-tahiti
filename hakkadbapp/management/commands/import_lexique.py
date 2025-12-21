@@ -1,12 +1,10 @@
 # your_app/management/commands/populate.py
-import csv
 import re
 from unicodedata import category
 from django.core.management.base import BaseCommand
-from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final, Traces
+from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final, Traces, Expression, ExpressionWord
 import pandas as pd
 import string
-
 
 INITIALS = [
     "b", "p", "m", "f",
@@ -35,7 +33,6 @@ def split_pinyin(pinyin):
 
     final = syllable[len(initial):]
     return initial, final, tone
-
 
 class Command(BaseCommand):
     help = 'Populate Word and WordPronunciation from a google sheet'
@@ -175,6 +172,7 @@ class Command(BaseCommand):
         Tone.objects.all().delete()
         Word.objects.all().delete()
         WordPronunciation.objects.all().delete()
+
 
         self.initial_set = set()
         self.final_set = set()

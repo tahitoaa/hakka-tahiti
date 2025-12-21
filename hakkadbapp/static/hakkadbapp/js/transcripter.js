@@ -36,6 +36,7 @@ class Transcription {
         const files = {
             "hakka.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.text}`).join('\n'),
             "french.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.french}`).join('\n'),
+            "transcription.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.pinyin}`).join('\n')
         };
         this.saveFilesToFolder(files);
     }

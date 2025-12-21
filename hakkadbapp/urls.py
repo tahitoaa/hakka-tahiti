@@ -45,6 +45,6 @@ urlpatterns = [
     path("phonemes/", views.phonemes, name="phonemes"),
     path('hanzi_by_pinyin/<str:syllable>', views.hanzi_by_pinyin, name='hanzi_by_pinyin'),
     path('hanzi_by_tone/<int:tone>', views.hanzi_by_tone, name='hanzi_by_tone'),
-    
     path('pronunciation/', views.pronunciation, name='pronunciation'),
+    path('expressions/', views.expressions, name='expressions'),
 ]

@@ -90,7 +90,78 @@ class Word(models.Model):
     def trad(self):
         return ''.join([wp.pronunciation.trad() for wp in self.wordpronunciation_set.all()])
     
+class Expression(models.Model):
+    """
+    A multi-word expression (phrase, idiom, sentence fragment…)
+    composed of an ordered list of Words.
+    """
+    french = models.TextField(help_text="French translation of the expression")
+    notes = models.TextField(blank=True, null=True)
+    category = models.CharField(max_length=50, blank=True, null=True)
+
+    # M2M through ExpressionWord to preserve order
+    words = models.ManyToManyField(
+        Word,
+        through="ExpressionWord",
+        related_name="expressions"
+    )
+
+    def __str__(self):
+        return self.text()
+
+    def text(self):
+        """Returns the expression as concatenated words (skip NULL placeholders)."""
+        return ' '.join(
+            ew.word.simp()
+            for ew in self.expressionword_set.all()
+            if ew.word is not None
+        )
+
+    def pinyin(self):
+        """Full pinyin of the expression (skip NULL placeholders)."""
+        return ' '.join(
+            ew.word.pinyin() 
+            for ew in self.expressionword_set.all()
+            if ew.word is not None
+        )
     
+    @property
+    def words_ordered(self):
+        return [ew.word for ew in self.expressionword_set.all() if ew.word]
+
+    @property
+    def simp(self):
+        return ''.join(w.simp() for w in self.words_ordered)
+
+    @property
+    def trad(self):
+        return ''.join(w.trad() for w in self.words_ordered)
+        
+    def french_translation(self):
+        return self.french
+
+class ExpressionWord(models.Model):
+    """
+    Connects each Expression to a Word, preserving the correct word order.
+    """
+    expression = models.ForeignKey(Expression, on_delete=models.CASCADE)
+    word = models.ForeignKey(
+        Word,
+        on_delete=models.CASCADE,
+        null=True,        # allow NULL in DB
+        blank=True        # allow empty value in admin/forms
+    )
+
+    # Order inside the expression
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position"]
+        unique_together = ("expression", "position")
+
+    def __str__(self):
+        return f"{self.position}: {self.word}"
+
 class WordPronunciation(models.Model):
     word = models.ForeignKey(Word, on_delete=models.CASCADE)
     pronunciation = models.ForeignKey(Pronunciation, on_delete=models.CASCADE)

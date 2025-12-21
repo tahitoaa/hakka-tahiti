@@ -230,6 +230,11 @@
         Prononciation
       </a>
     </li>
+        <li>
+      <a href="{% url 'expressions' %}" class="{% if page == 'expressions' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
+        Expressions
+      </a>
+    </li>
     </ul>
   </nav>
 </header>
@@ -275,9 +280,6 @@
     });
   });
 </script>
-
-
-
 
 <script>
 function downloadTableAsCSV(table) {

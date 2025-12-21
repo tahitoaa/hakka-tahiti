@@ -7,13 +7,14 @@ from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
 from django.db.models import F, Value, CharField
 from django.db.models.functions import Concat
-from .models import Pronunciation, Tone, Initial, Final, WordPronunciation, Word, Traces
+from .models import ExpressionWord, Pronunciation, Tone, Initial, Final, WordPronunciation, Word, Traces, Expression
 import csv
 from collections import defaultdict
 from urllib.parse import unquote
 from django.db.models import Case, When, IntegerField, Value
 import random
 from opencc import OpenCC
+from django.db import transaction
 
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
 s2t = OpenCC('s2t')
@@ -598,3 +599,53 @@ def pronunciation(request):
         'title': "Prononciation",
     }
     return render(request, "hakkadbapp/pronunciation.html", context)
+
+def create_expression_from_hanzi(sentence, french_translation=""):
+    tokens = sentence.strip().split()
+
+    # Create the expression
+    expr = Expression.objects.create(french=french_translation)
+
+    # Preload all words with pronunciations to avoid repeated DB queries
+    all_words = (
+        Word.objects
+        .prefetch_related("wordpronunciation_set__pronunciation")
+        .all()
+    )
+
+    with transaction.atomic():
+        for pos, token in enumerate(tokens):
+
+            # Find first Word whose full hanzi == token
+            match = next(
+                (w for w in all_words if w.char() == token),
+                None
+            )
+
+            # Create ExpressionWord row
+            ExpressionWord.objects.create(
+                expression=expr,
+                word=match,   # may be None only if your FK allows it
+                position=pos
+            )
+
+    return expr
+
+def expressions(request):
+
+    # Retrieve expressions + ordered words efficiently
+    expressions = (
+        Expression.objects
+        .prefetch_related(
+            "expressionword_set__word",
+            "expressionword_set__word__wordpronunciation_set__pronunciation"
+        )
+        .all()
+    )
+
+    context = {
+        "expressions": expressions,
+        "expressions_count": expressions.count(),
+    }
+
+    return render(request, "hakkadbapp/expressions.html", context)

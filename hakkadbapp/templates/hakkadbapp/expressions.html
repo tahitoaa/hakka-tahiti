@@ -1,0 +1,66 @@
+{% extends "hakkadbapp/base.html" %}
+{% block content %} 
+
+<h1 class="text-3xl font-extrabold text-gray-900 mb-6">
+    <button type="button" class="toggle-section focus:outline-none">
+        Phrases ou expressions ({{ expressions_count }})  
+    </button>
+</h1>
+<ul>
+    {% for e in expressions %}
+ <li class="p-3 border rounded shadow text-center">
+
+    <!-- Word chips -->
+    <div class="flex flex-wrap justify-center gap-2 mb-2">
+
+        {% for w in e.words_ordered %}
+            <div class="px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-center">
+
+                <!-- Hanzi: simp | trad -->
+                <div class="text-lg leading-tight font-serif">
+                    {{ w.simp }}
+                    {% if w.trad != w.simp %}
+                        <span class="text-gray-500">({{ w.trad }})</span>
+                    {% endif %}
+                </div>
+
+                <!-- Pinyin -->
+                <div class="text-xs text-gray-600 leading-none">
+                    {{ w.pinyin }}
+                </div>
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <div class="">
+        <div class="text-sm text-gray-700 leading-tight">
+            {{ e.text }}
+        </div>
+
+        <!-- Full expression info -->
+        <div class="text-xs text-gray-700 leading-tight">
+            {{ e.pinyin }}
+        </div>
+
+        <div class="text-sm text-gray-700 leading-tight">
+            {{ e.simp }}
+        </div>
+
+        <div class="text-sm text-gray-700 leading-tight">
+            {{ e.trad }}
+        </div>
+
+        <div class="text-base text-gray-900 mt-1 font-medium">
+            {{ e.french }}
+        </div>
+
+    </div>
+
+
+</li>
+
+    {% endfor %}
+</ul>
+
+{% endblock %}
