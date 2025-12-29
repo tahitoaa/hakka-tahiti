@@ -44,8 +44,6 @@ render() {
                 ${this.words}
             </div>
 
-
-
             <!-- Traduction -->
             <div class="text-sm text-gray-600 italic">
                 ${this.french}
@@ -65,7 +63,7 @@ render() {
      * @param {Object} word - Dictionary word object
      */
     renderWord(word, index) {
-        const { french, simp, trad, pinyin} = word.dataset;
+        var { french, simp, trad, pinyin} = word.dataset;
         // Color depending on translation availability
         var color = french === '?' ? 'bg-orange-400' : 'bg-green-300';
         if (index > 0) 
@@ -78,6 +76,15 @@ render() {
         // Show traditional only if different from simplified
         const showTrad = trad && trad !== simp;
 
+        if (!pinyin){
+            pinyin = ''
+            Array.from(simp).forEach((char) => {
+                const matches = this.dico.getMatchesForHanzi(char);
+                pinyin += matches.map(p => { return p.abstractPinyin()}).join('');
+                console.log(matches);   
+            })
+
+        }
         return `
             <span class="text-xs ${color} px-1 py-0.5 rounded inline-flex flex-col leading-tight"
                   title="${tooltip}">
@@ -85,7 +92,7 @@ render() {
 
                 <!-- 1. Pinyin -->
                 <span class="italic text-[10px]">
-                    ${pinyin || 'sans pinyin'}
+                    ${pinyin  }
                 </span>
 
                 <!-- 2. French -->
