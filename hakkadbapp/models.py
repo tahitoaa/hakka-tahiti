@@ -1,4 +1,6 @@
 from django.db import models
+from itertools import product
+
 from opencc import OpenCC
 
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
@@ -108,16 +110,8 @@ class Expression(models.Model):
     )
 
     def __str__(self):
-        return self.text
+        return self.text + ' ' +' ' + self.french
 
-    def pinyin(self):
-        """Full pinyin of the expression (skip NULL placeholders)."""
-        return ' '.join(
-            ew.word.pinyin() 
-            for ew in self.expressionword_set.all()
-            if ew.word is not None
-        )
-    
     @property
     def words_ordered(self):
         return [ew.word for ew in self.expressionword_set.all() if ew.word]

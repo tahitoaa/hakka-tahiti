@@ -1,4 +1,5 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
 {% block content %} 
 
 <h1 class="text-3xl font-extrabold text-gray-900 mb-6">
@@ -6,13 +7,21 @@
         Phrases ou expressions ({{ expressions_count }})  
     </button>
 </h1>
-<ul>
-    {% load render_expression_tag %}
-    {% for e in expressions %}
-        <li class="p-3 border rounded shadow text-center">
-            {% render_expression_tag e %}
-        </li>
-    {% endfor %}
-</ul>
+<ol id="output">
 
+</ol>
+<div id="expressions">
+    {% for e in expressions %}
+        <div
+            data-text="{{e.text}}"
+            data-french="{{e.french}}">
+        </div>
+    {% endfor %}
+</div>
+{% include  "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words%}
+    <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/expressions.js' %}"></script>
 {% endblock %}

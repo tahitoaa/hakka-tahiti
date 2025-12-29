@@ -317,6 +317,15 @@ def browse(request):
 
 
 def get_all_data():
+    expressions = (
+        Expression.objects
+        .prefetch_related(
+            "expressionword_set__word",
+            "expressionword_set__word__wordpronunciation_set__pronunciation"
+        )
+        .all()
+    )
+
     word_pron_qs = WordPronunciation.objects.select_related(
         'pronunciation__initial',
         'pronunciation__final',
@@ -336,6 +345,8 @@ def get_all_data():
         'words': words,
         'title': "Recherche de mots",
         "categories": Word.objects.values_list('category', flat=True).distinct(),
+        "expressions": expressions,
+        "expressions_count": expressions.count(),
     }
     return context 
 
@@ -632,20 +643,4 @@ def create_expression_from_hanzi(sentence, french_translation=""):
     return expr
 
 def expressions(request):
-
-    # Retrieve expressions + ordered words efficiently
-    expressions = (
-        Expression.objects
-        .prefetch_related(
-            "expressionword_set__word",
-            "expressionword_set__word__wordpronunciation_set__pronunciation"
-        )
-        .all()
-    )
-
-    context = {
-        "expressions": expressions,
-        "expressions_count": expressions.count(),
-    }
-
-    return render(request, "hakkadbapp/expressions.html", context)
+    return render(request, "hakkadbapp/expressions.html", get_all_data())

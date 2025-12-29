@@ -12,13 +12,13 @@ class Sentence {
      * @param {Object} dico - Dictionary instance containing words
      * @param {String} text - Input sentence
      */
-    constructor(dico, text = '') {
+    constructor(dico, text = '', french = '') {
         this.dico = dico;
         this.words = [];
         this.matches = [];
         this.unknowns = [];
-
         this.update(text);
+        this.french = french;
     }
 
     /**
@@ -27,14 +27,38 @@ class Sentence {
      * - Candidates are separated by "/"
      * - Words are separated by "|"
      */
-    render() {
-        return this.matches
-            .map(candidates =>
+render() {
+    // --- Ligne des mots analysés (candidats)
+    const wordsHtml = this.matches
+        .map(candidates =>
                 candidates
                     .map((word, index) => this.renderWord(word, index))
-            )
-            .join('|');              // word separator
-    }
+                    .join("")
+        )
+
+    return `
+        <div class="space-y-2 bg-gray p-10">
+
+            <!-- Phrase originale -->
+            <div class="text-lg font-serif text-gray-900 leading-relaxed">
+                ${this.words}
+            </div>
+
+
+
+            <!-- Traduction -->
+            <div class="text-sm text-gray-600 italic">
+                ${this.french}
+            </div>
+
+            <!-- Analyse / segmentation -->
+            <div class="flex flex-wrap gap-2">
+                ${wordsHtml}
+            </div>
+
+        </div>
+    `;
+}
 
     /**
      * Render a single dictionary word entry
@@ -42,8 +66,6 @@ class Sentence {
      */
     renderWord(word, index) {
         const { french, simp, trad, pinyin} = word.dataset;
-
-        console.log(word);
         // Color depending on translation availability
         var color = french === '?' ? 'bg-orange-400' : 'bg-green-300';
         if (index > 0) 

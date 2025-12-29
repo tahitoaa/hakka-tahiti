@@ -11,43 +11,57 @@ def find_word_by_hanzi(hanzi, all_words):
             return w
     return None
 
-
 def import_expressions_from_df(df):
-    # Prefetch all words once (much faster)
+    # Cache tous les mots une seule fois
     all_words = (
         Word.objects
         .prefetch_related("wordpronunciation_set__pronunciation")
         .all()
     )
 
-    created = []
+    expressions = []
+    expression_words = []   
 
+    # 1. Construire toutes les Expressions (sans les sauver)
     for _, row in df.iterrows():
-        french = str(row["french"]).strip()
-        phrase = str(row["phrase"]).strip()
-
-        if not phrase:
-            continue
+        if str(row['phrase']) == "nan":
+            print(f"Skipping empty line {_}")
+            continue 
         
-        tokens = phrase.split()
-        print(tokens)
+        phrase = str(row["phrase"]).strip()
+        french = str(row["french"]).strip()
+        
+        print(f"Adding row {_} {phrase} {french}")
+        expressions.append(
+            Expression(
+                french=french,
+                text=phrase
+            )
+        )
 
-        # Create expression
-        expr = Expression.objects.create(french=french, text=phrase)
+    # 2. Sauvegarde en une seule requête
+    with transaction.atomic():
+        Expression.objects.bulk_create(expressions)
 
-        with transaction.atomic():
+        # 3. Construire les ExpressionWord
+        for expr in expressions:
+            tokens = expr.text.split()
+
             for pos, token in enumerate(tokens):
                 word = find_word_by_hanzi(token, all_words)
 
-                ExpressionWord.objects.create(
-                    expression=expr,
-                    word=word,   # may be None if no match
-                    position=pos
+                expression_words.append(
+                    ExpressionWord(
+                        expression=expr,
+                        word=word,   # peut être None
+                        position=pos
+                    )
                 )
 
-        created.append(expr)
+        # 4. Sauvegarde des relations en une requête
+        ExpressionWord.objects.bulk_create(expression_words)
 
-    return created
+    return expressions
 
 
 class Command(BaseCommand):
@@ -80,8 +94,9 @@ class Command(BaseCommand):
 
         for sheet_name in excel_file.sheet_names:
             df = pd.read_excel(
-                excel_file,
+            excel_file,
                 usecols="A:B",     # only columns A and B
+                sheet_name=sheet_name,
                 skiprows=2         # skip the header row → start at line 2
             )
             df.columns = ["french", "phrase"]
