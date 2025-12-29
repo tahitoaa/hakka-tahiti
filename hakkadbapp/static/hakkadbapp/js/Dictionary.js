@@ -14,7 +14,7 @@ class Dictionary {
         this.pronunciations = this.pronItems.map(el => this.parsePronunciation(el));
         this.unknowns = new Set();
         this.wordItems = Array.from(document.querySelectorAll(`#word-list > ${itemSelector}`))
-        this.words = this.wordItems.map(el => new Word  (el.dataset));
+        this.words = this.wordItems.map(el => new Word(el.dataset));
     }
 
     parsePronunciation(el) {

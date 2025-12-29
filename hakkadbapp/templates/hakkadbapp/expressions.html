@@ -7,70 +7,11 @@
     </button>
 </h1>
 <ul>
+    {% load render_expression_tag %}
     {% for e in expressions %}
- <li class="p-3 border rounded shadow text-center">
-
-    <!-- Word chips -->
-    <div class="flex flex-wrap justify-center gap-2 mb-2">
-
-    {% for w in e.words_ordered %}
-        <div class="px-3 py-2 rounded bg-indigo-50 border border-indigo-200 text-center min-w-[60px]">
-            <!-- Pinyin -->
-            <div class="text-xs text-gray-700 leading-tight mb-1 font-medium">
-                {{ w.pinyin }}
-            </div>
-
-            <!-- French gloss -->
-            <div class="text-[0.65rem] text-gray-600 leading-tight italic">
-                {{ w.french }}
-            </div>
-
-            <!-- Hanzi: simp | trad -->
-            <div class="text-2xl font-serif leading-none mb-1 tracking-wide">
-                {{ w.simp }}
-                {% if w.trad != w.simp %}
-                    <span class="text-gray-500 text-base">({{ w.trad }})</span>
-                {% endif %}
-            </div>
-
-        </div>
-    {% endfor %}
-
-
-    </div>
-
-    <div class="">
-<!-- 1. Expression (Hanzi) -->
-<div class="text-xl text-gray-900 leading-tight mb-1 font-serif">
-    {{ e.text }}
-</div>
-
-<!-- 2. Pinyin -->
-<div class="text-sm text-gray-800 leading-tight mb-1">
-    {{ e.pinyin }}
-</div>
-
-<!-- 3. French translation -->
-<div class="text-base text-gray-900 font-medium mb-1">
-    {{ e.french }}
-</div>
-
-<!-- 4. Simplified -->
-<div class="hanzi text-xs text-gray-600 leading-tight">
-    {{ e.simp }}
-</div>
-
-<!-- 5. Traditional -->
-<div class="hanzi text-xs text-gray-400 leading-tight">
-    {{ e.trad }}
-</div>
-
-
-    </div>
-
-
-</li>
-
+        <li class="p-3 border rounded shadow text-center">
+            {% render_expression_tag e %}
+        </li>
     {% endfor %}
 </ul>
 

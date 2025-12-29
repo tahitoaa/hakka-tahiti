@@ -117,7 +117,6 @@ def chappell_py(initial, final, tone=""):
 
     return map_i.get(initial, initial)+ map_f.get(final, final) + superscript_map.get(str(tone),str(tone))
 
-
 @register.simple_tag
 def sagart_py(initial, final, tone=""):
     map_i = {
