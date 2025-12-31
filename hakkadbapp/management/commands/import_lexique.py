@@ -119,6 +119,7 @@ class Command(BaseCommand):
             syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
             hanzi_chars = list(hanzi)
 
+
             if len(syllabes) != len(hanzi_chars):
                 self.err_stream(
                     f"❌ Line {line_num}: mismatch between pinyin '{pinyin}' ({len(syllabes)} syll) "
@@ -131,9 +132,16 @@ class Command(BaseCommand):
             syllable_data = []
             for s, h in zip(syllabes, hanzi_chars):
                 initial, final, tone = split_pinyin(s)
+                if tone in ['5', '6'] and not (final[-1] in ['t', 'k', 'p']):
+                    self.err_stream(
+                        f"❌ Line {line_num}:  '{pinyin} {tone} {final}' tons 5 et 6 réservés aux finales t,k,p."
+                    )
+                    skipped += 1
+                    continue
                 self.initial_set.add(initial)
                 self.final_set.add(final)
                 self.tone_set.add(tone)
+
 
                 data = (h, initial, final, tone)
                 if data not in self.pron_set:

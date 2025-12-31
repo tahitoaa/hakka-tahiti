@@ -41,7 +41,11 @@ render() {
 
             <!-- Phrase originale -->
             <div class="text-lg font-serif text-gray-900 leading-relaxed">
+                ${this.words.map(w => this.getPinyin(w)).join(' ')}
+
+                <br>
                 ${this.words.join(' ')}
+
             </div>
 
             <!-- Traduction -->
@@ -57,6 +61,13 @@ render() {
         </div>
     `;
 }
+
+    getPinyin(simp){
+        return Array.from(simp).map((char) => {
+                const matches = this.dico.getMatchesForHanzi(char);
+                return matches.map(p => { return p.abstractPinyin()}).join("/");
+            }).join('');
+    }
 
     /**
      * Render a single dictionary word entry
@@ -76,15 +87,9 @@ render() {
         // Show traditional only if different from simplified
         const showTrad = trad && trad !== simp;
 
-        if (!pinyin){
-            pinyin = ''
-            Array.from(simp).forEach((char) => {
-                const matches = this.dico.getMatchesForHanzi(char);
-                pinyin += matches.map(p => { return p.abstractPinyin()}).join('');
-                console.log(matches);   
-            })
+        if (!pinyin)
+            pinyin = this.getPinyin(simp);
 
-        }
         return `
             <span class="text-xs ${color} px-1 py-0.5 rounded inline-flex flex-col leading-tight"
                   title="${tooltip}">
