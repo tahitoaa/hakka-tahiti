@@ -41,7 +41,7 @@ render() {
 
             <!-- Phrase originale -->
             <div class="text-lg font-serif text-gray-900 leading-relaxed">
-                ${this.words}
+                ${this.words.join(' ')}
             </div>
 
             <!-- Traduction -->
@@ -51,7 +51,7 @@ render() {
 
             <!-- Analyse / segmentation -->
             <div class="flex flex-wrap gap-2">
-                ${wordsHtml}
+                ${wordsHtml.join('')}
             </div>
 
         </div>

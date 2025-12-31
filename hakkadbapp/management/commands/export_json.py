@@ -28,11 +28,11 @@ def read_themes(sheet_id, image_dir):
         pinyin = str(row[10])
         english = str(row[8])
         print(french, hakka, english)
-        if len(hakka) > 0 and len(pinyin) > 0:
-            filename = f"{image_dir}/theme_{french}"
-            gen_img.generate_theme_img(filename, french, hakka, pinyin, english, 1024)
+        # if len(hakka) > 0 and len(pinyin) > 0:
+            # filename = f"{image_dir}/theme_{french}"
+            # gen_img.generate_theme_img(filename, french, hakka, pinyin, english, 1024)
         new_theme = jsonm.Theme(french,english,hakka)
-        new_theme.image = f"theme_{french}.png"
+        # new_theme.image = f"theme_{french}.png"
 
 class Command(BaseCommand):
     help = 'Export words to CSV'
