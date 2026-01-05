@@ -1,7 +1,7 @@
-from hakkadbapp.models import  Word, Expression, ExpressionWord
+from hakkadbapp.models import  Word, Expression, ExpressionWord, Pronunciation
 import pandas as pd
 from django.db import transaction
-
+from itertools import product
 from django.core.management.base import BaseCommand
 
 def find_word_by_hanzi(hanzi, all_words):
@@ -11,6 +11,36 @@ def find_word_by_hanzi(hanzi, all_words):
             return w
     return None
 
+def parse_token_pinyin(token):
+    if '(' in token:
+        sp = token.split('(')
+        pinyin = ''
+        if len(sp) == 2:
+            pinyin = sp[1]
+            pinyin = pinyin.split(')')[0]
+    else: 
+        pinyin = ' ? '
+    return pinyin
+
+def all_pinyins_for_token(token, all_prons):
+    """
+    Return a factorized pinyin string for a token.
+    Each character contributes its alternatives joined by '/'.
+    Unknown characters → '?'.
+    """
+    parts = []
+
+    for c in token:
+        prons = all_prons.filter(hanzi=c)
+
+        if prons.exists():
+            variants = [p.pinyin() for p in prons]
+            parts.append('/'.join(sorted(set(variants))))
+        else:
+            parts.append('?')
+
+    return ''.join(parts)
+
 def import_expressions_from_df(df):
     # Cache tous les mots une seule fois
     all_words = (
@@ -19,48 +49,55 @@ def import_expressions_from_df(df):
         .all()
     )
 
+    all_prons = (
+        Pronunciation.objects.all()
+    )
     expressions = []
     expression_words = []   
 
-    # 1. Construire toutes les Expressions (sans les sauver)
-    for _, row in df.iterrows():
-        if str(row['phrase']) == "nan":
-            print(f"Skipping empty line {_}")
-            continue 
-        
-        phrase = str(row["phrase"]).strip()
-        french = str(row["french"]).strip()
-        
-        print(f"Adding row {_} {phrase} {french}")
-        expressions.append(
-            Expression(
+    with transaction.atomic():
+        # 1. Construire toutes les Expressions (sans les sauver)
+        for _, row in df.iterrows():
+            if str(row['phrase']) == "nan":
+                continue 
+            
+            phrase = str(row["phrase"]).strip()
+            french = str(row["french"]).strip()
+
+            tokens =  phrase.split()
+            hanzi, pinyin = "", ""
+
+            words = []
+            expr = Expression(
                 french=french,
                 text=phrase
             )
-        )
-
-    # 2. Sauvegarde en une seule requête
-    with transaction.atomic():
-        Expression.objects.bulk_create(expressions)
-
-        # 3. Construire les ExpressionWord
-        for expr in expressions:
-            tokens = expr.text.split()
-
             for pos, token in enumerate(tokens):
                 word = find_word_by_hanzi(token, all_words)
+                hanzi += token
+                if word is None:
+                    pinyins = all_pinyins_for_token(token, all_prons)
 
-                expression_words.append(
-                    ExpressionWord(
-                        expression=expr,
-                        word=word,   # peut être None
-                        position=pos
+                    # s'il y a au moins un caractère inconnu
+                    if '?' in ''.join(pinyins):
+                        pinyin += parse_token_pinyin(token)
+                    else:
+                        pinyin += ''.join(pinyins)
+                else:
+                    words.append(word)
+                    pinyin += word.pinyin() + ' '
+                    expression_words.append(
+                        ExpressionWord(
+                            expression=expr,
+                            word=word,   # peut être None
+                            position=pos
+                        )
                     )
-                )
-
-        # 4. Sauvegarde des relations en une requête
+            expr.rendering = pinyin + ' - ' + hanzi
+            expressions.append(expr)
+            print(expr.rendering)
+        Expression.objects.bulk_create(expressions)
         ExpressionWord.objects.bulk_create(expression_words)
-
     return expressions
 
 

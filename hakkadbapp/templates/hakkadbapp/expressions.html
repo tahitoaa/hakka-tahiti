@@ -14,7 +14,9 @@
     {% for e in expressions %}
         <div
             data-text="{{e.text}}"
-            data-french="{{e.french}}">
+            data-rendering="{{e.rendering}}"
+            data-french="{{e.french}}"
+            >
         </div>
     {% endfor %}
 </div>

@@ -12,15 +12,21 @@ class Sentence {
      * @param {Object} dico - Dictionary instance containing words
      * @param {String} text - Input sentence
      */
-    constructor(dico, text = '', french = '') {
+    constructor(dico, text = '', french = '', rendering = '') {
         this.dico = dico;
         this.words = [];
         this.matches = [];
         this.unknowns = [];
         this.update(text);
         this.french = french;
+        this.rendering = rendering; // Wont be affected by the update.
     }
 
+    renderPinyin(pinyin){
+        return Array.from(pinyin)
+                    .map(c => Pronunciation.toneMap[c] || c ) 
+                    .join('')
+    }
     /**
      * Render the sentence as HTML
      * - Each word may have multiple candidate dictionary matches
@@ -35,23 +41,26 @@ render() {
                     .map((word, index) => this.renderWord(word, index))
                     .join("")
         )
-
     return `
-        <div class="space-y-2 bg-gray p-10">
-
+        <div class="bg-gray p-5">
             <!-- Phrase originale -->
-            <div class="text-lg font-serif text-gray-900 leading-relaxed">
-                ${this.words.map(w => this.getPinyin(w)).join(' ')}
-
-                <br>
+            <div class="text-sm font-serif text-gray-900 leading-relaxed">
+                ${this.matches.map((candidates, index) => {
+                        return candidates[0].dataset.pinyin ? this.renderPinyin(candidates[0].dataset.pinyin)
+                        : this.getPinyin(candidates[0].dataset.simp) || '?'
+                    }).join(' ')
+                }
+                 - 
                 ${this.words.join(' ')}
 
+                <br>
+
+                E-reo : ${this.rendering}
             </div>
 
+
             <!-- Traduction -->
-            <div class="text-sm text-gray-600 italic">
-                ${this.french}
-            </div>
+            <div class="text-lg text-gray-800 italic">${this.french}</div>
 
             <!-- Analyse / segmentation -->
             <div class="flex flex-wrap gap-2">
@@ -97,7 +106,7 @@ render() {
 
                 <!-- 1. Pinyin -->
                 <span class="italic text-[10px]">
-                    ${pinyin  }
+                    ${this.renderPinyin(pinyin)}
                 </span>
 
                 <!-- 2. French -->

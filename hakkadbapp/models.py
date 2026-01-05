@@ -76,6 +76,7 @@ class Word(models.Model):
     mandarin = models.TextField()
     category = models.CharField(max_length=20, default=None, null=True, blank=True)  # Category of the word (e.g., "HSK 1", "Beginner Vocabulary")
     status = models.CharField(max_length=20, default=None, null=True, blank=True)  # Status of the word (e.g., "common", "rare", etc.)
+    # audio = models.TextField(defalut=None, null=True, blank=True)
 
     def __str__(self):
         return f'{self.char()}'
@@ -98,6 +99,7 @@ class Expression(models.Model):
     composed of an ordered list of Words.
     """
     text = models.TextField(help_text="space separated words simp", blank=True, null=True)
+    rendering = models.TextField(help_text="pinyin+hanzi", blank=True, null=True, default="")
     french = models.TextField(help_text="French translation of the expression")
     notes = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=50, blank=True, null=True)

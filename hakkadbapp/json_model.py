@@ -11,7 +11,7 @@ class Streamable:
     def __init__(self):
         pass
     def to_dict(self):
-        return {k: v for k, v in self.__dict__.items() if k != "id"}
+        return {k: v for k, v in self.__dict__.items() if k != "id" and k != "_reuse"}
     
 class Translations(Streamable):
     def __init__(self, primary, secondary, target):
@@ -26,29 +26,57 @@ class Identified(Streamable):
     def export(cls):
         return json.dumps(cls.instances, default=encode_custom, ensure_ascii=False)
 
-    def __init__(self):
-        self.id = str(uuid.uuid4())
+    def __init__(self, id=None):
+        if id == None:
+            self.id = str(uuid.uuid4())
+        else:
+            self.id = id
         self.__class__.instances[self.id] = self
 
-class Theme(Identified):
-    def __new__(cls, primary, secondary, target):
-        # Reuse existing instance
-        for id, theme in cls.instances.items():
-            if theme.translations.primary == primary:
-                theme._reuse = True 
-                return theme
-        # Create new instance
-        obj = super().__new__(cls)
-        obj._reuse = False
-        return obj
+    @classmethod
+    def get_id(cls, id):
+        for instance in cls.instances.values():
+            if instance.id == id:
+                return instance
+        return None
+    
+    @classmethod
+    def find_first(cls, **criteria):
+        """
+        Find first instance matching given attributes.
+        Supports nested attributes via dot notation.
+        """
+        for instance in cls.instances.values():
+            match = True
+            for attr, value in criteria.items():
+                obj = instance
+                for part in attr.split("."):
+                    obj = getattr(obj, part, None)
+                if obj != value:
+                    match = False
+                    break
+            if match:
+                return instance.id
+        return None
 
-    def __init__(self, primary, secondary, target):
-        
-        if getattr(self, "_reuse", False):
-            return
-        
-        super().__init__()
+class Theme(Identified):
+    def __init__(self, id=None, primary=None, secondary=None, target=None):
+        super().__init__(id)
         self.translations = Translations(primary, secondary, target)
+
+    @classmethod
+    def get(cls, primary):
+        for theme in cls.instances.values():
+            if theme.translations.primary == primary:
+                return theme
+        return None
+    
+    @classmethod
+    def get_or_create(cls, primary, secondary=None, target=None):
+        theme = cls.get(primary)
+        if theme:
+            return theme
+        return cls(primary, secondary, target)
 
 class Word(Identified): 
     instances = {}

@@ -89,7 +89,6 @@ class Command(BaseCommand):
 
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
             french_raw, pinyin_raw, hanzi_raw = row[0], row[1], row[2]
-
             english = ""
             if english_col:
                 english = row[df.columns.get_loc(english_col)] 

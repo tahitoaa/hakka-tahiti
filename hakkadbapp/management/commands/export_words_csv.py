@@ -1,6 +1,7 @@
 import csv
 from django.core.management.base import BaseCommand
 from hakkadbapp.models import Word  # replace with your actual app name
+from hakkadbapp.models import Expression
 import os
 import shutil
 from django.conf import settings
@@ -40,6 +41,7 @@ class Command(BaseCommand):
                 char_sequence = word.char()
                 french = word.french.lower()
                 pinyin = word.pinyin()
+                english = word.tahitian
                 hanzi = word.simp()  # or word.trad() depending on your preference
                 target = f"{pinyin} {hanzi}"
                 theme = word.category or ''
@@ -55,8 +57,8 @@ class Command(BaseCommand):
                 theme = word.category or ''
                 # audio_path = os.path.join(settings.BASE_DIR, "..","lexique", "audio", theme, audio)
                 audio_path = os.path.join(settings.BASE_DIR, '..','export_e_reo', "audio", audio)
-                audio = audio if os.path.isfile(audio_path) else ""
-                print(f"Audio path: {audio_path}, Audio file: {audio}")
+                # audio = audio if os.path.isfile(audio_path) else ""
+                # print(f"Audio path: {audio_path}, Audio file: {audio}")
                 # Copier le fichier s'il existe
                 if os.path.exists(audio_path):
                     audio =  f"{audio}.wav"
@@ -64,7 +66,7 @@ class Command(BaseCommand):
                     shutil.copy(audio_path, dest_path)
                 else:
                     audio = ""
-                    self.stderr.write(f"Fichier audio non trouvé : {audio_path}")
+                    # self.stderr.write(f"Fichier audio non trouvé : {audio_path}")
 
                 if ("Hakka validé" in word.status or "Validé" in word.status):
                     writer.writerow([
@@ -72,7 +74,7 @@ class Command(BaseCommand):
                         '',                 # expression
                         target,             # target (e.g., 酒 jiu3)
                         french,             # pivot (French)
-                        '',                 # alternate
+                        english,                 # alternate
                         theme,              # themes
                         audio,              # audio
                         image                  # image
@@ -81,4 +83,22 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(f'Filtered ({word.status}): {char_sequence} - {french} - {pinyin} - {audio} \n')
 
+            for expression in Expression.objects():
+                    target = expression.text
+                    french = expression.french
+                    alternate = ""
+                    theme = ""
+                    audio = ""
+                    image = ""
+                    
+                    writer.writerow([
+                        '',                 # word
+                        'x',                 # expression
+                        target,             # target (e.g., 酒 jiu3)
+                        french,             # pivot (French)
+                        alternate,                 # alternate
+                        theme,              # themes
+                        audio,              # audio
+                        image                  # image
+                    ])
         self.stdout.write(self.style.SUCCESS(f'Successfully exported to {filename}'))
