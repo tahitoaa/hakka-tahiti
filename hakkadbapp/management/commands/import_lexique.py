@@ -88,6 +88,7 @@ class Command(BaseCommand):
                 break
 
         for line_num, row in enumerate(df.itertuples(index=False), start=2):  # header is row 1
+            infos = ''
             french_raw, pinyin_raw, hanzi_raw = row[0], row[1], row[2]
             english = ""
             if english_col:
@@ -116,22 +117,29 @@ class Command(BaseCommand):
             
             # Split into syllables and hanzi chars
             syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
-            hanzi_chars = list(hanzi)
 
-
-            if len(syllabes) != len(hanzi_chars):
-                self.err_stream(
-                    f"❌ Line {line_num}: mismatch between pinyin '{pinyin}' ({len(syllabes)} syll) "
-                    f"and hanzi '{hanzi}' ({len(hanzi_chars)} chars).\n"
-                )
-                skipped += 1
-                continue
+            if len(syllabes) != len(hanzi):
+                if hanzi == 'phonétique':
+                    hanzi = '-'*len(syllabes)
+                    french += ' (transcription phonétique sans caractères)'
+                    infos += ' (Phonétique 👂)'
+                elif hanzi == 'archaïsme':
+                    hanzi = '-'*len(syllabes)
+                    infos += ' (Caractère archaïque ❔)'
+                    french += ' (caractères inconnus ou archaïques)'
+                else:
+                    self.err_stream(
+                        f"❌ Line {line_num}: mismatch between pinyin '{pinyin}' ({len(syllabes)} syll) "
+                        f"and hanzi '{hanzi}' ({len(hanzi)} chars).\n"
+                    )
+                    skipped += 1
+                    continue
 
             # Process each syllable-character pair
             syllable_data = []
-            for s, h in zip(syllabes, hanzi_chars):
+            for s, h in zip(syllabes, hanzi):
                 initial, final, tone = split_pinyin(s)
-                if tone in ['5', '6'] and not (final[-1] in ['t', 'k', 'p']):
+                if tone in [5, 6] and not (final[-1] in ['t', 'k', 'p']):
                     self.err_stream(
                         f"❌ Line {line_num}:  '{pinyin} {tone} {final}' tons 5 et 6 réservés aux finales t,k,p."
                     )
@@ -150,7 +158,7 @@ class Command(BaseCommand):
 
             category = sheet_name
             self.word_data.append((french, syllable_data, category, status, english))
-            self.log_stream(f"{hanzi} {syllabes} {french} {english}")
+            self.log_stream(f"{hanzi} {syllabes} {french} {english} {infos}")
             added += 1
 
         # Final log

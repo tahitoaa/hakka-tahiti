@@ -26,10 +26,14 @@ def read_words(json_path):
             continue
         # --- Force ID to match JSON
         themes = payload.get("themes")
-        new_word = jsonm.Word(target, primary, secondary)
-        print(jsonm.Word.instances)
-        new_word.themes = themes
-        new_word.id = word_id
+        new_word = jsonm.Word(
+            id=word_id,
+            primary=primary,
+            secondary=secondary,
+            target=target,
+            themes=themes
+        )
+
 
 
 

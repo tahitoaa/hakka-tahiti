@@ -556,7 +556,7 @@ def pronunciation(request):
         'a', 'e', 'i', 'o', 'u', 'ai', 'oi', 'ui', 'iu', 'eu', 'am', 'em', 'im', 'an', 'in', 'un',
         'ang', 'ing', 'ung', 'ong', 'ap', 'ip', 'at', 'it', 'ut', 'ak', 'uk', 'ok', 'et', 'on',
         'iap', 'iung', 'ot', 'iong', 'au', 'ao', 'io', 'uo', 'iuk', 'en', 'iok', 'iun', 'ia',
-        'iang', 'ep', 'ian', 'iam', 'iao', 'iak'
+        'iang', 'ep', 'ian', 'iam', 'iao', 'iak','ü'
     ])
     # Build a Case/When expression for ordering
     order_cases = Case(
