@@ -104,15 +104,16 @@ render() {
                   title="${tooltip}">
                   <span>${index+1}</span>
 
+                <!-- 2. French -->
+                <span class="font-semibold block max-w-[8rem] truncate">
+                    ${french === '?' ? 'sans traduction' : french}
+                </span>
+
                 <!-- 1. Pinyin -->
                 <span class="italic text-[10px]">
                     ${this.renderPinyin(pinyin)}
                 </span>
 
-                <!-- 2. French -->
-                <span class="font-semibold block max-w-[8rem] truncate">
-                    ${french === '?' ? 'sans traduction' : french}
-                </span>
 
                 <!-- 3. Simplified Hanzi -->
                 <span class="hanzi text-lg">
