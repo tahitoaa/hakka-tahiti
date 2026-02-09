@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded",
 
         const output = document.getElementById("output");
         expressions.forEach((e, index) => {
-            output.innerHTML += '<li class="border bg-white">' +`<span>phrase ${index}</span>` + e.render() + '</li>';
+            output.innerHTML += '<li class="border bg-white">' +`<span>phrase ${index}</span>` + e.render() + `${e.category}</li>`;
         })
         container.append(output);
     }

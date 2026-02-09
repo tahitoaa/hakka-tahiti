@@ -214,18 +214,18 @@ class LabelView {
             .join('');      
 
 
-        // const ul = document.createElement('ul');
-        // ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all rounded-xxlborder';
-        // [this.furigana, this.french, this.sentenceView].forEach((e) => {
-        //     const li = document.createElement('li');
-        //     li.className = `
-        //         flex-col gap-1 px-3 py-4 
-        //         odd:rounded-xl
-        //         text-center
-        //     `;
-        //     li.innerHTML = e.innerHTML;
-        //     ul.appendChild(li);
-        // });
+        const ul = document.createElement('ul');
+        ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all rounded-xxlborder';
+        [this.furigana, this.french, this.sentenceView].forEach((e) => {
+            const li = document.createElement('li');
+            li.className = `
+                flex-col gap-1 px-3 py-4 
+                odd:rounded-xl
+                text-center
+            `;
+            li.innerHTML = e.innerHTML;
+            ul.appendChild(li);
+        });
         this.mixed.innerHTML = '';
         // this.mixed.appendChild(ul);
         const span = document.createElement('span');
@@ -374,7 +374,6 @@ class View {
 
         container.className = `
             flex flex-wrap justify-stretch items-start gap-2
-            print:grid print:grid-cols-1
         `;
         container.innerHTML = ''; // reset  
 
@@ -411,9 +410,9 @@ class View {
             panel.id = 'panel-' + key;
             panel.className = `
                 p-6 text-justify leading-relaxed
-                h-[calc(100vh-90px)]
                 overflow-y-auto
                 print:overflow-visible
+                print:p-20
                 bg-white
                 ${i === 0 ? "" : "hidden"}
             `;

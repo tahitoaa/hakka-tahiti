@@ -3,43 +3,193 @@ import pandas as pd
 from django.db import transaction
 from itertools import product
 from django.core.management.base import BaseCommand
+import re
+import locale
+import re
+from typing import Any
 
-def find_word_by_hanzi(hanzi, all_words):
-    """Return the first Word whose char() matches the token."""
+
+# Optional: improves French collation if available on the system
+try:
+    locale.setlocale(locale.LC_COLLATE, "fr_FR.UTF-8")
+except locale.Error:
+    pass
+
+def find_words_by_hanzi_with_disambiguation(token, all_words):
+    """
+    token: str
+        Format: "漢字" or "漢字:constraint1,constraint2"
+    all_words: iterable of Word-like objects
+        Expected attributes or methods:
+            - w.char()          -> hanzi (simp)
+            - w.trad() or w.trad -> traditional (optional)
+            - w.french          -> French gloss (str or None)
+            - w.pinyin()        -> pinyin string (or attribute)
+
+    Returns:
+        list of Word or a fallback pseudo-entry if no match
+    """
+
+    # --- 1️⃣ Parse token and constraints ---
+    parts = token.split(":", 1)
+    hanzi = parts[0]
+
+    constraints = None
+    if len(parts) == 2 and parts[1].strip():
+        constraints = [
+            c.strip().lower()
+            for c in parts[1].split(",")
+            if c.strip()
+        ]
+
+    matches = []
+
+    # --- 2️⃣ Filtering ---
     for w in all_words:
-        if w.char() == hanzi:
-            return w
-    return None
+        simp = w.char()
+        trad = getattr(w, "trad", lambda: None)()
+        # Hanzi match is mandatory
+        if simp != hanzi and trad != hanzi:
+            continue
+        french = (w.french or "").lower()
+        pinyin = (w.pinyin() or "").lower()
 
-def parse_token_pinyin(token):
-    if '(' in token:
-        sp = token.split('(')
-        pinyin = ''
-        if len(sp) == 2:
-            pinyin = sp[1]
-            pinyin = pinyin.split(')')[0]
-    else: 
-        pinyin = ' ? '
-    return pinyin
+        # No constraints → accept directly
+        if not constraints:
+            matches.append(w)
+            continue
 
-def all_pinyins_for_token(token, all_prons):
+        # At least one constraint must match French OR Pinyin
+        if any(c in french or c in pinyin for c in constraints):
+            matches.append(w)
+
+    if len(matches) == 1:
+        return matches
+    
+    # --- 3️⃣ Sorting ---
+    def sort_key(w):
+        fr = (w.french or "").lower()
+        py = (w.pinyin() or "").lower()
+        return (
+            len(fr),                    # shortest French first
+            locale.strxfrm(fr),         # French collation
+            locale.strxfrm(py),         # Pinyin collation
+        )
+
+    matches.sort(key=sort_key)
+
+    # --- 4️⃣ Fallback ---
+    if matches:
+        return matches
+
+    return [None]
+
+# "(be1)" -> captures "be1"
+_PAREN_PINYIN_RE = re.compile(r"\(([^()]*)\)")
+
+_SUPERSCRIPT = str.maketrans({
+    "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶",
+})
+
+def _tone_to_exponent(py: str) -> str:
+    """'be1' -> 'be¹' (only if trailing digit)."""
+    py = (py or "").strip()
+    if py and py[-1].isdigit():
+        return py[:-1] + py[-1].translate(_SUPERSCRIPT)
+    return py
+
+def _is_cjk(hanzi_char: str) -> bool:
+    """Heuristic: treat CJK Unified Ideographs blocks as Hanzi."""
+    if not hanzi_char or len(hanzi_char) != 1:
+        return False
+    code = ord(hanzi_char)
+    return (
+        0x4E00 <= code <= 0x9FFF or   # CJK Unified Ideographs
+        0x3400 <= code <= 0x4DBF or   # Extension A
+        0x20000 <= code <= 0x2A6DF or # Extension B
+        0x2A700 <= code <= 0x2B73F or # Extension C
+        0x2B740 <= code <= 0x2B81F or # Extension D
+        0x2B820 <= code <= 0x2CEAF or # Extension E/F
+        0xF900 <= code <= 0xFAFF     # Compatibility Ideographs
+    )
+
+def _lookup_first_pron(hanzi: str, all_prons: Any) -> str:
+    """One pinyin for a hanzi; '?' if missing."""
+    qs = all_prons.filter(hanzi=hanzi)
+    if not qs.exists():
+        return "?"
+    p = qs.first()
+    return p.pinyin() if p else "?"
+
+def resolve_pinyin(token: str, all_prons: Any) -> str:
     """
-    Return a factorized pinyin string for a token.
-    Each character contributes its alternatives joined by '/'.
-    Unknown characters → '?'.
+    Resolve ONE pinyin string for `token`:
+
+    Rules:
+    - Token is a string containing Hanzi plus optional inline pinyin precision '(be1)'.
+    - '-' represents an unknown Hanzi placeholder -> contributes '?'.
+    - Hanzi with no pron in `all_prons` -> contributes '?'.
+    - '(pinyin)' overwrites the pron of the *previous Hanzi*.
+    - Tone digit is rendered as superscript exponent.
+    - Any substring that is NOT Hanzi and NOT inside '(...)' is copied as-is
+      into the output (punctuation, latin letters, digits, etc.).
     """
-    parts = []
+    if token is None:
+        return ""
+    token = str(token)
+    if not token:
+        return ""
 
-    for c in token:
-        prons = all_prons.filter(hanzi=c)
+    out = []
+    last_hanzi_out_index = None  # index in out of last hanzi syllable (so we can overwrite)
 
-        if prons.exists():
-            variants = [p.pinyin() for p in prons]
-            parts.append('/'.join(sorted(set(variants))))
-        else:
-            parts.append('?')
+    i = 0
+    n = len(token)
 
-    return ''.join(parts)
+    while i < n:
+        ch = token[i]
+
+        # Inline pinyin override "(...)"
+        if ch == "(":
+            m = _PAREN_PINYIN_RE.match(token, i)
+            if m:
+                inline_py = m.group(1).strip()
+                if last_hanzi_out_index is not None:
+                    out[last_hanzi_out_index] = _tone_to_exponent(inline_py) if inline_py else "*"
+                # If no previous hanzi, ignore the override (per spec)
+                i = m.end()
+                continue
+            # malformed "(" -> copy as-is
+            out.append(ch)
+            i += 1
+            continue
+
+        # Preserve whitespace (or skip it if you prefer)
+        if ch.isspace():
+            out.append(ch)
+            i += 1
+            continue
+
+        # Unknown hanzi placeholder
+        if ch == "-":
+            out.append("*")
+            last_hanzi_out_index = len(out) - 1
+            i += 1
+            continue
+
+        # Hanzi: resolve from DB
+        if _is_cjk(ch):
+            py = _lookup_first_pron(ch, all_prons)
+            out.append(_tone_to_exponent(py))
+            last_hanzi_out_index = len(out) - 1
+            i += 1
+            continue
+
+        # Any other character outside parentheses: copy as-is
+        out.append(ch)
+        i += 1
+
+    return "".join(out)
 
 def import_expressions_from_df(df):
     # Cache tous les mots une seule fois
@@ -58,9 +208,12 @@ def import_expressions_from_df(df):
     with transaction.atomic():
         # 1. Construire toutes les Expressions (sans les sauver)
         for _, row in df.iterrows():
-            if str(row['phrase']) == "nan":
+            # if _ > 5:
+            #     continue
+
+            if str(row['phrase']) == "nan" or str(row['french']) == "nan":
                 continue 
-            
+
             phrase = str(row["phrase"]).strip()
             french = str(row["french"]).strip()
 
@@ -70,19 +223,17 @@ def import_expressions_from_df(df):
             words = []
             expr = Expression(
                 french=french,
-                text=phrase
+                text=phrase,
+                status=str(row['status']).strip(),
+                category=row['themes'].split(',')
             )
             for pos, token in enumerate(tokens):
-                word = find_word_by_hanzi(token, all_words)
-                hanzi += token
+                matches = find_words_by_hanzi_with_disambiguation(token, all_words)
+                word = matches[0]
+                print(len(matches), word)
+                hanzi += token.split(':')[0]
                 if word is None:
-                    pinyins = all_pinyins_for_token(token, all_prons)
-
-                    # s'il y a au moins un caractère inconnu
-                    if '?' in ''.join(pinyins):
-                        pinyin += parse_token_pinyin(token)
-                    else:
-                        pinyin += ''.join(pinyins)
+                    pinyin += resolve_pinyin(token, all_prons)
                 else:
                     words.append(word)
                     pinyin += word.pinyin() + ' '
@@ -90,12 +241,12 @@ def import_expressions_from_df(df):
                         ExpressionWord(
                             expression=expr,
                             word=word,   # peut être None
-                            position=pos
+                            position=pos,
                         )
                     )
-            expr.rendering = pinyin + ' - ' + hanzi
+            expr.rendering = pinyin + ' ' + hanzi
             expressions.append(expr)
-            print(expr.rendering)
+            print(expr.rendering + ' ' + expr.status )
         Expression.objects.bulk_create(expressions)
         ExpressionWord.objects.bulk_create(expression_words)
     return expressions
@@ -132,11 +283,11 @@ class Command(BaseCommand):
         for sheet_name in excel_file.sheet_names:
             df = pd.read_excel(
             excel_file,
-                usecols="A:B",     # only columns A and B
+                usecols="A:F",     # only columns A and B
                 sheet_name=sheet_name,
-                skiprows=2         # skip the header row → start at line 2
+                skiprows=1         # skip the header row → start at line 2
             )
-            df.columns = ["french", "phrase"]
+            df.columns = ["french", "phrase", "themes", "comments", "english", "status"]
             expressions = import_expressions_from_df(df)
         pass
 

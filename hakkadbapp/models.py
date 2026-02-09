@@ -103,6 +103,7 @@ class Expression(models.Model):
     french = models.TextField(help_text="French translation of the expression")
     notes = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
 
     # M2M through ExpressionWord to preserve order
     words = models.ManyToManyField(

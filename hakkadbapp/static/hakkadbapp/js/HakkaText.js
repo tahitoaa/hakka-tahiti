@@ -20,7 +20,7 @@ class HakkaText {
         if (update["hanzi"] != undefined){
             const text = update["hanzi"];
             const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
-            this.syllables = textWithoutStars.match(/[a-z]+[_0-6]?/gi) || [];
+            this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
             this.suggestions = [] 
             this.syllables.forEach((syl, i) => {
                 this.suggestions.push(...this.dico
@@ -42,7 +42,6 @@ class HakkaText {
                                     return matches.length > 1 ? '(' + matches.join('/') + ')' : matches[0];
                                 })
                                 .join(' ');
-            console.log(this.pinyin);
         }
     }
 

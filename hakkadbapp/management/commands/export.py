@@ -117,13 +117,16 @@ class Command(BaseCommand):
                     chars.append(p.hanzi)
                 # ---- skip early (cheap checks first)
                 if word.status not in {"Hakka validé", "Validé"}:
+                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for status " + word.status))
                     continue
 
                 if not word.category:
+                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing category."))
                     continue
 
                 theme = jsonm.Theme.get(word.category.lower())
                 if not theme:
+                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing theme {word.category.lower()} on e-reo export."))
                     continue
 
                 # ---- build pinyin + hanzi ONCE
@@ -139,6 +142,7 @@ class Command(BaseCommand):
                 hanzi = "".join(hanzi_parts)
 
                 if not pinyin:
+                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing pinyin."))
                     continue
 
                 target = f"{pinyin} {hanzi}"
@@ -149,9 +153,10 @@ class Command(BaseCommand):
 
                 json_word = jsonm.Word(target, word.french.lower(), word.tahitian.lower())
                 json_word.themes.append(theme.id)
+                json_word.audio = audio
                 
                 word_pinyin[word.id] = "".join(parts)
-                word_char[word.id] = "".join(chars)
+                word_char[word.id] = "".join(chars)     
 
                 writer.writerow([
                     "x",
@@ -169,28 +174,36 @@ class Command(BaseCommand):
 
             i = 0
             for expr in expressions.iterator(chunk_size=1):
+                i += 1
                 pinyin_parts = []
                 if "?" in expr.rendering:
                     self.stderr.write(f'Skipping {expr.rendering} because of missing pinyin.')
                     continue
-
-                if len(expr.ews) < 2:
-                    self.stderr.write(f'Skipping {expr.rendering} because it only one word.')
+                if "KO" in expr.status:
+                    self.stderr.write(f'Skipping {expr.rendering} status {expr.status}')
                     continue
+
+             
                 writer.writerow([
                     "",
                     "x",
                     expr.rendering,
                     expr.french,
-                    " ",
+                    expr.category,
                     "",
                     "",
                     "",
                 ])
+
+                themes = []
+                if expr.category:
+                    themes = [jsonm.Theme.get(th.lower()) for th in expr.category.split(',')]
+
                 new_expr = jsonm.Expression(
                     target=expr.rendering,
                     primary=expr.french,
-                    secondary=''
+                    secondary='',
+                    themes= themes
                 )
                 components = {}
                 for ew in expr.ews:

@@ -18,7 +18,7 @@ INITIALS = [
 
 def split_pinyin(pinyin):
     # Extract tone (last digit)
-    match = re.match(r"([a-z]+)(\d)", pinyin)
+    match = re.match(r"([a-zü]+)(\d)", pinyin)
     if not match:
         return None, None, None  # invalid format
     

@@ -80,7 +80,7 @@ class Theme(Identified):
 
 class Word(Identified): 
     instances = {}
-    def __init__(self, target, primary, secondary):
+    def __init__(self, target, primary, secondary, id=None, ):
         super().__init__()
         self.translations = Translations(primary, secondary, target)
         self.themes = [] # themes id
@@ -123,7 +123,7 @@ class Expression(Identified):
     #         "target": "ngai¹我 hi⁴去"
     #     }
     # },
-    def __init__(self, target, primary, secondary):
+    def __init__(self, target, primary, secondary, themes = []):
         super().__init__()
         self.translations = Translations(primary, secondary, target)
         self.themes = [] # thmes id
