@@ -42,26 +42,24 @@ render() {
                     .join("")
         )
     return `
-        <div class="bg-gray p-5">
+        <div class="bg-gray p-5 print:p-1">
             <!-- Phrase originale -->
-            <div class="text-sm font-serif text-gray-900 leading-relaxed">
+            <div class="text-sm font-serif text-gray-900 leading-relaxed print:hidden">
                 ${this.matches.map((candidates, index) => {
                         return candidates[0].dataset.pinyin ? this.renderPinyin(candidates[0].dataset.pinyin)
                         : this.getPinyin(candidates[0].dataset.simp) || '?'
                     }).join(' ')
                 }
-                 - 
-                ${this.words.join(' ')}
-
+                 <br>
+            ${this.matches.map((candidates, index) => {
+                    return candidates[0].dataset.pinyin ? `<span class="hanzi text-xxl">${candidates[0].dataset.simp}</span>` : this.getPinyin(candidates[0].dataset.simp) || '?'
+                }).join(' ')
+                }
                 <br>
 
-                E-reo : ${this.rendering}
+                E-reo : <span class=""> ${this.rendering} <span>
             </div>
-
-
-            <!-- Traduction -->
             <div class="text-lg text-gray-800 italic">${this.french}</div>
-
             <!-- Analyse / segmentation -->
             <div class="flex flex-wrap gap-2">
                 ${wordsHtml.join('')}
@@ -87,7 +85,7 @@ render() {
         // Color depending on translation availability
         var color = french === '?' ? 'bg-orange-400' : 'bg-green-300';
         if (index > 0) 
-            color = 'bg-green-100';
+            color = 'bg-green-100 print:hidden';
         // Tooltip: all dataset fields
         const tooltip = Object.entries(word.dataset)
             .map(([k, v]) => `${k}: ${v}`)
@@ -100,7 +98,7 @@ render() {
             pinyin = this.getPinyin(simp);
 
         return `
-            <span class="text-xs ${color} px-1 py-0.5 rounded inline-flex flex-col leading-tight"
+            <span class="text-xs ${color} print:p-0.5 px-1 py-0.5 rounded inline-flex flex-col leading-tight"
                   title="${tooltip}">
                   <span>${index+1}</span>
 
