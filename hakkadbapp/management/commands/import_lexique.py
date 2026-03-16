@@ -119,14 +119,16 @@ class Command(BaseCommand):
             syllabes = [s for s in re.split(r'(?<=[0-6])', pinyin) if s.strip()]
 
             if len(syllabes) != len(hanzi):
+                infos = ''
                 if hanzi == 'phonétique':
                     hanzi = '-'*len(syllabes)
-                    french += ' (transcription phonétique sans caractères)'
-                    infos += ' (Phonétique 👂)'
+                    infos += ' (transcription phonétique sans caractères)'
                 elif hanzi == 'archaïsme':
                     hanzi = '-'*len(syllabes)
-                    infos += ' (Caractère archaïque ❔)'
-                    french += ' (caractères inconnus ou archaïques)'
+                    infos += ' (caractères inconnus ou archaïques)'
+                elif hanzi == 'anglicisme':
+                    hanzi = '-'*len(syllabes)
+                    infos += ' (anglicisme)'
                 else:
                     self.err_stream(
                         f"❌ Line {line_num}: mismatch between pinyin '{pinyin}' ({len(syllabes)} syll) "
@@ -134,6 +136,7 @@ class Command(BaseCommand):
                     )
                     skipped += 1
                     continue
+                french += infos
 
             # Process each syllable-character pair
             syllable_data = []
@@ -199,7 +202,7 @@ class Command(BaseCommand):
         # self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ') 
         self.parse_sheets('1kWOkXIUfxj6q-TjzT-2CQygI1KfPJOfr0d6npHdfc6A')
         self.parse_sheets('1Dxjb849-AJCQL0e9p_9Zvl7bafbz9mJwGNmHubgnGyU')
-
+  
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
             [Initial(initial=i) for i in self.initial_set],

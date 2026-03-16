@@ -45,7 +45,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Fetching expressions from DB.'))
         expressions = (
             Expression.objects
-            .only("id", "text", "rendering")
             .prefetch_related(
                 models.Prefetch(
                     "expressionword_set",
@@ -105,141 +104,166 @@ class Command(BaseCommand):
             ])
 
             export = []
-            word_pinyin = {}
-            word_char = {}
+            word_pinyin = {}  # wid -> pinyin
+            word_char = {}    # wid -> hanzi
+            word_by_id = {} # optional
+            json_word_by_target = {}
+            theme_cache = {}
+            def get_theme(cat: str):
+                k = (cat or "").strip().lower()
+                if not k:
+                    return None
+                if k not in theme_cache:
+                    theme_cache[k] = jsonm.Theme.get(k)
+                return theme_cache[k]
 
-            for word in words.iterator(chunk_size=500):
-                parts = []
-                chars = []
-                for wp in word.wps:
-                    p = wp.pronunciation
-                    parts.append(p.pinyin())
-                    chars.append(p.hanzi)
-                # ---- skip early (cheap checks first)
+            written = 0
+            skipped_status = skipped_cat = skipped_theme = skipped_pinyin = 0
+
+            for word in words.iterator(chunk_size=1000):
+                # cheap skips first (avoid extra work)
                 if word.status not in {"Hakka validé", "Validé"}:
-                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for status " + word.status))
+                    skipped_status += 1
                     continue
 
                 if not word.category:
-                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing category."))
+                    skipped_cat += 1
                     continue
 
-                theme = jsonm.Theme.get(word.category.lower())
+                theme = get_theme(word.category)
                 if not theme:
-                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing theme {word.category.lower()} on e-reo export."))
+                    skipped_theme += 1
                     continue
 
-                # ---- build pinyin + hanzi ONCE
-                pinyin_parts = []
-                hanzi_parts = []
-
-                for wp in word.wps:
-                    p = wp.pronunciation
-                    pinyin_parts.append(p.pinyin())
-                    hanzi_parts.append(p.hanzi)
-
-                pinyin = "".join(pinyin_parts)
-                hanzi = "".join(hanzi_parts)
-
+                # build pinyin+hanzi ONCE from prefetched wps
+                pinyin = "".join(wp.pronunciation.pinyin() for wp in word.wps)
                 if not pinyin:
-                    self.stdout.write(self.style.WARNING(f"Skipping {word.char()} {word.french.lower()} for missing pinyin."))
+                    skipped_pinyin += 1
                     continue
+                hanzi = "".join(wp.pronunciation.hanzi for wp in word.wps)
 
                 target = f"{pinyin} {hanzi}"
+                audio = f"{pinyin.translate(trans)}.wav"
 
-                # ---- audio name
-                pinyin_sup = pinyin.translate(trans)
-                audio = f"{pinyin_sup}.wav"
+                fr = (word.french or "").lower()
+                ty = (word.tahitian or "").lower()
 
-                json_word = jsonm.Word(target, word.french.lower(), word.tahitian.lower())
+                json_word = jsonm.Word(target, fr, ty)
                 json_word.themes.append(theme.id)
                 json_word.audio = audio
-                
-                word_pinyin[word.id] = "".join(parts)
-                word_char[word.id] = "".join(chars)     
+                json_word_by_target[target] = json_word
 
-                writer.writerow([
-                    "x",
-                    "",
-                    target,
-                    word.french.lower(),
-                    word.tahitian.lower(),
-                    theme.translations.primary,
-                    audio,
-                    "",
-                ])
+                word_pinyin[word.id] = pinyin
+                word_char[word.id] = hanzi
+                word_by_id[word.id] = json_word  # only if you need it later
 
-                self.stdout.write(self.style.HTTP_INFO(f'Wrote word {target} {word.french.lower()} to csv and json.'))
-            self.stdout.write(self.style.SUCCESS(f'Exported all words. '))
+                writer.writerow(["x", "", target, fr, ty, theme.translations.primary, audio, ""])
+                written += 1
+
+                # optional: log every 500 instead of every row
+                # if written % 500 == 0:
+                #     self.stdout.write(self.style.SUCCESS(f"Wrote {written} words..."))
+
+            self.stdout.write(self.style.SUCCESS(
+                f"Words exported={written} "
+                f"(skipped status={skipped_status}, no_category={skipped_cat}, "
+                f"no_theme={skipped_theme}, no_pinyin={skipped_pinyin})"
+            ))
+
 
             i = 0
-            for expr in expressions.iterator(chunk_size=1):
-                i += 1
-                pinyin_parts = []
-                if "?" in expr.rendering:
-                    self.stderr.write(f'Skipping {expr.rendering} because of missing pinyin.')
+            theme_cache = {}
+            def get_theme(cat: str):
+                k = (cat or "").strip().lower()
+                if not k:
+                    return None
+                if k not in theme_cache:
+                    theme_cache[k] = jsonm.Theme.get(k)
+                return theme_cache[k]
+
+            written_expr = 0
+            skipped_missing_pinyin = 0
+            skipped_ko = 0
+            skipped_no_audio = 0
+
+            rows = []
+            for  expr in expressions.iterator(chunk_size=1000):
+                rendering = expr.rendering or ""
+                status = expr.status or ""
+
+                if "~" in rendering:
+                    self.stderr.write(f'Skipping {expr.rendering} missing pinyin')
+                    skipped_missing_pinyin += 1
                     continue
-                if "KO" in expr.status:
-                    self.stderr.write(f'Skipping {expr.rendering} status {expr.status}')
+                if "KO" in status:
+                    self.stderr.write(f'Skipping KO {expr.rendering}')
+                    skipped_ko += 1
                     continue
 
-             
-                writer.writerow([
-                    "",
-                    "x",
-                    expr.rendering,
-                    expr.french,
-                    expr.category,
-                    "",
-                    "",
-                    "",
+                self.stdout.write(f'{expr.status} {expr.rendering}')
+                rows.append([
+                    "", "x", rendering, expr.french, expr.english, expr.category.lower(),
+                    rendering.split(" ")[-1], "",
                 ])
 
+                # themes (cached)
                 themes = []
                 if expr.category:
-                    themes = [jsonm.Theme.get(th.lower()) for th in expr.category.split(',')]
+                    for th in expr.category.split(","):
+                        t = get_theme(th)
+                        if t:
+                            themes.append(t)
 
                 new_expr = jsonm.Expression(
-                    target=expr.rendering,
+                    target=rendering,
                     primary=expr.french,
-                    secondary='',
-                    themes= themes
+                    secondary=expr.english,
+                    themes=themes,
                 )
+
                 components = {}
+                pinyin_parts = []
+
                 for ew in expr.ews:
-                    if ew.word_id:
-                        p = word_pinyin.get(ew.word_id, "*")
-                        pinyin_parts.append(p)
-                        if '?' in p:
-                            continue
-                        word = words.get(id=ew.word_id)
-                        word_str =  p + " " + word_char.get(ew.word_id, "*")
-                        first_match = jsonm.Word.find_first(**{'translations.target':word_str})
-                        # print(ew, first_match)
-                        if first_match:
-                            components[word_str] = first_match
-                            jsonm.Word.get_id(first_match).in_expression.append(new_expr.id)
-                    else:  
+                    wid = ew.word_id
+                    if not wid:
                         pinyin_parts.append("*")
+                        continue
+
+                    p = word_pinyin.get(wid, "*")
+                    pinyin_parts.append(p)
+
+                    if "~" in p:  # word had unresolved pinyin
+                        continue
+
+                    h = word_char.get(wid, "*")
+                    word_str = f"{p} {h}"
+
+                    # O(1) lookup instead of jsonm.Word.find_first(...)
+                    jw = word_by_id.get(wid)
+                    if jw:
+                        components[word_str] = jw.id
+                        word = jsonm.Word.get_id(jw)
+                        if word:
+                            jsonm.Word.get_id(jw).in_expression.append(new_expr.id)
 
                 pinyin = " ".join(pinyin_parts)
 
-                # --- Hanzi
-                hanzi = expr.simp
-                target = f"{pinyin} {hanzi}"
-                self.stdout.write(self.style.HTTP_INFO(f'Processing {expr.rendering}'))
-                # --- Superscript inverse pour audio
-                pinyin_sup = "".join(
-                    reverse_superscript_map.get(ch, ch)
-                    for ch in pinyin
-                )
-                if not pinyin_sup.strip():
+                # audio key: your original logic removes superscripts -> digits/letters
+                pinyin_sup = "".join(reverse_superscript_map.get(ch, ch) for ch in pinyin).strip()
+                if not pinyin_sup:
+                    skipped_no_audio += 1
                     continue
-                new_expr.themes = []
+
                 new_expr.components = components
                 export.append(new_expr)
+                written_expr += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Exported {len(export)} expressions."))
+            writer.writerows(rows)
+            self.stdout.write(self.style.SUCCESS(
+                f"Expressions exported={written_expr} "
+                f"(skipped missing_pinyin={skipped_missing_pinyin}, skipped KO={skipped_ko}, skipped no_audio={skipped_no_audio})"
+            ))
 
         with open(os.path.join(export_json_dir, "expressionCorpus.json"), "w", encoding="utf-8") as f:
             f.write(jsonm.Expression.export())

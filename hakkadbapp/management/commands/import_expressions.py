@@ -1,6 +1,7 @@
-from hakkadbapp.models import  Word, Expression, ExpressionWord, Pronunciation
+from hakkadbapp.models import  Word, Expression, ExpressionWord, Pronunciation, WordPronunciation
 import pandas as pd
 from django.db import transaction
+from django.db.models import Prefetch
 from itertools import product
 from django.core.management.base import BaseCommand
 import re
@@ -8,12 +9,84 @@ import locale
 import re
 from typing import Any
 
+new_words = []
+
+PUNCT_MAP = str.maketrans({
+    ",": "，",
+    ".": "。",
+    ";": "；",
+    ":": "：",
+    "?": "？",
+    "!": "！",
+    "(": "（",
+    ")": "）",
+    "[": "【",
+    "]": "】",
+    "{": "｛",
+    "}": "｝",
+    "'": "’",
+    '"': "”",      # naive; see note below
+    "…": "……",    # French ellipsis to Chinese ellipsis style
+    "-": "—",      # optional: hyphen to em dash
+})
+
+REVERSE_PUNCT_MAP = str.maketrans({
+    "，": ",",
+    "。": ".",
+    "；": ";",
+    "：": ":",
+    "？": "?",
+    "！": "!",
+    "（": "(",
+    "）": ")",
+    "【": "[",
+    "】": "]",
+    "｛": "{",
+    "｝": "}",
+    "’": "'",
+    "”": '"',
+    "—": "-",
+})
 
 # Optional: improves French collation if available on the system
 try:
     locale.setlocale(locale.LC_COLLATE, "fr_FR.UTF-8")
 except locale.Error:
     pass
+
+_CJK_RE = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF]")
+
+def build_all_words_for_tokens(tokens):
+    """
+    tokens: iterable of token strings like:
+      "想:souhaiter", "陈(chin2)", "-(hak6)", "唔好", etc.
+
+    Returns a queryset that:
+      - only includes Words that contain at least one hanzi occurring in tokens
+      - prefetches pronunciations in correct order for char()/pinyin()/trad()
+    """
+    # 1) collect hanzi used in the import (base token before ':')
+    used_chars = set()
+    for t in tokens:
+        base = str(t).split(":", 1)[0]
+        used_chars.update(_CJK_RE.findall(base))
+
+    if not used_chars:
+        return Word.objects.none()
+
+    # 2) one SQL query to get matching words (distinct!)
+    wps_qs = (
+        WordPronunciation.objects
+        .select_related("pronunciation__initial", "pronunciation__final", "pronunciation__tone")
+        .order_by("position")
+    )
+
+    return (
+        Word.objects
+        .filter(wordpronunciation__pronunciation__hanzi__in=used_chars)
+        .distinct()
+        .prefetch_related(Prefetch("wordpronunciation_set", queryset=wps_qs))
+    )
 
 def find_words_by_hanzi_with_disambiguation(token, all_words):
     """
@@ -49,24 +122,19 @@ def find_words_by_hanzi_with_disambiguation(token, all_words):
         simp = w.char()
         trad = getattr(w, "trad", lambda: None)()
         # Hanzi match is mandatory
-        if simp != hanzi and trad != hanzi:
+        if  simp != hanzi and trad != hanzi:
             continue
         french = (w.french or "").lower()
         pinyin = (w.pinyin() or "").lower()
 
-        # No constraints → accept directly
-        if not constraints:
-            matches.append(w)
-            continue
-
         # At least one constraint must match French OR Pinyin
-        if any(c in french or c in pinyin for c in constraints):
+        if (not constraints) or any(c in french or c in pinyin for c in constraints):
             matches.append(w)
-
+    # print(hanzi  + " | ".join([m.pinyin() + m.french for m in matches]))
     if len(matches) == 1:
         return matches
     
-    # --- 3️⃣ Sorting ---
+    # --- 3️⃣ Sorting --- (many matches)
     def sort_key(w):
         fr = (w.french or "").lower()
         py = (w.pinyin() or "").lower()
@@ -77,15 +145,13 @@ def find_words_by_hanzi_with_disambiguation(token, all_words):
         )
 
     matches.sort(key=sort_key)
-
     # --- 4️⃣ Fallback ---
     if matches:
         return matches
 
     return [None]
 
-# "(be1)" -> captures "be1"
-_PAREN_PINYIN_RE = re.compile(r"\(([^()]*)\)")
+
 
 _SUPERSCRIPT = str.maketrans({
     "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶",
@@ -117,7 +183,7 @@ def _lookup_first_pron(hanzi: str, all_prons: Any) -> str:
     """One pinyin for a hanzi; '?' if missing."""
     qs = all_prons.filter(hanzi=hanzi)
     if not qs.exists():
-        return "?"
+        return "~"
     p = qs.first()
     return p.pinyin() if p else "?"
 
@@ -155,7 +221,7 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
             if m:
                 inline_py = m.group(1).strip()
                 if last_hanzi_out_index is not None:
-                    out[last_hanzi_out_index] = _tone_to_exponent(inline_py) if inline_py else "*"
+                    out[last_hanzi_out_index] =  _tone_to_exponent(inline_py) if inline_py else "*"
                 # If no previous hanzi, ignore the override (per spec)
                 i = m.end()
                 continue
@@ -188,34 +254,71 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
         # Any other character outside parentheses: copy as-is
         out.append(ch)
         i += 1
-
     return "".join(out)
+
+_PAREN_PINYIN_RE = re.compile(r"\(([^()]*)\)")
+
+def resolve_hanzi(token: str) -> str:
+    """
+    Extract the “hanzi piece” from a token.
+
+    Rules:
+    - "想:souhaiter"        -> "想"        (drop disambiguation after ':')
+    - "陈(chin2)"           -> "陈"        (drop inline pinyin "(...)")
+    - "-(hak6)"             -> "hak6"      (no hanzi: return the inline pinyin)
+    - "-" (no inline pinyin)-> "*"         (fallback)
+
+    Notes:
+    - Works even if both ':' and '(...)' exist (':' handled first).
+    """
+    if token is None:
+        return ""
+
+    s = str(token).strip()
+    if not s:
+        return ""
+
+    # 1) Remove disambiguation after ':'
+    s = s.split(":", 1)[0].strip()
+
+    # 2) If there is inline "(...)" capture it, but remove it from base
+    m = _PAREN_PINYIN_RE.search(s)
+    inline = m.group(1).strip() if m else ""
+    base = _PAREN_PINYIN_RE.sub("", s).strip()  # remove "(...)"
+
+    # 3) If base is "-" placeholder: return inline pinyin (or "*")
+    if base == "-":
+        return f"({_tone_to_exponent(inline)})" if inline else "*"
+
+    # 4) Normal case: return hanzi base
+    return base
 
 def import_expressions_from_df(df):
     # Cache tous les mots une seule fois
-    all_words = (
-        Word.objects
-        .prefetch_related("wordpronunciation_set__pronunciation")
-        .all()
-    )
 
-    all_prons = (
-        Pronunciation.objects.all()
-    )
+    all_tokens = []
+    for _, row in df.iterrows():
+        if pd.isna(row.phrase): 
+            continue
+        all_tokens.extend(str(row.phrase).strip().split())
+
+    # all_words is now a filtered queryset (not the whole DB)
+    all_words = build_all_words_for_tokens(all_tokens)
+    all_prons = Pronunciation.objects.all()
     expressions = []
     expression_words = []   
 
     with transaction.atomic():
         # 1. Construire toutes les Expressions (sans les sauver)
         for _, row in df.iterrows():
-            # if _ > 5:
-            #     continue
+            if pd.isna(row.phrase) or pd.isna(row.french):
+                continue
 
-            if str(row['phrase']) == "nan" or str(row['french']) == "nan":
-                continue 
-
-            phrase = str(row["phrase"]).strip()
-            french = str(row["french"]).strip()
+            phrase = str(row.phrase).strip()
+            french = str(row.french).strip()
+            status = str(row.status).strip() if hasattr(row, "status") else ""
+            category = str(row.themes).strip() if not pd.isna(row.themes) else ""
+            english = str(row.english).strip() if not pd.isna(row.english) else " - "
 
             tokens =  phrase.split()
             hanzi, pinyin = "", ""
@@ -224,33 +327,34 @@ def import_expressions_from_df(df):
             expr = Expression(
                 french=french,
                 text=phrase,
-                status=str(row['status']).strip(),
-                category=row['themes'].split(',')
+                status=status,
+                category=category,
+                english = english
             )
             for pos, token in enumerate(tokens):
                 matches = find_words_by_hanzi_with_disambiguation(token, all_words)
                 word = matches[0]
-                print(len(matches), word)
-                hanzi += token.split(':')[0]
                 if word is None:
-                    pinyin += resolve_pinyin(token, all_prons)
+                    token_pinyin =  resolve_pinyin(token, all_prons) + " "
+                    token_hanzi = resolve_hanzi(token)
+                    if token_hanzi in [', ', '?', '，', '？', '。']:
+                        continue
+                    new_words.append("mot inconnu " + token_pinyin + token_hanzi + ' dans ' + french + " " + phrase) 
                 else:
-                    words.append(word)
-                    pinyin += word.pinyin() + ' '
+                    token_hanzi = token.split(":", 1)[0]
+                    # Here, any :disambiguation is ignore if no alternatives found.
+                    token_pinyin = word.pinyin() + " "
                     expression_words.append(
-                        ExpressionWord(
-                            expression=expr,
-                            word=word,   # peut être None
-                            position=pos,
-                        )
+                        ExpressionWord(expression=expr, word=word, position=pos)
                     )
-            expr.rendering = pinyin + ' ' + hanzi
+                pinyin += token_pinyin
+                hanzi += token_hanzi
+            expr.rendering = (pinyin.translate(REVERSE_PUNCT_MAP).strip() + " " + hanzi).strip()
             expressions.append(expr)
-            print(expr.rendering + ' ' + expr.status )
+            print(str(_ + 2)+ ' ' + expr.rendering + ' ' + expr.status )
         Expression.objects.bulk_create(expressions)
         ExpressionWord.objects.bulk_create(expression_words)
     return expressions
-
 
 class Command(BaseCommand):
     help = 'Populate Word and WordPronunciation from a google sheet'
@@ -281,11 +385,12 @@ class Command(BaseCommand):
         excel_file = pd.ExcelFile(sheet_url)
 
         for sheet_name in excel_file.sheet_names:
+            self.log_stream(sheet_name)
             df = pd.read_excel(
             excel_file,
                 usecols="A:F",     # only columns A and B
                 sheet_name=sheet_name,
-                skiprows=1         # skip the header row → start at line 2
+                # skiprows=1         # skip the header row → start at line 2
             )
             df.columns = ["french", "phrase", "themes", "comments", "english", "status"]
             expressions = import_expressions_from_df(df)
@@ -301,4 +406,5 @@ class Command(BaseCommand):
         Expression.objects.all().delete()
 
         self.parse_expressions("1Zq5jZ7D8qfRu_P75iSNPrl1roO3OCroeXOKuj088i14")
+        print("\n".join(new_words))
 

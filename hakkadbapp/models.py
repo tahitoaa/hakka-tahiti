@@ -104,6 +104,7 @@ class Expression(models.Model):
     notes = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=50, blank=True, null=True)
     status = models.CharField(max_length=20, blank=True, null=True)
+    english = models.TextField(help_text="English", blank=True, null=True, default="")
 
     # M2M through ExpressionWord to preserve order
     words = models.ManyToManyField(
