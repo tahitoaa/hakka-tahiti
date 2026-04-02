@@ -1,195 +1,297 @@
-/**
- * Sentence
- * ----------
- * - Takes a dictionary (dico) and an input text
- * - Splits the text into tokens
- * - Matches each token against dictionary entries
- * - Renders annotated HTML (pinyin / french / hanzi)
- */
 class Sentence {
-
-    /**
-     * @param {Object} dico - Dictionary instance containing words
-     * @param {String} text - Input sentence
-     */
     constructor(dico, text = '', french = '', rendering = '') {
         this.dico = dico;
         this.words = [];
         this.matches = [];
-        this.unknowns = [];
+        this.parsedTokens = [];
         this.update(text);
         this.french = french;
-        this.rendering = rendering; // Wont be affected by the update.
+        this.rendering = rendering;
     }
 
-    renderPinyin(pinyin){
-        return Array.from(pinyin)
-                    .map(c => Pronunciation.toneMap[c] || c ) 
-                    .join('')
+    // -----------------------------
+    // Parsing
+    // -----------------------------
+    parseToken(token) {
+        if (!token) return { hanzi: '', constraints: null, inline: null, raw: token };
+
+        const parts = token.split(':');
+        const base = parts[0];
+
+        const constraints = parts[1]
+            ? parts[1].split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
+            : null;
+
+        const inlineMatch = base.match(/\(([^()]*)\)/);
+        const inline = inlineMatch ? inlineMatch[1].trim() : null;
+
+        const hanzi = base.replace(/\([^)]*\)/g, '').trim();
+
+        return { hanzi, constraints, inline, raw: token };
     }
-    /**
-     * Render the sentence as HTML
-     * - Each word may have multiple candidate dictionary matches
-     * - Candidates are separated by "/"
-     * - Words are separated by "|"
-     */
-render() {
-    // --- Ligne des mots analysés (candidats)
-    const wordsHtml = this.matches
-        .map(candidates =>
-                candidates
-                    .map((word, index) => this.renderWord(word, index))
-                    .join("")
-        )
+
+    // -----------------------------
+    // Dictionary matching
+    // -----------------------------
+    findMatches(hanzi, constraints) {
+        if (!hanzi) return [];
+
+        let matches = this.dico.words.filter(w => {
+            const d = w.dataset || w;
+            const { simp, trad, french = '', pinyin = '' } = d;
+
+            if (!simp) return false;
+            if (simp !== hanzi && trad !== hanzi) return false;
+
+            if (!constraints) return true;
+
+            const fr = french.toLowerCase();
+            const py = pinyin.toLowerCase();
+
+            return constraints.some(c => fr.includes(c) || py.includes(c));
+        });
+
+        matches.sort((a, b) => {
+            const da = a.dataset || a;
+            const db = b.dataset || b;
+
+            const fa = (da.french || '').toLowerCase();
+            const fb = (db.french || '').toLowerCase();
+
+            if (fa.length !== fb.length) return fa.length - fb.length;
+
+            const frCmp = fa.localeCompare(fb, 'fr', { sensitivity: 'base' });
+            if (frCmp !== 0) return frCmp;
+
+            const pa = (da.pinyin || '').toLowerCase();
+            const pb = (db.pinyin || '').toLowerCase();
+
+            return pa.localeCompare(pb, 'fr');
+        });
+
+        return matches;
+    }
+
+    // -----------------------------
+    // Unknown resolution
+    // -----------------------------
+    resolveUnknownPinyin(token) {
+        const { hanzi, inline } = this.parseToken(token);
+
+        if (inline) return inline;
+        if (!hanzi || hanzi === '-') return '';
+
+        return Array.from(hanzi).map(char => {
+            const matches = this.dico.getMatchesForHanzi(char);
+            if (!matches.length) return '?';
+
+            const prons = matches
+                .map(p => p.abstractPinyin?.())
+                .filter(Boolean);
+
+            return prons.length ? [...new Set(prons)].join('/') : '?';
+        }).join('');
+    }
+
+    buildUnknownEntry(token) {
+        const { hanzi, raw } = this.parseToken(token);
+        return {
+            dataset: {
+                simp: hanzi || raw || '?',
+                pinyin: this.resolveUnknownPinyin(token),
+                french: '?',
+                raw: raw || ''
+            },
+            isUnknown: true
+        };
+    }
+
+    // -----------------------------
+    // Update
+    // -----------------------------
+    update(text = '') {
+        this.words = text ? text.trim().split(/\s+/) : [];
+
+        this.matches = this.words.map(token => {
+            const { hanzi, constraints } = this.parseToken(token);
+
+            const matches = this.findMatches(hanzi, constraints);
+
+            return matches.length ? matches : [this.buildUnknownEntry(token)];
+        });
+    }
+
+    // -----------------------------
+    // Helpers
+    // -----------------------------
+    superscriptTone(pinyin) {
+        const map = { "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶" };
+        return String(pinyin || '').replace(/[1-6]/g, d => map[d]);
+    }
+
+    renderPinyin(pinyin) {
+        return this.superscriptTone(pinyin);
+    }
+
+renderFurigana() {
     return `
-        <div class="bg-gray p-5 print:p-1">
-            <!-- Phrase originale -->
-            <div class="text-sm font-serif text-gray-900 leading-relaxed print:hidden">
-                ${this.matches.map((candidates, index) => {
-                        return candidates[0].dataset.pinyin ? this.renderPinyin(candidates[0].dataset.pinyin)
-                        : this.getPinyin(candidates[0].dataset.simp) || '?'
-                    }).join(' ')
-                }
-                 <br>
-            ${this.matches.map((candidates, index) => {
-                    return candidates[0].dataset.pinyin ? `<span class="hanzi text-xxl">${candidates[0].dataset.simp}</span>` : this.getPinyin(candidates[0].dataset.simp) || '?'
-                }).join(' ')
-                }
-                <br>
+            ${this.matches.map((group, i) => {
+                const best = group?.[0];
+                const data = best?.dataset || best || {};
+                const tokenObj = this.parseToken(this.words?.[i] || '');
 
-                E-reo : <span class=""> ${this.rendering} <span>
-            </div>
-            <div class="text-lg text-gray-800 italic">${this.french}</div>
-            <!-- Analyse / segmentation -->
-            <div class="flex flex-wrap gap-2">
-                ${wordsHtml.join('')}
-            </div>
+                const hanzi = data.simp || tokenObj.hanzi || tokenObj.raw || '?';
 
-        </div>
+                let pinyin = data.pinyin || '';
+                if (!pinyin) {
+                    const resolved = this.resolveUnknownPinyin(this.words?.[i] || '');
+                    pinyin = resolved || '?';
+                }
+
+                return `
+                    <span class="inline-flex flex-col items-center text-center align-top gap-[3px]">
+                        
+                        <span class="text-[12px] italic text-gray-600">
+                            ${this.renderPinyin(pinyin)}
+                        </span>
+
+                        <span class="hanzi text-[1.15rem] font-semibold text-gray-900">
+                            ${hanzi}
+                        </span>
+
+                    </span>
+                `;
+            }).join('')}
     `;
 }
-
-    getPinyin(simp){
-        return Array.from(simp).map((char) => {
-                const matches = this.dico.getMatchesForHanzi(char);
-                return matches.map(p => { return p.abstractPinyin()}).join("/");
-            }).join('');
+    truncateFrench(text, max = 16) {
+        const s = String(text || '');
+        return s.length > max ? s.slice(0, max) + '...' : s;
     }
 
-    /**
-     * Render a single dictionary word entry
-     * @param {Object} word - Dictionary word object
-     */
-    renderWord(word, index) {
-        var { french, simp, trad, pinyin} = word.dataset;
-        // Color depending on translation availability
-        var color = french === '?' ? 'bg-orange-400' : 'bg-green-300';
-        if (index > 0) 
-            color = 'bg-green-100 print:hidden';
-        // Tooltip: all dataset fields
-        const tooltip = Object.entries(word.dataset)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join('\n');
+    // -----------------------------
+    // Sentence lines
+    // -----------------------------
+    renderPinyinLine() {
+        return this.matches.map((group, i) => {
+            const best = group?.[0];
+            const data = best?.dataset || best;
 
-        // Show traditional only if different from simplified
-        const showTrad = trad && trad !== simp;
+            if (data?.pinyin) return this.renderPinyin(data.pinyin);
 
-        if (!pinyin)
-            pinyin = this.getPinyin(simp);
+            const resolved = this.resolveUnknownPinyin(this.words[i]);
+            return resolved ? this.renderPinyin(resolved) : '?';
+        }).join(' ');
+    }
+
+    renderHanziLine() {
+        return this.matches.map((group, i) => {
+            const best = group?.[0];
+            const data = best?.dataset || best;
+
+            if (data?.simp) return data.simp;
+
+            const t = this.parseToken(this.words[i]);
+            return t.hanzi || t.raw || '?';
+        }).join('');
+    }
+
+    renderFrenchLine() {
+        return this.matches.map((group, i) => {
+            const best = group?.[0];
+            const data = best?.dataset || best;
+
+            if (best?.isUnknown) {
+                const t = this.parseToken(this.words[i]);
+                return t.raw || '?';
+            }
+
+            return this.truncateFrench(data.french || '?');
+        }).join(' ');
+    }
+
+    // -----------------------------
+    // Token rendering
+    // -----------------------------
+    renderToken(group, index) {
+        const best = group?.[0];
+        if (!best) return '';
+
+        const data = best.dataset || best;
+        const isUnknown = !!best.isUnknown;
+        const extra = group.length - 1;
+
+        let color = "bg-green-200";
+        if (isUnknown) color = "bg-orange-300";
+        else if (extra > 0) color = "bg-blue-200";
 
         return `
-            <span class="text-xs ${color} print:p-0.5 px-1 py-0.5 rounded inline-flex flex-col leading-tight"
-                  title="${tooltip}">
-                  <span>${index+1}</span>
+        <span class="relative inline-flex flex-col justify-between items-center rounded-xl px-2 py-1 ${color} min-w-[4.5rem] max-w-[7rem] h-[5.25rem] shadow-sm">
+            
+            <div class="text-[10px] italic truncate w-full text-center">
+                ${this.renderPinyin(data.pinyin)}
+            </div>
 
-                <!-- 2. French -->
-                <span class="font-semibold block max-w-[8rem] truncate">
-                    ${french === '?' ? 'sans traduction' : french}
-                </span>
+            <div class="text-lg font-semibold truncate w-full text-center">
+                ${data.simp}
+            </div>
 
-                <!-- 1. Pinyin -->
-                <span class="italic text-[10px]">
-                    ${this.renderPinyin(pinyin)}
-                </span>
+            <div class="text-[11px] truncate w-full text-center" title="${data.french}">
+                ${isUnknown ? this.truncateFrench(data.raw) : this.truncateFrench(data.french)}
+            </div>
 
+            ${(!isUnknown && extra > 0) ? `
+                <button onclick="toggleAlt(${index})" class="text-[10px]">+${extra}</button>
+            ` : `<span class="h-[1rem]"></span>`}
 
-                <!-- 3. Simplified Hanzi -->
-                <span class="hanzi text-lg">
-                    ${simp}
-                </span>
-
-                <!-- 4. Traditional Hanzi (optional) -->
-                ${showTrad
-                    ? `<span class="hanzi text-lg opacity-60">${trad}</span>`
-                    : ''
-                }
-            </span>
+            ${extra > 0 && !isUnknown ? `
+                <div id="alt-${index}" class="hidden absolute top-full bg-white shadow p-1">
+                    ${group.slice(1).map(w => {
+                        const d = w.dataset || w;
+                        return `
+                            <div class="text-center text-xs">
+                                ${this.renderPinyin(d.pinyin)} ${d.simp}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : ""}
+        </span>
         `;
     }
 
-    /**
-     * Update sentence content
-     * - Tokenizes text
-     * - Matches each token against dictionary words
-     * @param {String} text
-     */
-    update(text = '') {
-        // Split on spaces + common punctuation
-        this.words = text
-            ? text.trim().split(/[\s,。，.\-]+/)
-            : [];
+    // -----------------------------
+    // Main render
+    // -----------------------------
+    render() {
+        return `
+        <div class="flex flex-col gap-3">
+            
+            <div class="flex flex-wrap gap-2">
+                ${this.matches.map((g, i) => this.renderToken(g, i)).join('')}
+            </div>
 
-        // For each word, find dictionary matches
-        this.matches = this.words.map(disambiguatedWord => {
-            const word = disambiguatedWord.split(':')[0];
-            const disambiguation = disambiguatedWord.split(':')[1];
 
-            const constraints = disambiguation?.split(',')
-                                            .map(c => c.trim().toLowerCase())
-                                            .filter(Boolean);
-                                                        
-            const matches = this.dico.words
-                .filter(dictWord => {
-                    const { simp, trad, french = '', pinyin = '' } = dictWord.dataset || {};
+            <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <span class="text-sm text-slate-800">
+                    ${this.renderPinyinLine()}
+                </span>
+                <span class="hanzi text-lg font-medium text-slate-900 tracking-wide">
+                    ${this.renderHanziLine()}
+                </span>
+                <span class="text-sm text-slate-800 leading-snug">
+                    ${this.french}
+                </span>
+            </div>
 
-                    // 1️⃣ Hanzi match (required)
-                    if (!simp) return false;
 
-                    if ((simp !== word && trad !== word)) return false;
-
-                    // 2️⃣ No constraints → accept
-                    if (!constraints) return true;
-
-                    const fr = french.toLowerCase();
-                    const py = pinyin.toLowerCase();
-
-                    // 3️⃣ At least one constraint must match french OR pinyin
-                    return constraints.some(c =>
-                        fr.includes(c) || py.includes(c)
-                    );
-                })
-                .sort((a, b) => {
-                    const fa = (a.dataset.french || '').toLowerCase();
-                    const fb = (b.dataset.french || '').toLowerCase();
-
-                    if (fa.length < fb.length) 
-                        return -1;
-                    else if (fa.length > fb.length)
-                        return 1;
-                    // 1️⃣ French (ascending)
-                    if (fa !== fb) {
-                        return fa.localeCompare(fb, 'fr', { sensitivity: "base" });
-                    }
-
-                    // 2️⃣ Pinyin (lexicographical)
-                    const pa = (a.dataset.pinyin || '').toLowerCase();
-                    const pb = (b.dataset.pinyin || '').toLowerCase();
-
-                    return pa.localeCompare(pb, 'fr');
-                });
-                if (matches.length) return matches;
-
-                else return [{ dataset: { french: '?', simp: word } }];
-            });
+        </div>
+        `;
     }
+}
+
+// global helper
+function toggleAlt(i) {
+    const el = document.getElementById(`alt-${i}`);
+    if (el) el.classList.toggle('hidden');
 }

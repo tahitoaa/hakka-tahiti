@@ -1,45 +1,57 @@
-import uuid
 import json
-import zipfile
+import uuid
+from copy import deepcopy
+
 
 def encode_custom(o):
     if hasattr(o, "to_dict"):
         return o.to_dict()
-    # raise TypeError(f"{o.__class__.__name__} is not JSON serializable")
+
 
 class Streamable:
-    def __init__(self):
-        pass
     def to_dict(self):
         return {k: v for k, v in self.__dict__.items() if k != "id" and k != "_reuse"}
-    
+
+
 class Translations(Streamable):
-    def __init__(self, primary, secondary, target):
-        super().__init__()
+    def __init__(self, primary="", secondary="", target=""):
         self.primary = primary
         self.secondary = secondary
         self.target = target
 
+
 class Identified(Streamable):
     instances = {}
-    @classmethod
-    def export(cls):
-        return json.dumps(cls.instances, default=encode_custom, ensure_ascii=False)
-
-    def __init__(self, id=None):
-        if id == None:
-            self.id = str(uuid.uuid4())
-        else:
-            self.id = id
-        self.__class__.instances[self.id] = self
 
     @classmethod
-    def get_id(cls, id):
+    def reset(cls):
+        cls.instances = {}
+
+    @classmethod
+    def export(cls, indent=2):
+        return json.dumps(cls.instances, default=encode_custom, ensure_ascii=False, indent=indent, sort_keys=True)
+
+    @classmethod
+    def load_corpus(cls, path):
+        """Load a JSON corpus file into the class instances map."""
+        cls.reset()
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for obj_id, payload in data.items():
+            cls.from_dict(obj_id, payload)
+        return cls.instances
+
+    @classmethod
+    def get_id(cls, obj_id):
+        return cls.instances.get(obj_id)
+
+    @classmethod
+    def get_by_target(cls, target):
         for instance in cls.instances.values():
-            if instance.id == id:
+            if getattr(getattr(instance, "translations", None), "target", None) == target:
                 return instance
         return None
-    
+
     @classmethod
     def find_first(cls, **criteria):
         """
@@ -59,148 +71,125 @@ class Identified(Streamable):
                 return instance.id
         return None
 
+    def __init__(self, id=None):
+        self.id = id or str(uuid.uuid4())
+        self.__class__.instances[self.id] = self
+
+
 class Theme(Identified):
+    instances = {}
+
     def __init__(self, id=None, primary=None, secondary=None, target=None):
-        super().__init__(id)
+        super().__init__(id=id)
         self.translations = Translations(primary, secondary, target)
 
     @classmethod
+    def from_dict(cls, obj_id, data):
+        tr = data.get("translations", {})
+        return cls(
+            id=obj_id,
+            primary=tr.get("primary", ""),
+            secondary=tr.get("secondary", ""),
+            target=tr.get("target", ""),
+        )
+
+    @classmethod
     def get(cls, primary):
+        if primary is None:
+            return None
+        needle = str(primary).strip().lower()
         for theme in cls.instances.values():
-            if theme.translations.primary == primary:
+            current = (theme.translations.primary or "").strip().lower()
+            if current == needle:
                 return theme
         return None
-    
+
     @classmethod
     def get_or_create(cls, primary, secondary=None, target=None):
         theme = cls.get(primary)
         if theme:
             return theme
-        return cls(primary, secondary, target)
+        return cls(primary=primary, secondary=secondary, target=target)
 
-class Word(Identified): 
+
+class Word(Identified):
     instances = {}
-    def __init__(self, target, primary, secondary, id=None, ):
-        super().__init__()
-        self.translations = Translations(primary, secondary, target)
-        self.themes = [] # themes id
-        self.audio = "" # audio id 
-        self.image = "" # image id
-        self.level = 0
-        self.in_expression = [] # Expression id
-        self.part_of_speech = "n"
-        self.gloss_code = []
-        self.variants = {}
 
-    # "00b78a7f-46a7-4a7e-9005-7b76fcf74a00": {
-    #     "audio": "327f011f-b09d-4690-afd9-c8fd743da1ba",
-    #     "gloss_code": [],
-    #     "image": "b3d94cf4-48f2-4c13-83e0-323b90f9a9d3",
-    #     "in_expression": [],
-    #     "level": 0,
-    #     "part_of_speech": "n",
-    #     "themes": [
-    #         "3f6de0a5-09e2-4615-b6ab-ef6062cbb44d"
-    #     ],
-    #     "translations": {
-    #         "primary": "végétarien",
-    #         "secondary": "vegetarian",
-    #         "target": "shit⁶zai¹ 食斋"
-    #     },
-    #     "variants": {}
-    # },
+    def __init__(
+        self,
+        target,
+        primary,
+        secondary,
+        id=None,
+        *,
+        themes=None,
+        audio="",
+        image="",
+        level=0,
+        in_expression=None,
+        part_of_speech="n",
+        gloss_code=None,
+        variants=None,
+    ):
+        super().__init__(id=id)
+        self.translations = Translations(primary, secondary, target)
+        self.themes = list(themes or [])
+        self.audio = audio
+        self.image = image
+        self.level = level
+        self.in_expression = list(in_expression or [])
+        self.part_of_speech = part_of_speech
+        self.gloss_code = list(gloss_code or [])
+        self.variants = deepcopy(variants or {})
+
+    @classmethod
+    def from_dict(cls, obj_id, data):
+        tr = data.get("translations", {})
+        return cls(
+            target=tr.get("target", ""),
+            primary=tr.get("primary", ""),
+            secondary=tr.get("secondary", ""),
+            id=obj_id,
+            themes=data.get("themes", []),
+            audio=data.get("audio", ""),
+            image=data.get("image", ""),
+            level=data.get("level", 0),
+            in_expression=data.get("in_expression", []),
+            part_of_speech=data.get("part_of_speech", "n"),
+            gloss_code=data.get("gloss_code", []),
+            variants=data.get("variants", {}),
+        )
 
 
 class Expression(Identified):
     instances = {}
-#     "266e3714-1198-4e5e-88a3-3675e221b3cd": {
-    #     "components": {},
-    #     "level": 0,
-    #     "themes": [],
-    #     "translations": {
-    #         "primary": "Je vais",
-    #         "secondary": "I go",
-    #         "target": "ngai¹我 hi⁴去"
-    #     }
-    # },
-    def __init__(self, target, primary, secondary, themes = []):
-        super().__init__()
+
+    def __init__(
+        self,
+        target,
+        primary,
+        secondary,
+        id=None,
+        *,
+        themes=None,
+        level=0,
+        components=None,
+    ):
+        super().__init__(id=id)
         self.translations = Translations(primary, secondary, target)
-        self.themes = [] # thmes id
-        self.level = 0 
-        self.components = {}
-    
+        self.themes = list(themes or [])
+        self.level = level
+        self.components = deepcopy(components or {})
 
-# meteo = Theme("météo", "weather", "天时")
-# salutations = Theme("salutations", "greetings", "招呼")
-
-# # x,,ngai¹ 我,je,I,Pronoms personnels,,ngai1.
-# je = Word("ngai¹ 我", "je", "I")
-# # x,,ngi¹ 你,tu,you,Pronoms personnels,,ngi1.png
-# # x,,gi¹ 佢,il/elle,he/she,Pronoms personnels,,gi1.png
-# # x,,mai³pien⁴yi² 买便宜,promotion,promotion,Commerce,,mai3pien4yi2.png
-# # x,,gam³ga⁴ 减价,"réduction, remise","discount, rebate",Commerce,,gam3ga4.png
-# # x,,fui²zon³qian² 回转钱,rembourser,repay,Commerce,,fui2zon3qian2.png
-# # x,,giam³zon³qian² 捡转钱,rendre la monnaie,give change,Commerce,,giam3zon3qian2.png
-# # x,,sen¹li¹ 生理,un business,a business,Commerce,,sen1li1.png
-# # x,,son⁴pan² 算盘,boulier,abacus,Commerce,,son4pan2.png
-# # x,,zong¹ 装,transporter,carry,Commerce,,zong1.png
-# # x,,oi⁴ 爱,aimer,to like,Verbes usuels,,oi4.png
-# # x,,zung¹yi⁴ 中意,aimer,to like,Verbes usuels,,zung1yi4.png
-# # x,,hi⁴ 去,aller,go,Verbes usuels,,hi4.png
-# # x,,ten³ 等,attendre,to wait for,Verbes usuels,,ten3.png
-# # x,,zuk⁵ 捉,attraper,catch,Verbes usuels,,zuk5.png
-# # x,,mak⁶zoi³ 擗嘴,bâiller,yawn,Verbes usuels,,mak6zoi3.png
-# # x,,yim³ 饮,boire,drink,Verbes usuels,,yim3.png
-# # x,,son⁴ 算,compter,count,Verbes usuels,,son4.png
-# # x,,ha¹ 下,descendre,to come down,Verbes usuels,,ha1.png
-# # x,,shoi⁴ 睡,dormir,sleep,Verbes usuels,,shoi4.png
-# # x,,tang¹yim¹ngok⁶ 听音乐,écouter de la musique,listen to music,Verbes usuels,,tang1yim1ngok6.png
-# # x,,xia³ 写,écrire,to write,Verbes usuels,,xia3.png
-# # x,,zut⁶ 拭,essuyer,to wipe,Verbes usuels,,zut6.
-# je = Word("ngai¹ 我", "je", "I")
-# je.themes.append(salutations.id)
-# tu = Word("ngi¹ 你", "tu", "you")
-# tu.themes.append(salutations.id)
-# Word("gi¹ 佢", "il/elle", "he/she")
-# Word("mai³pien⁴yi² 买便宜", "promotion", "promotion")
-# Word("gam³ga⁴ 减价", "réduction, remise", "discount, rebate")
-# Word("fui²zon³qian² 回转钱", "rembourser", "repay")
-# Word("giam³zon³qian² 捡转钱", "rendre la monnaie", "give change")
-# Word("sen¹li¹ 生理", "un business", "a business")
-# Word("son⁴pan² 算盘", "boulier", "abacus")
-# Word("zong¹ 装", "transporter", "carry")
-# Word("oi⁴ 爱", "aimer", "to like")
-# Word("zung¹yi⁴ 中意", "aimer", "to like")
-# Word("hi⁴ 去", "aller", "go")
-# attendre = Word("ten³ 等", "attendre", "to wait for")
-# attendre.themes.append(salutations.id)
-# Word("zuk⁵ 捉", "attraper", "catch")
-# Word("mak⁶zoi³ 擗嘴", "bâiller", "yawn")
-# Word("yim³ 饮", "boire", "drink")
-
-# e1 = Expression("我等你", "Je t'attends", "I am waiting for you")
-# e1.themes.append(salutations.id)
-# for word in [je, attendre, tu]:
-#     e1.components[word.translations.target] = word.id
-# # Write Theme corpus to JSON
-# with open("themeCorpus.json", "w", encoding="utf-8") as f:
-#     f.write(Theme.export())
-
-# # Write Word corpus to JSON
-# with open("wordCorpus.json", "w", encoding="utf-8") as f:
-#     f.write(Word.export())
-
-# # Write Expression corpus to JSON
-# with open("expressionCorpus.json", "w", encoding="utf-8") as f:
-#     f.write(Expression.export())
-
-# # List of files to compress
-# files_to_zip = ["themeCorpus.json", "wordCorpus.json", "expressionCorpus.json"]
-
-# # Name of the output ZIP
-# zip_name = "corpus.zip"
-
-# with zipfile.ZipFile(zip_name, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
-#     for file in files_to_zip:
-#         zipf.write(file)
+    @classmethod
+    def from_dict(cls, obj_id, data):
+        tr = data.get("translations", {})
+        return cls(
+            target=tr.get("target", ""),
+            primary=tr.get("primary", ""),
+            secondary=tr.get("secondary", ""),
+            id=obj_id,
+            themes=data.get("themes", []),
+            level=data.get("level", 0),
+            components=data.get("components", {}),
+        )

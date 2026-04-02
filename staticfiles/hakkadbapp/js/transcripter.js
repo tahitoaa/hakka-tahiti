@@ -71,7 +71,7 @@ class LabelView {
             this.label.model.update({"hanzi": this.ta.value});
             // update only this labelView visuals, fast
             this.render(this.label);
-            new Sentence(this.ta.value);
+            return new Sentence(this.ta.value);
         })
         ta.addEventListener("keydown", (event) => {
             // SHIFT + ENTER → new line
@@ -131,10 +131,6 @@ class LabelView {
         this.pinyin = this.inlinePinyin;
 
         this.french = document.createElement('div');
-
-
-        this.mixed = document.createElement('div');
-
         this.render(label);
     }
 
@@ -147,72 +143,10 @@ class LabelView {
         this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
         // console.log(this.sentences);
         this.sentenceView.innerHTML = this.sentences.map(s => s.render()).join('<br>')
-        this.furigana.innerHTML = inputHanzi
-            .filter(e => e != "_")
-            .map(h => {
-                if (h === '\n') return '<br>';
-                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
-                if (isPunctuation(h)) {this.renderFurigana(h,"");}
-                if (!isHanzi(h)) {return this.renderBlock(this.renderFurigana("",h))}
-                const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' :
-                     matches.map(p => {
-                        if (getToneMode())
-                            return p.abstractPinyin();
-                        else 
-                            return p.diacriticsPinyin();
-                     }
-                    ).join('/');
-                return this.renderFurigana(matches.length > 0 ?  matches[0].char() :h, matchedPinyin)
-            })
-            .join('');
-
-        this.pinyinOutput.innerHTML = inputHanzi
-            .filter(e => e != "_")
-            .map(h => {
-                if (h == '\n') return '<br>';
-                if (h == ' ') return '<span class="inline-block w-4"></span>';
-                if (h == '。') return '.';
-                if (h == '、') return ',';
-                const matches = this.dico.getMatchesForHanzi(h).map(p => p.abstractPinyin());
-                return matches.length > 1 ? '(' + matches.join('/') + ')' : matches[0];
-            })
-            .join(' ');
-
-
-        this.hanziOnly.innerHTML = inputHanzi
-            .filter(e => e != "_")
-            .map(h => {
-                if (h === '\n') return '<br>';
-                const matches = this.dico.getMatchesForHanzi(h);
-                const el = document.createElement('span')
-                el.innerText = (matches.length > 0) ? matches[0].char() : h;
-                if (isHanzi(el.innerText)) 
-                {
-                    el.classList.add("hanzi");
-                    el.classList.add("text-2xl");
-                }
-                else {
-                    el.classList.add("font-serif");
-                    el.classList.add("font-serif");
-                } 
-                return el.outerHTML;
-            })
-            .join('');
-
-        this.inlinePinyin.innerHTML = inputHanzi
-            .filter(e => e != "_")
-            .map(h => {
-                if (h === '\n') return '<br>';
-                if (h == ' ') return ''; //'<span class="inline-block w-4"></span>';
-                if (isPunctuation(h)) {return h;}
-                if (!isHanzi(h)) {return h;}
-                const matches = this.dico.getMatchesForHanzi(h);
-                const matchedPinyin = (matches.length === 0) ? '?' : matches.map(p => p.abstractPinyin()).join('/');
-                return `${matchedPinyin} `
-            })
-            .join('');      
-
+        this.furigana.innerHTML = this.sentences.map(s => s.renderFurigana()).join('<br>')
+        this.pinyinOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>')
+        this.hanziOnly.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>')
+        this.inlinePinyin.innerHTML = this.sentences.map(s=> s.renderPinyinLine()).join('<br>')
 
         const ul = document.createElement('ul');
         ul.className = 'flex-col hover:shadow-md hover:bg-violet-50 transition-all rounded-xxlborder';
@@ -226,11 +160,8 @@ class LabelView {
             li.innerHTML = e.innerHTML;
             ul.appendChild(li);
         });
-        this.mixed.innerHTML = '';
-        // this.mixed.appendChild(ul);
         const span = document.createElement('span');
         span.innerHTML = this.sentenceView.innerHTML;
-        this.mixed.appendChild(span);
     }
 
     renderSuggestions(suggestions){
@@ -258,30 +189,7 @@ class LabelView {
                 </div>`
     }
 
-    renderChar(char) {
-        return `
-            <span 
-                class="hanzi block text-[1.8rem] leading-[2.4rem] text-black"
-                style="letter-spacing: 0.02em;"
-            >
-                ${char}
-            </span>
-        `;
-    }
-
-    renderKana(kana) {
-        return `
-            <span 
-                class="pinyin block font-serif text-[1.05rem] leading-[1.4rem] text-gray-800 mt-1"
-                style="letter-spacing: 0.01em;"
-            >
-                ${kana}
-            </span>
-        `;
-    }
-
     renderBlock(content){return `<span class="inline-block text-center align-center">${content}</span>`;}
-    renderFurigana(char, kana){return this.renderBlock(`${this.renderKana(kana)}${this.renderChar(char)}`)}
     renderUnknownChars() { 
         return Array.from(this.dico.unknowns.values())
                     .map(char => {
@@ -388,11 +296,10 @@ class View {
         container.appendChild(panels);
 
         this.outputs = {
-            "hanzi":"", 
             "furigana":"",
+            "hanzi":"", 
             "french":"", 
             "pinyin":"",
-            "mixed":""
         }
         Object.entries(this.outputs).forEach(([key, output], i) => {
             // --- Create tab button ---
@@ -474,7 +381,6 @@ class View {
             "furigana":"",
             "french":"", 
             "pinyin":"",
-            "mixed":""
         }
 
         this.views.forEach((labelView, e) => { 
