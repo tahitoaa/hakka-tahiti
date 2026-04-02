@@ -12,37 +12,42 @@ class HakkaText {
         this.update({"hanzi" : text});
     }
 
-    update(update){
-        // Remove all substrings between two * (including the *)
-        if (update["french"] != undefined) {
-            this.french = update["french"]
-        }
-        if (update["hanzi"] != undefined){
-            const text = update["hanzi"];
-            const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
-            this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
-            this.suggestions = [] 
-            this.syllables.forEach((syl, i) => {
-                this.suggestions.push(...this.dico
-                    .getMatchesForSyllable(syl.split("_")[0])
-                    .map(p => ({
-                        pron: p,      // original pronunciation
-                        for: i,       // syllable index
-                        start: 0,
-                        end: 0
-                    })));
-            });
-            this.text = text;
-            this.pinyin = Array.from(this.text)
-                                .filter(e => e != "_")
-                                .map(h => {
-                                    if (h == '。') return '.';
-                                    if (h == '、') return ',';
-                                    const matches = this.dico.getMatchesForHanzi(h).map(p => p.abstractPinyin());
-                                    return matches.length > 1 ? '(' + matches.join('/') + ')' : matches[0];
-                                })
-                                .join(' ');
-        }
+update(update) {
+    if (update["french"] != undefined) {
+        this.french = update["french"];
+    }
+
+    if (update["hanzi"] != undefined) {
+        const text = update["hanzi"];
+        const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
+        this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
+        this.suggestions = [];
+
+        this.syllables.forEach((syl, i) => {
+            this.suggestions.push(
+                ...this.dico.getMatchesForSyllable(syl.split("_")[0]).map(p => ({
+                    pron: p,
+                    for: i,
+                    start: 0,
+                    end: 0
+                }))
+            );
+        });
+
+        this.text = text;
+
+        // --- Compute pinyin from Sentence, line by line ---
+        this.pinyin = this.text
+                                .split('\n')
+                                .map(line => this.resolveSentencePinyin(line))
+                                .join('\n');
+                        }
+}
+
+    resolveSentencePinyin(line) {
+        const sentence = new Sentence(this.dico, line || '');
+
+        return sentence.renderPinyinLine();
     }
 
     select(selectionIndex){
