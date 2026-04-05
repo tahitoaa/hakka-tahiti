@@ -47,4 +47,5 @@ urlpatterns = [
     path('hanzi_by_tone/<int:tone>', views.hanzi_by_tone, name='hanzi_by_tone'),
     path('pronunciation/', views.pronunciation, name='pronunciation'),
     path('expressions/', views.expressions, name='expressions'),
+    path("api/convert-text/", views.api_convert_text, name="api_convert_text"),
 ]

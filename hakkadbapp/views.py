@@ -16,6 +16,12 @@ import random
 from opencc import OpenCC
 from django.db import transaction
 
+from django.http import JsonResponse
+from .text_to_words import (
+    build_all_words_for_tokens,
+    convert_phrase_to_word_data,
+)
+
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
 s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
@@ -644,3 +650,72 @@ def create_expression_from_hanzi(sentence, french_translation=""):
 
 def expressions(request):
     return render(request, "hakkadbapp/expressions.html", get_all_data())
+
+def api_convert_text(request):
+    """
+    GET /api/convert-text?text=我 就 在 Raiatea 出 世(she4) 嘅。
+
+    Returns:
+    {
+        "input": "...",
+        "words": [...],
+        "whole_pinyin": "...",
+        "mixed": "..."
+    }
+    """
+    text = (request.GET.get("text") or "").strip()
+
+    if not text:
+        return JsonResponse(
+            {"error": "Missing 'text' query parameter."},
+            status=400
+        )
+
+    tokens = text.split()
+    all_words = build_all_words_for_tokens(tokens)
+    token_data = convert_phrase_to_word_data(
+        phrase=text,
+        all_words=all_words,
+        all_prons=Pronunciation.objects.all(),
+    )
+
+    words = []
+    whole_pinyin_parts = []
+    mixed_parts = []
+
+    for item in token_data:
+        word = item["word"]
+        hanzi = item["hanzi"]
+        pinyin = item["pinyin"]
+
+        whole_pinyin_parts.append(pinyin)
+        mixed_parts.append(f"{pinyin} {hanzi}")
+
+        if word is None:
+            words.append({
+                "token": hanzi,
+                "matched": False,
+                "hanzi": hanzi,
+                "pinyin": pinyin,
+                "french": None,
+                "trad": None,
+            })
+        else:
+            words.append({
+                "token": hanzi,
+                "matched": True,
+                "id": word.id,
+                "hanzi": word.char(),
+                "trad": word.trad(),
+                "pinyin": word.pinyin(),
+                "french": word.french,
+                "category": word.category,
+                "status": word.status,
+            })
+
+    return JsonResponse({
+        "input": text,
+        "words": words,
+        "whole_pinyin": " ".join(whole_pinyin_parts).strip(),
+        "mixed": " | ".join(mixed_parts).strip(),
+    }, json_dumps_params={"ensure_ascii": False})

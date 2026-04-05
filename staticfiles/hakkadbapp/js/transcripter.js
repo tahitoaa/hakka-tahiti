@@ -91,9 +91,9 @@ exportEAF() {
         const pinyinId = `a${annCounter++}`;
         const mixedId = `a${annCounter++}`;
 
-        const hanziText = label.model?.text || "";
+        const hanziText = label.model?.hanzi || "";
         const translationText = label.model?.french || "";
-        const pinyinText = label.pinyin || label.model?.pinyin || "";
+        const pinyinText = label.model?.pinyin || "";
         const baseText = pinyinText;
         const mixedText = [pinyinText, hanziText].filter(Boolean).join(" ").trim();
 
@@ -316,7 +316,7 @@ class LabelView {
         this.taPinyin.rows = 1;
         this.taPinyin.placeholder = 'Pinyin';
         this.taPinyin.id = `pinyin-${this.index}`;
-        this.taPinyin.value = label.pinyin || '';
+        this.taPinyin.value = label.model?.pinyin || '';
         this.taPinyin.addEventListener("input", () => {
             this.label.pinyin = this.taPinyin.value;
             this.render(this.label);
@@ -362,7 +362,9 @@ class LabelView {
         this.furigana.innerHTML = this.sentences.map(s => s.renderFurigana()).join('<br>');
         this.pinyinOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
         this.hanziOnly.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
-        this.inlinePinyin.innerHTML = this.taPinyin.value || this.sentences.map(s => s.renderPinyinLine()).join('<br>');
+        this.inlinePinyin.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
+        this.pinyin = this.inlinePinyin;
+        this.hanzi = this.hanziOnly;
     }
 
     renderSuggestions(suggestions) {
@@ -505,6 +507,7 @@ class View {
             "hanzi": "",
             "french": "",
             "pinyin": "",
+            "words":"",
         };
 
         Object.entries(this.outputs).forEach(([key, output], i) => {
@@ -521,7 +524,7 @@ class View {
             panel.id = 'panel-' + key;
             panel.className = `
                 p-6 text-justify leading-relaxed
-                overflow-y-auto
+                overflow-y  
                 print:overflow-visible
                 print:p-20
                 bg-white

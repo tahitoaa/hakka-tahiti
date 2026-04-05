@@ -9,44 +9,47 @@ class HakkaText {
         this.dico = dico;
         this.pinyin = '';
         this.french = '';
+        this.hanzi = '';
+        this.sentences = [];
         this.update({"hanzi" : text});
+
     }
 
-update(update) {
-    if (update["french"] != undefined) {
-        this.french = update["french"];
+    update(update) {
+        if (update["french"] != undefined) {
+            this.french = update["french"];
+        }
+
+        if (update["hanzi"] != undefined) {
+            const text = update["hanzi"];
+            const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
+            this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
+            this.suggestions = [];
+
+            this.syllables.forEach((syl, i) => {
+                this.suggestions.push(
+                    ...this.dico.getMatchesForSyllable(syl.split("_")[0]).map(p => ({
+                        pron: p,
+                        for: i,
+                        start: 0,
+                        end: 0
+                    }))
+                );
+            });
+
+            this.text = text;
+            this.sentences = this.text
+                                    .split('\n')
+                                    .map(line => new Sentence(this.dico, line));
+
+            // --- Compute pinyin from Sentence, line by line ---
+            this.pinyin = this.sentences.map(s => s.renderPinyinLine()).join('\n ');
+            this.hanzi = this.sentences.map(s => s.renderHanziLine()).join('\n ');
+        }
     }
-
-    if (update["hanzi"] != undefined) {
-        const text = update["hanzi"];
-        const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
-        this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
-        this.suggestions = [];
-
-        this.syllables.forEach((syl, i) => {
-            this.suggestions.push(
-                ...this.dico.getMatchesForSyllable(syl.split("_")[0]).map(p => ({
-                    pron: p,
-                    for: i,
-                    start: 0,
-                    end: 0
-                }))
-            );
-        });
-
-        this.text = text;
-
-        // --- Compute pinyin from Sentence, line by line ---
-        this.pinyin = this.text
-                                .split('\n')
-                                .map(line => this.resolveSentencePinyin(line))
-                                .join('\n');
-                        }
-}
 
     resolveSentencePinyin(line) {
         const sentence = new Sentence(this.dico, line || '');
-
         return sentence.renderPinyinLine();
     }
 
