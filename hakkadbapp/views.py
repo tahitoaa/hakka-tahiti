@@ -652,17 +652,6 @@ def expressions(request):
     return render(request, "hakkadbapp/expressions.html", get_all_data())
 
 def api_convert_text(request):
-    """
-    GET /api/convert-text?text=我 就 在 Raiatea 出 世(she4) 嘅。
-
-    Returns:
-    {
-        "input": "...",
-        "words": [...],
-        "whole_pinyin": "...",
-        "mixed": "..."
-    }
-    """
     text = (request.GET.get("text") or "").strip()
 
     if not text:
@@ -682,14 +671,15 @@ def api_convert_text(request):
     words = []
     whole_pinyin_parts = []
     mixed_parts = []
+    unmatched_parts = []   # <-- NEW
 
     for item in token_data:
         word = item["word"]
-        hanzi = item["hanzi"]
-        pinyin = item["pinyin"]
+        hanzi = (item["hanzi"] or "").strip()
+        pinyin = (item["pinyin"] or "").strip()
 
         whole_pinyin_parts.append(pinyin)
-        mixed_parts.append(f"{pinyin} {hanzi}")
+        mixed_parts.append(f"{pinyin} {hanzi}".strip())
 
         if word is None:
             words.append({
@@ -700,6 +690,10 @@ def api_convert_text(request):
                 "french": None,
                 "trad": None,
             })
+
+            # ---- NEW: collect unmatched (skip punctuation/noise) ----
+            if hanzi and hanzi not in {",", ".", "?", "!", "，", "。", "？", "！"}:
+                unmatched_parts.append(f"{hanzi}({pinyin})" if pinyin else hanzi)
         else:
             words.append({
                 "token": hanzi,
@@ -718,4 +712,6 @@ def api_convert_text(request):
         "words": words,
         "whole_pinyin": " ".join(whole_pinyin_parts).strip(),
         "mixed": " | ".join(mixed_parts).strip(),
+        "unmatched": " | ".join(unmatched_parts),   # <-- NEW
+        "unmatched_count": len(unmatched_parts),    # optional but useful
     }, json_dumps_params={"ensure_ascii": False})

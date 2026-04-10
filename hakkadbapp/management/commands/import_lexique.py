@@ -201,7 +201,7 @@ class Command(BaseCommand):
         # Previous worksheet
         # self.parse_sheets('1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ') 
         self.parse_sheets('1kWOkXIUfxj6q-TjzT-2CQygI1KfPJOfr0d6npHdfc6A')
-        self.parse_sheets('1Dxjb849-AJCQL0e9p_9Zvl7bafbz9mJwGNmHubgnGyU')
+        # self.parse_sheets('1Dxjb849-AJCQL0e9p_9Zvl7bafbz9mJwGNmHubgnGyU')
   
         # 1. Bulk insert (ignore existing) and retrieve all relevant Initials
         Initial.objects.bulk_create(
