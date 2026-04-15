@@ -118,10 +118,10 @@ class Command(BaseCommand):
         word_json_by_db_id = {}
 
         written_words = 0
-        skipped_status = skipped_cat = skipped_theme = skipped_pinyin = 0
+        skipped_status = skipped_cat = skipped_theme = skipped_pinyin = no_audio_key = 0
 
         for word in words.iterator(chunk_size=1000):
-            if word.status not in {"Hakka validé", "Validé"}:
+            if word.status not in {"OK"}:
                 skipped_status += 1
                 continue
 
@@ -138,6 +138,10 @@ class Command(BaseCommand):
             if not pinyin:
                 skipped_pinyin += 1
                 continue
+
+            audio_lookup_key = "".join(reverse_superscript_map.get(ch, ch) for ch in pinyin).strip()
+            if not self.find_audio_filename(audio_lookup_key, audio_index):
+                no_audio_key += 1
 
             hanzi = "".join(wp.pronunciation.hanzi for wp in getattr(word, "wps", []))
             target = f"{pinyin} {hanzi}".strip()
@@ -189,7 +193,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Words exported={written_words} (skipped status={skipped_status}, no_category={skipped_cat}, "
+                f"Words exported={written_words} (no_audio={no_audio_key}, status={skipped_status}, no_category={skipped_cat}, "
                 f"no_theme={skipped_theme}, no_pinyin={skipped_pinyin})"
             )
         )
@@ -197,7 +201,7 @@ class Command(BaseCommand):
         written_expr = 0
         skipped_missing_pinyin = 0
         skipped_ko = 0
-        skipped_no_audio_key = 0
+        no_audio_key = 0
 
         for expr in expressions.iterator(chunk_size=1000):
             rendering = expr.rendering or ""
@@ -253,14 +257,11 @@ class Command(BaseCommand):
                     if json_expr.id not in json_word.in_expression:
                         json_word.in_expression.append(json_expr.id)
 
-            full_pinyin = " ".join(pinyin_parts).strip()
-            audio_lookup_key = "".join(reverse_superscript_map.get(ch, ch) for ch in full_pinyin).strip()
-            if not audio_lookup_key:
-                skipped_no_audio_key += 1
-                continue
 
-            expected_audio = f"{audio_lookup_key}.wav"
+            expected_audio = f"{rendering.split(' ')[-1]}.wav"
             audio_filename = self.find_audio_filename(expected_audio, audio_index)
+            if not audio_filename:
+                no_audio_key += 1
 
             json_expr.components = dict(sorted(components.items()))
 
@@ -280,7 +281,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Expressions exported={written_expr} "
                 f"(skipped missing_pinyin={skipped_missing_pinyin}, skipped KO={skipped_ko}, "
-                f"skipped no_audio_key={skipped_no_audio_key})"
+                f"skipped no_audio_key={no_audio_key})"
             )
         )
 

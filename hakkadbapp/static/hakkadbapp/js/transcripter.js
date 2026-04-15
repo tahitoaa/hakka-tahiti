@@ -295,6 +295,7 @@ class LabelView {
 
         this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
         this.sentenceView = document.createElement('div');
+        this.words = document.createElement('div');
 
         this.taFrench = document.createElement('textarea');
         this.taFrench.className = 'w-full rounded p-1 bg-white mt-1';
@@ -365,6 +366,14 @@ class LabelView {
         this.inlinePinyin.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
         this.pinyin = this.inlinePinyin;
         this.hanzi = this.hanziOnly;
+
+        this.words = document.createElement("div");
+        this.words.innerHTML =
+            `<span class="block mb-2 text-sm italic text-gray-700">
+                ${this.french.innerHTML}
+            </span>` +
+            this.sentences.map(s => s.renderTokens()).join('<br>');
+
     }
 
     renderSuggestions(suggestions) {
@@ -532,18 +541,25 @@ class View {
             `;
             panels.appendChild(panel);
 
-            tabBtn.addEventListener('click', () => {
-                panels.querySelectorAll('div').forEach(p => p.classList.add('hidden'));
+          tabBtn.addEventListener('click', () => {
+                // hide all panels
+                panels.querySelectorAll(':scope > div').forEach(p => {
+                    p.classList.add('hidden');
+
+                });
+
+                // show selected panel only
                 panel.classList.remove('hidden');
 
+                // update tab styles
                 tabsBar.querySelectorAll('button').forEach(b => {
                     b.classList.remove('bg-blue-500', 'text-white');
                     b.classList.add('bg-gray-200');
                 });
+
                 tabBtn.classList.remove('bg-gray-200');
                 tabBtn.classList.add('bg-blue-500', 'text-white');
             });
-
             if (i === 0) {
                 tabBtn.classList.remove('bg-gray-200');
                 tabBtn.classList.add('bg-blue-500', 'text-white');
@@ -563,63 +579,70 @@ class View {
     }
 
     renderMetaForm(model) {
-        this.metaForm.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <label class="flex flex-col text-sm">
-                <span>Author</span>
-                <input id="eaf-author" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.author || ''}">
-            </label>
-            <label class="flex flex-col text-sm md:col-span-2">
-                <span>Media URL / file path</span>
-                <input
-                    id="eaf-media-url"
-                    class="bg-white rounded p-2 border"
-                    type="text"
-                    placeholder="file:///C:/audio.wav or https://example.com/audio.wav"
-                    value="${model.media?.url || ''}">
-            </label>
+this.metaForm.innerHTML = `
+<details class="mb-4">
+    <summary class="cursor-pointer font-semibold text-gray-700 mb-2">
+        EAF Metadata
+    </summary>
 
-            <label class="flex flex-col text-sm">
-                <span>Participant / Speaker</span>
-                <input id="eaf-participant" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.participant || 'Speaker1'}">
-            </label>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+        <label class="flex flex-col text-sm">
+            <span>Author</span>
+            <input id="eaf-author" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.author || ''}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Date</span>
-                <input id="eaf-date" class="bg-white rounded p-2 border" type="datetime-local" value="${this.toDatetimeLocalValue(model.eafMeta?.date)}">
-            </label>
+        <label class="flex flex-col text-sm md:col-span-2">
+            <span>Media URL / file path</span>
+            <input
+                id="eaf-media-url"
+                class="bg-white rounded p-2 border"
+                type="text"
+                placeholder="file:///C:/audio.wav or https://example.com/audio.wav"
+                value="${model.media?.url || ''}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Media MIME type</span>
-                <input id="eaf-mimetype" class="bg-white rounded p-2 border" type="text" value="${model.media?.mimeType || 'audio/x-wav'}">
-            </label>
+        <label class="flex flex-col text-sm">
+            <span>Participant / Speaker</span>
+            <input id="eaf-participant" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.participant || 'Speaker1'}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Hakka tier name</span>
-                <input id="eaf-tier-hakka" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.hakka || 'Hakka'}">
-            </label>
+        <label class="flex flex-col text-sm">
+            <span>Date</span>
+            <input id="eaf-date" class="bg-white rounded p-2 border" type="datetime-local" value="${this.toDatetimeLocalValue(model.eafMeta?.date)}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>French tier name</span>
-                <input id="eaf-tier-french" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.french || 'French'}">
-            </label>
+        <label class="flex flex-col text-sm">
+            <span>Media MIME type</span>
+            <input id="eaf-mimetype" class="bg-white rounded p-2 border" type="text" value="${model.media?.mimeType || 'audio/x-wav'}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Pinyin tier name</span>
-                <input id="eaf-tier-pinyin" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.pinyin || 'Pinyin'}">
-            </label>
+        <label class="flex flex-col text-sm">
+            <span>Hakka tier name</span>
+            <input id="eaf-tier-hakka" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.hakka || 'Hakka'}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Alignable linguistic type</span>
-                <input id="eaf-lt-alignable" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.alignable || 'default-lt'}">
-            </label>
+        <label class="flex flex-col text-sm">
+            <span>French tier name</span>
+            <input id="eaf-tier-french" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.french || 'French'}">
+        </label>
 
-            <label class="flex flex-col text-sm">
-                <span>Ref linguistic type</span>
-                <input id="eaf-lt-ref" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.ref || 'ref-lt'}">
-            </label>
-        </div>
-        `;
+        <label class="flex flex-col text-sm">
+            <span>Pinyin tier name</span>
+            <input id="eaf-tier-pinyin" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.pinyin || 'Pinyin'}">
+        </label>
+
+        <label class="flex flex-col text-sm">
+            <span>Alignable linguistic type</span>
+            <input id="eaf-lt-alignable" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.alignable || 'default-lt'}">
+        </label>
+
+        <label class="flex flex-col text-sm">
+            <span>Ref linguistic type</span>
+            <input id="eaf-lt-ref" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.ref || 'ref-lt'}">
+        </label>
+    </div>
+</details>
+`;
     }
 
     render(data) {
@@ -654,11 +677,12 @@ class View {
             "furigana": "",
             "french": "",
             "pinyin": "",
+            "words":""
         };
 
         this.views.forEach((labelView, e) => {
             for (const [key, value] of Object.entries(this.outputs)) {
-                const el = document.createElement('span');
+                const el = document.createElement(key == 'words' ? 'div': 'span');
                 el.classList.add("rounded", "px-3", "py-1", "hover:bg-violet-200");
                 el.id = `${key}-${e}`;
                 el.innerHTML = labelView[key].innerHTML;

@@ -260,18 +260,18 @@ renderFurigana() {
         `;
     }
 
+    renderTokens(){
+        return `<div class="flex flex-wrap gap-2">
+                ${this.matches.map((g, i) => this.renderToken(g, i)).join('')}
+            </div>`;
+    }
     // -----------------------------
     // Main render
     // -----------------------------
     render() {
         return `
         <div class="flex flex-col gap-3">
-            
-            <div class="flex flex-wrap gap-2">
-                ${this.matches.map((g, i) => this.renderToken(g, i)).join('')}
-            </div>
-
-
+                ${this.renderTokens()}
             <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                 <span class="text-sm text-slate-800">
                     ${this.renderPinyinLine()}
@@ -283,7 +283,6 @@ renderFurigana() {
                     ${this.french}
                 </span>
             </div>
-
 
         </div>
         `;
