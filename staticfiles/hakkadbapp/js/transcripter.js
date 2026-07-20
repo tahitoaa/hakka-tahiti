@@ -366,7 +366,7 @@ class Transcription {
    ========================================================================= */
 
 class LabelView {
-    constructor(label, index, { onChange, onValidate, onInsertAfter, onDelete } = {}) {
+    constructor(label, index, { onChange, onValidate, onInsertAfter, onDelete, onSelectSuggestion } = {}) {
         this.label = label;
         this.index = index;
         this.onChange = onChange;
@@ -376,10 +376,15 @@ class LabelView {
         this.wrapper.appendChild(this.buildHeader(label, index, onInsertAfter, onDelete));
 
         this.ta = this.buildHanziInput(label);
-        this.wrapper.appendChild(this.ta);
+        this.suggestionsEl = createEl('div', 'flex gap-1.5 flex-wrap');
+        const hanziField = createEl('div', 'relative');
+        hanziField.append(this.ta, this.suggestionsEl);
+        this.wrapper.appendChild(hanziField);
 
-        this.suggestionsEl = createEl('div', 'flex gap-2 flex-wrap my-2');
-        this.wrapper.appendChild(this.suggestionsEl);
+        this.suggestionBar = new SuggestionBar(this.suggestionsEl, {
+            anchorTo: this.ta,
+            onSelect: (suggestionIndex) => onSelectSuggestion?.(suggestionIndex),
+        });
 
         this.taFrench = this.buildFrenchInput(label);
         this.wrapper.appendChild(this.taFrench);
@@ -399,13 +404,13 @@ class LabelView {
 
         const actions = createEl('div', 'flex items-center gap-1');
 
-        const insertBtn = createEl('button', 'px-2 py-0.5 rounded bg-white hover:bg-indigo-100 border', {
+        const insertBtn = createEl('button', 'min-h-9 px-3 py-1 rounded bg-white hover:bg-indigo-100 active:bg-indigo-200 border touch-manipulation', {
             type: 'button', title: 'Insérer une nouvelle étiquette après celle-ci (Ctrl+Entrée)',
         });
         insertBtn.textContent = '+ Étiquette';
         insertBtn.addEventListener('click', () => onInsertAfter?.());
 
-        const deleteBtn = createEl('button', 'px-2 py-0.5 rounded bg-white hover:bg-red-100 border', {
+        const deleteBtn = createEl('button', 'min-h-9 min-w-9 px-3 py-1 rounded bg-white hover:bg-red-100 active:bg-red-200 border touch-manipulation', {
             type: 'button', title: 'Supprimer cette étiquette',
         });
         deleteBtn.textContent = '🗑';
@@ -447,8 +452,9 @@ class LabelView {
     }
 
     buildHanziInput(label) {
-        const ta = createEl('textarea', 'hanzi w-full rounded p-2 bg-white border focus:outline-none focus:ring-2 focus:ring-indigo-300', {
+        const ta = createEl('textarea', 'hanzi w-full rounded p-2 text-base bg-white border focus:outline-none focus:ring-2 focus:ring-indigo-300', {
             id: `hanzi-${this.index}`, rows: 1, placeholder: 'Hakka : romanisation et/ou hanzi…',
+            autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false',
         });
         ta.value = label.model.text || '';
         autosizeTextarea(ta);
@@ -466,7 +472,7 @@ class LabelView {
     }
 
     buildFrenchInput(label) {
-        const ta = createEl('textarea', 'w-full rounded p-1 bg-white border mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-300', {
+        const ta = createEl('textarea', 'w-full rounded p-1 text-base bg-white border mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-300', {
             id: `french-${this.index}`, rows: 1, placeholder: 'Traduction française…',
         });
         ta.value = label.model.french || '';
@@ -499,7 +505,7 @@ class LabelView {
         this.label = label;
         this.sentences = this.ta.value.split('\n').map((line) => new Sentence(dico, line));
 
-        this.suggestionsEl.innerHTML = this.renderSuggestions(label.model.suggestions);
+        this.suggestionBar.render(label.model.suggestions);
         this.preview.innerHTML = this.sentences.map((s) => s.render()).join('<br>');
 
         const frenchLine = this.taFrench.value || '';
@@ -513,20 +519,6 @@ class LabelView {
                 this.sentences.map((s) => s.renderTokens()).join('<br>')),
         };
     }
-
-    renderSuggestions(suggestions) {
-        if (!suggestions?.length) return '';
-        return suggestions.map((s, i) => {
-            const keyHint = i < 9 ? String(i + 1) : String.fromCharCode(65 + i - 9);
-            return `
-                <button type="button" class="suggestion-btn flex flex-col items-center p-2 rounded bg-white border text-indigo-800 hover:bg-indigo-100 hover:shadow"
-                        data-label="${this.index}" data-suggestion="${i}" title="Raccourci : Maj+${keyHint}">
-                    <span class="text-[10px] text-gray-500">${keyHint}</span>
-                    <span class="hanzi text-sm font-semibold">${s.pron.char() || '?'}</span>
-                    <span class="text-[10px] text-gray-500">${s.pron.abstractPinyin() || '?'}</span>
-                </button>`;
-        }).join('');
-    }
 }
 
 /* =========================================================================
@@ -535,38 +527,42 @@ class LabelView {
    ========================================================================= */
 
 class View {
-    constructor({ onInsertLabelAfter, onDeleteLabel } = {}) {
+    constructor({ onInsertLabelAfter, onDeleteLabel, onSelectSuggestion } = {}) {
         this.onInsertLabelAfter = onInsertLabelAfter;
         this.onDeleteLabel = onDeleteLabel;
+        this.onSelectSuggestion = onSelectSuggestion;
 
         this.container = $('viewer');
         this.container.innerHTML = '';
 
         this.importProns = $('import-prons');
         this.index = $('label-index');
+        this.total = $('label-total');
         this.views = [];
         this.model = null;
         this.audio = null;
 
+        this.eafDialog = $('eaf-meta-dialog');
+        this.metaFields = $('eaf-meta-fields');
+
         this.forms = createEl('div', 'no-print', { id: 'viewer-forms' });
-        this.metaForm = createEl('div', 'no-print bg-white rounded p-3 mb-3 shadow-sm', { id: 'eaf-meta-form' });
         this.labelsContainer = createEl('div', 'space-y-3');
-        this.forms.append(this.metaForm, this.buildHelpBox(), this.labelsContainer);
+        this.forms.append(this.labelsContainer);
 
         this.displays = createEl('div', '', { id: 'viewer-displays' });
 
         this.audioEl = document.createElement('audio');
-        this.container.append(this.forms, this.displays, this.audioEl);
+        this.container.append(this.forms, this.displays, this.audioEl, this.buildHelpBox());
 
         this.panels = {};
         this.buildTabs();
     }
 
     buildHelpBox() {
-        const box = createEl('details', 'no-print text-xs text-gray-600 bg-white rounded p-2 mb-3 shadow-sm');
+        const box = createEl('details', 'no-print text-[11px] text-gray-400 mt-4 max-w-md mx-auto');
         box.innerHTML = `
-            <summary class="cursor-pointer font-semibold text-gray-700">Raccourcis clavier</summary>
-            <ul class="mt-2 list-disc list-inside space-y-0.5">
+            <summary class="cursor-pointer hover:text-gray-600 select-none">Raccourcis clavier</summary>
+            <ul class="mt-2 list-disc list-inside space-y-0.5 text-gray-500">
                 <li><b>Entrée</b> : valider et passer à l'étiquette suivante</li>
                 <li><b>Maj + Entrée</b> : nouvelle ligne</li>
                 <li><b>Ctrl + Entrée</b> : insérer une nouvelle étiquette après la courante</li>
@@ -628,24 +624,19 @@ class View {
         const meta = model.eafMeta || {};
         const tiers = meta.tierNames || {};
 
-        this.metaForm.innerHTML = `
-            <details>
-                <summary class="cursor-pointer font-semibold text-gray-700 mb-2">Métadonnées EAF (export ELAN)</summary>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    ${this.metaField('eaf-author', 'Auteur', 'text', meta.author || '')}
-                    ${this.metaField('eaf-media-url', 'URL / chemin du média', 'text', model.media?.url || '', {
-                        extraClass: 'md:col-span-2',
-                        placeholder: 'file:///C:/audio.wav ou https://example.com/audio.wav',
-                    })}
-                    ${this.metaField('eaf-participant', 'Participant / locuteur', 'text', meta.participant || 'Speaker1')}
-                    ${this.metaField('eaf-date', 'Date', 'datetime-local', this.toDatetimeLocalValue(meta.date))}
-                    ${this.metaField('eaf-mimetype', 'Type MIME du média', 'text', model.media?.mimeType || 'audio/x-wav')}
-                    ${this.metaField('eaf-tier-hakka', 'Nom du tier Hanzi', 'text', tiers.hakka || 'Hanzi')}
-                    ${this.metaField('eaf-tier-french', 'Nom du tier Français', 'text', tiers.french || 'Traduction')}
-                    ${this.metaField('eaf-tier-pinyin', 'Nom du tier Pinyin', 'text', tiers.pinyin || 'Pinyin')}
-                    ${this.metaField('eaf-tier-mixed', 'Nom du tier Mixte', 'text', tiers.mixed || 'Mixed')}
-                </div>
-            </details>`;
+        this.metaFields.innerHTML = `
+            ${this.metaField('eaf-author', 'Auteur', 'text', meta.author || '')}
+            ${this.metaField('eaf-media-url', 'URL / chemin du média', 'text', model.media?.url || '', {
+                extraClass: 'md:col-span-2',
+                placeholder: 'file:///C:/audio.wav ou https://example.com/audio.wav',
+            })}
+            ${this.metaField('eaf-participant', 'Participant / locuteur', 'text', meta.participant || 'Speaker1')}
+            ${this.metaField('eaf-date', 'Date', 'datetime-local', this.toDatetimeLocalValue(meta.date))}
+            ${this.metaField('eaf-mimetype', 'Type MIME du média', 'text', model.media?.mimeType || 'audio/x-wav')}
+            ${this.metaField('eaf-tier-hakka', 'Nom du tier Hanzi', 'text', tiers.hakka || 'Hanzi')}
+            ${this.metaField('eaf-tier-french', 'Nom du tier Français', 'text', tiers.french || 'Traduction')}
+            ${this.metaField('eaf-tier-pinyin', 'Nom du tier Pinyin', 'text', tiers.pinyin || 'Pinyin')}
+            ${this.metaField('eaf-tier-mixed', 'Nom du tier Mixte', 'text', tiers.mixed || 'Mixed')}`;
     }
 
     render(model) {
@@ -661,7 +652,9 @@ class View {
     }
 
     syncIndexBounds() {
-        this.index.max = String(Math.max(1, this.model.labels.length));
+        const total = Math.max(1, this.model.labels.length);
+        this.index.max = String(total);
+        if (this.total) this.total.textContent = `/ ${total}`;
     }
 
     createLabelView(label, i) {
@@ -670,6 +663,7 @@ class View {
             onValidate: () => goToLabel(i + 2),
             onInsertAfter: () => this.onInsertLabelAfter?.(i),
             onDelete: () => this.onDeleteLabel?.(i),
+            onSelectSuggestion: (suggestionIndex) => this.onSelectSuggestion?.(i, suggestionIndex),
         });
     }
 
@@ -733,6 +727,7 @@ class Controller {
         this.view = new View({
             onInsertLabelAfter: (i) => this.insertLabelAfter(i),
             onDeleteLabel: (i) => this.deleteLabel(i),
+            onSelectSuggestion: (labelIndex, suggestionIndex) => this.applySuggestion(labelIndex, suggestionIndex),
         });
         this.view.render(this.model);
 
@@ -747,21 +742,44 @@ class Controller {
             dico.handleImportProns(e).then(() => this.view.render(this.model));
         });
 
-        this.view.container.addEventListener('click', (e) => this.handleSelection(e));
         this.view.displays.addEventListener('click', (e) => this.handleClickOnDisplays(e));
-        this.view.forms.addEventListener('input', (e) => {
-            if (e.target.closest('#eaf-meta-form')) this.syncEafMetaFromForm();
-        });
         this.view.index.addEventListener('change', (e) => this.handleIndexChange(e));
 
         $('import-project')?.addEventListener('click', () => this.handleImportLocalProject());
         $('select-project')?.addEventListener('change', (e) => this.handleImportHostedProject(e));
         $('export-project')?.addEventListener('click', () => this.model.export());
+        $('toggle-hanzi')?.addEventListener('click', () => this.view.index.dispatchEvent(new Event('change')));
+
+        $('nav-prev')?.addEventListener('click', () => goToLabel(this.currentIndex()));
+        $('nav-next')?.addEventListener('click', () => goToLabel(this.currentIndex() + 2));
+        $('nav-new-label')?.addEventListener('click', () => this.insertLabelAfter(this.currentIndex()));
+
+        this.bindEafDialog();
+    }
+
+    bindEafDialog() {
+        const dialog = this.view.eafDialog;
+        if (!dialog) return;
+
         $('export-eaf')?.addEventListener('click', () => {
+            this.view.renderMetaForm(this.model);
+            dialog.showModal();
+        });
+
+        dialog.addEventListener('input', (e) => {
+            if (e.target.closest('#eaf-meta-fields')) this.syncEafMetaFromForm();
+        });
+
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) dialog.close();
+        });
+
+        $('eaf-dialog-cancel')?.addEventListener('click', () => dialog.close());
+        $('eaf-dialog-export')?.addEventListener('click', () => {
             this.syncEafMetaFromForm();
             this.model.exportEAF();
+            dialog.close();
         });
-        $('toggle-hanzi')?.addEventListener('click', () => this.view.index.dispatchEvent(new Event('change')));
     }
 
     bindKeyboard() {
@@ -827,12 +845,6 @@ class Controller {
         const match = target.id.match(/-(\d+)$/);
         if (!match) return;
         goToLabel(parseInt(match[1], 10) + 1);
-    }
-
-    handleSelection(event) {
-        const btn = event.target.closest('.suggestion-btn');
-        if (!btn) return;
-        this.applySuggestion(parseInt(btn.dataset.label, 10), parseInt(btn.dataset.suggestion, 10));
     }
 
     applySuggestion(labelIndex, suggestionIndex) {

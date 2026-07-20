@@ -14,19 +14,14 @@ class CopyButton {
 
         // Create the button
         this.button = document.createElement("button");
+        this.button.type = "button";
         this.button.textContent = this.label;
-        this.button.style.marginLeft = "6px";
-        this.button.style.cursor = "pointer";
+        this.button.className = options.className || "mb-1 min-h-9 px-3 py-1 text-xs font-medium rounded-md border bg-white hover:bg-brand/10 active:bg-brand/20 text-brand touch-manipulation";
 
-        // Insert after target element
-        this.target.insertAdjacentElement("before", this.button);
+        // Insert before target element
+        this.target.insertAdjacentElement("beforebegin", this.button);
 
-        // Attach event
-        document.addEventListener('DOMContentLoaded', ()=>{
-            this.button.addEventListener("click", () => this.copy());
-            console.log(button);
-            console.log(target);
-        })
+        this.button.addEventListener("click", () => this.copy());
     }
 
     /** Copy the textContent of the target element */
