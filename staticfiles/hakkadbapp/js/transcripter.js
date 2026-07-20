@@ -1,191 +1,188 @@
+/* =========================================================================
+   Hakka transcripter — model (Transcription/EafExporter/ProjectLoader),
+   view (LabelView/View) and controller (Controller) for the transcription
+   editor page.
+   ========================================================================= */
+
 const dico = new Dictionary({ itemSelector: 'li', containerId: '#pron-list' });
 
-class Transcription {
-    constructor() {
-        this.labels = [
-            { start: 1, end: 2, model: new HakkaText(dico, "hak_ga_"), pinyin: "" },
-            { start: 0, end: 1, model: new HakkaText(dico, "客家話"), pinyin: "" },
-            { start: 0, end: 1, model: new HakkaText(dico, "我 唔 食 猪 肉"), pinyin: "" },
-        ];
+/* -------------------------------------------------------------------------
+   Small generic helpers
+   ------------------------------------------------------------------------- */
 
-        this.media = {
-            url: "",
-            name: "",
-            mimeType: "audio/x-wav",
-        };
+const $ = (id) => document.getElementById(id);
 
-        this.eafMeta = {
-            author: "",
-            participant: "Speaker1",
-            date: new Date().toISOString(),
-            tiers: {
-                base: "Transcription",
-                translation: "Traduction",
-                hanzi: "Hanzi",
-            },
-            linguisticTypes: {
-                alignable: "default-lt",
-                ref: "ref-lt",
-            }
-        };
-
-        this.suggestions = [];
-    }
-
-    async saveFilesToFolder(files) {
-        try {
-            const dirHandle = await window.showDirectoryPicker();
-
-            for (const [name, content] of Object.entries(files)) {
-                const fileHandle = await dirHandle.getFileHandle(name, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-            }
-
-            alert("✅ Files saved successfully (overwritten if they existed).");
-        } catch (err) {
-            console.error("Error saving files:", err);
-        }
-    }
-
-exportEAF() {
-    const labels = Array.isArray(this.labels) ? this.labels : [];
-
-    const author = this.eafMeta?.author || "";
-    const date = this.eafMeta?.date || new Date().toISOString();
-    const participant = this.eafMeta?.participant || "Participant 1";
-
-    const baseTier = participant;
-    const translationTier = `${baseTier} Traduction`;
-    const hanziTier = `${baseTier} Hanzi`;
-    const pinyinTier = `${baseTier} Pinyin`;
-    const mixedTier = `${baseTier} Mixed`;
-
-    const mediaUrl = this.media?.url || "";
-    const mediaMimeType = this.media?.mimeType || "audio/x-wav";
-    const relativeMediaUrl = this.media?.relativeUrl || "";
-
-    const urn = this.eafMeta?.urn || `urn:nl-mpi-tools-elan-eaf:${crypto.randomUUID()}`;
-
-    let tsCounter = 1;
-    let annCounter = 1;
-
-    const timeSlots = [];
-    const baseAnnotations = [];
-    const translationAnnotations = [];
-    const hanziAnnotations = [];
-    const pinyinAnnotations = [];
-    const mixedAnnotations = [];
-
-    labels.forEach((label) => {
-        const start = Math.round((label.start || 0) * 1000);
-        const end = Math.round((label.end || 0) * 1000);
-
-        const ts1 = `ts${tsCounter++}`;
-        const ts2 = `ts${tsCounter++}`;
-
-        const baseId = `a${annCounter++}`;
-        const translationId = `a${annCounter++}`;
-        const hanziId = `a${annCounter++}`;
-        const pinyinId = `a${annCounter++}`;
-        const mixedId = `a${annCounter++}`;
-
-        const hanziText = label.model?.hanzi || "";
-        const translationText = label.model?.french || "";
-        const pinyinText = label.model?.pinyin || "";
-        const baseText = pinyinText;
-        const mixedText = [pinyinText, hanziText].filter(Boolean).join(" ").trim();
-
-        timeSlots.push(
-            `<TIME_SLOT TIME_SLOT_ID="${ts1}" TIME_VALUE="${start}"/>`,
-            `<TIME_SLOT TIME_SLOT_ID="${ts2}" TIME_VALUE="${end}"/>`
-        );
-
-        baseAnnotations.push(`
-        <ANNOTATION>
-            <ALIGNABLE_ANNOTATION ANNOTATION_ID="${baseId}"
-                TIME_SLOT_REF1="${ts1}" TIME_SLOT_REF2="${ts2}">
-                <ANNOTATION_VALUE>${this.escapeXML(baseText)}</ANNOTATION_VALUE>
-            </ALIGNABLE_ANNOTATION>
-        </ANNOTATION>`.trim());
-
-        translationAnnotations.push(`
-        <ANNOTATION>
-            <REF_ANNOTATION ANNOTATION_ID="${translationId}" ANNOTATION_REF="${baseId}">
-                <ANNOTATION_VALUE>${this.escapeXML(translationText)}</ANNOTATION_VALUE>
-            </REF_ANNOTATION>
-        </ANNOTATION>`.trim());
-
-        hanziAnnotations.push(`
-        <ANNOTATION>
-            <REF_ANNOTATION ANNOTATION_ID="${hanziId}" ANNOTATION_REF="${baseId}">
-                <ANNOTATION_VALUE>${this.escapeXML(hanziText)}</ANNOTATION_VALUE>
-            </REF_ANNOTATION>
-        </ANNOTATION>`.trim());
-
-        pinyinAnnotations.push(`
-        <ANNOTATION>
-            <REF_ANNOTATION ANNOTATION_ID="${pinyinId}" ANNOTATION_REF="${baseId}">
-                <ANNOTATION_VALUE>${this.escapeXML(pinyinText)}</ANNOTATION_VALUE>
-            </REF_ANNOTATION>
-        </ANNOTATION>`.trim());
-
-        mixedAnnotations.push(`
-        <ANNOTATION>
-            <REF_ANNOTATION ANNOTATION_ID="${mixedId}" ANNOTATION_REF="${baseId}">
-                <ANNOTATION_VALUE>${this.escapeXML(mixedText)}</ANNOTATION_VALUE>
-            </REF_ANNOTATION>
-        </ANNOTATION>`.trim());
+function createEl(tag, className = '', attrs = {}, html) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    Object.entries(attrs).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (key === 'id') node.id = value;
+        else node.setAttribute(key, value);
     });
+    if (html !== undefined) node.innerHTML = html;
+    return node;
+}
 
-    const lastUsedAnnotationId = annCounter - 1;
-    const relativeMediaAttr = relativeMediaUrl
-        ? ` RELATIVE_MEDIA_URL="${this.escapeXML(relativeMediaUrl)}"`
-        : "";
+function escapeXML(str = '') {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<ANNOTATION_DOCUMENT AUTHOR="${this.escapeXML(author)}" DATE="${this.escapeXML(date)}"
+function downloadFile(filename, content, type = 'text/plain') {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function formatTime(n) {
+    return Number(n || 0).toFixed(2);
+}
+
+function autosizeTextarea(ta) {
+    ta.rows = Math.max(1, ta.value.split('\n').length);
+}
+
+/** Move the shared label-index input to a given 1-based label number and
+ *  trigger the usual "change" refresh (highlight, scroll, audio cue…). */
+function goToLabel(oneBasedIndex) {
+    const input = $('label-index');
+    if (!input) return;
+    input.value = Math.max(1, oneBasedIndex);
+    input.dispatchEvent(new Event('change'));
+}
+
+/** Canonical list + order of the read-only "full transcript" tabs. Shared by
+ *  View (to build the tab bar/panels) and LabelView (to build the matching
+ *  per-label content for each tab). */
+const DISPLAY_TABS = [
+    { key: 'hanzi', label: 'Hanzi' },
+    { key: 'furigana', label: 'Furigana' },
+    { key: 'pinyin', label: 'Pinyin' },
+    { key: 'french', label: 'Français' },
+    { key: 'words', label: 'Détail' },
+];
+
+/* =========================================================================
+   EafExporter — builds an ELAN .eaf XML document from a Transcription
+   ========================================================================= */
+
+class EafExporter {
+    static build(model) {
+        const labels = Array.isArray(model.labels) ? model.labels : [];
+        const meta = model.eafMeta || {};
+        const tiers = meta.tierNames || {};
+
+        const author = meta.author || '';
+        const date = meta.date || new Date().toISOString();
+        const participant = meta.participant || 'Participant 1';
+
+        const baseTier = participant;
+        const hanziTier = `${baseTier} ${tiers.hakka || 'Hanzi'}`;
+        const frenchTier = `${baseTier} ${tiers.french || 'Traduction'}`;
+        const pinyinTier = `${baseTier} ${tiers.pinyin || 'Pinyin'}`;
+        const mixedTier = `${baseTier} ${tiers.mixed || 'Mixed'}`;
+
+        const mediaUrl = model.media?.url || '';
+        const mediaMimeType = model.media?.mimeType || 'audio/x-wav';
+        const relativeMediaUrl = model.media?.relativeUrl || '';
+
+        const urn = meta.urn || `urn:nl-mpi-tools-elan-eaf:${crypto.randomUUID()}`;
+
+        let tsCounter = 1;
+        let annCounter = 1;
+
+        const timeSlots = [];
+        const baseAnnotations = [];
+        const frenchAnnotations = [];
+        const hanziAnnotations = [];
+        const pinyinAnnotations = [];
+        const mixedAnnotations = [];
+
+        labels.forEach((label) => {
+            const start = Math.round((label.start || 0) * 1000);
+            const end = Math.round((label.end || 0) * 1000);
+
+            const ts1 = `ts${tsCounter++}`;
+            const ts2 = `ts${tsCounter++}`;
+
+            const baseId = `a${annCounter++}`;
+            const frenchId = `a${annCounter++}`;
+            const hanziId = `a${annCounter++}`;
+            const pinyinId = `a${annCounter++}`;
+            const mixedId = `a${annCounter++}`;
+
+            const hanziText = label.model?.hanzi || '';
+            const frenchText = label.model?.french || '';
+            const pinyinText = label.model?.pinyin || '';
+            const baseText = pinyinText;
+            const mixedText = [pinyinText, hanziText].filter(Boolean).join(' ').trim();
+
+            timeSlots.push(
+                `<TIME_SLOT TIME_SLOT_ID="${ts1}" TIME_VALUE="${start}"/>`,
+                `<TIME_SLOT TIME_SLOT_ID="${ts2}" TIME_VALUE="${end}"/>`
+            );
+
+            baseAnnotations.push(EafExporter.alignableAnnotation(baseId, ts1, ts2, baseText));
+            frenchAnnotations.push(EafExporter.refAnnotation(frenchId, baseId, frenchText));
+            hanziAnnotations.push(EafExporter.refAnnotation(hanziId, baseId, hanziText));
+            pinyinAnnotations.push(EafExporter.refAnnotation(pinyinId, baseId, pinyinText));
+            mixedAnnotations.push(EafExporter.refAnnotation(mixedId, baseId, mixedText));
+        });
+
+        const lastUsedAnnotationId = annCounter - 1;
+        const relativeMediaAttr = relativeMediaUrl
+            ? ` RELATIVE_MEDIA_URL="${escapeXML(relativeMediaUrl)}"`
+            : '';
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<ANNOTATION_DOCUMENT AUTHOR="${escapeXML(author)}" DATE="${escapeXML(date)}"
     FORMAT="3.0" VERSION="3.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="http://www.mpi.nl/tools/elan/EAFv3.0.xsd">
     <HEADER MEDIA_FILE="" TIME_UNITS="milliseconds">
         <MEDIA_DESCRIPTOR
-            MEDIA_URL="${this.escapeXML(mediaUrl)}"
-            MIME_TYPE="${this.escapeXML(mediaMimeType)}"${relativeMediaAttr}/>
-        <PROPERTY NAME="URN">${this.escapeXML(urn)}</PROPERTY>
+            MEDIA_URL="${escapeXML(mediaUrl)}"
+            MIME_TYPE="${escapeXML(mediaMimeType)}"${relativeMediaAttr}/>
+        <PROPERTY NAME="URN">${escapeXML(urn)}</PROPERTY>
         <PROPERTY NAME="lastUsedAnnotationId">${lastUsedAnnotationId}</PROPERTY>
     </HEADER>
     <TIME_ORDER>
-        ${timeSlots.join("\n        ")}
+        ${timeSlots.join('\n        ')}
     </TIME_ORDER>
 
-    <TIER ANNOTATOR="${this.escapeXML(author)}" LINGUISTIC_TYPE_REF="transcription"
-        PARTICIPANT="${this.escapeXML(participant)}" TIER_ID="${this.escapeXML(baseTier)}">
-        ${baseAnnotations.join("\n        ")}
+    <TIER ANNOTATOR="${escapeXML(author)}" LINGUISTIC_TYPE_REF="transcription"
+        PARTICIPANT="${escapeXML(participant)}" TIER_ID="${escapeXML(baseTier)}">
+        ${baseAnnotations.join('\n        ')}
     </TIER>
 
-    <TIER LINGUISTIC_TYPE_REF="traduction" PARENT_REF="${this.escapeXML(baseTier)}"
-        PARTICIPANT="${this.escapeXML(participant)}" TIER_ID="${this.escapeXML(translationTier)}">
-        ${translationAnnotations.join("\n        ")}
+    <TIER LINGUISTIC_TYPE_REF="traduction" PARENT_REF="${escapeXML(baseTier)}"
+        PARTICIPANT="${escapeXML(participant)}" TIER_ID="${escapeXML(frenchTier)}">
+        ${frenchAnnotations.join('\n        ')}
     </TIER>
 
-    <TIER ANNOTATOR="${this.escapeXML(author)}" LINGUISTIC_TYPE_REF="hanzi"
-        PARENT_REF="${this.escapeXML(baseTier)}" PARTICIPANT="${this.escapeXML(participant)}"
-        TIER_ID="${this.escapeXML(hanziTier)}">
-        ${hanziAnnotations.join("\n        ")}
+    <TIER ANNOTATOR="${escapeXML(author)}" LINGUISTIC_TYPE_REF="hanzi"
+        PARENT_REF="${escapeXML(baseTier)}" PARTICIPANT="${escapeXML(participant)}"
+        TIER_ID="${escapeXML(hanziTier)}">
+        ${hanziAnnotations.join('\n        ')}
     </TIER>
 
-    <TIER ANNOTATOR="${this.escapeXML(author)}" LINGUISTIC_TYPE_REF="pinyin"
-        PARENT_REF="${this.escapeXML(baseTier)}" PARTICIPANT="${this.escapeXML(participant)}"
-        TIER_ID="${this.escapeXML(pinyinTier)}">
-        ${pinyinAnnotations.join("\n        ")}
+    <TIER ANNOTATOR="${escapeXML(author)}" LINGUISTIC_TYPE_REF="pinyin"
+        PARENT_REF="${escapeXML(baseTier)}" PARTICIPANT="${escapeXML(participant)}"
+        TIER_ID="${escapeXML(pinyinTier)}">
+        ${pinyinAnnotations.join('\n        ')}
     </TIER>
 
-    <TIER ANNOTATOR="${this.escapeXML(author)}" LINGUISTIC_TYPE_REF="mixed"
-        PARENT_REF="${this.escapeXML(baseTier)}" PARTICIPANT="${this.escapeXML(participant)}"
-        TIER_ID="${this.escapeXML(mixedTier)}">
-        ${mixedAnnotations.join("\n        ")}
+    <TIER ANNOTATOR="${escapeXML(author)}" LINGUISTIC_TYPE_REF="mixed"
+        PARENT_REF="${escapeXML(baseTier)}" PARTICIPANT="${escapeXML(participant)}"
+        TIER_ID="${escapeXML(mixedTier)}">
+        ${mixedAnnotations.join('\n        ')}
     </TIER>
 
     <LINGUISTIC_TYPE GRAPHIC_REFERENCES="false"
@@ -211,890 +208,793 @@ exportEAF() {
         DESCRIPTION="Time alignable annotations within the parent annotation's time interval, gaps are allowed"
         STEREOTYPE="Included_In"/>
 </ANNOTATION_DOCUMENT>`;
-
-    this.downloadFile("transcription.eaf", xml, "application/xml");
-}
-
-    escapeXML(str = '') {
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
     }
 
-    downloadFile(filename, content, type = "text/plain") {
-        const blob = new Blob([content], { type });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
+    static alignableAnnotation(id, ts1, ts2, value) {
+        return `<ANNOTATION>
+            <ALIGNABLE_ANNOTATION ANNOTATION_ID="${id}"
+                TIME_SLOT_REF1="${ts1}" TIME_SLOT_REF2="${ts2}">
+                <ANNOTATION_VALUE>${escapeXML(value)}</ANNOTATION_VALUE>
+            </ALIGNABLE_ANNOTATION>
+        </ANNOTATION>`;
+    }
+
+    static refAnnotation(id, refId, value) {
+        return `<ANNOTATION>
+            <REF_ANNOTATION ANNOTATION_ID="${id}" ANNOTATION_REF="${refId}">
+                <ANNOTATION_VALUE>${escapeXML(value)}</ANNOTATION_VALUE>
+            </REF_ANNOTATION>
+        </ANNOTATION>`;
+    }
+}
+
+/* =========================================================================
+   ProjectLoader — shared parsing helpers for hakka/french/pinyin project
+   files, used by both the "local folder" and "hosted project" importers.
+   ========================================================================= */
+
+class ProjectLoader {
+    static parseHakka(text) {
+        return text
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map((line) => {
+                const [start, end, content] = line.split('\t');
+                return {
+                    start: parseFloat(start) || 0,
+                    end: parseFloat(end) || 0,
+                    model: new HakkaText(dico, content || ''),
+                };
+            });
+    }
+
+    static applyFrench(labels, text) {
+        if (!text) return;
+        text.split(/\r?\n/).filter(Boolean).forEach((line, i) => {
+            const parts = line.split('\t');
+            if (labels[i]) labels[i].model.french = parts[2] || '';
+        });
+    }
+
+    static applyPinyin(labels, text) {
+        if (!text) return;
+        text.split(/\r?\n/).filter(Boolean).forEach((line, i) => {
+            const parts = line.split('\t');
+            if (labels[i]) labels[i].pinyin = parts[2] || '';
+        });
+    }
+
+    static parsePronunciationsCsv(text) {
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (!lines.length) return [];
+        const hasHeader = lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial');
+        return lines.slice(hasHeader ? 1 : 0).map((line) => {
+            const [char, initial, final, tone] = line.split(',');
+            return new Pronunciation({ simp: char, trad: char, initial, final, tone });
+        });
+    }
+
+    /** Returns the 0-based label index encoded in a per-label audio file
+     *  name such as "audio-3.wav", or null if the name doesn't match. */
+    static matchNumberedAudioFile(name) {
+        const match = name.match(/^audio-(\d+)\.(mp3|wav|ogg|m4a|flac|webm)$/i);
+        return match ? parseInt(match[1], 10) - 1 : null;
+    }
+}
+
+/* =========================================================================
+   Transcription — the data model: an ordered list of time-aligned labels
+   plus the metadata needed to export an EAF/ELAN document.
+   ========================================================================= */
+
+class Transcription {
+    constructor() {
+        this.labels = [
+            { start: 1, end: 2, model: new HakkaText(dico, 'hak_ga_') },
+            { start: 2, end: 3, model: new HakkaText(dico, '客家話') },
+            { start: 3, end: 5, model: new HakkaText(dico, '我 唔 食 猪 肉') },
+        ];
+
+        this.media = {
+            url: '',
+            name: '',
+            mimeType: 'audio/x-wav',
+        };
+
+        this.eafMeta = {
+            author: '',
+            participant: 'Speaker1',
+            date: new Date().toISOString(),
+            tierNames: {
+                hakka: 'Hanzi',
+                french: 'Traduction',
+                pinyin: 'Pinyin',
+                mixed: 'Mixed',
+            },
+        };
+    }
+
+    /** Insert a fresh, empty label right after `index` and return its
+     *  (0-based) position. The new slot starts where the previous one ends,
+     *  so the timeline stays gap-free by default. */
+    addLabelAfter(index) {
+        const prev = this.labels[index] || this.labels[this.labels.length - 1];
+        const start = prev ? prev.end : 0;
+        const newLabel = { start, end: start + 2, model: new HakkaText(dico, '') };
+        this.labels.splice(index + 1, 0, newLabel);
+        return index + 1;
+    }
+
+    removeLabel(index) {
+        if (this.labels.length <= 1) return;
+        this.labels.splice(index, 1);
+    }
+
+    async saveFilesToFolder(files) {
+        try {
+            const dirHandle = await window.showDirectoryPicker();
+
+            for (const [name, content] of Object.entries(files)) {
+                const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+            }
+
+            alert('✅ Fichiers enregistrés (écrasés s\'ils existaient déjà).');
+        } catch (err) {
+            console.error('Error saving files:', err);
+        }
     }
 
     export() {
         const files = {
-            "hakka.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.text}`).join('\n'),
-            "french.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.french || ''}`).join('\n'),
-            "pinyin.txt": this.labels.map((l) => `${l.start}\t${l.end}\t${l.pinyin || l.model?.pinyin || ''}`).join('\n')
+            'hakka.txt': this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.text}`).join('\n'),
+            'french.txt': this.labels.map((l) => `${l.start}\t${l.end}\t${l.model.french || ''}`).join('\n'),
+            'pinyin.txt': this.labels.map((l) => `${l.start}\t${l.end}\t${l.pinyin || l.model?.pinyin || ''}`).join('\n'),
         };
         this.saveFilesToFolder(files);
     }
+
+    exportEAF() {
+        downloadFile('transcription.eaf', EafExporter.build(this), 'application/xml');
+    }
 }
 
+/* =========================================================================
+   LabelView — the editable form + live preview for a single label.
+   ========================================================================= */
+
 class LabelView {
-    constructor(label, index) {
+    constructor(label, index, { onChange, onValidate, onInsertAfter, onDelete } = {}) {
         this.label = label;
         this.index = index;
-        this.dico = dico;
+        this.onChange = onChange;
+        this.onValidate = onValidate;
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'mt-2 text-center';
-        wrapper.id = `chunk-${this.index}`;
-        this.wrapper = wrapper;
+        this.wrapper = createEl('div', 'chunk mt-2 rounded-lg bg-indigo-50/60 p-3 shadow-sm', { id: `chunk-${index}` });
+        this.wrapper.appendChild(this.buildHeader(label, index, onInsertAfter, onDelete));
 
-        const title = document.createElement('label');
-        title.textContent = `${label.start} : ${label.end}`;
-        title.htmlFor = `chunk-${this.index}`;
-        title.id = `start-stop-${this.index}`;
-        this.title = title;
-        wrapper.appendChild(title);
+        this.ta = this.buildHanziInput(label);
+        this.wrapper.appendChild(this.ta);
 
-        const ta = document.createElement('textarea');
-        ta.className = 'w-full rounded p-1 bg-white';
-        ta.rows = 1;
-        ta.value = label.model.text || '';
-        ta.id = `hanzi-${this.index}`;
-        this.ta = ta;
-        this.hanzi = this.ta;
-        ta.addEventListener("input", (event) => {
-            // Recompute suggestions
-            this.label.model.update({"hanzi": this.ta.value});
-            // update only this labelView visuals, fast
-            this.render(this.label);
-            return new Sentence(this.ta.value);
-        })
-        ta.addEventListener("keydown", (event) => {
-            // SHIFT + ENTER → new line
-            if (event.key === "Enter" && event.shiftKey) {
-                return; // let textarea insert a newline
-            }
+        this.suggestionsEl = createEl('div', 'flex gap-2 flex-wrap my-2');
+        this.wrapper.appendChild(this.suggestionsEl);
 
-            // ENTER without shift → validate
-            if (event.key === "Enter") {
-                event.preventDefault();               // stop newline
-                
-                this.handleValidate(this.label);           // validate changes
-            }
-        });
-        wrapper.appendChild(ta);
+        this.taFrench = this.buildFrenchInput(label);
+        this.wrapper.appendChild(this.taFrench);
 
-        this.suggestions = document.createElement('div');
-        this.suggestions.id= "suggested-hanzi"
-        wrapper.appendChild(this.suggestions);
+        this.preview = createEl('div', 'mt-2');
+        this.wrapper.appendChild(this.preview);
 
-        this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
-        this.sentenceView = document.createElement('div');
-        this.words = document.createElement('div');
-
-        this.taFrench = document.createElement('textarea');
-        this.taFrench.className = 'w-full rounded p-1 bg-white mt-1';
-        this.taFrench.rows = 1;
-        this.taFrench.placeholder = 'Français';
-        this.taFrench.id = `french-${this.index}`;
-        this.taFrench.value = label.model.french || '';
-        this.taFrench.addEventListener("input", () => {
-            this.label.model.french = this.taFrench.value;
-            this.render(this.label);
-            document.dispatchEvent(new CustomEvent("label-updated", {
-                detail: { index: this.index }
-            }));
-        });
-        wrapper.appendChild(this.taFrench);
-
-        this.taPinyin = document.createElement('textarea');
-        this.taPinyin.className = 'w-full rounded p-1 bg-white mt-1';
-        this.taPinyin.rows = 1;
-        this.taPinyin.placeholder = 'Pinyin';
-        this.taPinyin.id = `pinyin-${this.index}`;
-        this.taPinyin.value = label.model?.pinyin || '';
-        this.taPinyin.addEventListener("input", () => {
-            this.label.pinyin = this.taPinyin.value;
-            this.render(this.label);
-            document.dispatchEvent(new CustomEvent("label-updated", {
-                detail: { index: this.index }
-            }));
-        });
-        // wrapper.appendChild(this.taPinyin);
-
-        wrapper.appendChild(this.sentenceView);
-
-        const a = label.audio;
-        this.a = a;
-
-        const pinyinOutput = document.createElement('div');
-        pinyinOutput.id = `pinyin-output-${this.index}`;
-        this.pinyinOutput = pinyinOutput;
-
-        const furigana = document.createElement('span');
-        this.furigana = furigana;
-
-        const hanziOnly = document.createElement('div');
-        hanziOnly.classList.add("hanzi");
-        hanziOnly.id = `hanzi-only-${this.index}`;
-        this.hanziOnly = hanziOnly;
-        this.hanzi = this.hanziOnly;
-
-        const inlinePinyin = document.createElement('div');
-        this.inlinePinyin = inlinePinyin;
-        this.pinyin = this.inlinePinyin;
-
-        this.french = document.createElement('div');
+        this.outputs = {};
         this.render(label);
+    }
+
+    buildHeader(label, index, onInsertAfter, onDelete) {
+        const header = createEl('div', 'flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 mb-1');
+
+        const badge = createEl('span', 'font-semibold text-gray-700');
+        badge.textContent = `#${index + 1}`;
+
+        const actions = createEl('div', 'flex items-center gap-1');
+
+        const insertBtn = createEl('button', 'px-2 py-0.5 rounded bg-white hover:bg-indigo-100 border', {
+            type: 'button', title: 'Insérer une nouvelle étiquette après celle-ci (Ctrl+Entrée)',
+        });
+        insertBtn.textContent = '+ Étiquette';
+        insertBtn.addEventListener('click', () => onInsertAfter?.());
+
+        const deleteBtn = createEl('button', 'px-2 py-0.5 rounded bg-white hover:bg-red-100 border', {
+            type: 'button', title: 'Supprimer cette étiquette',
+        });
+        deleteBtn.textContent = '🗑';
+        deleteBtn.addEventListener('click', () => onDelete?.());
+
+        actions.append(insertBtn, deleteBtn);
+        header.append(badge, this.buildTimeControls(label, index), actions);
+        return header;
+    }
+
+    buildTimeControls(label, index) {
+        const wrap = createEl('div', 'flex items-center gap-1');
+
+        this.timeLabel = createEl('span', 'font-mono text-xs text-gray-500', { id: `start-stop-${index}` });
+        this.syncTimeLabel();
+
+        const startInput = createEl('input', 'w-16 text-xs rounded border px-1 py-0.5 bg-white', {
+            type: 'number', step: '0.01', value: label.start, title: 'Début (secondes)',
+        });
+        const separator = createEl('span', 'text-xs text-gray-400', {}, '–');
+        const endInput = createEl('input', 'w-16 text-xs rounded border px-1 py-0.5 bg-white', {
+            type: 'number', step: '0.01', value: label.end, title: 'Fin (secondes)',
+        });
+
+        const applyTimes = () => {
+            this.label.start = parseFloat(startInput.value) || 0;
+            this.label.end = parseFloat(endInput.value) || 0;
+            this.syncTimeLabel();
+        };
+        startInput.addEventListener('change', applyTimes);
+        endInput.addEventListener('change', applyTimes);
+
+        wrap.append(this.timeLabel, startInput, separator, endInput);
+        return wrap;
+    }
+
+    syncTimeLabel() {
+        this.timeLabel.textContent = `${formatTime(this.label.start)} : ${formatTime(this.label.end)}`;
+    }
+
+    buildHanziInput(label) {
+        const ta = createEl('textarea', 'hanzi w-full rounded p-2 bg-white border focus:outline-none focus:ring-2 focus:ring-indigo-300', {
+            id: `hanzi-${this.index}`, rows: 1, placeholder: 'Hakka : romanisation et/ou hanzi…',
+        });
+        ta.value = label.model.text || '';
+        autosizeTextarea(ta);
+
+        ta.addEventListener('input', () => {
+            this.label.model.update({ hanzi: ta.value });
+            autosizeTextarea(ta);
+            this.render(this.label);
+            this.onChange?.();
+        });
+
+        ta.addEventListener('keydown', (event) => this.handleValidationKeydown(event));
+
+        return ta;
+    }
+
+    buildFrenchInput(label) {
+        const ta = createEl('textarea', 'w-full rounded p-1 bg-white border mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-300', {
+            id: `french-${this.index}`, rows: 1, placeholder: 'Traduction française…',
+        });
+        ta.value = label.model.french || '';
+        autosizeTextarea(ta);
+
+        ta.addEventListener('input', () => {
+            this.label.model.french = ta.value;
+            autosizeTextarea(ta);
+            this.render(this.label);
+            this.onChange?.();
+        });
+
+        ta.addEventListener('keydown', (event) => this.handleValidationKeydown(event));
+
+        return ta;
+    }
+
+    /** Shared Enter-key behaviour for both textareas: Shift+Enter inserts a
+     *  newline, Ctrl/Cmd+Enter is left alone (handled globally to add a new
+     *  label), plain Enter validates and moves to the next label. */
+    handleValidationKeydown(event) {
+        if (event.key !== 'Enter') return;
+        if (event.ctrlKey || event.metaKey) return;
+        if (event.shiftKey) return;
+        event.preventDefault();
+        this.onValidate?.();
     }
 
     render(label) {
         this.label = label;
-        this.french.innerHTML = this.taFrench.value + ' ';
-        this.suggestions.innerHTML = this.renderSuggestions(label.model.suggestions);
+        this.sentences = this.ta.value.split('\n').map((line) => new Sentence(dico, line));
 
-        this.sentences = this.ta.value.split('\n').map(s => new Sentence(this.dico, s));
-        this.sentenceView.innerHTML = this.sentences.map(s => s.render()).join('<br>');
-        this.furigana.innerHTML = this.sentences.map(s => s.renderFurigana()).join('<br>');
-        this.pinyinOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
-        this.hanziOnly.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
-        this.inlinePinyin.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
-        this.pinyin = this.inlinePinyin;
-        this.hanzi = this.hanziOnly;
+        this.suggestionsEl.innerHTML = this.renderSuggestions(label.model.suggestions);
+        this.preview.innerHTML = this.sentences.map((s) => s.render()).join('<br>');
 
-        this.words = document.createElement("div");
-        this.words.innerHTML =
-            `<span class="block mb-2 text-sm italic text-gray-700">
-                ${this.french.innerHTML}
-            </span>` +
-            this.sentences.map(s => s.renderTokens()).join('<br>');
-
+        const frenchLine = this.taFrench.value || '';
+        this.outputs = {
+            hanzi: createEl('div', 'hanzi', {}, this.sentences.map((s) => s.renderHanziLine()).join('<br>')),
+            furigana: createEl('div', '', {}, this.sentences.map((s) => s.renderFurigana()).join('<br>')),
+            pinyin: createEl('div', '', {}, this.sentences.map((s) => s.renderPinyinLine()).join('<br>')),
+            french: createEl('div', '', {}, frenchLine),
+            words: createEl('div', '', {},
+                `<span class="block mb-2 text-sm italic text-gray-700">${frenchLine}</span>` +
+                this.sentences.map((s) => s.renderTokens()).join('<br>')),
+        };
     }
 
     renderSuggestions(suggestions) {
-        return `<div class="flex gap-2 flex-wrap mb-2">
-                    ${suggestions.map((s, i) => {
-            const keyHint = i < 9 ? (i + 1) : String.fromCharCode(65 + i - 9);
+        if (!suggestions?.length) return '';
+        return suggestions.map((s, i) => {
+            const keyHint = i < 9 ? String(i + 1) : String.fromCharCode(65 + i - 9);
             return `
-                            <div class="suggestion-btn flex p-3 flex-col items-center rounded text-indigo-800 hover:bg-white hover:shadow"
-                                    data-label="${this.index}"
-                                    data-suggestion="${i}">
-                                <div class="text-xs text-gray-600">
-                                    ${keyHint || '?'}
-                                </div>
-                                <button 
-                                    id="suggested-${keyHint}" 
-                                    class="text-small font-semibold" 
-                                    value="${i}">
-                                    ${s.pron.char() || '?'}
-                                </button>
-                                <div class="text-xs text-gray-600">
-                                    ${s.pron.abstractPinyin() || '?'}
-                                </div>
-                            </div>`;
-        }).join('')}
-                </div>`;
-    }
-
-    renderUnknownChars() {
-        return Array.from(this.dico.unknowns.values())
-            .map(char => {
-                return `
-                        <li>
-                            <label>${char}</label>
-                            <input class="bg-white w-4" type="text" id="initial-for-${char}">
-                            <input class="bg-white w-6" type="text" id="final-for-${char}">
-                            <input class="bg-white w-3" type="text" id="tone-for-${char}">
-                        </li>
-                        `;
-            });
-    }
-
-    renderUnknownProns(syllables) {
-        return Array.from(syllables)
-            .map((syl, i) => {
-                return `
-                            <tr>
-                                <td>${syl}</td>
-                                <td>
-                                <input id="char-for-syl-${i}" class="bg-white" type="text">
-                                </td>
-                            </tr>
-                            `;
-            }).join('');
-    }
-
-    handleValidate(label) {
-        this.label = label;
-        label.model.update(this.ta.value);
-        label.model.french = this.taFrench.value;
-        label.pinyin = this.taPinyin.value;
-
-        this.render(label);
-
-        document.getElementById("label-index").value = this.index + 2;
-        document.getElementById("label-index").dispatchEvent(new Event("change"));
-
-        document.dispatchEvent(new CustomEvent("label-updated", {
-            detail: { index: this.index }
-        }));
+                <button type="button" class="suggestion-btn flex flex-col items-center p-2 rounded bg-white border text-indigo-800 hover:bg-indigo-100 hover:shadow"
+                        data-label="${this.index}" data-suggestion="${i}" title="Raccourci : Maj+${keyHint}">
+                    <span class="text-[10px] text-gray-500">${keyHint}</span>
+                    <span class="hanzi text-sm font-semibold">${s.pron.char() || '?'}</span>
+                    <span class="text-[10px] text-gray-500">${s.pron.abstractPinyin() || '?'}</span>
+                </button>`;
+        }).join('');
     }
 }
 
-function getToneMode() {
-    return document.getElementById('tone-digital').ariaChecked;
-}
+/* =========================================================================
+   View — page chrome: metadata form, list of label forms, and the
+   read-only tabbed "full transcript" displays.
+   ========================================================================= */
 
 class View {
-    constructor() {
-        this.container = document.getElementById("viewer");
+    constructor({ onInsertLabelAfter, onDeleteLabel } = {}) {
+        this.onInsertLabelAfter = onInsertLabelAfter;
+        this.onDeleteLabel = onDeleteLabel;
+
+        this.container = $('viewer');
         this.container.innerHTML = '';
-        this.importProns = document.getElementById("import-prons");
-        this.importLabels = document.getElementById("import-labels");
-        this.index = document.getElementById("label-index");
-        this.dico = dico;
+
+        this.importProns = $('import-prons');
+        this.index = $('label-index');
         this.views = [];
-        this.forms = document.createElement('div');
-        this.forms.classList = "no-print";
-        this.forms.id = "viewer-forms";
-
-        this.metaForm = document.createElement('div');
-        this.metaForm.id = "eaf-meta-form";
-        this.metaForm.className = "no-print bg-white rounded p-3 mb-4 shadow-sm";
-
-        this.displays = document.createElement('div');
-        this.displays.id = "viewer-displays";
-
-        this.container.appendChild(this.forms);
-        this.container.appendChild(this.displays);
-
-        this.outputs = {};
+        this.model = null;
         this.audio = null;
+
+        this.forms = createEl('div', 'no-print', { id: 'viewer-forms' });
+        this.metaForm = createEl('div', 'no-print bg-white rounded p-3 mb-3 shadow-sm', { id: 'eaf-meta-form' });
+        this.labelsContainer = createEl('div', 'space-y-3');
+        this.forms.append(this.metaForm, this.buildHelpBox(), this.labelsContainer);
+
+        this.displays = createEl('div', '', { id: 'viewer-displays' });
+
         this.audioEl = document.createElement('audio');
-        this.container.appendChild(this.audioEl);
+        this.container.append(this.forms, this.displays, this.audioEl);
 
-        const toneWrapper = document.createElement("div");
-        toneWrapper.className = "flex items-center gap-3 p-2";
-        toneWrapper.innerHTML = `
-            <label class="flex items-center gap-1 text-sm cursor-pointer">
-                <input type="radio" name="toneMode" id="tone-digital" value="digital" checked>
-                Digital
-            </label>
+        this.panels = {};
+        this.buildTabs();
+    }
 
-            <label class="flex items-center gap-1 text-sm cursor-pointer">
-                <input type="radio" name="toneMode" id="tone-diacritic" value="diacritic">
-                Diacritic
-            </label>
-        `;
+    buildHelpBox() {
+        const box = createEl('details', 'no-print text-xs text-gray-600 bg-white rounded p-2 mb-3 shadow-sm');
+        box.innerHTML = `
+            <summary class="cursor-pointer font-semibold text-gray-700">Raccourcis clavier</summary>
+            <ul class="mt-2 list-disc list-inside space-y-0.5">
+                <li><b>Entrée</b> : valider et passer à l'étiquette suivante</li>
+                <li><b>Maj + Entrée</b> : nouvelle ligne</li>
+                <li><b>Ctrl + Entrée</b> : insérer une nouvelle étiquette après la courante</li>
+                <li><b>Page précédente / suivante</b> : étiquette précédente / suivante</li>
+                <li><b>Maj + 1…9</b> : choisir une suggestion de caractère</li>
+                <li><b>Espace</b> : lire l'extrait audio de l'étiquette courante</li>
+                <li><b>Ctrl + S</b> : exporter le projet (fichiers .txt)</li>
+            </ul>`;
+        return box;
+    }
 
-        this.displays.textContent = '';
-        const container = document.createElement('div');
+    buildTabs() {
+        const wrapper = createEl('div', 'flex flex-wrap justify-stretch items-start gap-2');
+        const tabsBar = createEl('div', 'flex flex-wrap gap-1 p-2 sticky top-0 z-20 bg-white shadow');
+        const panels = createEl('div', 'w-full');
 
-        container.className = `
-            flex flex-wrap justify-stretch items-start gap-2
-        `;
-        container.innerHTML = '';
+        DISPLAY_TABS.forEach(({ key, label }, i) => {
+            const tabBtn = createEl('button', 'px-3 py-1 text-sm rounded bg-gray-200 hover:bg-gray-300 transition', { type: 'button' });
+            tabBtn.textContent = label;
 
-        const tabsBar = document.createElement('div');
-        tabsBar.className = `
-            flex flex-wrap gap-1 p-2 sticky top-0 z-20 bg-white shadow
-        `;
-        container.appendChild(tabsBar);
-
-        const panels = document.createElement('div');
-        panels.className = 'w-full';
-        this.container.appendChild(toneWrapper);
-        container.appendChild(panels);
-
-        this.outputs = {
-            "furigana": "",
-            "hanzi": "",
-            "french": "",
-            "pinyin": "",
-            "words":"",
-        };
-
-        Object.entries(this.outputs).forEach(([key, output], i) => {
-            const tabBtn = document.createElement('button');
-            tabBtn.textContent = key;
-            tabBtn.className = `
-                px-3 py-1 text-sm rounded 
-                bg-gray-200 hover:bg-gray-300 
-                transition
-            `;
-            tabsBar.appendChild(tabBtn);
-
-            const panel = document.createElement('div');
-            panel.id = 'panel-' + key;
-            panel.className = `
-                p-6 text-justify leading-relaxed
-                overflow-y  
-                print:overflow-visible
-                print:p-20
-                bg-white
-                ${i === 0 ? "" : "hidden"}
-            `;
+            const panel = createEl('div', `p-6 text-justify leading-relaxed print:overflow-visible print:p-20 bg-white ${i === 0 ? '' : 'hidden'}`, { id: `panel-${key}` });
+            this.panels[key] = panel;
             panels.appendChild(panel);
 
-          tabBtn.addEventListener('click', () => {
-                // hide all panels
-                panels.querySelectorAll(':scope > div').forEach(p => {
-                    p.classList.add('hidden');
-
-                });
-
-                // show selected panel only
+            tabBtn.addEventListener('click', () => {
+                panels.querySelectorAll(':scope > div').forEach((p) => p.classList.add('hidden'));
                 panel.classList.remove('hidden');
-
-                // update tab styles
-                tabsBar.querySelectorAll('button').forEach(b => {
-                    b.classList.remove('bg-blue-500', 'text-white');
-                    b.classList.add('bg-gray-200');
-                });
-
+                tabsBar.querySelectorAll('button').forEach((b) => b.classList.remove('bg-blue-500', 'text-white'));
+                tabsBar.querySelectorAll('button').forEach((b) => b.classList.add('bg-gray-200'));
                 tabBtn.classList.remove('bg-gray-200');
                 tabBtn.classList.add('bg-blue-500', 'text-white');
             });
-            if (i === 0) {
-                tabBtn.classList.remove('bg-gray-200');
-                tabBtn.classList.add('bg-blue-500', 'text-white');
-            }
+
+            if (i === 0) tabBtn.classList.add('bg-blue-500', 'text-white');
+            tabsBar.appendChild(tabBtn);
         });
 
-        this.displays.appendChild(container);
-        new CopyButton('#output-hanzi-body');
+        wrapper.append(tabsBar, panels);
+        this.displays.appendChild(wrapper);
     }
 
     toDatetimeLocalValue(value) {
-        if (!value) return "";
+        if (!value) return '';
         const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return "";
-        const pad = (n) => String(n).padStart(2, "0");
+        if (Number.isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
-    renderMetaForm(model) {
-this.metaForm.innerHTML = `
-<details class="mb-4">
-    <summary class="cursor-pointer font-semibold text-gray-700 mb-2">
-        EAF Metadata
-    </summary>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-        <label class="flex flex-col text-sm">
-            <span>Author</span>
-            <input id="eaf-author" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.author || ''}">
-        </label>
-
-        <label class="flex flex-col text-sm md:col-span-2">
-            <span>Media URL / file path</span>
-            <input
-                id="eaf-media-url"
-                class="bg-white rounded p-2 border"
-                type="text"
-                placeholder="file:///C:/audio.wav or https://example.com/audio.wav"
-                value="${model.media?.url || ''}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Participant / Speaker</span>
-            <input id="eaf-participant" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.participant || 'Speaker1'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Date</span>
-            <input id="eaf-date" class="bg-white rounded p-2 border" type="datetime-local" value="${this.toDatetimeLocalValue(model.eafMeta?.date)}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Media MIME type</span>
-            <input id="eaf-mimetype" class="bg-white rounded p-2 border" type="text" value="${model.media?.mimeType || 'audio/x-wav'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Hakka tier name</span>
-            <input id="eaf-tier-hakka" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.hakka || 'Hakka'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>French tier name</span>
-            <input id="eaf-tier-french" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.french || 'French'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Pinyin tier name</span>
-            <input id="eaf-tier-pinyin" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.tiers?.pinyin || 'Pinyin'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Alignable linguistic type</span>
-            <input id="eaf-lt-alignable" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.alignable || 'default-lt'}">
-        </label>
-
-        <label class="flex flex-col text-sm">
-            <span>Ref linguistic type</span>
-            <input id="eaf-lt-ref" class="bg-white rounded p-2 border" type="text" value="${model.eafMeta?.linguisticTypes?.ref || 'ref-lt'}">
-        </label>
-    </div>
-</details>
-`;
+    metaField(id, label, type, value, { extraClass = '', placeholder = '' } = {}) {
+        return `
+            <label class="flex flex-col text-sm ${extraClass}">
+                <span>${label}</span>
+                <input id="${id}" class="bg-white rounded p-2 border" type="${type}" placeholder="${escapeXML(placeholder)}" value="${escapeXML(value)}">
+            </label>`;
     }
 
-    render(data) {
-        this.forms.textContent = '';
-        this.forms.appendChild(this.metaForm);
-        this.renderMetaForm(data);
+    renderMetaForm(model) {
+        const meta = model.eafMeta || {};
+        const tiers = meta.tierNames || {};
 
-        this.views = new Array(data.labels.length);
+        this.metaForm.innerHTML = `
+            <details>
+                <summary class="cursor-pointer font-semibold text-gray-700 mb-2">Métadonnées EAF (export ELAN)</summary>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                    ${this.metaField('eaf-author', 'Auteur', 'text', meta.author || '')}
+                    ${this.metaField('eaf-media-url', 'URL / chemin du média', 'text', model.media?.url || '', {
+                        extraClass: 'md:col-span-2',
+                        placeholder: 'file:///C:/audio.wav ou https://example.com/audio.wav',
+                    })}
+                    ${this.metaField('eaf-participant', 'Participant / locuteur', 'text', meta.participant || 'Speaker1')}
+                    ${this.metaField('eaf-date', 'Date', 'datetime-local', this.toDatetimeLocalValue(meta.date))}
+                    ${this.metaField('eaf-mimetype', 'Type MIME du média', 'text', model.media?.mimeType || 'audio/x-wav')}
+                    ${this.metaField('eaf-tier-hakka', 'Nom du tier Hanzi', 'text', tiers.hakka || 'Hanzi')}
+                    ${this.metaField('eaf-tier-french', 'Nom du tier Français', 'text', tiers.french || 'Traduction')}
+                    ${this.metaField('eaf-tier-pinyin', 'Nom du tier Pinyin', 'text', tiers.pinyin || 'Pinyin')}
+                    ${this.metaField('eaf-tier-mixed', 'Nom du tier Mixte', 'text', tiers.mixed || 'Mixed')}
+                </div>
+            </details>`;
+    }
+
+    render(model) {
+        this.model = model;
+        this.renderMetaForm(model);
+
+        this.labelsContainer.innerHTML = '';
+        this.views = model.labels.map((label, i) => this.mountLabel(label, i));
 
         this.renderAudio();
-
-        data.labels.forEach((label, i) => {
-            this.renderLabel(label, i);
-        });
-
         this.renderDisplays();
+        this.syncIndexBounds();
+    }
+
+    syncIndexBounds() {
+        this.index.max = String(Math.max(1, this.model.labels.length));
+    }
+
+    createLabelView(label, i) {
+        return new LabelView(label, i, {
+            onChange: () => this.renderDisplays(),
+            onValidate: () => goToLabel(i + 2),
+            onInsertAfter: () => this.onInsertLabelAfter?.(i),
+            onDelete: () => this.onDeleteLabel?.(i),
+        });
+    }
+
+    mountLabel(label, i) {
+        const labelView = this.createLabelView(label, i);
+        this.labelsContainer.appendChild(labelView.wrapper);
+        return labelView;
+    }
+
+    /** Rebuild a single label's form/preview in place (used after picking a
+     *  suggestion, so the rest of the list doesn't need to re-render). */
+    replaceLabelAt(i) {
+        const label = this.model.labels[i];
+        const labelView = this.createLabelView(label, i);
+        const old = this.labelsContainer.children[i];
+        if (old) this.labelsContainer.replaceChild(labelView.wrapper, old);
+        else this.labelsContainer.appendChild(labelView.wrapper);
+        this.views[i] = labelView;
+        return labelView;
     }
 
     renderAudio() {
-        if (this.audio) {
-            this.audioEl.id = "audio";
-            this.audioEl.controls = true;
-            this.audioEl.src = this.audio.url;
-            this.audioEl.preload = 'metadata';
-            this.audioEl.className = 'w-full mt-1';
+        if (!this.audio) {
+            this.audioEl.removeAttribute('id');
+            this.audioEl.removeAttribute('controls');
+            this.audioEl.removeAttribute('src');
+            return;
         }
+        this.audioEl.id = 'audio';
+        this.audioEl.controls = true;
+        this.audioEl.src = this.audio.url;
+        this.audioEl.preload = 'metadata';
+        this.audioEl.className = 'w-full mt-1';
     }
 
     renderDisplays() {
-        this.outputs = {
-            "hanzi": "",
-            "furigana": "",
-            "french": "",
-            "pinyin": "",
-            "words":""
-        };
-
-        this.views.forEach((labelView, e) => {
-            for (const [key, value] of Object.entries(this.outputs)) {
-                const el = document.createElement(key == 'words' ? 'div': 'span');
-                el.classList.add("rounded", "px-3", "py-1", "hover:bg-violet-200");
-                el.id = `${key}-${e}`;
-                el.innerHTML = labelView[key].innerHTML;
-                this.outputs[key] += el.outerHTML;
-            }
+        DISPLAY_TABS.forEach(({ key }) => {
+            const panel = this.panels[key];
+            panel.innerHTML = '';
+            this.views.forEach((labelView, i) => {
+                const tag = key === 'words' ? 'div' : 'span';
+                const item = createEl(tag, `rounded px-3 py-1 cursor-pointer hover:bg-violet-200 ${i % 2 ? 'bg-gray-50' : ''}`, {
+                    id: `${key}-${i}`,
+                    title: `#${i + 1} · ${formatTime(labelView.label.start)}–${formatTime(labelView.label.end)}s`,
+                });
+                item.innerHTML = labelView.outputs[key]?.innerHTML || '';
+                panel.appendChild(item);
+            });
         });
-
-        Object.entries(this.outputs).forEach(([key, output], i) => {
-            const panel = document.getElementById('panel-' + key);
-            panel.innerHTML = output;
-        });
-    }
-
-    renderLabel(label, i) {
-        const labelView = new LabelView(label, i);
-        if (this.forms.children[i + 1]) {
-            this.forms.replaceChild(labelView.wrapper, this.forms.children[i + 1]);
-        } else {
-            this.forms.appendChild(labelView.wrapper);
-        }
-        this.views[i] = labelView;
     }
 }
+
+/* =========================================================================
+   Controller — wires the model and view together, handles import/export
+   and keyboard shortcuts.
+   ========================================================================= */
 
 class Controller {
     constructor() {
         this.model = new Transcription();
-        this.view = new View();
+        this.view = new View({
+            onInsertLabelAfter: (i) => this.insertLabelAfter(i),
+            onDeleteLabel: (i) => this.deleteLabel(i),
+        });
         this.view.render(this.model);
-        this.dico = dico;
 
-        this.view.importProns.addEventListener('click', e => {
-            this.dico.handleImportProns(e).then(() => {
-                this.view.render(this.model);
-            });
+        this.bindStaticControls();
+        this.bindKeyboard();
+
+        goToLabel(1);
+    }
+
+    bindStaticControls() {
+        this.view.importProns?.addEventListener('click', (e) => {
+            dico.handleImportProns(e).then(() => this.view.render(this.model));
         });
 
-        this.view.container.addEventListener("click", e => this.handleSelection(e));
-        document.getElementById('import-project').addEventListener('click', e => this.handleImportLocalProject(e));
-        document.getElementById('select-project').addEventListener('change', e => this.handleImportHostedProject(e));
-        document.getElementById('export-project').addEventListener('click', e => this.model.export());
-        document.getElementById('export-eaf')?.addEventListener('click', () => {
+        this.view.container.addEventListener('click', (e) => this.handleSelection(e));
+        this.view.displays.addEventListener('click', (e) => this.handleClickOnDisplays(e));
+        this.view.forms.addEventListener('input', (e) => {
+            if (e.target.closest('#eaf-meta-form')) this.syncEafMetaFromForm();
+        });
+        this.view.index.addEventListener('change', (e) => this.handleIndexChange(e));
+
+        $('import-project')?.addEventListener('click', () => this.handleImportLocalProject());
+        $('select-project')?.addEventListener('change', (e) => this.handleImportHostedProject(e));
+        $('export-project')?.addEventListener('click', () => this.model.export());
+        $('export-eaf')?.addEventListener('click', () => {
             this.syncEafMetaFromForm();
             this.model.exportEAF();
         });
-        document.getElementById('label-index').addEventListener('change', e => this.handleIndexChange(e));
-        document.getElementById('viewer-displays').addEventListener('click', this.handleClickOnDisplays.bind(this));
-        window.addEventListener("keydown", e => this.handlePaging(e));
-        window.addEventListener("keyup", this.handleCtrlS.bind(this));
-        this.view.forms.addEventListener("input", (event) => {
-            if (event.target.closest("#eaf-meta-form")) {
-                this.syncEafMetaFromForm();
-            }
-        });
+        $('toggle-hanzi')?.addEventListener('click', () => this.view.index.dispatchEvent(new Event('change')));
+    }
 
-        this.view.index.dispatchEvent(new Event("change"));
-        this.mode = document.getElementById('toogle-hanzi');
-        document.getElementById('toggle-hanzi').addEventListener('click', this.handleToggleTrad.bind(this));
-
-        document.addEventListener("label-updated", () => {
-            this.view.renderDisplays(this.model);
-        });
-
-        document.addEventListener("keydown", (event) => {
-            if (event.shiftKey) {
+    bindKeyboard() {
+        window.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
                 event.preventDefault();
-                const key = event.key;
-                if (!/^[1-9]$/.test(key)) return;
+                this.model.export();
+                return;
+            }
 
-                const suggestionIndex = parseInt(key, 10) - 1;
-                const currentIndex = parseInt(this.view.index.value, 10) - 1;
-                const view = this.view.views[currentIndex];
-                if (!view) return;
-                if (suggestionIndex >= view.suggestions.length) return;
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                this.insertLabelAfter(this.currentIndex());
+                return;
+            }
 
-                const el = view.suggestions.querySelector(`[data-suggestion="${suggestionIndex}"]`);
-                if (el) el.click();
+            if (event.key === 'PageDown' || event.key === 'PageUp') {
+                event.preventDefault();
+                goToLabel(this.currentIndex() + (event.key === 'PageDown' ? 2 : 0));
+                return;
+            }
+
+            if (event.shiftKey && /^[1-9]$/.test(event.key)) {
+                const active = document.activeElement;
+                const blockedField = active?.tagName === 'TEXTAREA' && !active.id.startsWith('hanzi-');
+                if (blockedField) return;
+
+                const idx = this.currentIndex();
+                const label = this.model.labels[idx];
+                const suggestionIndex = parseInt(event.key, 10) - 1;
+                if (!label || suggestionIndex >= label.model.suggestions.length) return;
+
+                event.preventDefault();
+                this.applySuggestion(idx, suggestionIndex);
             }
         });
+    }
+
+    currentIndex() {
+        return Math.max(1, parseInt(this.view.index.value || '1', 10)) - 1;
     }
 
     syncEafMetaFromForm() {
-        this.model.eafMeta.author = document.getElementById("eaf-author")?.value || "";
-        this.model.eafMeta.participant = document.getElementById("eaf-participant")?.value || "Speaker1";
+        const meta = this.model.eafMeta;
+        meta.author = $('eaf-author')?.value || '';
+        meta.participant = $('eaf-participant')?.value || 'Speaker1';
 
-        const rawDate = document.getElementById("eaf-date")?.value || "";
-        this.model.eafMeta.date = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+        const rawDate = $('eaf-date')?.value || '';
+        meta.date = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
 
-        this.model.media.mimeType = document.getElementById("eaf-mimetype")?.value || "audio/x-wav";
+        this.model.media.mimeType = $('eaf-mimetype')?.value || 'audio/x-wav';
+        this.model.media.url = $('eaf-media-url')?.value || '';
 
-        this.model.eafMeta.tiers.hakka = document.getElementById("eaf-tier-hakka")?.value || "Hakka";
-        this.model.eafMeta.tiers.french = document.getElementById("eaf-tier-french")?.value || "French";
-        this.model.eafMeta.tiers.pinyin = document.getElementById("eaf-tier-pinyin")?.value || "Pinyin";
-
-        this.model.eafMeta.linguisticTypes.alignable = document.getElementById("eaf-lt-alignable")?.value || "default-lt";
-        this.model.eafMeta.linguisticTypes.ref = document.getElementById("eaf-lt-ref")?.value || "ref-lt";
-        this.model.media.url = document.getElementById("eaf-media-url")?.value || "";
-    }
-
-    handleCtrlS(event) {
-        if (event.key === "s" && event.ctrlKey) {
-            event.preventDefault();
-            this.model.export();
-        }
-    }
-
-    handleToggleTrad(event) {
-        this.view.views.forEach((v, i) => {});
-        this.view.index.dispatchEvent(new Event("change"));
+        meta.tierNames.hakka = $('eaf-tier-hakka')?.value || 'Hanzi';
+        meta.tierNames.french = $('eaf-tier-french')?.value || 'Traduction';
+        meta.tierNames.pinyin = $('eaf-tier-pinyin')?.value || 'Pinyin';
+        meta.tierNames.mixed = $('eaf-tier-mixed')?.value || 'Mixed';
     }
 
     handleClickOnDisplays(event) {
-        const el = event.target.closest('span[id]');
-        if (!el) return;
-
-        const match = el.id.match(/^(.*-\d+)$/);
-        const i = parseInt(match[0].split('-')[1]);
-
-        if (!isNaN(i)) {
-            this.view.index.value = (i + 1);
-            this.view.index.dispatchEvent(new Event("change"));
-        }
+        const target = event.target.closest('[id]');
+        if (!target) return;
+        const match = target.id.match(/-(\d+)$/);
+        if (!match) return;
+        goToLabel(parseInt(match[1], 10) + 1);
     }
 
     handleSelection(event) {
-        const btn = event.target.closest(".suggestion-btn");
+        const btn = event.target.closest('.suggestion-btn');
         if (!btn) return;
+        this.applySuggestion(parseInt(btn.dataset.label, 10), parseInt(btn.dataset.suggestion, 10));
+    }
 
-        const labelIndex = parseInt(btn.dataset.label, 10);
-        const suggestionIndex = parseInt(btn.dataset.suggestion, 10);
-
+    applySuggestion(labelIndex, suggestionIndex) {
         const label = this.model.labels[labelIndex];
         if (!label) return;
 
         label.model.select(suggestionIndex);
+        this.view.replaceLabelAt(labelIndex);
+        this.view.renderDisplays();
 
-        this.view.renderLabel(label, labelIndex);
-
-        const labelView = this.view.views[labelIndex];
-        labelView.wrapper.classList.add('visible');
-
-        const ta = document.getElementById(`hanzi-${labelIndex}`);
-        if (ta) ta.focus();
-        this.view.index.dispatchEvent(new Event("change"));
+        goToLabel(labelIndex + 1);
+        $(`hanzi-${labelIndex}`)?.focus();
     }
 
-    getMax() {
-        return window.app && app.model && Array.isArray(app.model.labels) ? app.model.labels.length : 1;
+    insertLabelAfter(index) {
+        const newIndex = this.model.addLabelAfter(index);
+        this.view.render(this.model);
+        goToLabel(newIndex + 1);
+        $(`hanzi-${newIndex}`)?.focus();
     }
 
-    handlePaging(event) {
-        const e = event;
-        if (e.key == 'PageDown' || e.key == 'PageUp') {
-            e.preventDefault();
-            const input = document.getElementById('label-index');
-            let v = Math.max(1, parseInt(input.value || '1', 10));
-
-            if (e.key === 'PageDown') v += 1;
-            else if (e.key === 'PageUp') v = Math.max(1, v - 1);
-
-            input.value = v;
-            input.dispatchEvent(new Event('change'));
+    deleteLabel(index) {
+        if (this.model.labels.length <= 1) {
+            alert('Impossible de supprimer la dernière étiquette.');
+            return;
         }
+        if (!confirm('Supprimer cette étiquette ?')) return;
+
+        this.model.removeLabel(index);
+        this.view.render(this.model);
+        goToLabel(Math.min(index, this.model.labels.length - 1) + 1);
     }
 
     handleIndexChange(event) {
-        const v = Math.max(1, parseInt(event.target.value || '1', 10));
-        const idx = v - 1;
-        const nodes = document.getElementById("viewer").querySelectorAll('[id^="chunk-"]');
-        nodes.forEach(n => {
-            if (n.id === `chunk-${idx}`) n.classList.add('visible');
-            else n.classList.remove('visible');
+        const total = Math.max(1, this.model.labels.length);
+        const value = Math.min(total, Math.max(1, parseInt(event.target.value || '1', 10)));
+        event.target.value = value;
+        const idx = value - 1;
+
+        this.view.labelsContainer.querySelectorAll('[id^="chunk-"]').forEach((n) => {
+            n.classList.toggle('visible', n.id === `chunk-${idx}`);
         });
 
-        for (var key in this.view.outputs) {
-            const spans = document.getElementById("viewer").querySelectorAll(`span[id^="${key}-"]`);
-            spans.forEach(n => {
-                n.classList.add('rounded-xl');
-                const margin = "m-10";
-                const highlight = 'bg-violet-300';
-                if (n.id === `${key}-${idx}`) {
-                    n.classList.add(highlight);
-                    n.classList.add(margin);
-                    n.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'nearest'
-                    });
-                } else {
-                    n.classList.remove(highlight);
-                    n.classList.remove(margin);
-                }
+        DISPLAY_TABS.forEach(({ key }) => {
+            this.view.panels[key].querySelectorAll(`[id^="${key}-"]`).forEach((n) => {
+                const isActive = n.id === `${key}-${idx}`;
+                n.classList.toggle('bg-violet-300', isActive);
+                n.classList.toggle('ring-2', isActive);
+                n.classList.toggle('ring-violet-400', isActive);
+                if (isActive) n.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             });
+        });
+
+        const focused = document.activeElement;
+        if (focused?.id) {
+            const type = focused.id.split('-')[0];
+            $(`${type}-${idx}`)?.focus();
+        }
+    }
+
+    async handleImportLocalProject() {
+        if (!window.showDirectoryPicker) {
+            alert("Votre navigateur ne supporte pas la sélection de dossier (File System Access API).");
+            return;
+        }
+        if (!confirm("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.")) {
+            return;
         }
 
-        const focusedId = document.activeElement?.id;
-        if (focusedId) {
-            const type = focusedId.split('-')[0];
-            const newFocusId = `${type}-${idx}`;
-            const newFocusEl = document.getElementById(newFocusId);
-            if (newFocusEl) newFocusEl.focus();
+        try {
+            const dirHandle = await window.showDirectoryPicker();
+            const filesByName = new Map();
+            for await (const [name, handle] of dirHandle.entries()) {
+                if (handle.kind === 'file') filesByName.set(name.toLowerCase(), handle);
+            }
+
+            const readText = async (name) => {
+                const handle = filesByName.get(name.toLowerCase());
+                return handle ? (await handle.getFile()).text() : null;
+            };
+
+            const [hakkaText, frenchText, pinyinText, pronText] = await Promise.all([
+                readText('hakka.txt'), readText('french.txt'), readText('pinyin.txt'), readText('prononciations.csv'),
+            ]);
+
+            if (!hakkaText) {
+                alert('Fichier introuvable : hakka.txt');
+                return;
+            }
+
+            this.model = new Transcription();
+            this.model.labels = ProjectLoader.parseHakka(hakkaText);
+            ProjectLoader.applyFrench(this.model.labels, frenchText);
+            ProjectLoader.applyPinyin(this.model.labels, pinyinText);
+
+            const audioHandle = filesByName.get('audio.wav');
+            if (audioHandle) {
+                const file = await audioHandle.getFile();
+                const url = URL.createObjectURL(file);
+                this.model.media = { name: 'audio.wav', file, url, mimeType: 'audio/x-wav' };
+                this.view.audio = { name: 'audio.wav', file, url };
+            }
+
+            for (const [name, handle] of filesByName) {
+                const labelIndex = ProjectLoader.matchNumberedAudioFile(name);
+                if (labelIndex !== null && this.model.labels[labelIndex]) {
+                    const file = await handle.getFile();
+                    this.model.labels[labelIndex].audio = { name, file, url: URL.createObjectURL(file) };
+                }
+            }
+
+            if (pronText) {
+                const prons = ProjectLoader.parsePronunciationsCsv(pronText);
+                dico.addPronunciations(prons);
+                alert(`${prons.length} prononciations chargées depuis le dossier.`);
+            }
+
+            this.view.render(this.model);
+            goToLabel(1);
+        } catch (err) {
+            console.error(err);
+            alert("Échec de l'import du dossier.");
         }
     }
 
     async handleImportHostedProject(event) {
+        const projectPath = event.target.value;
+        if (!projectPath) return;
+
         try {
-            const projectPath = event.target.value;
-            const files = {};
-            files.hakka = projectPath + "hakka.txt";
-            files.french = projectPath + "french.txt";
-            files.pinyin = projectPath + "pinyin.txt";
-            files.audio = projectPath + "audio.wav";
-            files.pron = projectPath + "prononciations.csv";
+            const readText = (name) => fetch(projectPath + name)
+                .then((r) => (r.ok ? r.text() : null))
+                .catch(() => null);
+
+            const [hakkaText, frenchText, pinyinText, pronText] = await Promise.all([
+                readText('hakka.txt'), readText('french.txt'), readText('pinyin.txt'), readText('prononciations.csv'),
+            ]);
+
+            if (!hakkaText) {
+                alert('Fichier introuvable : hakka.txt');
+                return;
+            }
 
             this.model = new Transcription();
-            this.view = new View();
+            this.model.labels = ProjectLoader.parseHakka(hakkaText);
+            ProjectLoader.applyFrench(this.model.labels, frenchText);
+            ProjectLoader.applyPinyin(this.model.labels, pinyinText);
 
-            if (files.hakka) {
-                const text = await fetch(files.hakka).then(r => r.text()).catch(() => alert("Fichier introuvable : hakka.txt"));
-                if (text) {
-                    const lines = text.split(/\r?\n/).filter(Boolean);
-                    this.model.labels = lines.map(line => {
-                        const [start, end, content] = line.split("\t");
-                        return {
-                            start: parseFloat(start),
-                            end: parseFloat(end),
-                            model: new HakkaText(dico, content || ""),
-                            pinyin: ""
-                        };
-                    });
-                }
-            }
+            const audioUrl = projectPath + 'audio.wav';
+            this.model.media = { name: 'audio.wav', url: audioUrl, mimeType: 'audio/x-wav' };
+            this.view.audio = { name: 'audio.wav', url: audioUrl };
 
-            if (files.french) {
-                const text = await fetch(files.french).then(r => r.text()).catch(() => alert("Fichier introuvable : french.txt"));
-                if (text) {
-                    const lines = text.split(/\r?\n/).filter(Boolean);
-                    lines.forEach((l, i) => {
-                        const parts = l.split("\t");
-                        if (this.model.labels?.[i]) {
-                            this.model.labels[i].model.french = parts[2] || "";
-                        }
-                    });
-                }
-            }
-
-            if (files.pinyin) {
-                const text = await fetch(files.pinyin).then(r => r.text()).catch(() => null);
-                if (text) {
-                    const lines = text.split(/\r?\n/).filter(Boolean);
-                    lines.forEach((l, i) => {
-                        const parts = l.split("\t");
-                        if (this.model.labels?.[i]) {
-                            this.model.labels[i].pinyin = parts[2] || "";
-                        }
-                    });
-                }
-            }
-
-            if (files.audio) {
-                this.view.audio = {
-                    name: "audio",
-                    url: files.audio
-                };
-                this.model.media = {
-                    name: "audio",
-                    url: files.audio,
-                    mimeType: "audio/x-wav",
-                };
-            }
-
-            if (files.pron) {
-                const text = await fetch(files.pron).then(r => r.text()).catch(() => alert("Fichier introuvable : prononciation.txt"));
-                if (text) {
-                    const lines = text.split(/\r?\n/).filter(Boolean);
-                    const pronunciations = [];
-                    const start = lines[0].includes("char") ? 1 : 0;
-
-                    for (let i = start; i < lines.length; i++) {
-                        const [char, initial, final, tone] = lines[i].split(",");
-                        pronunciations.push(
-                            new Pronunciation({ simp: char, trad: char, initial, final, tone })
-                        );
-                    }
-                    this.dico.addPronunciations(pronunciations);
-                }
+            if (pronText) {
+                dico.addPronunciations(ProjectLoader.parsePronunciationsCsv(pronText));
             }
 
             this.view.render(this.model);
-            this.view.displays.addEventListener("click", this.handleClickOnDisplays.bind(this));
-            this.view.index.dispatchEvent(new Event("change"));
-
-            alert("Project successfully loaded!");
-
+            goToLabel(1);
+            alert('Transcription chargée !');
         } catch (err) {
             console.error(err);
-            alert("Failed to import project.");
-        }
-    }
-
-    async handleImportLocalProject(event) {
-        if (!window.showDirectoryPicker) {
-            alert("Your browser does not support the File System Access API required for folder picking.");
-            return;
-        }
-        try {
-            alert("Vous êtes sur le point de charger un nouveau projet. Les modifications non enregistrées seront perdues.");
-
-            const dirHandle = await window.showDirectoryPicker();
-            const audios = [];
-
-            this.model = new Transcription();
-            this.view = new View();
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                if (name.toLowerCase() === 'hakka.txt') {
-                    const file = await handle.getFile();
-                    const text = await file.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-                    this.model.labels = lines.map(l => {
-                        const line = l.split('\t');
-                        return {
-                            start: parseFloat(line[0]),
-                            end: parseFloat(line[1]),
-                            model: new HakkaText(dico, line[2] || ''),
-                            pinyin: ""
-                        };
-                    });
-                    break;
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                if (name.toLowerCase() === 'french.txt') {
-                    const file = await handle.getFile();
-                    const text = await file.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-                    lines.forEach((l, i) => {
-                        const line = l.split('\t');
-                        if (this.model?.labels[i]) this.model.labels[i].model.french = line[2] || "";
-                    });
-                    break;
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                if (name.toLowerCase() === 'pinyin.txt') {
-                    const file = await handle.getFile();
-                    const text = await file.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-                    lines.forEach((l, i) => {
-                        const line = l.split('\t');
-                        if (this.model?.labels[i]) this.model.labels[i].pinyin = line[2] || "";
-                    });
-                    break;
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind == 'file' && name == 'audio.wav') {
-                    const file = await handle.getFile();
-                    const url = URL.createObjectURL(file);
-                    this.view.audio = { name, file, url };
-                    this.model.media = {
-                        name,
-                        file,
-                        url,
-                        mimeType: "audio/x-wav",
-                    };
-                }
-            }
-
-            for await (const [name, handle] of dirHandle.entries()) {
-                if (handle.kind !== 'file') continue;
-                const lower = name.toLowerCase();
-                const file = await handle.getFile();
-                const url = URL.createObjectURL(file);
-                if (/\.(mp3|wav|ogg|m4a|flac|webm)$/i.test(lower)) {
-                    const audio = { name, file, url };
-                    audios.push(audio);
-                    const i = parseInt(name.split("-")[1]);
-                    if (this.model?.labels[i]) this.model.labels[i - 1].audio = audio;
-                }
-            }
-
-            const pronunciations = [];
-            for await (const entry of dirHandle.values()) {
-                if (entry.kind === 'file' && entry.name == 'prononciations.csv') {
-                    const file = await entry.getFile();
-                    const text = await file.text();
-                    const lines = text.split('\n').filter(line => line.trim());
-                    let start = 0;
-                    if (lines[0].toLowerCase().includes('char') && lines[0].toLowerCase().includes('initial')) start = 1;
-                    for (let i = start; i < lines.length; i++) {
-                        const [char, initial, final, tone] = lines[i].split(',');
-                        const p = new Pronunciation({ simp: char, trad: char, initial, final, tone });
-                        pronunciations.push(p);
-                    }
-                    this.dico.addPronunciations(pronunciations);
-                    alert(`Loaded ${pronunciations.length} pronunciations from folder.`);
-                }
-            }
-
-            this.view.render(this.model);
-            this.view.displays.addEventListener('click', this.handleClickOnDisplays.bind(this));
-            this.view.index.dispatchEvent(new Event("change"));
-
-        } catch (err) {
-            console.error(err);
-            alert("Failed to import audios.");
+            alert("Échec de l'import du projet.");
         }
     }
 }

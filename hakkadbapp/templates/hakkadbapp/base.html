@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" class="bg-black text-white">
+<html lang="en" class="bg-gray-200 text-black">
 <head>
     <meta charset="UTF-8">
     <title> {{ title }}</title>
@@ -8,6 +8,20 @@
 
     <!-- Tailwind CSS -->
      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <!-- Charte graphique : rouge/or de l'association, police d'affichage arrondie -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @theme {
+            --color-brand: #8B1A1A;
+            --color-brand-dark: #6B1313;
+            --color-brand-gold: #F2A93D;
+            --font-display: "Baloo 2", "Poppins", sans-serif;
+        }
+    </style>
+
      <style>
   /* Global Hanzi font style */
   .hanzi {
@@ -112,130 +126,138 @@
 <body class="bg-gray-200 text-black min-h-screen flex flex-col font-sans">
 
 <!-- Header -->
-<header class="bg-red-600 text-white shadow-md">
-<div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
-  
-  <!-- Logo & Title Block -->
-<div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-  <div class="text-center sm:text-left">
-    <span class="hidden sm:inline text-2xl font-extrabold tracking-widest text-white drop-shadow hanzi leading-tight">
-      文化協會大溪地客家話辭典
-    </span>
-    <span class="inline sm:hidden text-lg font-bold text-white hanzi">
-      大溪地客家話辭典
-    </span>
-    <h1 class="text-lg font-semibold text-white mt-1">
-      {{ title }}
-    </h1>
-  </div>
+<header class="bg-brand text-white shadow-md">
+  <div class="container mx-auto px-4 py-3 sm:py-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 
-  <div class="no-print flex items-center gap-3">
-    <button
-      id="toggle-hanzi"
-      class="bg-red-700 text-white font-semibold text-sm px-3 py-2 rounded-full hover:bg-red-800 transition-colors"
-      aria-pressed="false"
-    >
-      Trad. / Simp.
-    </button>
+      <div class="flex items-center justify-between gap-3">
+        <!-- Logo & Title Block -->
+        <div class="min-w-0 flex-1 sm:flex-initial text-left">
+          <span class="hidden sm:inline text-2xl font-extrabold tracking-widest text-white drop-shadow hanzi leading-tight">
+            文化協會大溪地客家話辭典
+          </span>
+          <span class="inline sm:hidden text-lg font-bold text-white hanzi">
+            大溪地客家話辭典
+          </span>
+          <h1 class="font-display text-sm sm:text-lg font-semibold text-brand-gold truncate">
+            {{ title }}
+          </h1>
+        </div>
 
-    <div class="no-print flex items-center bg-red-700 text-white rounded-full px-3 py-1">
-      <label for="pinyin-menu" class="sr-only">Système de transcription</label>
-      <select
-        id="pinyin-menu"
-        class="bg-transparent text-black text-sm focus:outline-none"
-        aria-label="Système de transcription"
-      >
-        <option value="wenfa_py" selected>Guide de prononciation de l'association Wenfa</option>
-        <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
-        <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
-        <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
-        <option value="">Chinese English dictionary, the Hakka Dialect</option>
-        <option value="">Ernest Sin Chan</option>
-        <option value="">Manuel de Hakka de Francine Laufatte</option>
-      </select>
+        <!-- Mobile Menu Button -->
+        <button id="menu-toggle"
+                class="no-print sm:hidden shrink-0 min-h-11 min-w-11 p-2 rounded-lg bg-black/20 hover:bg-black/30 active:bg-black/40 text-white focus:outline-none focus:ring-2 focus:ring-brand-gold touch-manipulation"
+                aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="menu">
+          <svg class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" stroke-width="2"
+               viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Reading controls -->
+      <div class="no-print flex flex-wrap items-center gap-2 sm:gap-3">
+        <button
+          id="toggle-hanzi"
+          class="min-h-9 bg-black/20 text-white font-semibold text-sm px-3 py-2 rounded-full hover:bg-black/30 active:bg-black/40 transition-colors touch-manipulation"
+          aria-pressed="false"
+        >
+          Trad. / Simp.
+        </button>
+
+        <div class="no-print flex items-center bg-black/20 text-white rounded-full px-3 py-1">
+          <label for="pinyin-menu" class="sr-only">Système de transcription</label>
+          <select
+            id="pinyin-menu"
+            class="max-w-[10rem] sm:max-w-[16rem] truncate bg-transparent text-white text-sm focus:outline-none"
+            aria-label="Système de transcription"
+          >
+            <option value="wenfa_py" selected>Guide de prononciation de l'association Wenfa</option>
+            <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
+            <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
+            <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
+            <option value="">Chinese English dictionary, the Hakka Dialect</option>
+            <option value="">Ernest Sin Chan</option>
+            <option value="">Manuel de Hakka de Francine Laufatte</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const menu = document.getElementById('pinyin-menu');
-    menu.value = "wenfa_py";
-    function selectPinyin () {
-      if (menu.value) {
-        // Hide all pinyin classes
-        document.querySelectorAll('.wenfa_py, .hakka_dict_py, .chappell_py, .sagart_py').forEach(el => {
-          el.style.display = 'none';
-        });
-        // Show selected class
-        document.querySelectorAll('.' + menu.value).forEach(el => {
-          el.style.display = '';
-        });
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const menu = document.getElementById('pinyin-menu');
+      menu.value = "wenfa_py";
+      function selectPinyin () {
+        if (menu.value) {
+          // Hide all pinyin classes
+          document.querySelectorAll('.wenfa_py, .hakka_dict_py, .chappell_py, .sagart_py').forEach(el => {
+            el.style.display = 'none';
+          });
+          // Show selected class
+          document.querySelectorAll('.' + menu.value).forEach(el => {
+            el.style.display = '';
+          });
+        }
       }
-    }
-    selectPinyin();
-    menu.addEventListener('change', selectPinyin);
-  });
-</script>
-</div>
-  <!-- Mobile Menu Button -->
-  <button id="menu-toggle" class="no-print sm:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-white bg-red-600 hover:bg-red-700 text-white">
-    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
-         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  </button>
-</div>
+      selectPinyin();
+      menu.addEventListener('change', selectPinyin);
+    });
+  </script>
 
   <!-- Navigation Menu -->
-  <nav id="menu" class="no-print hidden sm:block px-4 pb-4 sm:pb-0">
-    <ul class="no-print flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0 text-sm sm:text-base font-medium">
-      <li>
-        <a href="{% url 'transcripter' %}" class="{% if page == 'transcripter' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Transcrire
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'pinyin_converter' %}" class="{% if page == 'converter' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Écrire
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'search' %}" class="{% if page == 'search' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Recherche
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'caracters' %}" class="{% if page == 'caracters' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Caractères
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'flashcards' %}" class="{% if page == 'flashcards' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Flashcards
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'reports' %}" class="{% if page == 'reports' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Analyse du lexique
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'phonemes' %}" class="{% if page == 'phonemes' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-          Phonèmes
-        </a>
-      </li>
-    <li>
-      <a href="{% url 'pronunciation' %}" class="{% if page == 'pronunciation' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-        Prononciation
-      </a>
-    </li>
+  <nav id="menu" class="no-print hidden sm:block border-t border-white/10 sm:border-0">
+    <div class="container mx-auto px-4">
+      <ul class="no-print flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1 text-sm sm:text-base font-medium font-display">
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'transcripter' %}" class="block py-2.5 sm:py-2 {% if page == 'transcripter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Transcrire
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'pinyin_converter' %}" class="block py-2.5 sm:py-2 {% if page == 'converter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Écrire
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'search' %}" class="block py-2.5 sm:py-2 {% if page == 'search' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Recherche
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'caracters' %}" class="block py-2.5 sm:py-2 {% if page == 'caracters' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Caractères
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'flashcards' %}" class="block py-2.5 sm:py-2 {% if page == 'flashcards' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Flashcards
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'reports' %}" class="block py-2.5 sm:py-2 {% if page == 'reports' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Analyse du lexique
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'phonemes' %}" class="block py-2.5 sm:py-2 {% if page == 'phonemes' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Phonèmes
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'pronunciation' %}" class="block py-2.5 sm:py-2 {% if page == 'pronunciation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Prononciation
+          </a>
+        </li>
         <li>
-      <a href="{% url 'expressions' %}" class="{% if page == 'expressions' %}text-lg font-bold{% else %}hover:text-lg font-bold{% endif %}">
-        Expressions
-      </a>
-    </li>
-    </ul>
+          <a href="{% url 'expressions' %}" class="block py-2.5 sm:py-2 {% if page == 'expressions' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Expressions
+          </a>
+        </li>
+      </ul>
+    </div>
   </nav>
 </header>
 
@@ -248,7 +270,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white text-black text-sm text-center p-4 shadow-inner">
+    <footer class="bg-brand text-white text-sm text-center p-4 shadow-inner font-display">
         &copy; {{ now|date:"Y" }} Lexique Hakka par l'association Wenfa.
     </footer>
 
@@ -257,7 +279,8 @@
   const menu = document.getElementById("menu");
 
   toggle.addEventListener("click", () => {
-    menu.classList.toggle("hidden");
+    const isOpen = menu.classList.toggle("hidden") === false;
+    toggle.setAttribute("aria-expanded", String(isOpen));
   });
 </script>
 

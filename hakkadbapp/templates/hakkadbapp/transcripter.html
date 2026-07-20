@@ -2,40 +2,80 @@
 {% load static %}
 {% block content %}
 <div class="mt-4"></div>
-    <div class="no-print flex flex-wrap justify-center gap-3">
-        <button id="import-prons" class="px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
-            Prononciations
+
+<div class="no-print flex justify-center">
+    <div class="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 bg-white rounded-xl shadow-sm px-4 py-3">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Import</span>
+            <button id="import-prons" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                🔤 Prononciations
+            </button>
+            <button id="import-project" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                📁 Dossier local
+            </button>
+            <select id="select-project" class="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md shadow-sm hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option> Transcription existante </option>
+                <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/"> Transcription 1 </option>
+                <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/paulette_than/"> Transcription 2 </option>
+            </select>
+        </div>
+
+        <div class="w-px self-stretch bg-gray-200 hidden sm:block"></div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Export</span>
+            <button id="export-project" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-md shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                💾 Fichiers texte
+            </button>
+            <button id="export-eaf" class="px-3 py-1.5 text-sm bg-emerald-700 text-white rounded-md shadow-sm hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                🎞️ Exporter EAF…
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="no-print mt-4 flex justify-center">
+    <div class="flex items-center gap-1 bg-white rounded-full shadow-sm px-2 py-1.5">
+        <button id="nav-prev" type="button" title="Étiquette précédente (Page précédente)"
+            class="px-3 py-1 text-sm rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            ◀ Précédent
         </button>
-        <!-- <button id="import-labels" class="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            Etiquettes
+
+        <div class="flex items-center gap-1 px-1">
+            <label for="label-index" class="sr-only">Index de l'étiquette</label>
+            <input id="label-index" type="number" min="1" step="1" value="1" inputmode="numeric" pattern="\d*" aria-label="Index de l'étiquette" title="Numéro d'étiquette"
+                class="w-16 text-center bg-gray-50 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <span id="label-total" class="text-xs text-gray-400 whitespace-nowrap"></span>
+        </div>
+
+        <button id="nav-next" type="button" title="Étiquette suivante (Page suivante)"
+            class="px-3 py-1 text-sm rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            Suivant ▶
         </button>
-        <button id="import-audios" class="px-4 py-2 bg-gray-700 text-white rounded-md shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400">
-            Audios
-        </button> -->
-        <button id="import-project" class="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">
-            Importer 📁
-        </button>
-        <select id="select-project" class="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">
-            <option> Transcription existante </option>
-            <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/"> Transcription 1 </option>
-            <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/paulette_than/"> Transcription 2 </option>
-        </select>
-        <button id="export-project" class="px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">
-            Exporter 💾
-        </button>
-        <button id="export-eaf" class="px-4 py-2 bg-emerald-600 text-white rounded-md shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300">
-            Exporter EAF
+
+        <span class="w-px h-5 bg-gray-200 mx-1"></span>
+
+        <button id="nav-new-label" type="button" title="Nouvelle étiquette après la courante (Ctrl+Entrée)"
+            class="px-3 py-1 text-sm rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            + Étiquette
         </button>
     </div>
 </div>
 
-<div class="no-print mt-6 flex items-center justify-center gap-3">
-    <div class="flex items-center gap-2">
-        <label for="label-index" class="sr-only">Index de l'étiquette</label>
-        <input id="label-index" type="number" min="1" step="1" value="1" inputmode="numeric" pattern="\d*" aria-label="Index de l'étiquette" title="Numéro d'étiquette"
-            class="w-20 text-center bg-white rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+<dialog id="eaf-meta-dialog" class="rounded-lg shadow-xl p-0 border-0 bg-white text-black w-full max-w-2xl backdrop:bg-black/50 max-h-[85vh] overflow-y-auto">
+    <div class="p-5">
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">Métadonnées EAF (export ELAN)</h2>
+        <div id="eaf-meta-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button type="button" id="eaf-dialog-cancel" class="px-4 py-2 text-sm rounded-md border hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                Annuler
+            </button>
+            <button type="button" id="eaf-dialog-export" class="px-4 py-2 text-sm rounded-md bg-emerald-700 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                Exporter
+            </button>
+        </div>
     </div>
-</div>
+</dialog>
 
 <style>
     /* hide all rendered chunks by default, show only the one with .visible */
@@ -51,6 +91,7 @@
     <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/CopyButton.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/transcripter.js' %}"></script>

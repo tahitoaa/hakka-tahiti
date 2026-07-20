@@ -1,12 +1,7 @@
-class HakkaText {
+class HakkaText extends SyllableInputModel {
     constructor (dico, text='') {
-        // A text model is a list of Tokens
-        // this.items = [];
-        this.suggestions = [];
-        this.syllables = [];
-        this.text = '';
+        super(dico);
         this.matches = '';
-        this.dico = dico;
         this.pinyin = '';
         this.french = '';
         this.hanzi = '';
@@ -21,23 +16,7 @@ class HakkaText {
         }
 
         if (update["hanzi"] != undefined) {
-            const text = update["hanzi"];
-            const textWithoutStars = text.replace(/\*[^*]*\*/g, '');
-            this.syllables = textWithoutStars.match(/[a-zü]+[_0-6]?/gi) || [];
-            this.suggestions = [];
-
-            this.syllables.forEach((syl, i) => {
-                this.suggestions.push(
-                    ...this.dico.getMatchesForSyllable(syl.split("_")[0]).map(p => ({
-                        pron: p,
-                        for: i,
-                        start: 0,
-                        end: 0
-                    }))
-                );
-            });
-
-            this.text = text;
+            this.parse(update["hanzi"]);
             this.sentences = this.text
                                     .split('\n')
                                     .map(line => new Sentence(this.dico, line));
@@ -55,13 +34,8 @@ class HakkaText {
 
     select(selectionIndex){
         const suggestion = this.suggestions[selectionIndex];
+        if (!suggestion) return;
         this.replace(suggestion.for, suggestion.pron.simp);
         this.update({"hanzi": this.text});
-    }
-
-    replace(sylIndex, replaceValue) {
-        const toReplace = this.syllables[sylIndex];
-        const replaced = this.text.replace(toReplace, replaceValue);
-        this.text = replaced;
     }
 }
