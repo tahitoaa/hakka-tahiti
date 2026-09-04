@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corpus Diff Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:      #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --border-strong:  rgba(11,11,11,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.10);
+    --status-warning:   #b5790a;
+    --status-warning-bg:rgba(250,178,25,0.18);
+    --status-serious:   #c25a34;
+    --status-serious-bg:rgba(236,131,90,0.16);
+    --status-critical:  #d03b3b;
+    --status-critical-bg:rgba(208,59,59,0.10);
+    --chip-bg:        #f0efec;
+    --chip-bg-active: #0b0b0b;
+    --chip-fg-active: #fcfcfb;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --border-strong:  rgba(255,255,255,0.18);
+      --status-good:      #0ca30c;
+      --status-good-bg:   rgba(12,163,12,0.18);
+      --status-warning:   #fab219;
+      --status-warning-bg:rgba(250,178,25,0.16);
+      --status-serious:   #ec835a;
+      --status-serious-bg:rgba(236,131,90,0.18);
+      --status-critical:  #e66767;
+      --status-critical-bg:rgba(230,103,103,0.16);
+      --chip-bg:        #262623;
+      --chip-bg-active: #ffffff;
+      --chip-fg-active: #1a1a19;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --border-strong:  rgba(255,255,255,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.18);
+    --status-warning:   #fab219;
+    --status-warning-bg:rgba(250,178,25,0.16);
+    --status-serious:   #ec835a;
+    --status-serious-bg:rgba(236,131,90,0.18);
+    --status-critical:  #e66767;
+    --status-critical-bg:rgba(230,103,103,0.16);
+    --chip-bg:        #262623;
+    --chip-bg-active: #ffffff;
+    --chip-fg-active: #1a1a19;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
+
+  header.top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  header.top h1 { font-size: 20px; margin: 0 0 4px; }
+  header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  .theme-toggle {
+    border: 1px solid var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--sans);
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--text-muted); }
+
+  .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+  @media (max-width: 760px) { .overview { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 12px; color: var(--text-primary); }
+  .card h2 .count { color: var(--text-muted); font-weight: 400; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  @media (max-width: 520px) { .stat-row { grid-template-columns: repeat(2, 1fr); } }
+  .stat-tile {
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--chip-bg);
+  }
+  .stat-tile .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-tile .label { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .dot-good { background: var(--status-good); }
+  .dot-warning { background: var(--status-warning); }
+  .dot-serious { background: var(--status-serious); }
+  .dot-critical { background: var(--status-critical); }
+
+  .stack-bar { height: 8px; border-radius: 4px; overflow: hidden; display: flex; gap: 2px; background: var(--gridline); }
+  .stack-seg { height: 100%; }
+  .stack-seg.good { background: var(--status-good); }
+  .stack-seg.warning { background: var(--status-warning); }
+  .stack-seg.critical { background: var(--status-critical); }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--gridline);
+    margin-bottom: 16px;
+  }
+  nav.tabs button {
+    font-family: var(--sans);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 10px 4px;
+    margin-right: 18px;
+    cursor: pointer;
+  }
+  nav.tabs button.active { color: var(--text-primary); border-bottom-color: var(--text-primary); font-weight: 600; }
+  nav.tabs button .badge {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    background: var(--chip-bg);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-variant-numeric: tabular-nums;
+  }
+  nav.tabs button.active .badge { background: var(--chip-bg-active); color: var(--chip-fg-active); }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .chip {
+    font-family: var(--sans);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .chip.active { background: var(--chip-bg-active); color: var(--chip-fg-active); border-color: transparent; }
+  .search {
+    margin-left: auto;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: var(--sans);
+    min-width: 220px;
+  }
+  .search:focus { outline: 2px solid var(--status-good); outline-offset: -1px; }
+
+  table.rows { width: 100%; border-collapse: collapse; }
+  table.rows th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  table.rows td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--gridline);
+    vertical-align: top;
+  }
+  table.rows tr.data-row { cursor: pointer; }
+  table.rows tr.data-row:hover td { background: var(--chip-bg); }
+  table.rows tr.data-row.open td { background: var(--chip-bg); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .target-cell { font-weight: 600; }
+  .target-cell .target-text { display: inline-block; vertical-align: middle; }
+  .id-cell { color: var(--text-muted); font-size: 11px; }
+
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    width: 22px;
+    height: 22px;
+    margin-left: 4px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--chip-bg); color: var(--text-primary); }
+  .copy-btn:focus-visible { outline: 2px solid var(--status-good); outline-offset: 1px; }
+  .copy-btn svg { width: 13px; height: 13px; }
+  .copy-btn.copied { color: var(--status-good); }
+  .dup-target .copy-btn { width: 20px; height: 20px; }
+  .chevron { display: inline-block; transition: transform 0.15s ease; color: var(--text-muted); margin-right: 6px; }
+  tr.open .chevron { transform: rotate(90deg); }
+
+  .status-badge {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-badge.added { background: var(--status-good-bg); color: var(--status-good); }
+  .status-badge.modified { background: var(--status-warning-bg); color: var(--status-warning); }
+  .status-badge.deleted { background: var(--status-critical-bg); color: var(--status-critical); }
+  .status-badge.dup-critical { background: var(--status-critical-bg); color: var(--status-critical); }
+  .status-badge.dup-serious { background: var(--status-serious-bg); color: var(--status-serious); }
+  .status-badge.audio-missing, .status-badge.audio-lost { background: var(--status-critical-bg); color: var(--status-critical); }
+  .status-badge.audio-renamed { background: var(--status-warning-bg); color: var(--status-warning); }
+  .status-badge.audio-gained, .status-badge.audio-present { background: var(--status-good-bg); color: var(--status-good); }
+  .status-badge.audio-unchanged { background: var(--chip-bg); color: var(--text-muted); }
+
+  .flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 5px;
+    padding: 1px 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .flag.dup { background: var(--status-serious-bg); color: var(--status-serious); }
+
+  .detail-row td {
+    background: var(--page-plane);
+    padding: 0;
+  }
+  .detail-inner { padding: 14px 16px 18px 30px; }
+  .diff-field { display: grid; grid-template-columns: 160px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--gridline); align-items: start; }
+  .diff-field:last-child { border-bottom: none; }
+  .diff-field .field-name { font-size: 11px; color: var(--text-muted); padding-top: 3px; }
+  .diff-field .field-value { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .diff-field.single .field-value { grid-template-columns: 1fr; }
+  .val-box { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; padding: 5px 8px; border-radius: 6px; background: var(--chip-bg); }
+  .val-box.removed { background: var(--status-critical-bg); color: var(--status-critical); text-decoration: line-through; text-decoration-color: var(--status-critical); opacity: 0.85; }
+  .val-box.added { background: var(--status-good-bg); color: var(--status-good); }
+  .val-box.empty { color: var(--text-muted); font-style: italic; background: transparent; }
+  .diff-field.unchanged { opacity: 0.55; }
+  .toggle-unchanged {
+    font-family: var(--sans);
+    background: none;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 4px 9px;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .theme-chip { display: inline-block; background: var(--chip-bg); border-radius: 5px; padding: 1px 7px; font-size: 11px; margin: 1px 3px 1px 0; }
+
+  .empty-state { color: var(--text-muted); font-size: 13px; padding: 30px 10px; text-align: center; }
+
+  .dup-section { margin-bottom: 20px; }
+  .dup-section h3 { font-size: 13px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .dup-section p.hint { color: var(--text-secondary); font-size: 12px; margin: 0 0 10px; }
+  .dup-group { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface-1); }
+  .dup-group .dup-target { font-weight: 600; margin-bottom: 6px; }
+  .dup-entries { display: flex; flex-direction: column; gap: 4px; }
+  .dup-entry { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-secondary); }
+  .dup-entry .mono { color: var(--text-primary); }
+
+  footer.note { margin-top: 30px; color: var(--text-muted); font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Corpus Diff Dashboard</h1>
+      <p>Reference = E-reo database &middot; Current = Vercel database &middot; Generated <span id="generated-at"></span></p>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>
+  </header>
+
+  <section class="overview" id="overview"></section>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="words" class="active">Words <span class="badge" id="tab-count-words"></span></button>
+    <button data-tab="expressions">Expressions <span class="badge" id="tab-count-expressions"></span></button>
+    <button data-tab="audio">Audio <span class="badge" id="tab-count-audio"></span></button>
+    <button data-tab="duplicates">Duplicates <span class="badge" id="tab-count-duplicates"></span></button>
+  </nav>
+
+  <section id="panel-words" class="panel">
+    <div class="controls">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="added">Add</button>
+      <button class="chip" data-filter="modified">Modified</button>
+      <button class="chip" data-filter="deleted">Delete from E-reo</button>
+      <input class="search" type="search" placeholder="Search target / french / tahitian / id&hellip;" id="search-words">
+    </div>
+    <table class="rows">
+      <thead><tr><th>Status</th><th>Target</th><th>French</th><th>Tahitian</th><th>ID</th></tr></thead>
+      <tbody id="tbody-words"></tbody>
+    </table>
+    <div class="empty-state" id="empty-words" hidden>No rows match this filter.</div>
+  </section>
+
+  <section id="panel-expressions" class="panel" hidden>
+    <div class="controls">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="added">Add</button>
+      <button class="chip" data-filter="modified">Modified</button>
+      <button class="chip" data-filter="deleted">Delete from E-reo</button>
+      <input class="search" type="search" placeholder="Search target / french / english / id&hellip;" id="search-expressions">
+    </div>
+    <table class="rows">
+      <thead><tr><th>Status</th><th>Target</th><th>French</th><th>English</th><th>ID</th></tr></thead>
+      <tbody id="tbody-expressions"></tbody>
+    </table>
+    <div class="empty-state" id="empty-expressions" hidden>No rows match this filter.</div>
+  </section>
+
+  <section id="panel-audio" class="panel" hidden>
+    <div class="controls">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="missing">Missing</button>
+      <button class="chip" data-filter="lost">Lost</button>
+      <button class="chip" data-filter="renamed">Renamed</button>
+      <button class="chip" data-filter="gained">Gained</button>
+      <input class="search" type="search" placeholder="Search target / french / tahitian&hellip;" id="search-audio">
+    </div>
+    <table class="rows">
+      <thead><tr><th>Audio status</th><th>Target</th><th>French</th><th>Reference audio</th><th>Current audio</th></tr></thead>
+      <tbody id="tbody-audio"></tbody>
+    </table>
+    <div class="empty-state" id="empty-audio" hidden>No rows match this filter.</div>
+  </section>
+
+  <section id="panel-duplicates" class="panel" hidden>
+    <div id="duplicates-content"></div>
+  </section>
+
+  <footer class="note">Open this file directly in a browser &mdash; all diff data is embedded, no server required.</footer>
+</div>
+
+<script id="diff-data" type="application/json">__DIFF_DATA_JSON__</script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("diff-data").textContent);
+  var THEMES = DATA.themes || {};
+
+  var STATUS_LABELS = { added: "Add", modified: "Modified", deleted: "Delete from E-reo" };
+
+  var WORD_FIELDS = [
+    { key: "translations.primary", label: "French" },
+    { key: "translations.secondary", label: "Tahitian" },
+    { key: "translations.target", label: "Target" },
+    { key: "themes", label: "Themes", kind: "themes" },
+    { key: "part_of_speech", label: "Part of speech" },
+    { key: "level", label: "Level" },
+    { key: "image", label: "Image" },
+    { key: "gloss_code", label: "Gloss code", kind: "list" },
+    { key: "variants", label: "Variants", kind: "json" },
+    { key: "in_expression", label: "In expression", kind: "list" }
+  ];
+
+  var EXPR_FIELDS = [
+    { key: "translations.primary", label: "French" },
+    { key: "translations.secondary", label: "English" },
+    { key: "translations.target", label: "Target" },
+    { key: "themes", label: "Themes", kind: "themes" },
+    { key: "level", label: "Level" },
+    { key: "components", label: "Components", kind: "json" }
+  ];
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var COPY_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
+  var CHECK_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8.5l3 3 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function copyButtonHtml(text, extraClass) {
+    if (!text) return "";
+    return '<button type="button" class="copy-btn' + (extraClass ? " " + extraClass : "") +
+      '" data-copy="' + escapeHtml(text) + '" title="Copy target" aria-label="Copy target">' + COPY_ICON + "</button>";
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { copyTextFallback(text); });
+    }
+    copyTextFallback(text);
+    return Promise.resolve();
+  }
+
+  function copyTextFallback(text) {
+    var el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.top = "-1000px";
+    document.body.appendChild(el);
+    el.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(el);
+  }
+
+  function bindCopyButtons(container) {
+    Array.prototype.forEach.call(container.querySelectorAll(".copy-btn"), function (btn) {
+      btn.addEventListener("click", function (evt) {
+        evt.stopPropagation();
+        var text = btn.getAttribute("data-copy") || "";
+        copyText(text);
+        var original = btn.innerHTML;
+        btn.classList.add("copied");
+        btn.innerHTML = CHECK_ICON;
+        clearTimeout(btn._copyResetTimer);
+        btn._copyResetTimer = setTimeout(function () {
+          btn.classList.remove("copied");
+          btn.innerHTML = original;
+        }, 1200);
+      });
+    });
+  }
+
+  function getPath(obj, path) {
+    if (!obj) return undefined;
+    return path.split(".").reduce(function (o, k) { return o == null ? undefined : o[k]; }, obj);
+  }
+
+  function fmtScalar(v) {
+    if (v === undefined || v === null || v === "") return "";
+    return String(v);
+  }
+
+  function fmtThemes(ids) {
+    if (!ids || !ids.length) return "";
+    return ids.map(function (id) {
+      var name = THEMES[id];
+      return '<span class="theme-chip">' + escapeHtml(name ? name : id) + '</span>';
+    }).join("");
+  }
+
+  function fmtList(arr) {
+    if (!arr || !arr.length) return "";
+    return escapeHtml(arr.join(", "));
+  }
+
+  function fmtJson(v) {
+    if (v === undefined || v === null) return "";
+    if (typeof v === "object" && Object.keys(v).length === 0) return "";
+    return "<pre style=\"margin:0;font-family:inherit;white-space:pre-wrap\">" + escapeHtml(JSON.stringify(v, null, 2)) + "</pre>";
+  }
+
+  function renderFieldValue(field, value) {
+    if (field.kind === "themes") return fmtThemes(value);
+    if (field.kind === "list") return fmtList(value);
+    if (field.kind === "json") return fmtJson(value);
+    return escapeHtml(fmtScalar(value));
+  }
+
+  function isEmptyVal(v) {
+    if (v === undefined || v === null || v === "") return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === "object") return Object.keys(v).length === 0;
+    return false;
+  }
+
+  function valuesEqual(a, b) {
+    return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+  }
+
+  // ---- row model -----------------------------------------------------
+
+  function buildRows(category) {
+    var section = DATA[category] || { added: [], modified: [], deleted: [] };
+    var dupIds = new Set();
+    (DATA.duplicates && DATA.duplicates["current_" + category] || []).forEach(function (g) {
+      g.entries.forEach(function (e) { dupIds.add(e.resulting_id); });
+    });
+    var shadowedRefIds = new Set();
+    (DATA.duplicates && DATA.duplicates["reference_" + category] || []).forEach(function (g) {
+      g.ids.forEach(function (id) { shadowedRefIds.add(id); });
+    });
+
+    var rows = [];
+    section.added.forEach(function (e) {
+      rows.push({ type: "added", id: e.id, reference: null, current: e.current, dup: dupIds.has(e.id) });
+    });
+    section.modified.forEach(function (e) {
+      rows.push({ type: "modified", id: e.id, reference: e.reference, current: e.current, dup: dupIds.has(e.id) });
+    });
+    section.deleted.forEach(function (e) {
+      rows.push({ type: "deleted", id: e.id, reference: e.reference, current: null, shadowed: shadowedRefIds.has(e.id) });
+    });
+
+    rows.sort(function (a, b) {
+      var ta = ((a.current || a.reference || {}).translations || {}).target || "";
+      var tb = ((b.current || b.reference || {}).translations || {}).target || "";
+      return ta.localeCompare(tb);
+    });
+    return rows;
+  }
+
+  function rowSearchText(row) {
+    var t = row.current || row.reference || {};
+    var tr = t.translations || {};
+    return [row.id, tr.primary, tr.secondary, tr.target].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  // Only words carry an "audio" field. Status is derived from presence, not
+  // the exact filename, mirroring the presence-only rule used to decide
+  // whether a row counts as "modified" in the first place.
+  function audioStatus(row) {
+    var refAudio = row.reference ? row.reference.audio : undefined;
+    var curAudio = row.current ? row.current.audio : undefined;
+    var refHas = !!refAudio;
+    var curHas = !!curAudio;
+
+    if (row.type === "added") return curHas ? "present" : "missing";
+    if (row.type === "deleted") return refHas ? "present" : "missing";
+
+    if (refHas && !curHas) return "lost";
+    if (!refHas && curHas) return "gained";
+    if (!refHas && !curHas) return "missing";
+    if (refAudio !== curAudio) return "renamed";
+    return "unchanged";
+  }
+
+  var AUDIO_STATUS_LABELS = {
+    missing: "Missing", lost: "Lost", renamed: "Renamed",
+    gained: "Gained", present: "Present", unchanged: "Unchanged"
+  };
+
+  function buildAudioRows() {
+    return buildRows("words").map(function (row) {
+      var t = row.current || row.reference || {};
+      var tr = t.translations || {};
+      return {
+        id: row.id,
+        target: tr.target || "",
+        primary: tr.primary || "",
+        refAudio: row.reference ? row.reference.audio || "" : "",
+        curAudio: row.current ? row.current.audio || "" : "",
+        status: audioStatus(row)
+      };
+    });
+  }
+
+  // ---- table rendering -------------------------------------------------
+
+  var state = {
+    words: { filter: "all", search: "", openId: null },
+    expressions: { filter: "all", search: "", openId: null },
+    audio: { filter: "all", search: "" },
+    activeTab: "words"
+  };
+
+  function fieldsFor(category) { return category === "words" ? WORD_FIELDS : EXPR_FIELDS; }
+
+  function renderDetail(category, row) {
+    var fields = fieldsFor(category);
+    var htmlParts = [];
+    var hasUnchanged = false;
+
+    fields.forEach(function (field) {
+      var refVal = row.reference ? getPath(row.reference, field.key) : undefined;
+      var curVal = row.current ? getPath(row.current, field.key) : undefined;
+
+      if (row.type === "added") {
+        if (isEmptyVal(curVal)) return;
+        htmlParts.push(
+          '<div class="diff-field single"><div class="field-name">' + escapeHtml(field.label) + '</div>' +
+          '<div class="field-value"><div class="val-box added">' + renderFieldValue(field, curVal) + '</div></div></div>'
+        );
+        return;
+      }
+      if (row.type === "deleted") {
+        if (isEmptyVal(refVal)) return;
+        htmlParts.push(
+          '<div class="diff-field single"><div class="field-name">' + escapeHtml(field.label) + '</div>' +
+          '<div class="field-value"><div class="val-box removed">' + renderFieldValue(field, refVal) + '</div></div></div>'
+        );
+        return;
+      }
+
+      // modified
+      var same = field.presenceOnly ? (!!refVal === !!curVal) : valuesEqual(refVal, curVal);
+      if (same && isEmptyVal(refVal)) return;
+      var refHtml = isEmptyVal(refVal) ? '<span class="val-box empty">empty</span>' : '<div class="val-box' + (same ? "" : " removed") + '">' + renderFieldValue(field, refVal) + "</div>";
+      var curHtml = isEmptyVal(curVal) ? '<span class="val-box empty">empty</span>' : '<div class="val-box' + (same ? "" : " added") + '">' + renderFieldValue(field, curVal) + "</div>";
+      if (same) hasUnchanged = true;
+      htmlParts.push(
+        '<div class="diff-field' + (same ? " unchanged" : "") + '" data-unchanged="' + same + '">' +
+        '<div class="field-name">' + escapeHtml(field.label) + (same ? "" : ' <strong style="color:var(--status-warning)">&bull;</strong>') + '</div>' +
+        '<div class="field-value">' + refHtml + curHtml + '</div></div>'
+      );
+    });
+
+    var toggleBtn = row.type === "modified" && hasUnchanged
+      ? '<button class="toggle-unchanged" type="button">Show unchanged fields</button>' : "";
+
+    var flagHtml = "";
+    if (row.dup) flagHtml += '<span class="flag dup">duplicate target &mdash; see Duplicates tab</span>';
+    if (row.shadowed) flagHtml += '<span class="flag dup">reference target shadowed by a duplicate &mdash; see Duplicates tab</span>';
+
+    var header = row.type === "modified"
+      ? '<div style="display:flex;gap:16px;margin-bottom:8px;color:var(--text-muted);font-size:11px"><span style="width:160px">&nbsp;</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1"><span>Reference (E-reo)</span><span>Current (Vercel)</span></div></div>'
+      : "";
+
+    return '<div class="detail-inner">' + (flagHtml ? '<div style="margin-bottom:10px">' + flagHtml + '</div>' : "") +
+      toggleBtn + header + htmlParts.join("") + "</div>";
+  }
+
+  function renderTable(category) {
+    var s = state[category];
+    var tbody = document.getElementById("tbody-" + category);
+    var empty = document.getElementById("empty-" + category);
+    var rows = buildRows(category).filter(function (r) {
+      if (s.filter !== "all" && r.type !== s.filter) return false;
+      if (s.search && rowSearchText(r).indexOf(s.search) === -1) return false;
+      return true;
+    });
+
+    if (!rows.length) {
+      tbody.innerHTML = "";
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (row) {
+      var t = row.current || row.reference || {};
+      var tr = t.translations || {};
+      var open = state[category].openId === row.id;
+      var dupFlag = row.dup || row.shadowed ? '<span class="flag dup">dup</span>' : "";
+      return (
+        '<tr class="data-row' + (open ? " open" : "") + '" data-id="' + escapeHtml(row.id) + '">' +
+        '<td><span class="chevron">&#9656;</span><span class="status-badge ' + row.type + '">' + STATUS_LABELS[row.type] + "</span>" + dupFlag + "</td>" +
+        '<td class="target-cell"><span class="target-text">' + escapeHtml(fmtScalar(tr.target)) + "</span>" + copyButtonHtml(fmtScalar(tr.target)) + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(tr.primary)) + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(tr.secondary)) + "</td>" +
+        '<td class="id-cell mono">' + escapeHtml(row.id) + "</td>" +
+        "</tr>" +
+        (open
+          ? '<tr class="detail-row" data-detail-for="' + escapeHtml(row.id) + '"><td colspan="5">' + renderDetail(category, row) + "</td></tr>"
+          : "")
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(tbody.querySelectorAll("tr.data-row"), function (tr) {
+      tr.addEventListener("click", function () {
+        var id = tr.getAttribute("data-id");
+        state[category].openId = state[category].openId === id ? null : id;
+        renderTable(category);
+      });
+    });
+
+    bindCopyButtons(tbody);
+
+    var toggleBtn = tbody.querySelector(".toggle-unchanged");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", function (evt) {
+        evt.stopPropagation();
+        var container = toggleBtn.closest(".detail-inner");
+        var hidden = container.classList.toggle("show-unchanged");
+        Array.prototype.forEach.call(container.querySelectorAll('.diff-field[data-unchanged="true"]'), function (el) {
+          el.style.display = hidden ? "grid" : "none";
+        });
+        toggleBtn.textContent = hidden ? "Hide unchanged fields" : "Show unchanged fields";
+      });
+      Array.prototype.forEach.call(tbody.querySelectorAll('.diff-field[data-unchanged="true"]'), function (el) {
+        el.style.display = "none";
+      });
+    }
+  }
+
+  function renderAudioTable() {
+    var s = state.audio;
+    var tbody = document.getElementById("tbody-audio");
+    var empty = document.getElementById("empty-audio");
+    var rows = buildAudioRows().filter(function (r) {
+      if (s.filter !== "all" && r.status !== s.filter) return false;
+      if (s.search) {
+        var text = [r.target, r.primary].join(" ").toLowerCase();
+        if (text.indexOf(s.search) === -1) return false;
+      }
+      return true;
+    });
+
+    if (!rows.length) {
+      tbody.innerHTML = "";
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (row) {
+      return (
+        "<tr>" +
+        '<td><span class="status-badge audio-' + row.status + '">' + AUDIO_STATUS_LABELS[row.status] + "</span></td>" +
+        '<td class="target-cell"><span class="target-text">' + escapeHtml(row.target) + "</span>" + copyButtonHtml(row.target) + "</td>" +
+        "<td>" + escapeHtml(row.primary) + "</td>" +
+        '<td class="mono">' + (row.refAudio ? escapeHtml(row.refAudio) : '<span class="val-box empty" style="padding:0">&mdash;</span>') + "</td>" +
+        '<td class="mono">' + (row.curAudio ? escapeHtml(row.curAudio) : '<span class="val-box empty" style="padding:0">&mdash;</span>') + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+
+    bindCopyButtons(tbody);
+  }
+
+  // ---- overview stat tiles ----------------------------------------------
+
+  function renderOverview() {
+    var overview = document.getElementById("overview");
+    var cats = [
+      { key: "words", label: "Words" },
+      { key: "expressions", label: "Expressions" }
+    ];
+    overview.innerHTML = cats.map(function (c) {
+      var s = (DATA.summary && DATA.summary[c.key]) || { added: 0, modified: 0, deleted: 0 };
+      var dupCount = ((DATA.duplicates && DATA.duplicates["current_" + c.key]) || []).length +
+        ((DATA.duplicates && DATA.duplicates["reference_" + c.key]) || []).length;
+      var total = s.added + s.modified + s.deleted || 1;
+      return (
+        '<div class="card"><h2>' + c.label + ' <span class="count">(' + (s.added + s.modified + s.deleted) + ' changed)</span></h2>' +
+        '<div class="stat-row">' +
+        '<div class="stat-tile"><div class="value">' + s.added + '</div><div class="label"><span class="dot dot-good"></span>Add</div></div>' +
+        '<div class="stat-tile"><div class="value">' + s.modified + '</div><div class="label"><span class="dot dot-warning"></span>Modified</div></div>' +
+        '<div class="stat-tile"><div class="value">' + s.deleted + '</div><div class="label"><span class="dot dot-critical"></span>Delete from E-reo</div></div>' +
+        '<div class="stat-tile"><div class="value">' + dupCount + '</div><div class="label"><span class="dot dot-serious"></span>Duplicate targets</div></div>' +
+        "</div>" +
+        '<div class="stack-bar">' +
+        '<div class="stack-seg good" style="flex:' + s.added + '"></div>' +
+        '<div class="stack-seg warning" style="flex:' + s.modified + '"></div>' +
+        '<div class="stack-seg critical" style="flex:' + s.deleted + '"></div>' +
+        (total === 1 && s.added + s.modified + s.deleted === 0 ? '<div class="stack-seg" style="flex:1;background:var(--gridline)"></div>' : "") +
+        "</div></div>"
+      );
+    }).join("");
+  }
+
+  // ---- duplicates tab ---------------------------------------------------
+
+  function dupEntryLine(category, entry) {
+    if (category.indexOf("words") !== -1) {
+      return '<div class="dup-entry">' +
+        '<span>db id <span class="mono">' + escapeHtml(entry.db_id) + "</span></span>" +
+        "<span>" + escapeHtml(entry.french || "&mdash;") + " / " + escapeHtml(entry.tahitian || "&mdash;") + "</span>" +
+        '<span>&rarr; resulting id <span class="mono">' + escapeHtml(entry.resulting_id) + "</span></span>" +
+        "</div>";
+    }
+    return '<div class="dup-entry">' +
+      '<span>db id <span class="mono">' + escapeHtml(entry.db_id) + "</span></span>" +
+      "<span>" + escapeHtml(entry.french || "&mdash;") + " / " + escapeHtml(entry.english || "&mdash;") + "</span>" +
+      '<span>&rarr; resulting id <span class="mono">' + escapeHtml(entry.resulting_id) + "</span></span>" +
+      "</div>";
+  }
+
+  function renderCurrentDupSection(title, hint, groups, severityKey) {
+    var filtered = groups.filter(function (g) {
+      var matched = !!g.entries[0].matched_reference_id;
+      return severityKey === "critical" ? matched : !matched;
+    });
+    if (!filtered.length) return "";
+    var badgeClass = severityKey === "critical" ? "dup-critical" : "dup-serious";
+    return '<div class="dup-section"><h3>' + title + ' <span class="status-badge ' + badgeClass + '">' + filtered.length + "</span></h3>" +
+      '<p class="hint">' + hint + "</p>" +
+      filtered.map(function (g) {
+        return '<div class="dup-group"><div class="dup-target">' + escapeHtml(g.target || "(empty target)") + copyButtonHtml(g.target) + "</div>" +
+          '<div class="dup-entries">' + g.entries.map(function (e) { return dupEntryLine(title.toLowerCase(), e); }).join("") + "</div></div>";
+      }).join("") + "</div>";
+  }
+
+  function renderReferenceDupSection(title, hint, groups) {
+    if (!groups.length) return "";
+    return '<div class="dup-section"><h3>' + title + ' <span class="status-badge dup-critical">' + groups.length + "</span></h3>" +
+      '<p class="hint">' + hint + "</p>" +
+      groups.map(function (g) {
+        return '<div class="dup-group"><div class="dup-target">' + escapeHtml(g.target || "(empty target)") + copyButtonHtml(g.target) + "</div>" +
+          '<div class="dup-entries"><div class="dup-entry">ids: ' + g.ids.map(function (id) { return '<span class="mono">' + escapeHtml(id) + "</span>"; }).join(", ") + "</div></div></div>";
+      }).join("") + "</div>";
+  }
+
+  function renderDuplicates() {
+    var d = DATA.duplicates || {};
+    var target = document.getElementById("duplicates-content");
+    var parts = [];
+
+    parts.push(renderCurrentDupSection(
+      "Current words &mdash; overwrite risk", "Multiple source rows resolved to the same reference id: only the last one processed survives in the export &mdash; the others were silently dropped.",
+      d.current_words || [], "critical"
+    ));
+    parts.push(renderCurrentDupSection(
+      "Current expressions &mdash; overwrite risk", "Multiple source rows resolved to the same reference id: only the last one processed survives in the export &mdash; the others were silently dropped.",
+      d.current_expressions || [], "critical"
+    ));
+    parts.push(renderCurrentDupSection(
+      "Current words &mdash; duplicate new entries", "Multiple source rows share the same target text but none matched a reference id, so each got its own new id. Likely duplicate data entry.",
+      d.current_words || [], "serious"
+    ));
+    parts.push(renderCurrentDupSection(
+      "Current expressions &mdash; duplicate new entries", "Multiple source rows share the same target text but none matched a reference id, so each got its own new id. Likely duplicate data entry.",
+      d.current_expressions || [], "serious"
+    ));
+    parts.push(renderReferenceDupSection(
+      "Reference words &mdash; shadowed ids", "Two reference ids share the same target text. Only the last-indexed id can ever be matched again; the other(s) will always show up as “deleted” even if still valid.",
+      d.reference_words || []
+    ));
+    parts.push(renderReferenceDupSection(
+      "Reference expressions &mdash; shadowed ids", "Two reference ids share the same target text. Only the last-indexed id can ever be matched again; the other(s) will always show up as “deleted” even if still valid.",
+      d.reference_expressions || []
+    ));
+
+    var content = parts.filter(Boolean).join("");
+    target.innerHTML = content || '<div class="empty-state">No duplicate targets detected. &#127881;</div>';
+    bindCopyButtons(target);
+  }
+
+  function dupTotal() {
+    var d = DATA.duplicates || {};
+    return (d.current_words || []).length + (d.current_expressions || []).length +
+      (d.reference_words || []).length + (d.reference_expressions || []).length;
+  }
+
+  // ---- wiring -------------------------------------------------------
+
+  function audioIssueCount() {
+    return buildAudioRows().filter(function (r) {
+      return r.status === "missing" || r.status === "lost" || r.status === "renamed";
+    }).length;
+  }
+
+  function refreshBadges() {
+    var sw = DATA.summary.words, se = DATA.summary.expressions;
+    document.getElementById("tab-count-words").textContent = sw.added + sw.modified + sw.deleted;
+    document.getElementById("tab-count-expressions").textContent = se.added + se.modified + se.deleted;
+    document.getElementById("tab-count-audio").textContent = audioIssueCount();
+    document.getElementById("tab-count-duplicates").textContent = dupTotal();
+  }
+
+  function setupTabs() {
+    var buttons = document.querySelectorAll("#tabs button");
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        buttons.forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        var tab = btn.getAttribute("data-tab");
+        state.activeTab = tab;
+        ["words", "expressions", "audio", "duplicates"].forEach(function (name) {
+          document.getElementById("panel-" + name).hidden = name !== tab;
+        });
+      });
+    });
+  }
+
+  function setupAudioControls() {
+    var panel = document.getElementById("panel-audio");
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.audio.filter = chip.getAttribute("data-filter");
+        renderAudioTable();
+      });
+    });
+    document.getElementById("search-audio").addEventListener("input", function (evt) {
+      state.audio.search = evt.target.value.trim().toLowerCase();
+      renderAudioTable();
+    });
+  }
+
+  function setupCategory(category) {
+    var panel = document.getElementById("panel-" + category);
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state[category].filter = chip.getAttribute("data-filter");
+        renderTable(category);
+      });
+    });
+    document.getElementById("search-" + category).addEventListener("input", function (evt) {
+      state[category].search = evt.target.value.trim().toLowerCase();
+      renderTable(category);
+    });
+  }
+
+  function setupTheme() {
+    var btn = document.getElementById("theme-toggle");
+    var stored = null;
+    try { stored = localStorage.getItem("corpus-diff-theme"); } catch (e) {}
+    if (stored) document.documentElement.setAttribute("data-theme", stored);
+    btn.addEventListener("click", function () {
+      var current = document.documentElement.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("corpus-diff-theme", next); } catch (e) {}
+    });
+  }
+
+  document.getElementById("generated-at").textContent = DATA.generated_at || "";
+  renderOverview();
+  refreshBadges();
+  renderTable("words");
+  renderTable("expressions");
+  renderAudioTable();
+  renderDuplicates();
+  setupTabs();
+  setupCategory("words");
+  setupCategory("expressions");
+  setupAudioControls();
+  setupTheme();
+})();
+</script>
+</body>
+</html>

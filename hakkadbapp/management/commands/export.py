@@ -2,6 +2,7 @@ import csv
 import datetime
 import json
 import os
+import shutil
 import zipfile
 from copy import deepcopy
 from pathlib import Path
@@ -17,6 +18,37 @@ import hakkadbapp.read_themes_corpus
 superscript_map = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶"}
 reverse_superscript_map = {v: k for k, v in superscript_map.items()}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac", ".webm"}
+DATE_FOLDER_FORMAT = "%d_%m_%Y"
+ROW_HEADERS = ["word", "expression", "target", "pivot", "alternate", "themes", "audio", "image"]
+
+
+def find_latest_dated_corpus_dir(base_dir):
+    """Find the base_dir/<dd_mm_yyyy>/ subfolder with the most recent date.
+
+    The platform reference corpus used to live flat in base_dir; it's now
+    snapshotted into dated subfolders (e.g. 02_09_2026/) each time it's
+    pulled from the platform, so "the current online corpus" means whichever
+    such folder has the latest date. Returns None if base_dir has no dated
+    subfolder (e.g. only the old flat files are present).
+    """
+    if not base_dir.is_dir():
+        return None
+
+    dated = []
+    for child in base_dir.iterdir():
+        if not child.is_dir():
+            continue
+        try:
+            date = datetime.datetime.strptime(child.name, DATE_FOLDER_FORMAT).date()
+        except ValueError:
+            continue
+        dated.append((date, child))
+
+    if not dated:
+        return None
+
+    dated.sort(key=lambda pair: pair[0])
+    return dated[-1][1]
 
 
 class Command(BaseCommand):
@@ -44,16 +76,22 @@ class Command(BaseCommand):
         jsonm.Word.reset()
         jsonm.Expression.reset()
 
-        self.stdout.write(self.style.SUCCESS("Reading themes."))
-        hakkadbapp.read_themes_corpus.read_themes("../e_reo_json/themeCorpus.json")
+        base_corpus_dir = Path("../e_reo_json")
+        corpus_dir = find_latest_dated_corpus_dir(base_corpus_dir) or base_corpus_dir
+        self.stdout.write(self.style.SUCCESS(f"Using platform reference corpus: {corpus_dir}/"))
 
-        reference_word_path = Path("../e_reo_json/wordCorpus.json")
-        reference_expression_path = Path("../e_reo_json/expressionCorpus.json")
+        self.stdout.write(self.style.SUCCESS("Reading themes."))
+        hakkadbapp.read_themes_corpus.read_themes(str(corpus_dir / "themeCorpus.json"))
+
+        reference_word_path = corpus_dir / "wordCorpus.json"
+        reference_expression_path = corpus_dir / "expressionCorpus.json"
 
         reference_words = self.load_reference_corpus(reference_word_path)
         reference_expressions = self.load_reference_corpus(reference_expression_path)
-        reference_words_by_target = self.index_reference_by_target(reference_words)
-        reference_expressions_by_target = self.index_reference_by_target(reference_expressions)
+        reference_words_by_target, reference_word_duplicates = self.index_reference_by_target(reference_words)
+        reference_expressions_by_target, reference_expression_duplicates = self.index_reference_by_target(
+            reference_expressions
+        )
 
         if reference_words:
             self.stdout.write(self.style.SUCCESS(f"Loaded {len(reference_words)} reference words."))
@@ -71,6 +109,83 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING("No source audio directory found; audio column will stay empty when missing."))
 
+        state = self.build_current_state(
+            reference_words_by_target, reference_expressions_by_target, audio_index, export_audio_dir
+        )
+        rows = state["rows"]
+        word_target_occurrences = state["word_target_occurrences"]
+        expression_target_occurrences = state["expression_target_occurrences"]
+        current_word_payloads = state["current_word_payloads"]
+        current_expression_payloads = state["current_expression_payloads"]
+
+        diff_payload = {
+            "words": self.compute_diff(reference_words, current_word_payloads),
+            "expressions": self.compute_diff(reference_expressions, current_expression_payloads),
+        }
+        diff_payload["summary"] = {
+            "words": self.summarize_diff(diff_payload["words"]),
+            "expressions": self.summarize_diff(diff_payload["expressions"]),
+        }
+        diff_payload["duplicates"] = {
+            "reference_words": self.dedupe_reference(reference_word_duplicates),
+            "reference_expressions": self.dedupe_reference(reference_expression_duplicates),
+            "current_words": self.dedupe_current(word_target_occurrences),
+            "current_expressions": self.dedupe_current(expression_target_occurrences),
+        }
+        diff_payload["themes"] = {
+            theme_id: theme_obj.translations.primary
+            for theme_id, theme_obj in jsonm.Theme.instances.items()
+        }
+        diff_payload["generated_at"] = timestamp
+
+        # CSV export.
+        with open(export_csv_file, mode="w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(ROW_HEADERS)
+            writer.writerows(rows)
+
+        # XLSX export.
+        self.write_xlsx(export_xlsx_file, rows)
+
+        with open(export_json_dir / "expressionCorpus.json", "w", encoding="utf-8") as f:
+            f.write(jsonm.Expression.export())
+
+        with open(export_json_dir / "wordCorpus.json", "w", encoding="utf-8") as f:
+            f.write(jsonm.Word.export())
+
+        with open(export_json_dir / "themeCorpus.json", "w", encoding="utf-8") as f:
+            f.write(jsonm.Theme.export())
+
+        with open(export_json_dir / "corpusDiff.json", "w", encoding="utf-8") as f:
+            json.dump(diff_payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+        dashboard_file = export_dir / "corpusDiffDashboard.html"
+        with open(dashboard_file, "w", encoding="utf-8") as f:
+            f.write(self.render_diff_dashboard(diff_payload))
+        self.stdout.write(self.style.SUCCESS(f"Wrote diff dashboard to {dashboard_file}"))
+
+        self.stdout.write(self.style.SUCCESS("Successfully exported."))
+
+        zip_name = export_dir / "e_reo_corpus.zip"
+        with zipfile.ZipFile(zip_name, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(export_json_dir / "wordCorpus.json", arcname="wordCorpus.json")
+            zipf.write(export_json_dir / "expressionCorpus.json", arcname="expressionCorpus.json")
+            for audio_file in sorted(export_audio_dir.glob("*")):
+                if audio_file.is_file():
+                    zipf.write(audio_file, arcname=f"audio/{audio_file.name}")
+        self.stdout.write(self.style.SUCCESS(f"Wrote {zip_name}"))
+
+    def build_current_state(
+        self, reference_words_by_target, reference_expressions_by_target, audio_index, export_audio_dir
+    ):
+        """Scan the personal DB, matching each word/expression to the reference
+        corpus by target text (reusing the reference's id when matched, else
+        minting a fresh one) and building the jsonm registries + CSV/XLSX rows.
+
+        Returns a dict shared by the full export (handle()) and by any command
+        that only needs a subset of the current state (e.g. a missing-only
+        export), so this matching logic exists in exactly one place.
+        """
         expressions = Expression.objects.prefetch_related(
             models.Prefetch(
                 "expressionword_set",
@@ -112,10 +227,13 @@ class Command(BaseCommand):
 
         # Keep workbook and CSV rows aligned.
         rows = []
+        word_row_by_id = {}
+        expression_row_by_id = {}
 
         word_pinyin = {}
         word_hanzi = {}
         word_json_by_db_id = {}
+        word_target_occurrences = {}
 
         written_words = 0
         skipped_status = skipped_cat = skipped_theme = skipped_pinyin = no_audio_key = 0
@@ -151,6 +269,10 @@ class Command(BaseCommand):
             # Expected audio filename from pronunciation.
             expected_audio = f"{pinyin.translate(trans)}.wav"
             audio_filename = self.find_audio_filename(expected_audio, audio_index)
+            if audio_filename:
+                source_path = audio_index["path_by_name"].get(audio_filename)
+                if source_path:
+                    shutil.copy2(source_path, export_audio_dir / audio_filename)
 
             ref = reference_words_by_target.get(target)
             ref_data = deepcopy(ref["data"]) if ref else {}
@@ -175,11 +297,19 @@ class Command(BaseCommand):
             if theme.id not in json_word.themes:
                 json_word.themes.append(theme.id)
 
+            word_target_occurrences.setdefault(target, []).append({
+                "db_id": word.id,
+                "french": fr,
+                "tahitian": ty,
+                "resulting_id": json_word.id,
+                "matched_reference_id": ref["id"] if ref else None,
+            })
+
             word_pinyin[word.id] = pinyin
             word_hanzi[word.id] = hanzi
             word_json_by_db_id[word.id] = json_word
 
-            rows.append([
+            row = [
                 "x",
                 "",
                 target,
@@ -188,7 +318,9 @@ class Command(BaseCommand):
                 self.render_theme_names(json_word.themes),
                 json_word.audio,
                 json_word.image,
-            ])
+            ]
+            rows.append(row)
+            word_row_by_id[json_word.id] = row
             written_words += 1
 
         self.stdout.write(
@@ -202,6 +334,7 @@ class Command(BaseCommand):
         skipped_missing_pinyin = 0
         skipped_ko = 0
         no_audio_key = 0
+        expression_target_occurrences = {}
 
         for expr in expressions.iterator(chunk_size=1000):
             rendering = expr.rendering or ""
@@ -238,18 +371,29 @@ class Command(BaseCommand):
                 components={},
             )
 
+            expression_target_occurrences.setdefault(rendering, []).append({
+                "db_id": expr.id,
+                "french": expr.french or "",
+                "english": expr.english or "",
+                "resulting_id": json_expr.id,
+                "matched_reference_id": ref["id"] if ref else None,
+            })
+
             components = {}
             pinyin_parts = []
+            hanzi_parts = []
 
             for ew in getattr(expr, "ews", []):
                 wid = ew.word_id
                 if not wid:
                     pinyin_parts.append("*")
+                    hanzi_parts.append("*")
                     continue
 
                 pinyin = word_pinyin.get(wid, "*")
                 hanzi = word_hanzi.get(wid, "*")
                 pinyin_parts.append(pinyin)
+                hanzi_parts.append(hanzi)
 
                 json_word = word_json_by_db_id.get(wid)
                 if json_word and pinyin != "*":
@@ -258,14 +402,25 @@ class Command(BaseCommand):
                         json_word.in_expression.append(json_expr.id)
 
 
-            expected_audio = f"{rendering.split(' ')[-1]}.wav"
-            audio_filename = self.find_audio_filename(expected_audio, audio_index)
+            # Expression audio files are named after the expression's hanzi
+            # (concatenated, no separators) rather than its pinyin: unlike
+            # single words, pinyin for a whole expression isn't a stable or
+            # human-friendly filename (spaces, tone marks, homophones), while
+            # the hanzi rendering is exactly what a recording is made from.
+            expression_hanzi = "".join(part for part in hanzi_parts if part and part != "*")
+            expected_audio = f"{expression_hanzi}.wav" if expression_hanzi else ""
+            audio_filename = self.find_audio_filename(expected_audio, audio_index) if expected_audio else ""
             if not audio_filename:
                 no_audio_key += 1
+            else:
+                source_path = audio_index["path_by_name"].get(audio_filename)
+                if source_path:
+                    shutil.copy2(source_path, export_audio_dir / audio_filename)
 
+            json_expr.audio = audio_filename
             json_expr.components = dict(sorted(components.items()))
 
-            rows.append([
+            row = [
                 "",
                 "x",
                 rendering,
@@ -274,7 +429,9 @@ class Command(BaseCommand):
                 self.render_theme_names(json_expr.themes),
                 audio_filename,
                 "",
-            ])
+            ]
+            rows.append(row)
+            expression_row_by_id[json_expr.id] = row
             written_expr += 1
 
         self.stdout.write(
@@ -295,50 +452,18 @@ class Command(BaseCommand):
             for obj_id, expr_obj in jsonm.Expression.instances.items()
         }
 
-        diff_payload = {
-            "words": self.compute_diff(reference_words, current_word_payloads),
-            "expressions": self.compute_diff(reference_expressions, current_expression_payloads),
+        return {
+            "rows": rows,
+            "word_row_by_id": word_row_by_id,
+            "expression_row_by_id": expression_row_by_id,
+            "word_pinyin": word_pinyin,
+            "word_hanzi": word_hanzi,
+            "word_json_by_db_id": word_json_by_db_id,
+            "word_target_occurrences": word_target_occurrences,
+            "expression_target_occurrences": expression_target_occurrences,
+            "current_word_payloads": current_word_payloads,
+            "current_expression_payloads": current_expression_payloads,
         }
-        diff_payload["summary"] = {
-            "words": self.summarize_diff(diff_payload["words"]),
-            "expressions": self.summarize_diff(diff_payload["expressions"]),
-        }
-
-        # CSV export.
-        with open(export_csv_file, mode="w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow([
-                "word",
-                "expression",
-                "target",
-                "pivot",
-                "alternate",
-                "themes",
-                "audio",
-                "image",
-            ])
-            writer.writerows(rows)
-
-        # XLSX export.
-        self.write_xlsx(export_xlsx_file, rows)
-
-        with open(export_json_dir / "expressionCorpus.json", "w", encoding="utf-8") as f:
-            f.write(jsonm.Expression.export())
-
-        with open(export_json_dir / "wordCorpus.json", "w", encoding="utf-8") as f:
-            f.write(jsonm.Word.export())
-
-        with open(export_json_dir / "themeCorpus.json", "w", encoding="utf-8") as f:
-            f.write(jsonm.Theme.export())
-
-        with open(export_json_dir / "corpusDiff.json", "w", encoding="utf-8") as f:
-            json.dump(diff_payload, f, ensure_ascii=False, indent=2, sort_keys=True)
-
-        self.stdout.write(self.style.SUCCESS("Successfully exported."))
-
-        zip_name = export_dir / "expressionCorpus.zip"
-        with zipfile.ZipFile(zip_name, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(export_json_dir / "expressionCorpus.json", arcname="expressionCorpus.json")
 
     @staticmethod
     def load_reference_corpus(path):
@@ -349,10 +474,22 @@ class Command(BaseCommand):
 
     @staticmethod
     def index_reference_by_target(corpus):
-        return {
-            payload.get("translations", {}).get("target", ""): {"id": obj_id, "data": payload}
-            for obj_id, payload in corpus.items()
-        }
+        """Index a reference corpus by target text.
+
+        When two reference ids share the same target, only the last one indexed
+        stays reachable via target lookup; the shadowed id can never be matched
+        to current data again and will permanently show up as "deleted". Such
+        collisions are returned separately so callers can surface them.
+        """
+        index = {}
+        duplicates = {}
+        for obj_id, payload in corpus.items():
+            target = payload.get("translations", {}).get("target", "")
+            existing = index.get(target)
+            if existing is not None:
+                duplicates.setdefault(target, [existing["id"]]).append(obj_id)
+            index[target] = {"id": obj_id, "data": payload}
+        return index, duplicates
 
     @staticmethod
     def build_word_payload(word_obj):
@@ -371,15 +508,40 @@ class Command(BaseCommand):
     @staticmethod
     def build_expression_payload(expr_obj):
         return {
+            "audio": expr_obj.audio,
             "components": dict(sorted(expr_obj.components.items())),
             "level": expr_obj.level,
             "themes": list(expr_obj.themes),
             "translations": expr_obj.translations.to_dict(),
         }
 
+    # These keys depend on local/environment state rather than actual word or
+    # expression content, so they're excluded from the diff entirely (not
+    # just presence-normalized): whether an audio file happens to sit in the
+    # local audio source dir at export time, or whether a word has an image,
+    # isn't a meaningful content edit either way. The exclusion has to be a
+    # full drop rather than a bool cast on the existing value, because one
+    # side can omit the key altogether rather than storing a falsy value —
+    # e.g. an older reference snapshot predating expression audio support
+    # won't have the key at all, while the current side always builds one
+    # (possibly empty), so a bool cast would still flag nearly every
+    # expression as "modified" purely for that asymmetry. Dropping the key
+    # sidesteps the presence mismatch entirely. The actual values are still
+    # kept in the stored payloads for display.
+    DIFF_IGNORED_KEYS = ("audio", "image")
+
     @staticmethod
     def normalize_for_diff(payload):
         return json.loads(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    @classmethod
+    def diff_comparable(cls, payload):
+        if not isinstance(payload, dict):
+            return payload
+        comparable = dict(payload)
+        for key in cls.DIFF_IGNORED_KEYS:
+            comparable.pop(key, None)
+        return comparable
 
     def compute_diff(self, reference_map, current_map):
         added = []
@@ -398,7 +560,7 @@ class Command(BaseCommand):
         for obj_id in sorted(reference_ids & current_ids):
             reference_payload = self.normalize_for_diff(reference_map[obj_id])
             current_payload = self.normalize_for_diff(current_map[obj_id])
-            if reference_payload != current_payload:
+            if self.diff_comparable(reference_payload) != self.diff_comparable(current_payload):
                 modified.append(
                     {
                         "id": obj_id,
@@ -416,6 +578,34 @@ class Command(BaseCommand):
             "modified": len(diff_section["modified"]),
             "deleted": len(diff_section["deleted"]),
         }
+
+    @staticmethod
+    def dedupe_reference(duplicate_map):
+        return [
+            {"target": target, "ids": ids}
+            for target, ids in sorted(duplicate_map.items())
+        ]
+
+    @staticmethod
+    def dedupe_current(occurrences):
+        return [
+            {"target": target, "entries": entries}
+            for target, entries in sorted(occurrences.items())
+            if len(entries) > 1
+        ]
+
+    @staticmethod
+    def render_diff_dashboard(diff_payload):
+        """Render the standalone interactive dashboard, with diff data inlined.
+
+        The JSON is embedded in a <script type="application/json"> tag; every
+        "<" is escaped to "\\u003c" so a value containing "</script" can't
+        terminate the tag early (valid inside both JSON and HTML text).
+        """
+        template_path = Path(__file__).resolve().parent / "corpus_diff_dashboard_template.html"
+        template = template_path.read_text(encoding="utf-8")
+        payload_json = json.dumps(diff_payload, ensure_ascii=False, sort_keys=True).replace("<", "\\u003c")
+        return template.replace("__DIFF_DATA_JSON__", payload_json)
 
     def get_theme_factory(self):
         theme_cache = {}
@@ -449,7 +639,7 @@ class Command(BaseCommand):
         return None
 
     def build_audio_index(self, audio_dir):
-        index = {"by_name": {}, "by_stem": {}, "count": 0}
+        index = {"by_name": {}, "by_stem": {}, "path_by_name": {}, "count": 0}
         if not audio_dir:
             return index
 
@@ -466,6 +656,11 @@ class Command(BaseCommand):
                 # Store the first match to keep the export deterministic.
                 index["by_name"].setdefault(lower_name, filename)
                 index["by_stem"].setdefault(lower_stem, filename)
+                # Keyed by the original-case filename (as returned by
+                # find_audio_filename via by_name/by_stem), so callers that
+                # need the actual file on disk -- e.g. to copy out unmatched
+                # audio -- don't have to re-walk the directory themselves.
+                index["path_by_name"].setdefault(filename, str(path))
 
         return index
 
@@ -487,17 +682,7 @@ class Command(BaseCommand):
         sheet = workbook.active
         sheet.title = "Export"
 
-        headers = [
-            "word",
-            "expression",
-            "target",
-            "pivot",
-            "alternate",
-            "themes",
-            "audio",
-            "image",
-        ]
-        sheet.append(headers)
+        sheet.append(ROW_HEADERS)
         for row in rows:
             sheet.append(row)
 

@@ -64,10 +64,15 @@ function goToLabel(oneBasedIndex) {
 const DISPLAY_TABS = [
     { key: 'hanzi', label: 'Hanzi' },
     { key: 'furigana', label: 'Furigana' },
+    { key: 'pinyinHanzi', label: 'Pinyin + Hanzi' },
     { key: 'pinyin', label: 'Pinyin' },
     { key: 'french', label: 'Français' },
     { key: 'words', label: 'Détail' },
 ];
+
+/** Tab keys whose per-label content spans multiple lines and so need a
+ *  block element rather than an inline span. */
+const BLOCK_DISPLAY_TABS = new Set(['words']);
 
 /* =========================================================================
    EafExporter — builds an ELAN .eaf XML document from a Transcription
@@ -512,6 +517,7 @@ class LabelView {
         this.outputs = {
             hanzi: createEl('div', 'hanzi', {}, this.sentences.map((s) => s.renderHanziLine()).join('<br>')),
             furigana: createEl('div', '', {}, this.sentences.map((s) => s.renderFurigana()).join('<br>')),
+            pinyinHanzi: createEl('div', 'hanzi', {}, this.sentences.map((s) => `${s.renderPinyinLine()} ${s.renderHanziLine()}`).join('<br>')),
             pinyin: createEl('div', '', {}, this.sentences.map((s) => s.renderPinyinLine()).join('<br>')),
             french: createEl('div', '', {}, frenchLine),
             words: createEl('div', '', {},
@@ -583,13 +589,19 @@ class View {
             const tabBtn = createEl('button', 'px-3 py-1 text-sm rounded bg-gray-200 hover:bg-gray-300 transition', { type: 'button' });
             tabBtn.textContent = label;
 
-            const panel = createEl('div', `p-6 text-justify leading-relaxed print:overflow-visible print:p-20 bg-white ${i === 0 ? '' : 'hidden'}`, { id: `panel-${key}` });
+            // Each tab gets its own `relative` wrapper so a CopyButton can be
+            // pinned to its corner; the wrapper (not the panel itself) is
+            // what gets shown/hidden when switching tabs.
+            const panelWrapper = createEl('div', `relative print:overflow-visible ${i === 0 ? '' : 'hidden'}`, { id: `panel-wrapper-${key}` });
+            const extraPadding = (key === 'pinyinHanzi' || key === 'furigana') ? 'pr-14' : '';
+            const panel = createEl('div', `p-6 text-justify leading-relaxed print:overflow-visible print:p-20 bg-white ${extraPadding}`, { id: `panel-${key}` });
+            panelWrapper.appendChild(panel);
             this.panels[key] = panel;
-            panels.appendChild(panel);
+            panels.appendChild(panelWrapper);
 
             tabBtn.addEventListener('click', () => {
                 panels.querySelectorAll(':scope > div').forEach((p) => p.classList.add('hidden'));
-                panel.classList.remove('hidden');
+                panelWrapper.classList.remove('hidden');
                 tabsBar.querySelectorAll('button').forEach((b) => b.classList.remove('bg-blue-500', 'text-white'));
                 tabsBar.querySelectorAll('button').forEach((b) => b.classList.add('bg-gray-200'));
                 tabBtn.classList.remove('bg-gray-200');
@@ -602,6 +614,12 @@ class View {
 
         wrapper.append(tabsBar, panels);
         this.displays.appendChild(wrapper);
+
+        new CopyButton('#panel-pinyinHanzi', { label: 'Copier pinyin + hanzi' });
+        new CopyButton('#panel-furigana', {
+            label: 'Copier le furigana',
+            getText: () => this.panels.pinyinHanzi.innerText,
+        });
     }
 
     toDatetimeLocalValue(value) {
@@ -704,7 +722,7 @@ class View {
             const panel = this.panels[key];
             panel.innerHTML = '';
             this.views.forEach((labelView, i) => {
-                const tag = key === 'words' ? 'div' : 'span';
+                const tag = BLOCK_DISPLAY_TABS.has(key) ? 'div' : 'span';
                 const item = createEl(tag, `rounded px-3 py-1 cursor-pointer hover:bg-violet-200 ${i % 2 ? 'bg-gray-50' : ''}`, {
                     id: `${key}-${i}`,
                     title: `#${i + 1} · ${formatTime(labelView.label.start)}–${formatTime(labelView.label.end)}s`,

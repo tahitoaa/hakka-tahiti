@@ -174,12 +174,14 @@ class Expression(Identified):
         themes=None,
         level=0,
         components=None,
+        audio="",
     ):
         super().__init__(id=id)
         self.translations = Translations(primary, secondary, target)
         self.themes = list(themes or [])
         self.level = level
         self.components = deepcopy(components or {})
+        self.audio = audio
 
     @classmethod
     def from_dict(cls, obj_id, data):
@@ -192,4 +194,5 @@ class Expression(Identified):
             themes=data.get("themes", []),
             level=data.get("level", 0),
             components=data.get("components", {}),
+            audio=data.get("audio", ""),
         )

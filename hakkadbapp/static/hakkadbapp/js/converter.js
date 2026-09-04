@@ -11,6 +11,7 @@ class View {
         this.input = document.getElementById('pinyin-input');
         this.output = document.getElementById('suggested-hanzi');
         this.furiganaOutput = document.getElementById('pinyin-sentence-results');
+        this.pinyinHanziLinesOutput = document.getElementById('pinyin-hanzi-lines');
         this.pinyinOnlyOutput = document.getElementById('pinyin-only');
         this.hanziOnlyOutput = document.getElementById('hanzi-only-output');
         this.expressionOutput = document.getElementById('expression-output');
@@ -53,6 +54,9 @@ class View {
         this.sentences = text.split('\n').map((line) => new Sentence(this.dico, line));
 
         this.furiganaOutput.innerHTML = this.sentences.map(s => s.renderFurigana()).join('<br>');
+        this.pinyinHanziLinesOutput.textContent = this.sentences
+            .map(s => `${s.renderPinyinLine()} ${s.renderHanziLine()}`)
+            .join('\n');
         this.pinyinOnlyOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
         this.hanziOnlyOutput.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
         this.expressionOutput.innerHTML = this.sentences.map(s => s.render()).join('<br>');
@@ -190,9 +194,15 @@ document.addEventListener("DOMContentLoaded", () =>
             containerId: '#pron-list',
         });
 
-        new CopyButton('#expression-output', { label: '📋 Copier le détail', successLabel: '✅ Copié !' });
-        new CopyButton('#pinyin-sentence-results', { label: '📋 Copier le furigana', successLabel: '✅ Copié !' });
-        new CopyButton('#hanzi-only-output', { label: '📋 Copier les hanzi', successLabel: '✅ Copié !' });
-        new CopyButton('#pinyin-only', { label: '📋 Copier le pinyin', successLabel: '✅ Copié !' });
+        new CopyButton('#expression-output', { label: 'Copier le détail' });
+        new CopyButton('#pinyin-sentence-results', {
+            label: 'Copier le furigana',
+            getText: () => converter.view.sentences
+                .map(s => `${s.renderPinyinLine()} ${s.renderHanziLine()}`)
+                .join('\n'),
+        });
+        new CopyButton('#pinyin-hanzi-lines', { label: 'Copier pinyin + hanzi' });
+        new CopyButton('#hanzi-only-output', { label: 'Copier les hanzi' });
+        new CopyButton('#pinyin-only', { label: 'Copier le pinyin' });
     }
 )

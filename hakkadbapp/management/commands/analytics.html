@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analytics</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:      #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --border:         rgba(11,11,11,0.10);
+    --border-strong:  rgba(11,11,11,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.10);
+    --status-warning:   #b5790a;
+    --status-warning-bg:rgba(250,178,25,0.18);
+    --status-critical:  #d03b3b;
+    --status-critical-bg:rgba(208,59,59,0.10);
+    --accent:         #3457d5;
+    --accent-bg:      rgba(52,87,213,0.10);
+    --chip-bg:        #f0efec;
+    --chip-bg-active: #0b0b0b;
+    --chip-fg-active: #fcfcfb;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --border:         rgba(255,255,255,0.10);
+      --border-strong:  rgba(255,255,255,0.18);
+      --status-good:      #0ca30c;
+      --status-good-bg:   rgba(12,163,12,0.18);
+      --status-warning:   #fab219;
+      --status-warning-bg:rgba(250,178,25,0.16);
+      --status-critical:  #e66767;
+      --status-critical-bg:rgba(230,103,103,0.16);
+      --accent:         #7c95ee;
+      --accent-bg:      rgba(124,149,238,0.16);
+      --chip-bg:        #262623;
+      --chip-bg-active: #ffffff;
+      --chip-fg-active: #1a1a19;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --border:         rgba(255,255,255,0.10);
+    --border-strong:  rgba(255,255,255,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.18);
+    --status-warning:   #fab219;
+    --status-warning-bg:rgba(250,178,25,0.16);
+    --status-critical:  #e66767;
+    --status-critical-bg:rgba(230,103,103,0.16);
+    --accent:         #7c95ee;
+    --accent-bg:      rgba(124,149,238,0.16);
+    --chip-bg:        #262623;
+    --chip-bg-active: #ffffff;
+    --chip-fg-active: #1a1a19;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.45;
+    padding-bottom: 72px; /* room for sticky action bar */
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 20px 40px; }
+
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+  header.top h1 { font-size: 20px; margin: 0 0 4px; }
+  header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  .theme-toggle {
+    border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-family: var(--sans); flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--text-muted); }
+
+  /* ---- loader ---- */
+  .loader {
+    border: 2px dashed var(--border-strong);
+    border-radius: 14px;
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    background: var(--surface-1);
+  }
+  .loader.drag-over { border-color: var(--accent); background: var(--accent-bg); color: var(--text-primary); }
+  .loader h2 { font-size: 16px; margin: 0 0 8px; color: var(--text-primary); }
+  .loader p { margin: 0 0 16px; font-size: 13px; }
+  .loader input[type="file"] { display: none; }
+  .btn {
+    font-family: var(--sans); border: 1px solid var(--border-strong); background: var(--surface-1);
+    color: var(--text-primary); border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--text-muted); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .load-error { color: var(--status-critical); font-size: 13px; margin-top: 10px; }
+
+  .source-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .source-bar .mono { color: var(--text-primary); }
+  .source-bar a { color: var(--accent); text-decoration: none; }
+  .source-bar a:hover { text-decoration: underline; }
+
+  .quick-links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .quick-links a {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; text-decoration: none;
+    border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 999px; padding: 5px 12px;
+  }
+  .quick-links a:hover { border-color: var(--accent); color: var(--accent); }
+
+  .overview { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+  @media (max-width: 760px) { .overview { grid-template-columns: 1fr; } }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; }
+  .card h2 .count { color: var(--text-muted); font-weight: 400; }
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-tile { border-radius: 10px; padding: 10px 12px; background: var(--chip-bg); }
+  .stat-tile .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-tile .label { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .dot-good { background: var(--status-good); }
+  .dot-warning { background: var(--status-warning); }
+  .dot-critical { background: var(--status-critical); }
+
+  .legend-box { font-size: 12px; color: var(--text-secondary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 20px; }
+  .legend-box b { color: var(--text-primary); }
+  .legend-box .row { margin-bottom: 4px; }
+  .legend-box .row:last-child { margin-bottom: 0; }
+
+  nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--gridline); margin-bottom: 16px; }
+  nav.tabs button {
+    font-family: var(--sans); background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-secondary); font-size: 13px; padding: 10px 4px; margin-right: 18px; cursor: pointer;
+  }
+  nav.tabs button.active { color: var(--text-primary); border-bottom-color: var(--text-primary); font-weight: 600; }
+  nav.tabs button .badge {
+    display: inline-block; margin-left: 6px; font-size: 11px; background: var(--chip-bg); color: var(--text-secondary);
+    border-radius: 999px; padding: 1px 7px; font-variant-numeric: tabular-nums;
+  }
+  nav.tabs button.active .badge { background: var(--chip-bg-active); color: var(--chip-fg-active); }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .chip {
+    font-family: var(--sans); border: 1px solid var(--border-strong); background: var(--surface-1);
+    color: var(--text-secondary); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .chip.active { background: var(--chip-bg-active); color: var(--chip-fg-active); border-color: transparent; }
+  .search {
+    margin-left: auto; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: var(--sans); min-width: 220px;
+  }
+  .bulk-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .bulk-actions select { font-family: var(--sans); font-size: 12px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 6px; background: var(--surface-1); color: var(--text-primary); }
+
+  table.rows { width: 100%; border-collapse: collapse; }
+  table.rows th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted);
+    font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--gridline);
+  }
+  table.rows td { padding: 9px 10px; border-bottom: 1px solid var(--gridline); vertical-align: top; }
+  table.rows tr.data-row:hover td { background: var(--chip-bg); }
+  table.rows tr.data-row.open td { background: var(--chip-bg); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .target-cell { font-weight: 600; cursor: pointer; }
+  .id-cell { color: var(--text-muted); font-size: 11px; }
+
+  .status-badge { display: inline-block; border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 600; }
+  .status-badge.added { background: var(--status-good-bg); color: var(--status-good); }
+  .status-badge.modified { background: var(--status-warning-bg); color: var(--status-warning); }
+  .status-badge.deleted { background: var(--status-critical-bg); color: var(--status-critical); }
+  .status-badge.audio-ok { background: var(--status-good-bg); color: var(--status-good); }
+
+  .play-btn {
+    display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+    width: 22px; height: 22px; margin-left: 6px; padding: 0; border: none; border-radius: 50%;
+    background: var(--chip-bg); color: var(--text-primary); font-size: 10px; cursor: pointer;
+  }
+  .play-btn:hover { background: var(--accent-bg); color: var(--accent); }
+  .play-btn.playing { background: var(--accent); color: #fff; }
+  .status-badge.audio-missing { background: var(--status-critical-bg); color: var(--status-critical); }
+
+  .decision-select {
+    font-family: var(--sans); font-size: 12px; border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 4px 6px; background: var(--surface-1); color: var(--text-primary); max-width: 190px;
+  }
+  .decision-select.is-push, .decision-select.is-reimport { border-color: var(--status-good); color: var(--status-good); }
+  .decision-select.is-custom { border-color: var(--accent); color: var(--accent); }
+  .decision-select.is-keep, .decision-select.is-ignore, .decision-select.is-skip { color: var(--text-secondary); }
+  .decision-select.is-remove { border-color: var(--status-critical); color: var(--status-critical); }
+
+  .detail-row td { background: var(--page-plane); padding: 0; }
+  .detail-inner { padding: 14px 16px 18px 16px; }
+  .diff-field { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--gridline); align-items: start; }
+  .diff-field:last-child { border-bottom: none; }
+  .diff-field .field-name { font-size: 11px; color: var(--text-muted); padding-top: 3px; }
+  .diff-field .field-value { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .diff-field.single .field-value { grid-template-columns: 1fr; }
+  .val-box { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; padding: 5px 8px; border-radius: 6px; background: var(--chip-bg); }
+  .val-box.removed { background: var(--status-critical-bg); color: var(--status-critical); }
+  .val-box.added { background: var(--status-good-bg); color: var(--status-good); }
+  .val-box.empty { color: var(--text-muted); font-style: italic; background: transparent; }
+  .theme-chip { display: inline-block; background: var(--chip-bg); border-radius: 5px; padding: 1px 7px; font-size: 11px; margin: 1px 3px 1px 0; }
+  .diff-header { display: flex; gap: 16px; margin-bottom: 8px; color: var(--text-muted); font-size: 11px; }
+  .diff-header span:first-child { width: 150px; flex-shrink: 0; }
+  .diff-header .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; }
+
+  .custom-editor { margin-top: 10px; }
+  .custom-editor label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .custom-editor textarea {
+    width: 100%; min-height: 160px; font-family: var(--mono); font-size: 12px; padding: 8px;
+    border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    resize: vertical;
+  }
+  .custom-editor .json-error { color: var(--status-critical); font-size: 11px; margin-top: 4px; }
+
+  .empty-state { color: var(--text-muted); font-size: 13px; padding: 30px 10px; text-align: center; }
+
+  .unmatched-section { margin-top: 26px; }
+  .unmatched-section h3 { font-size: 13px; margin: 0 0 6px; }
+  .unmatched-section p.hint { color: var(--text-secondary); font-size: 12px; margin: 0 0 10px; }
+  .unmatched-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .unmatched-list .mono { background: var(--chip-bg); border-radius: 6px; padding: 3px 8px; }
+
+  .action-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: var(--surface-1); border-top: 1px solid var(--border-strong);
+    padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+  }
+  .action-bar .counts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); }
+  .action-bar .counts b { color: var(--text-primary); }
+  .action-bar .spacer { flex: 1; }
+
+  footer.note { margin-top: 30px; color: var(--text-muted); font-size: 11px; text-align: center; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Analytics</h1>
+      <p>Load a <span class="mono">diff_summary.json</span> (from <span class="mono">manage.py export_missing</span>) to review E-reo/Vercel differences, decide a merge, and track audio coverage.</p>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>
+  </header>
+
+  <section id="loader-section" class="loader">
+    <h2>Load a diff_summary.json file</h2>
+    <p>Drop it here, or pick it from disk. Nothing leaves this browser tab &mdash; it's all read and processed locally.</p>
+    <button class="btn primary" id="pick-file-btn" type="button">Choose file&hellip;</button>
+    <input type="file" id="file-input" accept="application/json,.json">
+    <div class="load-error" id="load-error" hidden></div>
+  </section>
+
+  <div id="app" hidden>
+
+    <div class="source-bar">
+      <span>E-reo corpus: <span class="mono" id="src-corpus-dir"></span></span>
+      <span>&middot;</span>
+      <span>Generated: <span class="mono" id="src-generated-at"></span></span>
+      <span>&middot;</span>
+      <button class="btn small" id="load-different-btn" type="button">Load a different file</button>
+    </div>
+
+    <div class="quick-links" id="quick-links">
+      <a id="link-platform-ref" href="platform_reference/" target="_blank" rel="noopener">📄 Platform reference (E-reo)</a>
+      <a id="link-full-db" href="full_db_export/" target="_blank" rel="noopener">💾 Full DB export (Vercel)</a>
+      <a id="link-full-db-zip" href="full_db_export.zip" target="_blank" rel="noopener">📦 Full DB export + audio (.zip)</a>
+      <a id="link-unmatched-audio" href="unmatched_audio/" target="_blank" rel="noopener" hidden>🎧 Unmatched audio files</a>
+    </div>
+
+    <div class="legend-box">
+      <div class="row"><b>Added</b> &mdash; in Vercel, but E-reo has no matching entry. Default: push to E-reo (new id).</div>
+      <div class="row"><b>Modified</b> &mdash; both sides have it, content differs. Default: push the Vercel version to E-reo (same id).</div>
+      <div class="row"><b>Deleted</b> &mdash; E-reo has it, Vercel doesn't. Default: ignore (leave E-reo alone).</div>
+      <div class="row">Use the dropdown on each row to override the default, or pick <b>Custom</b> to hand-edit the JSON that gets pushed/re-imported.</div>
+      <div class="row">Vercel is rebuilt from the GONG HAKKA Google Sheet (not a direct DB write), so <b>Re-import to Vercel</b> exports a <b>.xlsx</b> with MOTS / EXPRESSIONS rows ready to paste into that sheet &mdash; not JSON.</div>
+    </div>
+
+    <section class="overview" id="overview"></section>
+
+    <nav class="tabs" id="tabs">
+      <button data-tab="words" class="active">Words <span class="badge" id="tab-count-words"></span></button>
+      <button data-tab="expressions">Expressions <span class="badge" id="tab-count-expressions"></span></button>
+      <button data-tab="audio">Audio <span class="badge" id="tab-count-audio"></span></button>
+      <button data-tab="duplicates">Duplicates <span class="badge" id="tab-count-duplicates"></span></button>
+    </nav>
+
+    <section id="panel-words" class="panel">
+      <div class="controls">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="added">Added</button>
+        <button class="chip" data-filter="modified">Modified</button>
+        <button class="chip" data-filter="deleted">Deleted</button>
+        <input class="search" type="search" placeholder="Search target / french / tahitian / id&hellip;" id="search-words">
+      </div>
+      <div class="bulk-actions">
+        Set all visible rows to:
+        <select id="bulk-words">
+          <option value="">&hellip;</option>
+          <option value="__default__">Reset to default</option>
+        </select>
+      </div>
+      <table class="rows">
+        <thead><tr><th>Decision</th><th>Status</th><th>Target</th><th>French</th><th>Tahitian</th><th>ID</th></tr></thead>
+        <tbody id="tbody-words"></tbody>
+      </table>
+      <div class="empty-state" id="empty-words" hidden>No rows match this filter.</div>
+    </section>
+
+    <section id="panel-expressions" class="panel" hidden>
+      <div class="controls">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="added">Added</button>
+        <button class="chip" data-filter="modified">Modified</button>
+        <button class="chip" data-filter="deleted">Deleted</button>
+        <input class="search" type="search" placeholder="Search target / french / english / id&hellip;" id="search-expressions">
+      </div>
+      <div class="bulk-actions">
+        Set all visible rows to:
+        <select id="bulk-expressions">
+          <option value="">&hellip;</option>
+          <option value="__default__">Reset to default</option>
+        </select>
+      </div>
+      <table class="rows">
+        <thead><tr><th>Decision</th><th>Status</th><th>Target</th><th>French</th><th>English</th><th>ID</th></tr></thead>
+        <tbody id="tbody-expressions"></tbody>
+      </table>
+      <div class="empty-state" id="empty-expressions" hidden>No rows match this filter.</div>
+    </section>
+
+    <section id="panel-audio" class="panel" hidden>
+      <p style="color:var(--text-secondary);font-size:12px;margin:0 0 12px">
+        Covers the <b>whole current DB</b> (not just added/modified/deleted above) &mdash; whether each word/expression
+        has a matching local audio file, and whether E-reo has an audio entry for it at all.
+      </p>
+      <div class="controls">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="missing">Missing local file</button>
+        <button class="chip" data-filter="ok">Local file OK</button>
+        <input class="search" type="search" placeholder="Search target / french&hellip;" id="search-audio">
+      </div>
+      <table class="rows">
+        <thead><tr><th>Type</th><th>Local file</th><th>E-reo audio</th><th>Target</th><th>French</th></tr></thead>
+        <tbody id="tbody-audio"></tbody>
+      </table>
+      <div class="empty-state" id="empty-audio" hidden>No rows match this filter.</div>
+
+      <div class="unmatched-section" id="unmatched-section" hidden>
+        <h3>Unmatched local audio files</h3>
+        <p class="hint">Files found in the local audio folder that don't match any current word/expression by
+          filename. <span id="unmatched-copied-note"></span></p>
+        <div class="unmatched-list" id="unmatched-list"></div>
+      </div>
+    </section>
+
+    <section id="panel-duplicates" class="panel" hidden>
+      <p style="color:var(--text-secondary);font-size:12px;margin:0 0 12px">
+        Entries sharing the same french, hakka (target), or english text &mdash; within Vercel and within E-reo
+        separately, across the <b>whole corpus</b>. Same hakka usually means a true duplicate; same french/english is
+        a weaker signal (synonyms happen) but still worth a look.
+      </p>
+      <div class="controls">
+        <button class="chip active" data-side="all">All sides</button>
+        <button class="chip" data-side="vercel">Vercel</button>
+        <button class="chip" data-side="e_reo">E-reo</button>
+        <span style="width:1px;align-self:stretch;background:var(--gridline)"></span>
+        <button class="chip active" data-key="all">All keys</button>
+        <button class="chip" data-key="french">Same french</button>
+        <button class="chip" data-key="target">Same hakka</button>
+        <button class="chip" data-key="english">Same english</button>
+        <input class="search" type="search" placeholder="Search the shared value&hellip;" id="search-duplicates">
+      </div>
+      <table class="rows">
+        <thead><tr><th>Side</th><th>Type</th><th>Key</th><th>Shared value</th><th>Count</th></tr></thead>
+        <tbody id="tbody-duplicates"></tbody>
+      </table>
+      <div class="empty-state" id="empty-duplicates" hidden>No duplicates match this filter.</div>
+    </section>
+
+    <footer class="note">Nothing is uploaded anywhere &mdash; loading, editing and exporting all happen locally in this browser tab.</footer>
+  </div>
+</div>
+
+<div class="action-bar" id="action-bar" hidden>
+  <div class="counts">
+    <span>&#8594; Push to E-reo: <b id="count-push">0</b></span>
+    <span>&#8592; Re-import to Vercel: <b id="count-reimport">0</b></span>
+    <span>Custom: <b id="count-custom">0</b></span>
+    <span>Skipped/ignored: <b id="count-skip">0</b></span>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn primary" id="generate-btn" type="button">&#11015; Generate merge files</button>
+</div>
+
+<audio id="audio-player"></audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = null;
+  var THEMES = {};
+  var decisions = {}; // id -> { choice, customText }
+
+  var STATUS_LABELS = { added: "Added", modified: "Modified", deleted: "Deleted" };
+
+  // Options per row type. value === "" means "use the type's default".
+  var OPTIONS_BY_TYPE = {
+    added: [
+      { value: "push", label: "→ Push to E-reo" },
+      { value: "skip", label: "Skip" },
+      { value: "custom", label: "Custom…" }
+    ],
+    modified: [
+      { value: "push", label: "→ Push Vercel version to E-reo" },
+      { value: "keep", label: "← Keep E-reo version (ignore)" },
+      { value: "custom", label: "Custom…" },
+      { value: "skip", label: "Skip (decide later)" }
+    ],
+    deleted: [
+      { value: "ignore", label: "Ignore (leave E-reo as-is)" },
+      { value: "remove", label: "Mark for removal from E-reo" },
+      { value: "reimport", label: "← Re-import to Vercel" },
+      { value: "custom", label: "Custom (edit re-import payload)…" }
+    ]
+  };
+
+  var DEFAULT_CHOICE = { added: "push", modified: "push", deleted: "ignore" };
+
+  var WORD_FIELDS = [
+    { key: "translations.primary", label: "French" },
+    { key: "translations.secondary", label: "Tahitian" },
+    { key: "translations.target", label: "Target" },
+    { key: "themes", label: "Themes", kind: "themes" },
+    { key: "part_of_speech", label: "Part of speech" },
+    { key: "level", label: "Level" },
+    { key: "gloss_code", label: "Gloss code", kind: "list" },
+    { key: "variants", label: "Variants", kind: "json" },
+    { key: "in_expression", label: "In expression", kind: "list" }
+  ];
+
+  var EXPR_FIELDS = [
+    { key: "translations.primary", label: "French" },
+    { key: "translations.secondary", label: "English" },
+    { key: "translations.target", label: "Target" },
+    { key: "themes", label: "Themes", kind: "themes" },
+    { key: "level", label: "Level" },
+    { key: "components", label: "Components", kind: "json" }
+  ];
+
+  function fieldsFor(category) { return category === "words" ? WORD_FIELDS : EXPR_FIELDS; }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function getPath(obj, path) {
+    if (!obj) return undefined;
+    return path.split(".").reduce(function (o, k) { return o == null ? undefined : o[k]; }, obj);
+  }
+
+  function fmtScalar(v) { return (v === undefined || v === null || v === "") ? "" : String(v); }
+
+  function fmtThemes(ids) {
+    if (!ids || !ids.length) return "";
+    return ids.map(function (id) {
+      var name = THEMES[id];
+      return '<span class="theme-chip">' + escapeHtml(name ? name : id) + "</span>";
+    }).join("");
+  }
+
+  function fmtList(arr) { return (!arr || !arr.length) ? "" : escapeHtml(arr.join(", ")); }
+
+  function fmtJson(v) {
+    if (v === undefined || v === null) return "";
+    if (typeof v === "object" && Object.keys(v).length === 0) return "";
+    return "<pre style=\"margin:0;font-family:inherit;white-space:pre-wrap\">" + escapeHtml(JSON.stringify(v, null, 2)) + "</pre>";
+  }
+
+  function renderFieldValue(field, value) {
+    if (field.kind === "themes") return fmtThemes(value);
+    if (field.kind === "list") return fmtList(value);
+    if (field.kind === "json") return fmtJson(value);
+    return escapeHtml(fmtScalar(value));
+  }
+
+  function isEmptyVal(v) {
+    if (v === undefined || v === null || v === "") return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === "object") return Object.keys(v).length === 0;
+    return false;
+  }
+
+  function valuesEqual(a, b) {
+    return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+  }
+
+  // ---- row model ----------------------------------------------------
+
+  function buildRows(category) {
+    var section = DATA[category] || { added: [], modified: [], deleted: [] };
+    var rows = [];
+    (section.added || []).forEach(function (e) { rows.push({ category: category, type: "added", id: e.id, reference: null, current: e.current }); });
+    (section.modified || []).forEach(function (e) { rows.push({ category: category, type: "modified", id: e.id, reference: e.reference, current: e.current }); });
+    (section.deleted || []).forEach(function (e) { rows.push({ category: category, type: "deleted", id: e.id, reference: e.reference, current: null }); });
+    rows.sort(function (a, b) {
+      var ta = ((a.current || a.reference || {}).translations || {}).target || "";
+      var tb = ((b.current || b.reference || {}).translations || {}).target || "";
+      return ta.localeCompare(tb);
+    });
+    return rows;
+  }
+
+  function allRows() {
+    return buildRows("words").concat(buildRows("expressions"));
+  }
+
+  function rowSearchText(row) {
+    var t = row.current || row.reference || {};
+    var tr = t.translations || {};
+    return [row.id, tr.primary, tr.secondary, tr.target].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  function getDecision(row) {
+    var d = decisions[row.id];
+    if (!d) { d = { choice: DEFAULT_CHOICE[row.type], customText: "" }; decisions[row.id] = d; }
+    return d;
+  }
+
+  function setDecision(row, choice) {
+    var d = getDecision(row);
+    d.choice = choice;
+    if (choice === "custom" && !d.customText) {
+      var basis = row.type === "deleted" ? row.reference : row.current;
+      d.customText = JSON.stringify(basis || {}, null, 2);
+    }
+  }
+
+  // ---- table rendering ------------------------------------------------
+
+  var state = {
+    words: { filter: "all", search: "", openId: null },
+    expressions: { filter: "all", search: "", openId: null },
+    audio: { filter: "all", search: "" },
+    duplicates: { side: "all", key: "all", search: "", openKey: null }
+  };
+
+  function decisionSelectHtml(row) {
+    var d = getDecision(row);
+    var opts = OPTIONS_BY_TYPE[row.type].map(function (o) {
+      return '<option value="' + o.value + '"' + (o.value === d.choice ? " selected" : "") + ">" + escapeHtml(o.label) + "</option>";
+    }).join("");
+    return '<select class="decision-select is-' + d.choice + '" data-id="' + escapeHtml(row.id) + '">' + opts + "</select>";
+  }
+
+  function renderDetail(category, row) {
+    var fields = fieldsFor(category);
+    var htmlParts = [];
+
+    fields.forEach(function (field) {
+      var refVal = row.reference ? getPath(row.reference, field.key) : undefined;
+      var curVal = row.current ? getPath(row.current, field.key) : undefined;
+
+      if (row.type === "added") {
+        if (isEmptyVal(curVal)) return;
+        htmlParts.push('<div class="diff-field single"><div class="field-name">' + escapeHtml(field.label) + '</div><div class="field-value"><div class="val-box added">' + renderFieldValue(field, curVal) + "</div></div></div>");
+        return;
+      }
+      if (row.type === "deleted") {
+        if (isEmptyVal(refVal)) return;
+        htmlParts.push('<div class="diff-field single"><div class="field-name">' + escapeHtml(field.label) + '</div><div class="field-value"><div class="val-box removed">' + renderFieldValue(field, refVal) + "</div></div></div>");
+        return;
+      }
+
+      var same = valuesEqual(refVal, curVal);
+      if (same && isEmptyVal(refVal)) return;
+      var refHtml = isEmptyVal(refVal) ? '<span class="val-box empty">empty</span>' : '<div class="val-box' + (same ? "" : " removed") + '">' + renderFieldValue(field, refVal) + "</div>";
+      var curHtml = isEmptyVal(curVal) ? '<span class="val-box empty">empty</span>' : '<div class="val-box' + (same ? "" : " added") + '">' + renderFieldValue(field, curVal) + "</div>";
+      htmlParts.push('<div class="diff-field"><div class="field-name">' + escapeHtml(field.label) + (same ? "" : ' <strong style="color:var(--status-warning)">&bull;</strong>') + '</div><div class="field-value">' + refHtml + curHtml + "</div></div>");
+    });
+
+    var header = row.type === "modified"
+      ? '<div class="diff-header"><span>&nbsp;</span><div class="cols"><span>E-reo (reference)</span><span>Vercel (current)</span></div></div>'
+      : "";
+
+    var d = getDecision(row);
+    var customHtml = "";
+    if (d.choice === "custom") {
+      customHtml = '<div class="custom-editor"><label>' +
+        (row.type === "deleted" ? "JSON to re-import into Vercel (starts from E-reo's payload; becomes a MOTS/EXPRESSIONS row in the GONG HAKKA sheet on export):" : "JSON to push to E-reo (starts from Vercel's payload):") +
+        '</label><textarea data-id="' + escapeHtml(row.id) + '" spellcheck="false">' + escapeHtml(d.customText || "{}") + "</textarea>" +
+        '<div class="json-error" hidden></div></div>';
+    }
+
+    return '<div class="detail-inner">' + header + (htmlParts.length ? htmlParts.join("") : '<div style="color:var(--text-muted);font-size:12px">No other field differs.</div>') + customHtml + "</div>";
+  }
+
+  function renderTable(category) {
+    var s = state[category];
+    var tbody = document.getElementById("tbody-" + category);
+    var empty = document.getElementById("empty-" + category);
+    var rows = buildRows(category).filter(function (r) {
+      if (s.filter !== "all" && r.type !== s.filter) return false;
+      if (s.search && rowSearchText(r).indexOf(s.search) === -1) return false;
+      return true;
+    });
+
+    if (!rows.length) { tbody.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (row) {
+      var t = row.current || row.reference || {};
+      var tr = t.translations || {};
+      var open = s.openId === row.id;
+      return (
+        '<tr class="data-row' + (open ? " open" : "") + '" data-id="' + escapeHtml(row.id) + '">' +
+        "<td>" + decisionSelectHtml(row) + "</td>" +
+        '<td><span class="status-badge ' + row.type + '">' + STATUS_LABELS[row.type] + "</span></td>" +
+        '<td class="target-cell" data-toggle="' + escapeHtml(row.id) + '">' + escapeHtml(fmtScalar(tr.target)) + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(tr.primary)) + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(tr.secondary)) + "</td>" +
+        '<td class="id-cell mono">' + escapeHtml(row.id) + "</td>" +
+        "</tr>" +
+        (open ? '<tr class="detail-row"><td colspan="6">' + renderDetail(category, row) + "</td></tr>" : "")
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(tbody.querySelectorAll("[data-toggle]"), function (cell) {
+      cell.addEventListener("click", function () {
+        var id = cell.getAttribute("data-toggle");
+        s.openId = s.openId === id ? null : id;
+        renderTable(category);
+      });
+    });
+
+    Array.prototype.forEach.call(tbody.querySelectorAll(".decision-select"), function (sel) {
+      sel.addEventListener("click", function (evt) { evt.stopPropagation(); });
+      sel.addEventListener("change", function (evt) {
+        evt.stopPropagation();
+        var id = sel.getAttribute("data-id");
+        var row = rows.filter(function (r) { return r.id === id; })[0];
+        if (!row) return;
+        setDecision(row, sel.value);
+        if (sel.value === "custom") { s.openId = id; }
+        renderTable(category);
+        refreshActionBar();
+      });
+    });
+
+    Array.prototype.forEach.call(tbody.querySelectorAll("textarea[data-id]"), function (ta) {
+      ta.addEventListener("click", function (evt) { evt.stopPropagation(); });
+      ta.addEventListener("input", function () {
+        var id = ta.getAttribute("data-id");
+        var d = decisions[id];
+        if (!d) return;
+        d.customText = ta.value;
+        var errBox = ta.parentElement.querySelector(".json-error");
+        try {
+          JSON.parse(ta.value);
+          errBox.hidden = true;
+        } catch (e) {
+          errBox.hidden = false;
+          errBox.textContent = "Invalid JSON: " + e.message;
+        }
+        refreshActionBar();
+      });
+    });
+  }
+
+  // ---- audio playback -----------------------------------------------------
+  //
+  // Files aren't copied into every export folder (they can be large and
+  // numerous), so playback goes straight to the local audio source dir via
+  // the relative path export_missing.py computed (audio_source_relative_dir)
+  // -- a plain "<audio src>" load, not fetch/XHR, so it isn't blocked by the
+  // stricter same-origin rules Chrome applies to file:// scripts. Unmatched
+  // files ARE copied alongside analytics.html, so those just use their own
+  // folder directly.
+
+  var nowPlayingKey = null;
+
+  function audioUrl(dir, filename) {
+    if (!dir || !filename) return null;
+    return dir.replace(/\/+$/, "") + "/" + encodeURIComponent(filename);
+  }
+
+  function playButtonHtml(key, url) {
+    if (!url) return "";
+    var playing = nowPlayingKey === key;
+    return '<button type="button" class="play-btn' + (playing ? " playing" : "") + '" data-key="' +
+      escapeHtml(key) + '" data-url="' + escapeHtml(url) + '" title="Play/pause">' + (playing ? "&#9208;" : "&#9654;") + "</button>";
+  }
+
+  function refreshPlayButtonIcons() {
+    Array.prototype.forEach.call(document.querySelectorAll(".play-btn"), function (btn) {
+      var playing = btn.getAttribute("data-key") === nowPlayingKey;
+      btn.classList.toggle("playing", playing);
+      btn.innerHTML = playing ? "&#9208;" : "&#9654;";
+    });
+  }
+
+  function bindPlayButtons(container) {
+    Array.prototype.forEach.call(container.querySelectorAll(".play-btn"), function (btn) {
+      btn.addEventListener("click", function (evt) {
+        evt.stopPropagation();
+        var key = btn.getAttribute("data-key");
+        var player = document.getElementById("audio-player");
+        if (nowPlayingKey === key) {
+          player.pause();
+          nowPlayingKey = null;
+        } else {
+          player.src = btn.getAttribute("data-url");
+          nowPlayingKey = key;
+          player.play().catch(function () { nowPlayingKey = null; refreshPlayButtonIcons(); });
+        }
+        refreshPlayButtonIcons();
+      });
+    });
+  }
+
+  // ---- audio tab ---------------------------------------------------------
+
+  function buildAudioRows() {
+    var audio = DATA.audio || { words: [], expressions: [] };
+    var rows = [];
+    (audio.words || []).forEach(function (e) { rows.push({ type: "Word", entry: e }); });
+    (audio.expressions || []).forEach(function (e) { rows.push({ type: "Expression", entry: e }); });
+    rows.sort(function (a, b) { return (a.entry.target || "").localeCompare(b.entry.target || ""); });
+    return rows;
+  }
+
+  function renderAudioTable() {
+    var s = state.audio;
+    var tbody = document.getElementById("tbody-audio");
+    var empty = document.getElementById("empty-audio");
+    var rows = buildAudioRows().filter(function (r) {
+      var status = r.entry.local_file ? "ok" : "missing";
+      if (s.filter !== "all" && status !== s.filter) return false;
+      if (s.search) {
+        var text = [r.entry.target, r.entry.primary].join(" ").toLowerCase();
+        if (text.indexOf(s.search) === -1) return false;
+      }
+      return true;
+    });
+
+    if (!rows.length) { tbody.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (r) {
+      var e = r.entry;
+      var hasLocal = !!e.local_file;
+      var url = hasLocal ? audioUrl(DATA.audio_source_relative_dir, e.local_file) : null;
+      return (
+        "<tr>" +
+        "<td>" + escapeHtml(r.type) + "</td>" +
+        '<td><span class="status-badge ' + (hasLocal ? "audio-ok" : "audio-missing") + '">' + (hasLocal ? escapeHtml(e.local_file) : "missing") + "</span>" +
+        playButtonHtml("word-audio:" + e.id, url) + "</td>" +
+        "<td>" + (e.platform_has_audio ? "yes" : "&mdash;") + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(e.target)) + "</td>" +
+        "<td>" + escapeHtml(fmtScalar(e.primary)) + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+
+    bindPlayButtons(tbody);
+  }
+
+  function renderUnmatchedAudio() {
+    var files = DATA.unmatched_audio_files || [];
+    var section = document.getElementById("unmatched-section");
+    if (!files.length) { section.hidden = true; return; }
+    section.hidden = false;
+    document.getElementById("unmatched-copied-note").textContent = DATA.unmatched_audio_dir
+      ? "Copied to " + DATA.unmatched_audio_dir + "/ for review."
+      : "";
+    var list = document.getElementById("unmatched-list");
+    list.innerHTML = files.map(function (f) {
+      var url = DATA.unmatched_audio_dir ? audioUrl(DATA.unmatched_audio_dir, f) : null;
+      return '<span class="mono">' + escapeHtml(f) + playButtonHtml("unmatched:" + f, url) + "</span>";
+    }).join("");
+    bindPlayButtons(list);
+  }
+
+  function audioIssueCount() {
+    return buildAudioRows().filter(function (r) { return !r.entry.local_file; }).length;
+  }
+
+  // ---- duplicates tab -----------------------------------------------------
+
+  var SIDE_LABELS = { vercel: "Vercel", e_reo: "E-reo" };
+  var DUP_KEY_LABELS = { french: "Same french", target: "Same hakka", english: "Same english" };
+  var DUP_CATEGORY_LABELS = { words: "Word", expressions: "Expression" };
+
+  function buildDuplicateRows() {
+    var d = DATA.duplicates || {};
+    var rows = [];
+    ["vercel", "e_reo"].forEach(function (side) {
+      ["words", "expressions"].forEach(function (category) {
+        var perKey = (d[side] && d[side][category]) || {};
+        ["french", "target", "english"].forEach(function (key) {
+          (perKey[key] || []).forEach(function (group) {
+            rows.push({
+              rowKey: side + "|" + category + "|" + key + "|" + group.value,
+              side: side, category: category, key: key, value: group.value, entries: group.entries
+            });
+          });
+        });
+      });
+    });
+    rows.sort(function (a, b) { return b.entries.length - a.entries.length; });
+    return rows;
+  }
+
+  function renderDuplicateEntries(entries) {
+    return '<div class="detail-inner"><table class="rows" style="border:none"><thead><tr><th>ID</th><th>French</th><th>Hakka</th><th>English</th></tr></thead><tbody>' +
+      entries.map(function (e) {
+        return "<tr><td class=\"mono id-cell\">" + escapeHtml(e.id) + "</td><td>" + escapeHtml(fmtScalar(e.french)) +
+          "</td><td class=\"hanzi\">" + escapeHtml(fmtScalar(e.target)) + "</td><td>" + escapeHtml(fmtScalar(e.english)) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+
+  function renderDuplicatesTable() {
+    var s = state.duplicates;
+    var tbody = document.getElementById("tbody-duplicates");
+    var empty = document.getElementById("empty-duplicates");
+    var rows = buildDuplicateRows().filter(function (r) {
+      if (s.side !== "all" && r.side !== s.side) return false;
+      if (s.key !== "all" && r.key !== s.key) return false;
+      if (s.search && r.value.toLowerCase().indexOf(s.search) === -1) return false;
+      return true;
+    });
+
+    if (!rows.length) { tbody.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (row) {
+      var open = s.openKey === row.rowKey;
+      return (
+        '<tr class="data-row' + (open ? " open" : "") + '" data-key="' + escapeHtml(row.rowKey) + '">' +
+        "<td>" + escapeHtml(SIDE_LABELS[row.side] || row.side) + "</td>" +
+        "<td>" + escapeHtml(DUP_CATEGORY_LABELS[row.category] || row.category) + "</td>" +
+        "<td>" + escapeHtml(DUP_KEY_LABELS[row.key] || row.key) + "</td>" +
+        '<td class="target-cell hanzi">' + escapeHtml(row.value) + "</td>" +
+        "<td>" + row.entries.length + "</td>" +
+        "</tr>" +
+        (open ? '<tr class="detail-row"><td colspan="5">' + renderDuplicateEntries(row.entries) + "</td></tr>" : "")
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(tbody.querySelectorAll("tr.data-row"), function (tr) {
+      tr.addEventListener("click", function () {
+        var key = tr.getAttribute("data-key");
+        s.openKey = s.openKey === key ? null : key;
+        renderDuplicatesTable();
+      });
+    });
+  }
+
+  function duplicatesCount() {
+    return buildDuplicateRows().length;
+  }
+
+  // ---- overview ---------------------------------------------------------
+
+  function renderOverview() {
+    var overview = document.getElementById("overview");
+    var cats = [{ key: "words", label: "Words" }, { key: "expressions", label: "Expressions" }];
+    overview.innerHTML = cats.map(function (c) {
+      var s = (DATA.summary && DATA.summary[c.key]) || { added: 0, modified: 0, deleted: 0 };
+      return (
+        '<div class="card"><h2>' + c.label + ' <span class="count">(' + (s.added + s.modified + s.deleted) + " changed)</span></h2>" +
+        '<div class="stat-row">' +
+        '<div class="stat-tile"><div class="value">' + s.added + '</div><div class="label"><span class="dot dot-good"></span>Added</div></div>' +
+        '<div class="stat-tile"><div class="value">' + s.modified + '</div><div class="label"><span class="dot dot-warning"></span>Modified</div></div>' +
+        '<div class="stat-tile"><div class="value">' + s.deleted + '</div><div class="label"><span class="dot dot-critical"></span>Deleted</div></div>' +
+        "</div></div>"
+      );
+    }).join("");
+  }
+
+  function refreshBadges() {
+    var sw = DATA.summary.words, se = DATA.summary.expressions;
+    document.getElementById("tab-count-words").textContent = sw.added + sw.modified + sw.deleted;
+    document.getElementById("tab-count-expressions").textContent = se.added + se.modified + se.deleted;
+    document.getElementById("tab-count-audio").textContent = audioIssueCount();
+    document.getElementById("tab-count-duplicates").textContent = duplicatesCount();
+  }
+
+  // ---- action bar / merge generation -------------------------------------
+
+  function refreshActionBar() {
+    var push = 0, reimport = 0, custom = 0, skip = 0;
+    allRows().forEach(function (row) {
+      var d = getDecision(row);
+      if (d.choice === "custom") { custom++; return; }
+      if (d.choice === "push") { push++; return; }
+      if (d.choice === "reimport") { reimport++; return; }
+      skip++;
+    });
+    document.getElementById("count-push").textContent = push;
+    document.getElementById("count-reimport").textContent = reimport;
+    document.getElementById("count-custom").textContent = custom;
+    document.getElementById("count-skip").textContent = skip;
+  }
+
+  function downloadJson(filename, obj) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function downloadBlob(filename, blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // Bundles the two push files into one archive -- same shape as export.py's
+  // own expressionCorpus.zip, just covering both corpora -- so pushing to
+  // E-reo is a single file instead of two separate same-named downloads
+  // piling up as "(1)", "(2)", etc. in the Downloads folder.
+  function downloadPlatformZip(wordPayload, expressionPayload) {
+    var zip = new JSZip();
+    if (Object.keys(wordPayload).length) zip.file("wordCorpus.json", JSON.stringify(wordPayload, null, 2));
+    if (Object.keys(expressionPayload).length) zip.file("expressionCorpus.json", JSON.stringify(expressionPayload, null, 2));
+    return zip.generateAsync({ type: "blob" }).then(function (blob) {
+      downloadBlob("e_reo_push.zip", blob);
+    });
+  }
+
+  // ---- "re-import to Vercel" -> GONG HAKKA sheet rows --------------------
+  //
+  // The Vercel-side DB isn't updated by pasting JSON -- it's rebuilt from the
+  // live GONG HAKKA Google Sheet (MOTS / EXPRESSIONS tabs) via `manage.py
+  // import_v2`. So a "re-import to Vercel" decision has to come out as rows
+  // in that exact column layout, ready to paste into the sheet, rather than
+  // as JSON. Headers below (including the trailing space in "OBSERVATIONS ")
+  // were read directly off the live sheet -- keep them byte-for-byte if it
+  // ever needs updating.
+  var MOTS_HEADERS = ["FRANCAIS", "PINYIN (manuel)", "PINYIN (auto)", "SINOGRAMME", "CW", "JFW", "GM", "DS", "TA", "THEMES", "OBSERVATIONS ", "STATUT", "ANGLAIS"];
+  var EXPRESSIONS_HEADERS = ["FRANCAIS", "SINOGRAMME", "PINYIN (AUTO)", "NOUVEAUX MOTS", "CW", "JFW", "GM", "DS", "TA", "THEMES", "OBSERVATIONS ", "STATUT", "ANGLAIS", "MOTS INCONNUS"];
+
+  var SUP_TO_DIGIT = { "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6" };
+  function toDigitPinyin(s) {
+    return String(s || "").replace(/[¹²³⁴⁵⁶]/g, function (c) { return SUP_TO_DIGIT[c] || c; });
+  }
+
+  function themeNames(ids) {
+    return (ids || []).map(function (id) { return THEMES[id] || id; }).join(", ");
+  }
+
+  // target is "<space-separated pinyin words> <concatenated hanzi>" -- the
+  // hanzi block has no internal spaces, so it's always the trailing token.
+  function splitTarget(target) {
+    var lastSpace = String(target || "").lastIndexOf(" ");
+    if (lastSpace === -1) return { pinyin: target || "", hanzi: "" };
+    return { pinyin: target.slice(0, lastSpace), hanzi: target.slice(lastSpace + 1) };
+  }
+
+  function wordRowFromPayload(payload) {
+    var tr = (payload && payload.translations) || {};
+    var parts = splitTarget(tr.target);
+    var row = {};
+    row["FRANCAIS"] = tr.primary || "";
+    row["PINYIN (manuel)"] = toDigitPinyin(parts.pinyin);
+    row["PINYIN (auto)"] = parts.pinyin;
+    row["SINOGRAMME"] = parts.hanzi;
+    row["CW"] = ""; row["JFW"] = ""; row["GM"] = ""; row["DS"] = ""; row["TA"] = "";
+    row["THEMES"] = themeNames(payload && payload.themes);
+    row["OBSERVATIONS "] = "";
+    row["STATUT"] = "OK";
+    row["ANGLAIS"] = tr.secondary || "";
+    return row;
+  }
+
+  // Expression components are keyed "<word pinyin> <word hanzi>" but stored
+  // sorted alphabetically, not in sentence order -- match each component's
+  // pinyin against the space-separated pinyin words in `target` (which ARE
+  // in order) to reconstruct the space-separated hanzi phrase the sheet
+  // expects. A word that can't be matched is left as "(pinyin?)" so it's
+  // obvious in the sheet what needs a human fix, rather than silently wrong.
+  function expressionRowFromPayload(payload) {
+    var tr = (payload && payload.translations) || {};
+    var parts = splitTarget(tr.target);
+    var pinyinWords = parts.pinyin ? parts.pinyin.split(" ") : [];
+
+    var pinyinToHanzi = {};
+    Object.keys((payload && payload.components) || {}).forEach(function (key) {
+      var idx = key.lastIndexOf(" ");
+      if (idx === -1) return;
+      pinyinToHanzi[key.slice(0, idx)] = key.slice(idx + 1);
+    });
+
+    var phrase = pinyinWords.map(function (w) { return pinyinToHanzi[w] || ("(" + w + "?)"); }).join(" ");
+
+    var row = {};
+    row["FRANCAIS"] = tr.primary || "";
+    row["SINOGRAMME"] = phrase;
+    row["PINYIN (AUTO)"] = parts.pinyin;
+    row["NOUVEAUX MOTS"] = "";
+    row["CW"] = ""; row["JFW"] = ""; row["GM"] = ""; row["DS"] = ""; row["TA"] = "";
+    row["THEMES"] = themeNames(payload && payload.themes);
+    row["OBSERVATIONS "] = "";
+    row["STATUT"] = "OK";
+    row["ANGLAIS"] = tr.secondary || "";
+    row["MOTS INCONNUS"] = "";
+    return row;
+  }
+
+  function downloadReimportXlsx(filename, wordRows, exprRows) {
+    var wb = XLSX.utils.book_new();
+    if (wordRows.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wordRows, { header: MOTS_HEADERS }), "MOTS");
+    }
+    if (exprRows.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exprRows, { header: EXPRESSIONS_HEADERS }), "EXPRESSIONS");
+    }
+    XLSX.writeFile(wb, filename);
+  }
+
+  function parseCustom(row, d) {
+    try {
+      return JSON.parse(d.customText);
+    } catch (e) {
+      return row.type === "deleted" ? row.reference : row.current;
+    }
+  }
+
+  function generateMerge() {
+    var btn = document.getElementById("generate-btn");
+    var platform = { words: {}, expressions: {} };
+    var reimportWordRows = [];
+    var reimportExprRows = [];
+    var log = [];
+    var invalidCustom = [];
+
+    allRows().forEach(function (row) {
+      var d = getDecision(row);
+      log.push({ id: row.id, category: row.category, type: row.type, choice: d.choice });
+
+      if (d.choice === "custom") {
+        try { JSON.parse(d.customText); } catch (e) { invalidCustom.push(row.id); }
+      }
+
+      if (row.type === "deleted") {
+        if (d.choice === "reimport" || d.choice === "custom") {
+          var payload = d.choice === "custom" ? parseCustom(row, d) : row.reference;
+          if (row.category === "words") reimportWordRows.push(wordRowFromPayload(payload));
+          else reimportExprRows.push(expressionRowFromPayload(payload));
+        }
+        return;
+      }
+
+      if (d.choice === "push") platform[row.category][row.id] = row.current;
+      else if (d.choice === "custom") platform[row.category][row.id] = parseCustom(row, d);
+    });
+
+    if (invalidCustom.length) {
+      if (!confirm(invalidCustom.length + " row(s) have invalid custom JSON and will fall back to their original payload. Continue anyway?")) return;
+    }
+
+    var wrote = false;
+    var hasPushWords = Object.keys(platform.words).length > 0;
+    var hasPushExpr = Object.keys(platform.expressions).length > 0;
+
+    var zipPromise = (hasPushWords || hasPushExpr)
+      ? downloadPlatformZip(platform.words, platform.expressions)
+      : Promise.resolve();
+    if (hasPushWords || hasPushExpr) wrote = true;
+
+    btn.disabled = true;
+    zipPromise.then(function () {
+      if (reimportWordRows.length || reimportExprRows.length) {
+        downloadReimportXlsx("deleted_for_reimport.xlsx", reimportWordRows, reimportExprRows);
+        wrote = true;
+      }
+      downloadJson("merge_decisions.json", { generated_at: new Date().toISOString(), source: { corpus_dir: DATA.corpus_dir, generated_at: DATA.generated_at }, decisions: log });
+
+      if (!wrote) alert("Nothing to push or re-import (everything is set to skip/ignore) -- only merge_decisions.json was downloaded.");
+    }).finally(function () {
+      btn.disabled = false;
+    });
+  }
+
+  // ---- wiring -------------------------------------------------------
+
+  function setupTabs() {
+    var buttons = document.querySelectorAll("#tabs button");
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        buttons.forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        var tab = btn.getAttribute("data-tab");
+        ["words", "expressions", "audio", "duplicates"].forEach(function (name) {
+          document.getElementById("panel-" + name).hidden = name !== tab;
+        });
+      });
+    });
+  }
+
+  function setupCategory(category) {
+    var panel = document.getElementById("panel-" + category);
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state[category].filter = chip.getAttribute("data-filter");
+        renderTable(category);
+      });
+    });
+    document.getElementById("search-" + category).addEventListener("input", function (evt) {
+      state[category].search = evt.target.value.trim().toLowerCase();
+      renderTable(category);
+    });
+
+    var bulkSelect = document.getElementById("bulk-" + category);
+    bulkSelect.addEventListener("change", function () {
+      var val = bulkSelect.value;
+      if (!val) return;
+      var s = state[category];
+      var visible = buildRows(category).filter(function (r) {
+        if (s.filter !== "all" && r.type !== s.filter) return false;
+        if (s.search && rowSearchText(r).indexOf(s.search) === -1) return false;
+        return true;
+      });
+      visible.forEach(function (row) {
+        if (val === "__default__") { setDecision(row, DEFAULT_CHOICE[row.type]); return; }
+        var valid = OPTIONS_BY_TYPE[row.type].some(function (o) { return o.value === val; });
+        if (valid) setDecision(row, val);
+      });
+      bulkSelect.value = "";
+      renderTable(category);
+      refreshActionBar();
+    });
+  }
+
+  function setupAudioControls() {
+    var panel = document.getElementById("panel-audio");
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.audio.filter = chip.getAttribute("data-filter");
+        renderAudioTable();
+      });
+    });
+    document.getElementById("search-audio").addEventListener("input", function (evt) {
+      state.audio.search = evt.target.value.trim().toLowerCase();
+      renderAudioTable();
+    });
+  }
+
+  function setupDuplicatesControls() {
+    var panel = document.getElementById("panel-duplicates");
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip[data-side]"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip[data-side]").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.duplicates.side = chip.getAttribute("data-side");
+        renderDuplicatesTable();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip[data-key]"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip[data-key]").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.duplicates.key = chip.getAttribute("data-key");
+        renderDuplicatesTable();
+      });
+    });
+    document.getElementById("search-duplicates").addEventListener("input", function (evt) {
+      state.duplicates.search = evt.target.value.trim().toLowerCase();
+      renderDuplicatesTable();
+    });
+  }
+
+  function setupTheme() {
+    var btn = document.getElementById("theme-toggle");
+    var stored = null;
+    try { stored = localStorage.getItem("analytics-theme"); } catch (e) {}
+    if (stored) document.documentElement.setAttribute("data-theme", stored);
+    btn.addEventListener("click", function () {
+      var current = document.documentElement.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("analytics-theme", next); } catch (e) {}
+    });
+  }
+
+  function setupQuickLinks() {
+    if (!DATA.platform_reference_dir) document.getElementById("link-platform-ref").hidden = true;
+    if (!DATA.full_db_export_dir) document.getElementById("link-full-db").hidden = true;
+    document.getElementById("link-unmatched-audio").hidden = !DATA.unmatched_audio_dir;
+  }
+
+  function boot() {
+    THEMES = DATA.themes || {};
+    decisions = {};
+    document.getElementById("src-corpus-dir").textContent = DATA.corpus_dir || "(unknown)";
+    document.getElementById("src-generated-at").textContent = DATA.generated_at || "(unknown)";
+
+    document.getElementById("loader-section").hidden = true;
+    document.getElementById("app").hidden = false;
+    document.getElementById("action-bar").hidden = false;
+
+    setupQuickLinks();
+    renderOverview();
+    refreshBadges();
+    renderTable("words");
+    renderTable("expressions");
+    renderAudioTable();
+    renderUnmatchedAudio();
+    renderDuplicatesTable();
+    refreshActionBar();
+  }
+
+  function loadFile(file) {
+    var errBox = document.getElementById("load-error");
+    errBox.hidden = true;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (!parsed.words || !parsed.expressions) throw new Error('missing "words" or "expressions" key -- is this a diff_summary.json file?');
+        DATA = parsed;
+        boot();
+      } catch (e) {
+        errBox.hidden = false;
+        errBox.textContent = "Could not read this file: " + e.message;
+      }
+    };
+    reader.onerror = function () {
+      errBox.hidden = false;
+      errBox.textContent = "Could not read this file.";
+    };
+    reader.readAsText(file);
+  }
+
+  function setupLoader() {
+    var section = document.getElementById("loader-section");
+    var input = document.getElementById("file-input");
+    document.getElementById("pick-file-btn").addEventListener("click", function () { input.click(); });
+    input.addEventListener("change", function () {
+      if (input.files && input.files[0]) loadFile(input.files[0]);
+    });
+    ["dragenter", "dragover"].forEach(function (evt) {
+      section.addEventListener(evt, function (e) { e.preventDefault(); section.classList.add("drag-over"); });
+    });
+    ["dragleave", "drop"].forEach(function (evt) {
+      section.addEventListener(evt, function (e) { e.preventDefault(); section.classList.remove("drag-over"); });
+    });
+    section.addEventListener("drop", function (e) {
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById("load-different-btn").addEventListener("click", function () {
+      document.getElementById("app").hidden = true;
+      document.getElementById("action-bar").hidden = true;
+      document.getElementById("loader-section").hidden = false;
+      input.value = "";
+    });
+  }
+
+  setupLoader();
+  setupTabs();
+  setupCategory("words");
+  setupCategory("expressions");
+  setupAudioControls();
+  setupDuplicatesControls();
+  setupTheme();
+  document.getElementById("generate-btn").addEventListener("click", generateMerge);
+  document.getElementById("audio-player").addEventListener("ended", function () {
+    nowPlayingKey = null;
+    refreshPlayButtonIcons();
+  });
+
+  // Try to auto-load a sibling diff_summary.json when opened over http(s)
+  // (fetch is blocked from file:// pages, so this silently no-ops there --
+  // the user just uses the file picker/drag-drop instead).
+  if (location.protocol !== "file:") {
+    fetch("diff_summary.json").then(function (r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function (parsed) {
+      if (parsed && parsed.words && parsed.expressions) { DATA = parsed; boot(); }
+    }).catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
