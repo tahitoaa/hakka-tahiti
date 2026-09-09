@@ -1,36 +1,202 @@
 {% extends "hakkadbapp/base.html" %}
 
-{% block content %} 
+{% block content %}
 
+<style>
+  /* Palette borrowed from management/commands/corpus_diff_dashboard_template.html
+     so this live page reads like the same family of tool. */
+  .reports-dark {
+    --surface-1:      #1a1a19;
+    --surface-2:      #111110;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --border:         rgba(255,255,255,0.10);
+    --border-strong:  rgba(255,255,255,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.18);
+    --status-warning:   #fab219;
+    --status-warning-bg:rgba(250,178,25,0.18);
+    --status-critical:  #e66767;
+    --status-critical-bg:rgba(230,103,103,0.16);
+    --accent:         #7c95ee;
+    --accent-bg:      rgba(124,149,238,0.16);
+    background: var(--page-plane);
+    color: var(--text-primary);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .reports-dark a { color: var(--accent); }
+  .reports-dark .intro { color: var(--text-secondary); margin-bottom: 20px; }
 
-<p class="mb-6 text-gray-700">
-    Cette page présente une synthèse de l’état du lexique analysé automatiquement pour la création de ce site. 
-    Consultez également l’onglet <a class="text-blue-600 hover:underline" href="{% url 'caracters' %}"> Caractères </a>, en particulier la section sur les caractères à plusieurs prononciations, afin de détecter d’éventuelles incohérences dans les données.
-</p>
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  .reports-dark .stat-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 14px; margin-bottom: 20px; }
+  @media (min-width: 640px) { .reports-dark .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .reports-dark .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+  .reports-dark .stat-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .reports-dark .stat-card h3 { font-size: 13px; font-weight: 600; color: var(--status-warning); margin: 0; }
+  .reports-dark .stat-card .value { font-size: 26px; font-weight: 700; margin: 6px 0 2px; }
+  .reports-dark .stat-card .desc { font-size: 12px; color: var(--text-muted); }
+  .reports-dark .stat-card .stat-link { font-size: 12px; display: inline-block; margin-top: 6px; }
+
+  .reports-dark details.drawer { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; margin-top: 12px; }
+  .reports-dark details.drawer.nested { background: var(--surface-2); margin: 10px 0 0; }
+  .reports-dark details.drawer > summary { padding: 12px 16px; font-weight: 600; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; }
+  .reports-dark details.drawer.nested > summary { padding: 9px 14px; font-size: 13px; }
+  .reports-dark details.drawer.nested > .drawer-body { padding: 0 14px 12px; }
+  .reports-dark details.drawer > summary::-webkit-details-marker { display: none; }
+  .reports-dark .chevron { color: var(--text-muted); transition: transform 0.15s ease; flex-shrink: 0; }
+  .reports-dark details.drawer[open] > summary .chevron { transform: rotate(90deg); }
+  .reports-dark .drawer-body { padding: 0 16px 16px; }
+  .reports-dark p.hint { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; }
+  .reports-dark .count-badge { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+  .reports-dark table.report-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+  .reports-dark table.report-table th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.02em; border-bottom: 1px solid var(--gridline); padding: 6px 12px 6px 0; }
+  .reports-dark table.report-table td { border-bottom: 1px solid var(--gridline); padding: 6px 12px 6px 0; vertical-align: top; }
+
+  .reports-dark .log-box { background: var(--surface-2); border: 1px solid var(--gridline); border-radius: 8px; padding: 14px; font-family: ui-monospace, monospace; font-size: 12px; overflow: auto; max-height: 24rem; }
+  .reports-dark .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace; font-size: 12px; }
+</style>
+
+<div class="reports-dark">
+
+  <p class="intro">
+    Cette page présente une synthèse de l'état du lexique, calculée en direct sur la base actuelle.
+    Consultez également l'onglet <a class="hover:underline" href="{% url 'caracters' %}">Caractères</a>,
+    en particulier la section sur les caractères à plusieurs prononciations.
+  </p>
+
+  <div class="stat-grid">
     {% for s in stats %}
-        <div class="bg-white text-black rounded-lg shadow-md p-4">
-            <h3 class="text-lg font-semibold text-red-600">{{ s.title }}</h3>
-            <p class="text-3xl font-bold mt-2">{{ s.value }}</p>
-            {% if s.description %}
-                <p class="text-sm text-gray-600 mt-1">{{ s.description }}</p>
-            {% endif %}
-        </div>
+      <div class="stat-card">
+        <h3>{{ s.title }}</h3>
+        <p class="value">{{ s.value }}</p>
+        {% if s.description %}<p class="desc">{{ s.description }}</p>{% endif %}
+        {% if s.link %}<a class="stat-link hover:underline" href="{{ s.link }}">{{ s.link_label|default:"Voir le détail →" }}</a>{% endif %}
+      </div>
     {% endfor %}
+  </div>
+
+  <details class="drawer">
+    <summary><span class="chevron">&#9656;</span> Mots par thème</summary>
+    <div class="drawer-body" style="overflow-x:auto">
+      <table class="report-table">
+        <thead><tr><th>Thème</th><th>Nombre de mots</th></tr></thead>
+        <tbody>
+          {% for row in words_by_category %}
+            <tr><td>{{ row.category }}</td><td>{{ row.n }}</td></tr>
+          {% empty %}
+            <tr><td colspan="2" class="hint">Aucune donnée.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary><span class="chevron">&#9656;</span> Expressions par thème</summary>
+    <div class="drawer-body" style="overflow-x:auto">
+      <p class="hint">Une expression peut porter plusieurs thèmes (séparés par des virgules) ; chacun est compté séparément.</p>
+      <table class="report-table">
+        <thead><tr><th>Thème</th><th>Nombre d'expressions</th></tr></thead>
+        <tbody>
+          {% for row in expressions_by_category %}
+            <tr><td>{{ row.category }}</td><td>{{ row.n }}</td></tr>
+          {% empty %}
+            <tr><td colspan="2" class="hint">Aucune donnée.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>
+      <span class="chevron">&#9656;</span> Audio manquant (plateforme)
+      {% if audio_snapshot %}
+        <span class="count-badge">({{ audio_snapshot.missing_words|length }} mots, {{ audio_snapshot.missing_expressions|length }} expressions)</span>
+      {% endif %}
+    </summary>
+    <div class="drawer-body">
+      {% if audio_snapshot %}
+        <p class="hint">
+          D'après l'instantané de la plateforme enregistré lors du dernier
+          <span class="mono">platform_to_vercel --yes</span>, le {{ audio_snapshot.timestamp|date:"j F Y à H:i:s" }}
+          &mdash; c'est une métadonnée de la plateforme (un id audio par mot/expression), pas une lecture du disque,
+          donc ça fonctionne aussi bien en ligne qu'en local. Peut être légèrement obsolète si des audios ont été
+          ajoutés sur la plateforme depuis.
+        </p>
+        <details class="drawer nested" style="margin-top:0">
+          <summary><span class="chevron">&#9656;</span> Mots sans audio <span class="count-badge">({{ audio_snapshot.missing_words|length }} / {{ audio_snapshot.total_words }})</span></summary>
+          <div class="drawer-body" style="overflow-x:auto; max-height:20rem; overflow-y:auto">
+            <table class="report-table">
+              <thead><tr><th>Français</th><th>Hakka</th><th>Nom de fichier attendu</th></tr></thead>
+              <tbody>
+                {% for w in audio_snapshot.missing_words %}
+                  <tr><td>{{ w.french }}</td><td class="hanzi">{{ w.target }}</td><td class="mono">{{ w.expected_filename }}</td></tr>
+                {% empty %}
+                  <tr><td colspan="3" class="hint">Aucun.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+        <details class="drawer nested">
+          <summary><span class="chevron">&#9656;</span> Expressions sans audio <span class="count-badge">({{ audio_snapshot.missing_expressions|length }} / {{ audio_snapshot.total_expressions }})</span></summary>
+          <div class="drawer-body" style="overflow-x:auto; max-height:20rem; overflow-y:auto">
+            <table class="report-table">
+              <thead><tr><th>Français</th><th>Hakka</th><th>Nom de fichier attendu</th></tr></thead>
+              <tbody>
+                {% for e in audio_snapshot.missing_expressions %}
+                  <tr><td>{{ e.french }}</td><td class="hanzi">{{ e.target }}</td><td class="mono">{{ e.expected_filename }}</td></tr>
+                {% empty %}
+                  <tr><td colspan="3" class="hint">Aucune.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      {% else %}
+        <p class="hint">
+          Aucun instantané de plateforme n'est encore enregistré. Lancez
+          <span class="mono">manage.py platform_to_vercel --yes</span> une première fois pour en générer un
+          &mdash; à partir de là, cette section reste à jour à chaque nouvel import, sans lecture de disque.
+        </p>
+      {% endif %}
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary><span class="chevron">&#9656;</span> Erreurs de format actuelles <span class="count-badge">({{ format_errors_count }})</span></summary>
+    <div class="drawer-body">
+      <p class="hint">
+        Analyse en direct de la base actuelle (pas seulement du dernier import) : tons 5/6 sur une finale
+        invalide, mots sans thème/statut, expressions incomplètes.
+      </p>
+      <div class="log-box">
+        {% if format_errors %}
+          <ul>
+            {% for err in format_errors %}<li>&#10060; {{ err }}</li>{% endfor %}
+          </ul>
+        {% else %}
+          <p>Aucune erreur de format détectée.</p>
+        {% endif %}
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>
+      <span class="chevron">&#9656;</span>
+      Dernière importation du lexique : le {{ traces.last.timestamp|date:"j F Y à H:i:s" }} ({{ traces.errors }} erreurs)
+    </summary>
+    <div class="drawer-body">
+      <div class="log-box"><pre>{{ traces.last.details|default:"Aucun log disponible" }}</pre></div>
+    </div>
+  </details>
+
 </div>
-
-
-<h1 class="text-xl font-semibold text-gray-800">
-  Dernière importation du lexique : le {{ traces.last.timestamp|date:"j F Y à H:i:s" }} ({{traces.errors }} erreurs)
-</h1>
-<div class="bg-gray-900 text-white rounded-lg p-4 text-sm font-mono overflow-auto shadow-md max-h-96">
-  <pre>
-    {{ traces.last.details|default:"Aucun log disponible" }}
-</pre>
-</div>
-
-
-
-
 
 {% endblock %}

@@ -13,9 +13,6 @@
     Touchez ou cliquez un caractère suggéré pour l'insérer dans le champ de saisie
     (ou <kbd>Maj</kbd> + <kbd>1</kbd>…<kbd>9</kbd> au clavier).
   </small>
-  <button id="import-prons" class="w-full sm:w-auto min-h-11 px-4 py-2 rounded-md shadow-sm text-center bg-brand text-white hover:bg-brand-dark active:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-gold touch-manipulation">
-    Importer un répertoire de prononciations
-  </button>
 
   <div class="relative mt-4">
     <textarea id="pinyin-input"
@@ -40,7 +37,7 @@
   </div>
 
   <div class="relative mt-4 bg-white p-3 pr-11 rounded-md shadow border border-gray-100">
-    <div id="pinyin-hanzi-lines" class="hanzi text-sm text-gray-700 leading-snug text-left whitespace-pre-line break-words"></div>
+    <div id="pinyin-hanzi-lines" class="font-sans text-sm text-gray-700 leading-snug text-left whitespace-pre-line break-words"></div>
   </div>
 
   <div class="relative mt-4 bg-white p-3 pr-11 rounded-md shadow border border-gray-100">
@@ -61,7 +58,13 @@
                <ul id="unknown-prons" class="text-sm leading-snug text-left bg-white p-3 rounded-md shadow border border-gray-100"></ul>
           </div>
      </div>
+
+  <button id="import-prons" class="w-full sm:w-auto min-h-11 px-4 py-2 rounded-md shadow-sm text-center bg-brand text-white hover:bg-brand-dark active:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-gold touch-manipulation">
+    Importer un répertoire de prononciations
+  </button>
+
 </div>
+
 {% include  "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words%}
     <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>

@@ -4,7 +4,14 @@
   <p class="print:text-black print:bg-white print:shadow-none print:p-0">
     Cliquez sur un phonème pour voir les caractères associés.
   </p>
+  <label class="inline-flex items-center gap-2 mb-2 text-sm print:hidden">
+    <input type="checkbox" id="toggle-hanzi">
+    Afficher les caractères correspondants
+  </label>
   <style>
+    #phonemes-table-wrap .hanzi-label { display: none; }
+    #phonemes-table-wrap.show-hanzi .py-label { display: none; }
+    #phonemes-table-wrap.show-hanzi .hanzi-label { display: inline; }
     @media print {
       .no-print-overflow {
         overflow-x: visible !important;
@@ -31,6 +38,7 @@
       }
     }
   </style>
+  <div id="phonemes-table-wrap">
   <table class="table-auto border-collapse w-full text-sm">
     <thead>
       <tr class="bg-gray-700 text-white text-center">
@@ -56,8 +64,10 @@
               {% combo_exists initial.id final.id combo_set as exists %}
               {% if exists %}
                 <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
-                  <span class="font-bold px-1 py-0.5 rounded">  
-                    {% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=final.final%}
+                  <span class="font-bold px-1 py-0.5 rounded">
+                    <span class="py-label">{% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=final.final%}</span>
+                    {% combo_hanzi_list initial.id final.id combo_hanzi as hanzi_list %}
+                    <span class="hanzi-label hanzi">{{ hanzi_list|join:" " }}</span>
                   </span>
                 </a>
               {% endif %}
@@ -67,6 +77,18 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
+<script>
+  (function () {
+    var toggle = document.getElementById('toggle-hanzi');
+    var wrap = document.getElementById('phonemes-table-wrap');
+    if (toggle && wrap) {
+      toggle.addEventListener('change', function () {
+        wrap.classList.toggle('show-hanzi', toggle.checked);
+      });
+    }
+  })();
+</script>
 
 {% endblock %}

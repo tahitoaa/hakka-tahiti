@@ -131,7 +131,7 @@ def parse_words_df(df: pd.DataFrame) -> WordImportParseResult:
 
 
 @transaction.atomic
-def import_words_from_df(df: pd.DataFrame, *, reset: bool = False, traces_details: str = "") -> dict:
+def import_words_from_df(df: pd.DataFrame, *, reset: bool = False, traces_details: str = "", platform_data=None) -> dict:
     parsed = parse_words_df(df)
 
     if reset:
@@ -219,6 +219,7 @@ def import_words_from_df(df: pd.DataFrame, *, reset: bool = False, traces_detail
         details="\n".join([traces_details, *parsed.logs]).strip(),
         char_count=Pronunciation.objects.values("hanzi").distinct().count(),
         word_count=Word.objects.count(),
+        platform_data=platform_data,
     )
 
     return {

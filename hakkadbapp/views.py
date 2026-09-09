@@ -1,15 +1,16 @@
 from io import StringIO
 import json
-from django.db.models import Prefetch, Count
+from django.db.models import Prefetch, Count, Q
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
 from django.db.models import F, Value, CharField
 from django.db.models.functions import Concat
 from .models import ExpressionWord, Pronunciation, Tone, Initial, Final, WordPronunciation, Word, Traces, Expression
 import csv
-from collections import defaultdict
+from collections import Counter, defaultdict
 from urllib.parse import unquote
 from django.db.models import Case, When, IntegerField, Value
 import random
@@ -27,7 +28,121 @@ s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
 
 from .management.commands import import_lexique
+from .management.commands.platform_to_vercel import split_target
 from django.db.models import Case, When, Value, IntegerField
+
+TONE_SUPERSCRIPT = {1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶"}
+SUPERSCRIPT_TO_DIGIT = str.maketrans("¹²³⁴⁵⁶", "123456")
+
+# Fields shown in the duplicates "compared fields" table, in display order.
+DUP_FIELDS = ["french", "hakka", "secondary", "theme", "status"]
+
+
+def _dup_word_entry(w):
+    return {
+        "id": w.id, "french": w.french, "hakka": f"{w.char()} {w.pinyin()}".strip(),
+        "secondary": w.tahitian, "theme": w.category or "", "status": w.status or "",
+    }
+
+
+def _dup_expression_entry(e):
+    return {
+        "id": e.id, "french": e.french, "hakka": e.rendering,
+        "secondary": e.english, "theme": e.category or "", "status": e.status or "",
+    }
+
+
+def _duplicate_groups(items, key_fn, entry_fn):
+    """Group items sharing a key (french / hakka / tahitian-english), normalized
+    into comparable dicts.
+
+    Divergent fields are computed per-group, never against an arbitrary
+    "first" entry: queryset order carries no meaning, so treating one row as
+    the reference and the rest as "changed" would bias the display toward
+    whichever entry the DB happened to return first. Instead a field is
+    flagged when the group's entries don't all agree on it, and every entry's
+    cell for that field is highlighted the same way -- nobody is presumed
+    correct, the reader decides.
+    """
+    groups = defaultdict(list)
+    for item in items:
+        key = (key_fn(item) or "").strip().lower()
+        if key:
+            groups[key].append(entry_fn(item))
+    result = []
+    for key, entries in groups.items():
+        if len(entries) < 2:
+            continue
+        entries = sorted(entries, key=lambda e: e["id"])
+        divergent_fields = [f for f in DUP_FIELDS if len({e[f] for e in entries}) > 1]
+        for entry in entries:
+            entry["diffs"] = divergent_fields
+        search_blob = " ".join(
+            f"{e['id']} {e['french']} {e['hakka']} {e['secondary']} {e['theme']} {e['status']}" for e in entries
+        )
+        result.append({
+            "value": key, "entries": entries, "divergent_fields": divergent_fields,
+            "search": f"{key} {search_blob}".lower(),
+        })
+    result.sort(key=lambda g: -len(g["entries"]))
+    return result
+
+
+def get_latest_platform_snapshot():
+    """Most recent Traces row carrying a platform_data JSON payload (written
+    by `platform_to_vercel --yes`). Reading this instead of the local
+    e_reo_json/ folder is what makes platform-vs-Vercel checks (missing
+    audio, component/pronunciation mismatches) safe to run from a view that
+    also has to work on the deployed instance, which has no filesystem
+    access to that folder at all."""
+    return Traces.objects.exclude(platform_data__isnull=True).order_by("-timestamp").first()
+
+
+def build_duplicate_sections():
+    words_for_dup = list(
+        Word.objects.prefetch_related(
+            Prefetch(
+                "wordpronunciation_set",
+                queryset=WordPronunciation.objects.select_related(
+                    "pronunciation__initial", "pronunciation__final", "pronunciation__tone"
+                ),
+            )
+        )
+    )
+    expressions_for_dup = list(Expression.objects.all())
+
+    return [
+        {
+            "key": "words-french", "category": "words",
+            "title": "Mots -- même français", "secondary_label": "Tahitien",
+            "groups": _duplicate_groups(words_for_dup, lambda w: w.french, _dup_word_entry),
+        },
+        {
+            "key": "words-hakka", "category": "words",
+            "title": "Mots -- même hakka", "secondary_label": "Tahitien",
+            "groups": _duplicate_groups(words_for_dup, lambda w: f"{w.pinyin()} {w.char()}", _dup_word_entry),
+        },
+        {
+            "key": "words-tahitian", "category": "words",
+            "title": "Mots -- même tahitien", "secondary_label": "Tahitien",
+            "groups": _duplicate_groups(words_for_dup, lambda w: w.tahitian, _dup_word_entry),
+        },
+        {
+            "key": "expressions-french", "category": "expressions",
+            "title": "Expressions -- même français", "secondary_label": "Anglais",
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.french, _dup_expression_entry),
+        },
+        {
+            "key": "expressions-hakka", "category": "expressions",
+            "title": "Expressions -- même hakka", "secondary_label": "Anglais",
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.rendering, _dup_expression_entry),
+        },
+        {
+            "key": "expressions-english", "category": "expressions",
+            "title": "Expressions -- même anglais", "secondary_label": "Anglais",
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.english, _dup_expression_entry),
+        },
+    ]
 
 def static(request):
     context = {
@@ -290,7 +405,178 @@ def reports(request):
         "description" : "Nombre d'erreurs de parsing corrigées lors de la dernière importation."
     })
 
+    context["stats"].append({
+        'title': 'Expressions',
+        'value': Expression.objects.count(),
+        'description': "Nombre d'expressions dans la base.",
+    })
+
+    # ---- couverture des mots par les expressions ---------------------------
+
+    words_total = Word.objects.count()
+    words_in_expressions = Word.objects.filter(expressionword__isnull=False).distinct().count()
+    coverage_pct = round(100 * words_in_expressions / words_total, 1) if words_total else 0
+
+    context["stats"].append({
+        'title': 'Couverture par les expressions',
+        'value': f"{words_in_expressions} / {words_total} ({coverage_pct}%)",
+        'description': "Nombre de mots qui apparaissent dans au moins une expression.",
+    })
+
+    # ---- statistiques par thème (live) -------------------------------------
+
+    context["words_by_category"] = list(
+        Word.objects.exclude(category__isnull=True).exclude(category="")
+        .values("category").annotate(n=Count("id")).order_by("-n")
+    )
+
+    # Expression.category is comma-separated (an expression can carry several
+    # themes), unlike Word.category which only ever holds one -- so counting
+    # "by theme" means exploding on the comma, not grouping the raw string.
+    expr_theme_counts = Counter()
+    for raw_category in Expression.objects.exclude(category__isnull=True).exclude(category="").values_list("category", flat=True):
+        for theme in raw_category.split(","):
+            theme = theme.strip()
+            if theme:
+                expr_theme_counts[theme] += 1
+    context["expressions_by_category"] = [
+        {"category": name, "n": n} for name, n in sorted(expr_theme_counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    # ---- doublons : même français / même hakka / même tahitien-anglais ----
+    # (base actuelle uniquement -- pas de comparaison avec la plateforme)
+    # Le détail interactif vit sur sa propre page (/doublons) ; ici on ne
+    # garde qu'un compteur et un lien.
+    duplicates_count = sum(len(section["groups"]) for section in build_duplicate_sections())
+    context["stats"].append({
+        'title': 'Doublons',
+        'value': duplicates_count,
+        'description': "Groupes d'entrées en doublon dans la base actuelle.",
+        'link': reverse('duplicates'),
+        'link_label': 'Voir le détail →',
+    })
+
+    # ---- erreurs de format, en direct sur la base actuelle -----------------
+    # (par opposition au log de la dernière importation ci-dessus, qui peut
+    # être obsolète si la base a été modifiée depuis)
+
+    format_errors = []
+
+    entering_tone_violations = (
+        Pronunciation.objects.filter(tone__tone_number__in=[5, 6])
+        .exclude(final__final__iregex=r"[ptk]$")
+        .select_related("initial", "final", "tone")
+    )
+    for pron in entering_tone_violations:
+        format_errors.append(
+            f"{pron.hanzi} {pron.pinyin()} : ton 5/6 réservé aux finales en p/t/k, "
+            f"finale actuelle \"{pron.final}\""
+        )
+
+    incomplete_words = Word.objects.filter(
+        Q(category__isnull=True) | Q(category="") | Q(status__isnull=True) | Q(status="")
+    )
+    for word in incomplete_words:
+        format_errors.append(f"mot incomplet (catégorie ou statut manquant) : {word.french} / {word.char()}")
+
+    incomplete_expressions = Expression.objects.filter(
+        Q(rendering__contains="~") | Q(status__icontains="KO")
+    )
+    for expr in incomplete_expressions:
+        format_errors.append(f"expression incomplète : {expr.french} | {expr.rendering}")
+
+    context["format_errors"] = format_errors
+    context["format_errors_count"] = len(format_errors)
+
+    # ---- audio manquant, d'après le dernier instantané plateforme ---------
+    # Whether a recording exists is metadata on the *platform* side (an
+    # "audio" id on each word/expression payload) -- Vercel doesn't store
+    # audio at all, so this reads the platform_data JSON snapshotted onto
+    # the latest platform_to_vercel Traces row, never the local filesystem.
+    snapshot = get_latest_platform_snapshot()
+    if snapshot:
+        platform_words = (snapshot.platform_data or {}).get("words", {}) or {}
+        platform_expressions = (snapshot.platform_data or {}).get("expressions", {}) or {}
+
+        def missing_audio(payloads, kind):
+            # Expected filename mirrors export.py's own convention exactly
+            # (see Command.handle_words / handle_expressions there): a word's
+            # recording is named after its digit-tone pinyin (concatenated
+            # across syllables, e.g. "on1lok6.wav"); an expression's is named
+            # after its concatenated hanzi instead -- pinyin isn't a stable,
+            # human-friendly filename for a whole phrase, hanzi is exactly
+            # what the recording is made from.
+            out = []
+            for payload in payloads.values():
+                if payload.get("audio"):
+                    continue
+                tr = payload.get("translations", {}) or {}
+                target = tr.get("target", "")
+                pinyin, hanzi = split_target(target)
+                if kind == "word":
+                    expected_filename = f"{pinyin.translate(SUPERSCRIPT_TO_DIGIT)}.wav" if pinyin else ""
+                else:
+                    expected_filename = f"{hanzi}.wav" if hanzi else ""
+                out.append({
+                    "french": tr.get("primary", ""), "target": target,
+                    "expected_filename": expected_filename,
+                })
+            out.sort(key=lambda e: e["target"])
+            return out
+
+        missing_audio_words = missing_audio(platform_words, "word")
+        missing_audio_expressions = missing_audio(platform_expressions, "expression")
+        context["audio_snapshot"] = {
+            "timestamp": snapshot.timestamp,
+            "total_words": len(platform_words),
+            "total_expressions": len(platform_expressions),
+            "missing_words": missing_audio_words,
+            "missing_expressions": missing_audio_expressions,
+        }
+    else:
+        context["audio_snapshot"] = None
+
     return render(request, "hakkadbapp/reports.html", context)
+
+
+def duplicates_view(request):
+    """Dedicated, interactive duplicates page (live DB, no platform diff).
+
+    Data is embedded as JSON and rendered client-side (search/filter/copy/
+    "resolved" state all happen instantly with no round-trip), same
+    architecture as management/commands/corpus_diff_dashboard_template.html.
+    "Resolved" is tracked per-browser in localStorage only -- this page never
+    writes to the database, it's a triage aid while editing happens on the
+    e-reo platform itself.
+    """
+    sections = build_duplicate_sections()
+    payload = {
+        "sections": [
+            {
+                "key": section["key"],
+                "title": section["title"],
+                "category": section["category"],
+                "secondary_label": section["secondary_label"],
+                "groups": [
+                    {
+                        "id": f"{section['key']}:{group['value']}",
+                        "value": group["value"],
+                        "divergent_fields": group["divergent_fields"],
+                        "search": group["search"],
+                        "entries": group["entries"],
+                    }
+                    for group in section["groups"]
+                ],
+            }
+            for section in sections
+        ],
+    }
+    context = {
+        "title": "Doublons",
+        "diff_data_json": json.dumps(payload, ensure_ascii=False),
+        "duplicates_count": sum(len(s["groups"]) for s in sections),
+    }
+    return render(request, "hakkadbapp/duplicates.html", context)
 
 
 def search(request):
@@ -493,10 +779,24 @@ def phonemes(request):
     # Convert to set of tuples for fast lookup
     combo_set = set(combos)
 
+    # Distinct hanzi per (initial, final) combo, ignoring tone -- lets the
+    # "show matching characters" toggle reveal them inline instead of just
+    # linking out to the hanzi_by_pinyin page.
+    combo_hanzi = defaultdict(list)
+    seen = defaultdict(set)
+    for initial_id, final_id, hanzi_char in Pronunciation.objects.values_list(
+        'initial_id', 'final_id', 'hanzi'
+    ).order_by('hanzi'):
+        key = (initial_id, final_id)
+        if hanzi_char not in seen[key]:
+            seen[key].add(hanzi_char)
+            combo_hanzi[key].append(hanzi_char)
+
     context = {
         'initials': initials,
         'finals': finals,
         'combo_set': combo_set,
+        'combo_hanzi': dict(combo_hanzi),
         'title': "Tableau des phonèmes"
     }
     return render(request, 'hakkadbapp/phonemes.html', context)
@@ -648,8 +948,42 @@ def create_expression_from_hanzi(sentence, french_translation=""):
 
     return expr
 
+def build_expression_platform_components():
+    """Maps each platform expression's concatenated hanzi (no spaces, same
+    shape as Expression.text.replace(" ", "")) to the raw platform fields the
+    expressions page compares against Vercel/the DB's own computation: its
+    french/english translations, its "pinyin hanzi" target text as recorded
+    (no recomputation), and its `components` dict (word "pinyin hanzi" ->
+    platform word id). This is the key the expressions page uses client-side
+    to line up a Vercel Expression with its platform counterpart and flag
+    fields (or individual words) that differ from what the platform has on
+    file."""
+    snapshot = get_latest_platform_snapshot()
+    if not snapshot:
+        return {}, None
+
+    platform_expressions = (snapshot.platform_data or {}).get("expressions", {}) or {}
+    by_hanzi_concat = {}
+    for payload in platform_expressions.values():
+        translations = payload.get("translations") or {}
+        target = translations.get("target", "")
+        _, hanzi_concat = split_target(target)
+        if hanzi_concat:
+            by_hanzi_concat[hanzi_concat] = {
+                "primary": translations.get("primary", ""),
+                "secondary": translations.get("secondary", ""),
+                "target": target,
+                "components": payload.get("components") or {},
+            }
+    return by_hanzi_concat, snapshot.timestamp
+
+
 def expressions(request):
-    return render(request, "hakkadbapp/expressions.html", get_all_data())
+    context = get_all_data()
+    components_by_hanzi, snapshot_timestamp = build_expression_platform_components()
+    context["platform_components_json"] = json.dumps(components_by_hanzi, ensure_ascii=False)
+    context["platform_snapshot_timestamp"] = snapshot_timestamp
+    return render(request, "hakkadbapp/expressions.html", context)
 
 def api_convert_text(request):
     text = (request.GET.get("text") or "").strip()

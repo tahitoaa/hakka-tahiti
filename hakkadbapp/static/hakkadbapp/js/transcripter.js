@@ -517,7 +517,10 @@ class LabelView {
         this.outputs = {
             hanzi: createEl('div', 'hanzi', {}, this.sentences.map((s) => s.renderHanziLine()).join('<br>')),
             furigana: createEl('div', '', {}, this.sentences.map((s) => s.renderFurigana()).join('<br>')),
-            pinyinHanzi: createEl('div', 'hanzi', {}, this.sentences.map((s) => `${s.renderPinyinLine()} ${s.renderHanziLine()}`).join('<br>')),
+            // Sans-serif container: only the hanzi run below gets the dedicated
+            // hanzi font, so pinyin (tone-superscript digits included) doesn't
+            // render in a calligraphic face meant for characters.
+            pinyinHanzi: createEl('div', '', {}, this.sentences.map((s) => `${s.renderPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`).join('<br>')),
             pinyin: createEl('div', '', {}, this.sentences.map((s) => s.renderPinyinLine()).join('<br>')),
             french: createEl('div', '', {}, frenchLine),
             words: createEl('div', '', {},

@@ -33,6 +33,7 @@ urlpatterns = [
     # path('static', views.static, name='static'),
     # 
     path('reports', views.reports, name='reports'),
+    path('doublons', views.duplicates_view, name='duplicates'),
     path("search/", views.search, name="search"),
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),

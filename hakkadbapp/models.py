@@ -173,6 +173,12 @@ class Traces(models.Model):
     details = models.TextField(null=True, blank=True)  # Additional details about the action
     char_count = models.IntegerField(default=0)  # Count of characters processed
     word_count = models.IntegerField(default=0)  # Count of words processed
-    
+    # Raw platform corpus (words/expressions/themes) as read from e_reo_json/
+    # at import time, only populated by `platform_to_vercel` -- lets any
+    # deployed view query the exact platform snapshot a given import ran
+    # against, without needing filesystem access to e_reo_json/ (which only
+    # exists on a developer's machine, not on Vercel).
+    platform_data = models.JSONField(null=True, blank=True)
+
     def __str__(self):
         return f"{self.timestamp} - {self.details or 'No Details'}"

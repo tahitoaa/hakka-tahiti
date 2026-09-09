@@ -23,10 +23,79 @@
     </style>
 
      <style>
-  /* Global Hanzi font style */
+  /* Global Hanzi font style -- calligraphic KaiTi is the deliberate choice
+     (kept per explicit request over a plainer sans-serif alternative that
+     was tried earlier). "Kaiti SC" is listed alongside the legacy
+     "STKaiti" name since macOS/iOS renamed the font at some point and a
+     given device only exposes one of the two; falls through to Song-style
+     serifs, then any serif, on platforms with no Kaiti variant installed
+     (most Android/Linux browsers). Sized up from the surrounding text
+     since hanzi need more visual weight to stay legible; line-height and
+     letter-spacing give KaiTi's tall flourish strokes room so they don't
+     get clipped or crowd neighbouring lines on narrow mobile viewports,
+     and font-smoothing keeps the thin strokes crisp instead of blurry on
+     high-DPI mobile screens. */
   .hanzi {
-    font-family: "KaiTi", "STKaiti", "SimSun-ExtB", "SimSun", "Songti SC", "Noto Sans SC", "Noto Serif SC", serif;
+    font-family: "KaiTi", "STKaiti", "Kaiti SC", "SimSun-ExtB", "SimSun", "Songti SC", "Noto Serif SC", serif;
     font-weight: 600;
+    font-size: 1.2em;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Sitewide colors for Sentence.js's rendered markup (token badges, the
+     pinyin/hanzi/french preview box, furigana) -- Sentence.js is shared by
+     the converter, transcripter and expressions pages, so this lives here
+     rather than duplicated per page. Light values match the original
+     hardcoded Tailwind classes (slate/green/orange/blue-*) it used to carry
+     directly; dark values apply automatically under system dark mode, and
+     under a manual [data-theme="dark"] on <html> for pages (like
+     expressions) that offer their own toggle. */
+  :root {
+    --sentence-badge-known-bg: #bbf7d0;
+    --sentence-badge-known-fg: #14532d;
+    --sentence-badge-multi-bg: #bfdbfe;
+    --sentence-badge-multi-fg: #1e3a8a;
+    --sentence-badge-unknown-bg: #fdba74;
+    --sentence-badge-unknown-fg: #7c2d12;
+    --sentence-preview-bg: #f8fafc;
+    --sentence-preview-border: #e2e8f0;
+    --sentence-text-primary: #1e293b;
+    --sentence-text-strong: #0f172a;
+    --sentence-text-muted: #4b5563;
+    --sentence-popup-bg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --sentence-badge-known-bg: #14532d;
+      --sentence-badge-known-fg: #bbf7d0;
+      --sentence-badge-multi-bg: #1e3a8a;
+      --sentence-badge-multi-fg: #bfdbfe;
+      --sentence-badge-unknown-bg: #7c2d12;
+      --sentence-badge-unknown-fg: #fdba74;
+      --sentence-preview-bg: #1a1a19;
+      --sentence-preview-border: #383835;
+      --sentence-text-primary: #e5e7eb;
+      --sentence-text-strong: #ffffff;
+      --sentence-text-muted: #9ca3af;
+      --sentence-popup-bg: #1a1a19;
+    }
+  }
+  :root[data-theme="dark"] {
+    --sentence-badge-known-bg: #14532d;
+    --sentence-badge-known-fg: #bbf7d0;
+    --sentence-badge-multi-bg: #1e3a8a;
+    --sentence-badge-multi-fg: #bfdbfe;
+    --sentence-badge-unknown-bg: #7c2d12;
+    --sentence-badge-unknown-fg: #fdba74;
+    --sentence-preview-bg: #1a1a19;
+    --sentence-preview-border: #383835;
+    --sentence-text-primary: #e5e7eb;
+    --sentence-text-strong: #ffffff;
+    --sentence-text-muted: #9ca3af;
+    --sentence-popup-bg: #1a1a19;
   }
 </style>
 
@@ -330,7 +399,7 @@ function downloadTableAsCSV(table) {
 }
 
 function attachExportButtons() {
-    document.querySelectorAll("table").forEach((table, index) => {
+    document.querySelectorAll("table:not(.no-auto-csv)").forEach((table, index) => {
         const button = document.createElement("button");
         button.textContent = "Export CSV";
         button.className = "export-csv-btn";

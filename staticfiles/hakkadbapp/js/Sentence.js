@@ -149,13 +149,13 @@ renderFurigana() {
                 }
 
                 return `
-                    <span class="inline-flex flex-col items-center text-center align-top gap-[3px]">
-                        
-                        <span class="text-[12px] italic text-gray-600">
+                    <span class="inline-flex flex-col items-center text-center align-top gap-[1px] mr-1">
+
+                        <span class="text-[10px] italic leading-none text-[var(--sentence-text-muted)]">
                             ${this.renderPinyin(pinyin)}
                         </span>
 
-                        <span class="hanzi text-[1.15rem] font-semibold text-gray-900">
+                        <span class="hanzi text-base leading-tight font-semibold text-[var(--sentence-text-strong)]">
                             ${hanzi}
                         </span>
 
@@ -221,35 +221,40 @@ renderFurigana() {
         const isUnknown = !!best.isUnknown;
         const extra = group.length - 1;
 
-        let color = "bg-green-200";
-        if (isUnknown) color = "bg-orange-300";
-        else if (extra > 0) color = "bg-blue-200";
+        // CSS-var-backed instead of fixed Tailwind colors, so these badges
+        // stay legible under dark mode (system prefers-color-scheme, or a
+        // page's own manual [data-theme="dark"] toggle) -- see base.html.
+        // Three distinct hues (green/blue/orange) are kept even in dark mode
+        // so known / multi-match / unknown words stay easy to tell apart.
+        let colorClass = "bg-[var(--sentence-badge-known-bg)] text-[var(--sentence-badge-known-fg)]";
+        if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
+        else if (extra > 0) colorClass = "bg-[var(--sentence-badge-multi-bg)] text-[var(--sentence-badge-multi-fg)]";
 
         return `
-        <span class="relative inline-flex flex-col justify-between items-center rounded-xl px-2 py-1 ${color} min-w-[4.5rem] max-w-[7rem] h-[5.25rem] shadow-sm">
-            
-            <div class="text-[10px] italic truncate w-full text-center">
+        <span class="relative inline-flex flex-col justify-between items-center rounded-lg px-1.5 py-1 ${colorClass} min-w-[3.5rem] max-w-[5.5rem] h-[3.75rem]">
+
+            <div class="text-[9px] italic leading-none truncate w-full text-center">
                 ${this.renderPinyin(data.pinyin)}
             </div>
 
-            <div class="text-lg font-semibold truncate w-full text-center">
+            <div class="text-base font-semibold leading-tight truncate w-full text-center">
                 ${data.simp}
             </div>
 
-            <div class="text-[11px] truncate w-full text-center" title="${data.french}">
-                ${isUnknown ? this.truncateFrench(data.raw) : this.truncateFrench(data.french)}
+            <div class="text-[9px] leading-none truncate w-full text-center" title="${escapeAttr(isUnknown ? data.raw : data.french)}">
+                ${isUnknown ? this.truncateFrench(data.raw, 10) : this.truncateFrench(data.french, 10)}
             </div>
 
             ${(!isUnknown && extra > 0) ? `
-                <button onclick="toggleAlt(${index})" class="text-[10px]">+${extra}</button>
-            ` : `<span class="h-[1rem]"></span>`}
+                <button onclick="toggleAlt(${index})" class="absolute -top-1 -right-1 leading-none text-[9px] w-3.5 h-3.5 rounded-full bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] border border-[var(--sentence-preview-border)]">+${extra}</button>
+            ` : ""}
 
             ${extra > 0 && !isUnknown ? `
-                <div id="alt-${index}" class="hidden absolute top-full bg-white shadow p-1">
+                <div id="alt-${index}" class="hidden absolute top-full left-0 z-10 mt-0.5 min-w-full whitespace-nowrap rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow p-1">
                     ${group.slice(1).map(w => {
                         const d = w.dataset || w;
                         return `
-                            <div class="text-center text-xs">
+                            <div class="text-center text-[11px] leading-tight py-0.5">
                                 ${this.renderPinyin(d.pinyin)} ${d.simp}
                             </div>
                         `;
@@ -261,27 +266,48 @@ renderFurigana() {
     }
 
     renderTokens(){
-        return `<div class="flex flex-wrap gap-2">
+        return `<div class="flex flex-wrap gap-1.5">
                 ${this.matches.map((g, i) => this.renderToken(g, i)).join('')}
             </div>`;
     }
+
+    // -----------------------------
+    // Copy-to-clipboard field
+    // -----------------------------
+    renderCopyButton(text, label) {
+        return `
+            <button type="button"
+                class="copy-btn inline-flex items-center justify-center w-6 h-6 flex-shrink-0 rounded-md border border-[var(--sentence-preview-border)] text-[var(--sentence-text-muted)] hover:text-[var(--sentence-text-primary)] hover:border-[var(--sentence-text-muted)] transition-colors"
+                data-copy-text="${escapeAttr(text)}"
+                title="Copier ${escapeAttr(label)}"
+                onclick="copyFromButton(this)">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+        `;
+    }
+
     // -----------------------------
     // Main render
     // -----------------------------
     render() {
+        const pinyinLine = this.renderPinyinLine();
+        const hanziLine = this.renderHanziLine();
+
         return `
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-2">
                 ${this.renderTokens()}
-            <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                <span class="text-sm text-slate-800">
-                    ${this.renderPinyinLine()}
-                </span>
-                <span class="hanzi text-lg font-medium text-slate-900 tracking-wide">
-                    ${this.renderHanziLine()}
-                </span>
-                <span class="text-sm text-slate-800 leading-snug">
-                    ${this.french}
-                </span>
+            <div class="flex flex-col rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-preview-bg)] overflow-hidden">
+                <div class="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--sentence-preview-border)]">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs text-[var(--sentence-text-primary)] truncate">${pinyinLine}</div>
+                        <div class="hanzi text-base font-medium text-[var(--sentence-text-strong)] tracking-wide truncate">${hanziLine}</div>
+                    </div>
+                    ${this.renderCopyButton(`${pinyinLine} ${hanziLine}`, 'pinyin et hanzi')}
+                </div>
+                <div class="flex items-center gap-2 px-2 py-1.5">
+                    <div class="flex-1 min-w-0 text-xs text-[var(--sentence-text-primary)] leading-snug">${this.french}</div>
+                    ${this.renderCopyButton(this.french, 'français')}
+                </div>
             </div>
 
         </div>
@@ -289,8 +315,34 @@ renderFurigana() {
     }
 }
 
-// global helper
+// global helpers
 function toggleAlt(i) {
     const el = document.getElementById(`alt-${i}`);
     if (el) el.classList.toggle('hidden');
+}
+
+function escapeAttr(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+const COPY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const CHECK_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+function copyFromButton(btn) {
+    const text = btn.getAttribute('data-copy-text') || '';
+    if (!navigator.clipboard) return;
+
+    navigator.clipboard.writeText(text).then(() => {
+        btn.innerHTML = CHECK_ICON;
+        btn.classList.add('text-green-600');
+        clearTimeout(btn._copyResetTimer);
+        btn._copyResetTimer = setTimeout(() => {
+            btn.innerHTML = COPY_ICON;
+            btn.classList.remove('text-green-600');
+        }, 1200);
+    }).catch(() => {});
 }

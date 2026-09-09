@@ -1,0 +1,510 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+
+<div id="dup-app">
+<style>
+  #dup-app {
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --border:         rgba(11,11,11,0.10);
+    --border-strong:  rgba(11,11,11,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.10);
+    --status-warning:   #b5790a;
+    --status-warning-bg:rgba(250,178,25,0.18);
+    --status-serious:   #c25a34;
+    --status-serious-bg:rgba(236,131,90,0.16);
+    --status-critical:  #d03b3b;
+    --status-critical-bg:rgba(208,59,59,0.14);
+    --chip-bg:        #f0efec;
+    --chip-bg-active: #0b0b0b;
+    --chip-fg-active: #fcfcfb;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    color-scheme: light;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.45;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    #dup-app:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --border:         rgba(255,255,255,0.10);
+      --border-strong:  rgba(255,255,255,0.18);
+      --status-good:      #0ca30c;
+      --status-good-bg:   rgba(12,163,12,0.18);
+      --status-warning:   #fab219;
+      --status-warning-bg:rgba(250,178,25,0.16);
+      --status-serious:   #ec835a;
+      --status-serious-bg:rgba(236,131,90,0.18);
+      --status-critical:  #e66767;
+      --status-critical-bg:rgba(230,103,103,0.20);
+      --chip-bg:        #262623;
+      --chip-bg-active: #ffffff;
+      --chip-fg-active: #1a1a19;
+    }
+  }
+  #dup-app[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --border:         rgba(255,255,255,0.10);
+    --border-strong:  rgba(255,255,255,0.18);
+    --status-good:      #0ca30c;
+    --status-good-bg:   rgba(12,163,12,0.18);
+    --status-warning:   #fab219;
+    --status-warning-bg:rgba(250,178,25,0.16);
+    --status-serious:   #ec835a;
+    --status-serious-bg:rgba(236,131,90,0.18);
+    --status-critical:  #e66767;
+    --status-critical-bg:rgba(230,103,103,0.20);
+    --chip-bg:        #262623;
+    --chip-bg-active: #ffffff;
+    --chip-fg-active: #1a1a19;
+  }
+
+  #dup-app * { box-sizing: border-box; }
+  #dup-app a { color: inherit; }
+  #dup-app header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+  #dup-app header.top h1 { font-size: 20px; margin: 0 0 4px; }
+  #dup-app header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  #dup-app header.top .back-link { font-size: 12px; display: inline-block; margin-top: 6px; }
+  #dup-app .theme-toggle {
+    border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+  }
+  #dup-app .theme-toggle:hover { border-color: var(--text-muted); }
+
+  #dup-app .tip {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 18px;
+  }
+  #dup-app .tip strong { color: var(--text-primary); }
+
+  #dup-app .overview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 760px) { #dup-app .overview { grid-template-columns: repeat(2, 1fr); } }
+  #dup-app .stat-tile { border-radius: 10px; padding: 10px 12px; background: var(--surface-1); border: 1px solid var(--border); }
+  #dup-app .stat-tile .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #dup-app .stat-tile .label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  #dup-app .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+  #dup-app .chip {
+    border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary);
+    border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  #dup-app .chip.active { background: var(--chip-bg-active); color: var(--chip-fg-active); border-color: transparent; }
+  #dup-app .search {
+    margin-left: auto; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; min-width: 240px;
+  }
+  #dup-app .search:focus { outline: 2px solid var(--status-good); outline-offset: -1px; }
+
+  #dup-app .dup-section { margin-bottom: 22px; }
+  #dup-app .dup-section h2 { font-size: 14px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  #dup-app .dup-section .badge {
+    display: inline-block; font-size: 11px; background: var(--chip-bg); color: var(--text-secondary);
+    border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums;
+  }
+  #dup-app .dup-section p.hint { color: var(--text-secondary); font-size: 12px; margin: 0 0 10px; }
+
+  #dup-app .dup-group { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--surface-1); }
+  #dup-app .dup-group.resolved { opacity: 0.5; }
+  #dup-app .dup-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  #dup-app .dup-target { font-weight: 600; font-size: 15px; }
+  #dup-app .dup-group-head .count-badge { font-size: 11px; color: var(--text-muted); }
+  #dup-app .resolve-toggle { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+  #dup-app .resolve-toggle input { cursor: pointer; }
+
+  #dup-app table.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+  #dup-app table.compare-table th { width: 110px; color: var(--text-muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--gridline); padding: 5px 12px 5px 0; vertical-align: top; white-space: nowrap; }
+  #dup-app table.compare-table td { border-bottom: 1px solid var(--gridline); padding: 5px 12px 5px 0; vertical-align: top; }
+  #dup-app .diff-char { background: var(--status-critical-bg); color: var(--status-critical); border-radius: 3px; padding: 0 1px; font-weight: 700; }
+  #dup-app .mono { font-family: var(--mono); font-size: 12px; }
+
+  #dup-app .copy-btn {
+    display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+    margin-left: 4px; padding: 0; border: none; border-radius: 5px; background: transparent;
+    color: var(--text-muted); cursor: pointer; vertical-align: middle;
+  }
+  #dup-app .copy-btn:hover { background: var(--chip-bg); color: var(--text-primary); }
+  #dup-app .copy-btn svg { width: 13px; height: 13px; }
+  #dup-app .copy-btn.copied { color: var(--status-good); }
+
+  #dup-app .empty-state { color: var(--text-muted); font-size: 13px; padding: 30px 10px; text-align: center; }
+</style>
+
+  <header class="top">
+    <div>
+      <h1>Doublons du lexique</h1>
+      <p>Base actuelle (Vercel) uniquement &middot; pas de comparaison avec la plateforme e-reo.</p>
+      <a class="back-link hover:underline" href="{% url 'reports' %}">&larr; Retour aux rapports</a>
+    </div>
+    <button class="theme-toggle" id="dup-theme-toggle" type="button">Thème</button>
+  </header>
+
+  <p class="tip">
+    <strong>Astuce :</strong> gardez cette page ouverte à côté de la plateforme e-reo. Copiez le français ou le
+    hakka d'une entrée pour la retrouver rapidement là-bas, corrigez ou supprimez le doublon, puis cochez
+    « traité » pour le sortir de la liste (mémorisé dans ce navigateur, la base n'est jamais modifiée depuis
+    cette page). Les champs surlignés sont ceux où les entrées d'un même groupe ne sont pas toutes d'accord
+    &mdash; sans présumer laquelle est correcte : c'est à vous de trancher.
+  </p>
+
+  <div class="overview" id="dup-overview"></div>
+
+  <div class="controls">
+    <button class="chip active" data-role="category" data-value="all">Tous</button>
+    <button class="chip" data-role="category" data-value="words">Mots</button>
+    <button class="chip" data-role="category" data-value="expressions">Expressions</button>
+    <button class="chip active" data-role="status" data-value="all" style="margin-left:14px">Tous</button>
+    <button class="chip" data-role="status" data-value="open">À traiter</button>
+    <button class="chip" data-role="status" data-value="resolved">Traités</button>
+    <input class="search" type="search" id="dup-search" placeholder="Filtrer (français, hakka, id, thème, statut&hellip;)">
+    <button class="chip" id="dup-export-csv" type="button" style="margin-left:8px">&#11015; Export CSV (global)</button>
+  </div>
+
+  <div id="dup-content"></div>
+</div>
+
+<script id="dup-data" type="application/json">{{ diff_data_json|safe }}</script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("dup-data").textContent);
+  var SECTION_ORDER = ["words-hakka", "expressions-hakka", "words-french", "expressions-french", "words-tahitian", "expressions-english"];
+  var FIELD_LABELS = { french: "Français", hakka: "Hakka", secondary: null, theme: "Thème", status: "Statut" };
+
+  var app = document.getElementById("dup-app");
+  var RESOLVED_KEY = "hakka-dup-resolved-v1";
+  var THEME_KEY = "hakka-dup-theme";
+
+  function loadResolved() {
+    try { return JSON.parse(localStorage.getItem(RESOLVED_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function saveResolved(map) {
+    try { localStorage.setItem(RESOLVED_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+  var resolved = loadResolved();
+
+  function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var COPY_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
+  var CHECK_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8.5l3 3 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function copyButtonHtml(text) {
+    if (!text) return "";
+    return '<button type="button" class="copy-btn" data-copy="' + escapeHtml(text) +
+      '" title="Copier" aria-label="Copier">' + COPY_ICON + "</button>";
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { copyTextFallback(text); });
+    }
+    copyTextFallback(text);
+    return Promise.resolve();
+  }
+  function copyTextFallback(text) {
+    var el = document.createElement("textarea");
+    el.value = text;
+    el.style.position = "fixed";
+    el.style.top = "-1000px";
+    document.body.appendChild(el);
+    el.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(el);
+  }
+  function bindCopyButtons(container) {
+    Array.prototype.forEach.call(container.querySelectorAll(".copy-btn"), function (btn) {
+      btn.addEventListener("click", function (evt) {
+        evt.stopPropagation();
+        copyText(btn.getAttribute("data-copy") || "");
+        var original = btn.innerHTML;
+        btn.classList.add("copied");
+        btn.innerHTML = CHECK_ICON;
+        clearTimeout(btn._t);
+        btn._t = setTimeout(function () { btn.classList.remove("copied"); btn.innerHTML = original; }, 1200);
+      });
+    });
+  }
+
+  var state = { category: "all", status: "all", search: "" };
+
+  function sortedSections() {
+    return DATA.sections.slice().sort(function (a, b) {
+      var ia = SECTION_ORDER.indexOf(a.key), ib = SECTION_ORDER.indexOf(b.key);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  }
+
+  function allGroups() {
+    var out = [];
+    DATA.sections.forEach(function (s) {
+      s.groups.forEach(function (g) { out.push(g); });
+    });
+    return out;
+  }
+
+  function renderOverview() {
+    var groups = allGroups();
+    var resolvedCount = groups.filter(function (g) { return !!resolved[g.id]; }).length;
+    var wordsCount = 0, exprCount = 0;
+    DATA.sections.forEach(function (s) {
+      if (s.category === "words") wordsCount += s.groups.length;
+      else exprCount += s.groups.length;
+    });
+    var tiles = [
+      { value: groups.length, label: "Groupes de doublons" },
+      { value: wordsCount, label: "Groupes de mots" },
+      { value: exprCount, label: "Groupes d'expressions" },
+      { value: resolvedCount, label: "Traités" },
+      { value: groups.length - resolvedCount, label: "Restants" }
+    ];
+    document.getElementById("dup-overview").innerHTML = tiles.map(function (t) {
+      return '<div class="stat-tile"><div class="value">' + t.value + '</div><div class="label">' + t.label + "</div></div>";
+    }).join("");
+  }
+
+  function groupMatchesFilters(section, g) {
+    if (state.category !== "all" && section.category !== state.category) return false;
+    var isResolved = !!resolved[g.id];
+    if (state.status === "open" && isResolved) return false;
+    if (state.status === "resolved" && !isResolved) return false;
+    if (state.search && (g.search || "").indexOf(state.search) === -1) return false;
+    return true;
+  }
+
+  function charDiffSpans(values) {
+    // Position-based, symmetric across all entries -- no single baseline.
+    // At each position: if everyone present agrees, nothing is flagged. If
+    // they disagree but most entries share one value (a plurality with more
+    // than one vote), only the entries that depart from that shared value
+    // are flagged -- e.g. a lone tone digit changing between otherwise-
+    // identical hakka readings lights up on its own, on both sides when
+    // there are only two entries (a straight disagreement, no "correct"
+    // side to presume). When there's no plurality at all (a tie, or every
+    // entry has its own distinct value), everyone is flagged at that spot:
+    // there's no consensus to compare against.
+    var maxLen = 0;
+    values.forEach(function (v) { maxLen = Math.max(maxLen, v.length); });
+    var out = values.map(function () { return ""; });
+    for (var i = 0; i < maxLen; i++) {
+      var chars = values.map(function (v) { return v.charAt(i); });
+      var present = values.map(function (v) { return i < v.length; });
+      var counts = {};
+      chars.forEach(function (c, idx) { if (present[idx]) counts[c] = (counts[c] || 0) + 1; });
+      var distinct = Object.keys(counts);
+      var maxCount = 0;
+      distinct.forEach(function (c) { if (counts[c] > maxCount) maxCount = counts[c]; });
+      var modeCandidates = distinct.filter(function (c) { return counts[c] === maxCount; });
+      var mode = (distinct.length > 1 && modeCandidates.length === 1 && maxCount > 1) ? modeCandidates[0] : null;
+      values.forEach(function (v, idx) {
+        if (!present[idx]) return;
+        var c = chars[idx];
+        var differs = distinct.length > 1 && (mode === null || c !== mode);
+        out[idx] += differs ? '<span class="diff-char">' + escapeHtml(c) + "</span>" : escapeHtml(c);
+      });
+    }
+    return out;
+  }
+
+  function renderCompareTable(section, g) {
+    var rows = [
+      { key: "id", label: "ID", render: function (e) { return '<span class="mono">' + escapeHtml(e.id) + "</span>"; } },
+      { key: "french", label: "Français", copy: true },
+      { key: "hakka", label: "Hakka", copy: true, wrap: function (html) { return '<span class="hanzi">' + html + "</span>"; } },
+      { key: "secondary", label: section.secondary_label },
+      { key: "theme", label: "Thème" },
+      { key: "status", label: "Statut" }
+    ];
+    var body = rows.map(function (row) {
+      var cells;
+      if (row.render) {
+        cells = g.entries.map(function (e) { return "<td>" + row.render(e) + "</td>"; }).join("");
+      } else {
+        // Character-level red highlighting is only meaningful (and only
+        // asked for) on the Hakka field of Expression duplicates -- words
+        // and the other fields show the plain value, no highlighting.
+        var useDiff = section.category === "expressions" && row.key === "hakka";
+        var values = g.entries.map(function (e) { return e[row.key] || ""; });
+        var rendered = useDiff ? charDiffSpans(values) : values.map(function (v) { return escapeHtml(v); });
+        cells = g.entries.map(function (e, idx) {
+          var html = row.wrap ? row.wrap(rendered[idx]) : rendered[idx];
+          return "<td>" + html + (row.copy ? copyButtonHtml(e[row.key]) : "") + "</td>";
+        }).join("");
+      }
+      return "<tr><th>" + escapeHtml(row.label) + "</th>" + cells + "</tr>";
+    }).join("");
+    return '<table class="compare-table no-auto-csv"><tbody>' + body + "</tbody></table>";
+  }
+
+  function renderGroup(section, g) {
+    var isResolved = !!resolved[g.id];
+    var isHakka = section.key.indexOf("hakka") !== -1;
+    var targetHtml = isHakka ? '<span class="hanzi">' + escapeHtml(g.value) + "</span>" : escapeHtml(g.value);
+    return (
+      '<div class="dup-group' + (isResolved ? " resolved" : "") + '" data-group-id="' + escapeHtml(g.id) + '">' +
+      '<div class="dup-group-head">' +
+      '<span class="dup-target">' + (targetHtml || "(vide)") + "</span>" + copyButtonHtml(g.value) +
+      '<span class="count-badge">&mdash; ' + g.entries.length + " entrées</span>" +
+      '<label class="resolve-toggle"><input type="checkbox" class="resolve-checkbox"' + (isResolved ? " checked" : "") + "> Traité</label>" +
+      "</div>" +
+      '<div style="overflow-x:auto">' + renderCompareTable(section, g) + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderContent() {
+    var parts = [];
+    sortedSections().forEach(function (section) {
+      var visible = section.groups.filter(function (g) { return groupMatchesFilters(section, g); });
+      if (!visible.length) return;
+      parts.push(
+        '<div class="dup-section"><h2>' + escapeHtml(section.title) +
+        ' <span class="badge">' + visible.length + "</span></h2>" +
+        '<p class="hint">Base actuelle uniquement. Une même lecture hakka est en général un vrai doublon ; ' +
+        "un même français/tahitien/anglais peut n'être qu'un synonyme.</p>" +
+        visible.map(function (g) { return renderGroup(section, g); }).join("") +
+        "</div>"
+      );
+    });
+    var content = document.getElementById("dup-content");
+    content.innerHTML = parts.join("") || '<div class="empty-state">Aucun doublon ne correspond à ces filtres.</div>';
+
+    bindCopyButtons(content);
+    Array.prototype.forEach.call(content.querySelectorAll(".resolve-checkbox"), function (cb) {
+      cb.addEventListener("change", function () {
+        var groupEl = cb.closest(".dup-group");
+        var id = groupEl.getAttribute("data-group-id");
+        if (cb.checked) resolved[id] = true; else delete resolved[id];
+        saveResolved(resolved);
+        groupEl.classList.toggle("resolved", cb.checked);
+        renderOverview();
+        if (state.status !== "all") renderContent();
+      });
+    });
+  }
+
+  function setupControls() {
+    Array.prototype.forEach.call(document.querySelectorAll('.chip[data-role="category"]'), function (chip) {
+      chip.addEventListener("click", function () {
+        document.querySelectorAll('.chip[data-role="category"]').forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.category = chip.getAttribute("data-value");
+        renderContent();
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.chip[data-role="status"]'), function (chip) {
+      chip.addEventListener("click", function () {
+        document.querySelectorAll('.chip[data-role="status"]').forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.status = chip.getAttribute("data-value");
+        renderContent();
+      });
+    });
+    document.getElementById("dup-search").addEventListener("input", function (evt) {
+      state.search = evt.target.value.trim().toLowerCase();
+      renderContent();
+    });
+    document.getElementById("dup-export-csv").addEventListener("click", exportGlobalCsv);
+  }
+
+  // ---- single global CSV export -----------------------------------------
+  // One file for the whole page, not one button per on-screen table: each
+  // group becomes a block of rows (one per compared field, same layout as
+  // the on-screen "compared fields" table), so the comparison survives
+  // outside the browser instead of flattening into an unreadable per-entry row.
+
+  function csvEscape(v) {
+    return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  }
+
+  function exportGlobalCsv() {
+    var FIELD_ROWS = [
+      { key: "id", label: "ID" },
+      { key: "french", label: "Français" },
+      { key: "hakka", label: "Hakka" },
+      { key: "secondary", label: null },
+      { key: "theme", label: "Thème" },
+      { key: "status", label: "Statut" }
+    ];
+
+    var maxEntries = 0;
+    DATA.sections.forEach(function (s) {
+      s.groups.forEach(function (g) { maxEntries = Math.max(maxEntries, g.entries.length); });
+    });
+
+    var header = ["Section", "Groupe", "Champ", "Divergent"];
+    for (var i = 1; i <= maxEntries; i++) header.push("Entrée " + i);
+    var rows = [header];
+
+    sortedSections().forEach(function (section) {
+      section.groups.forEach(function (g) {
+        FIELD_ROWS.forEach(function (f) {
+          var label = f.key === "secondary" ? section.secondary_label : f.label;
+          var isDivergent = f.key !== "id" && (g.divergent_fields || []).indexOf(f.key) !== -1;
+          var row = [section.title, g.value, label, isDivergent ? "oui" : ""];
+          for (var i = 0; i < maxEntries; i++) {
+            var e = g.entries[i];
+            row.push(e ? e[f.key] : "");
+          }
+          rows.push(row);
+        });
+      });
+    });
+
+    var csvString = rows.map(function (row) { return row.map(csvEscape).join(","); }).join("\r\n");
+    var blob = new Blob(["﻿" + csvString], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "doublons_lexique.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function setupTheme() {
+    var btn = document.getElementById("dup-theme-toggle");
+    var stored = null;
+    try { stored = localStorage.getItem(THEME_KEY); } catch (e) {}
+    if (stored) app.setAttribute("data-theme", stored);
+    btn.addEventListener("click", function () {
+      var current = app.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
+      app.setAttribute("data-theme", next);
+      try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+    });
+  }
+
+  renderOverview();
+  renderContent();
+  setupControls();
+  setupTheme();
+})();
+</script>
+
+{% endblock %}

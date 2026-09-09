@@ -54,8 +54,11 @@ class View {
         this.sentences = text.split('\n').map((line) => new Sentence(this.dico, line));
 
         this.furiganaOutput.innerHTML = this.sentences.map(s => s.renderFurigana()).join('<br>');
-        this.pinyinHanziLinesOutput.textContent = this.sentences
-            .map(s => `${s.renderPinyinLine()} ${s.renderHanziLine()}`)
+        // The container is plain sans-serif; only the hanzi run gets the
+        // dedicated hanzi font, so pinyin (with its tone-superscript digits)
+        // doesn't render in a calligraphic/serif face meant for characters.
+        this.pinyinHanziLinesOutput.innerHTML = this.sentences
+            .map(s => `${s.renderPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`)
             .join('\n');
         this.pinyinOnlyOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
         this.hanziOnlyOutput.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
@@ -77,7 +80,7 @@ class Controller{
         this.view.input.addEventListener("change", (event) => this.handleInput(event));
         this.view.exportNew.addEventListener('click', (event) => this.handleExportNew(event));
         this.view.importProns.addEventListener('click', (event) => {this.handleImportProns(event)});
-        this.view.input.value = '若 爸爸 在 屋家 麽?';
+        this.view.input.value = '若 爸爸 在 屋家 么 ?';
         this.view.input.dispatchEvent(new Event('change'));
 
         this.bindKeyboard();

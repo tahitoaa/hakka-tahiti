@@ -314,6 +314,9 @@
       <button data-tab="expressions">Expressions <span class="badge" id="tab-count-expressions"></span></button>
       <button data-tab="audio">Audio <span class="badge" id="tab-count-audio"></span></button>
       <button data-tab="duplicates">Duplicates <span class="badge" id="tab-count-duplicates"></span></button>
+      <button data-tab="pronunciations">Pronunciations <span class="badge" id="tab-count-pronunciations"></span></button>
+      <button data-tab="format-errors">Format errors <span class="badge" id="tab-count-format-errors"></span></button>
+      <button data-tab="statistics">Statistics</button>
     </nav>
 
     <section id="panel-words" class="panel">
@@ -369,6 +372,7 @@
         <button class="chip active" data-filter="all">All</button>
         <button class="chip" data-filter="missing">Missing local file</button>
         <button class="chip" data-filter="ok">Local file OK</button>
+        <button class="chip" data-filter="missing-platform">Missing on E-reo</button>
         <input class="search" type="search" placeholder="Search target / french&hellip;" id="search-audio">
       </div>
       <table class="rows">
@@ -407,6 +411,53 @@
         <tbody id="tbody-duplicates"></tbody>
       </table>
       <div class="empty-state" id="empty-duplicates" hidden>No duplicates match this filter.</div>
+    </section>
+
+    <section id="panel-pronunciations" class="panel" hidden>
+      <p style="color:var(--text-secondary);font-size:12px;margin:0 0 12px">
+        Hanzi characters that show up with more than one reading across the <b>whole corpus</b>. Some are
+        legitimate polyphones (e.g. multiple valid pronunciations); others are a typo'd tone or initial on a
+        single entry &mdash; only a human can tell which.
+      </p>
+      <div class="controls">
+        <button class="chip active" data-side="all">All sides</button>
+        <button class="chip" data-side="vercel">Vercel</button>
+        <button class="chip" data-side="e_reo">E-reo</button>
+        <input class="search" type="search" placeholder="Search character or reading&hellip;" id="search-pronunciations">
+      </div>
+      <table class="rows">
+        <thead><tr><th>Side</th><th>Character</th><th>Readings</th></tr></thead>
+        <tbody id="tbody-pronunciations"></tbody>
+      </table>
+      <div class="empty-state" id="empty-pronunciations" hidden>No characters match this filter.</div>
+    </section>
+
+    <section id="panel-format-errors" class="panel" hidden>
+      <p style="color:var(--text-secondary);font-size:12px;margin:0 0 12px">
+        Structural problems found converting the <b>platform (E-reo)</b> corpus into the shape Vercel's importer
+        expects &mdash; missing pinyin, syllable/hanzi count mismatches, invalid tone/final combinations for
+        words; pinyin/hanzi length mismatches for expressions. Pure validation, no DB access. This does
+        <b>not</b> include "unknown word in dictionary" gaps &mdash; those need a real (opt-in) import to detect
+        accurately; see <code>platform_to_vercel --yes</code>.
+      </p>
+      <div class="controls">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="words">Words</button>
+        <button class="chip" data-filter="expressions">Expressions</button>
+      </div>
+      <table class="rows">
+        <thead><tr><th>Type</th><th>Error</th></tr></thead>
+        <tbody id="tbody-format-errors"></tbody>
+      </table>
+      <div class="empty-state" id="empty-format-errors" hidden>No format errors &mdash; the platform data converts cleanly.</div>
+    </section>
+
+    <section id="panel-statistics" class="panel" hidden>
+      <p style="color:var(--text-secondary);font-size:12px;margin:0 0 12px">
+        Word/expression counts, overall and by theme, for Vercel and E-reo side by side.
+      </p>
+      <div class="overview" id="statistics-overview"></div>
+      <div id="statistics-tables"></div>
     </section>
 
     <footer class="note">Nothing is uploaded anywhere &mdash; loading, editing and exporting all happen locally in this browser tab.</footer>
@@ -578,7 +629,9 @@
     words: { filter: "all", search: "", openId: null },
     expressions: { filter: "all", search: "", openId: null },
     audio: { filter: "all", search: "" },
-    duplicates: { side: "all", key: "all", search: "", openKey: null }
+    duplicates: { side: "all", key: "all", search: "", openKey: null },
+    pronunciations: { side: "all", search: "" },
+    formatErrors: { filter: "all" }
   };
 
   function decisionSelectHtml(row) {
@@ -771,7 +824,11 @@
     var empty = document.getElementById("empty-audio");
     var rows = buildAudioRows().filter(function (r) {
       var status = r.entry.local_file ? "ok" : "missing";
-      if (s.filter !== "all" && status !== s.filter) return false;
+      if (s.filter === "missing-platform") {
+        if (r.entry.platform_has_audio) return false;
+      } else if (s.filter !== "all" && status !== s.filter) {
+        return false;
+      }
       if (s.search) {
         var text = [r.entry.target, r.entry.primary].join(" ").toLowerCase();
         if (text.indexOf(s.search) === -1) return false;
@@ -896,6 +953,151 @@
     return buildDuplicateRows().length;
   }
 
+  // ---- pronunciations tab -------------------------------------------------
+
+  function buildPronunciationRows() {
+    var report = DATA.pronunciations || { vercel: [], e_reo: [] };
+    var rows = [];
+    ["vercel", "e_reo"].forEach(function (side) {
+      (report[side] || []).forEach(function (entry) {
+        rows.push({ side: side, char: entry.char, readings: entry.readings });
+      });
+    });
+    rows.sort(function (a, b) { return b.readings.length - a.readings.length; });
+    return rows;
+  }
+
+  function renderPronunciationsTable() {
+    var s = state.pronunciations;
+    var tbody = document.getElementById("tbody-pronunciations");
+    var empty = document.getElementById("empty-pronunciations");
+    var rows = buildPronunciationRows().filter(function (r) {
+      if (s.side !== "all" && r.side !== s.side) return false;
+      if (s.search) {
+        var text = [r.char].concat(r.readings.map(function (rd) { return rd.pinyin; })).join(" ").toLowerCase();
+        if (text.indexOf(s.search) === -1) return false;
+      }
+      return true;
+    });
+
+    if (!rows.length) { tbody.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (r) {
+      var readingsHtml = r.readings.map(function (rd) {
+        return '<div style="margin-bottom:4px"><span class="mono" style="font-weight:600">' + escapeHtml(rd.pinyin) + "</span> " +
+          '<span style="color:var(--text-secondary)">' + rd.examples.map(escapeHtml).join(", ") + "</span></div>";
+      }).join("");
+      return (
+        "<tr>" +
+        "<td>" + escapeHtml(SIDE_LABELS[r.side] || r.side) + "</td>" +
+        '<td class="hanzi" style="font-size:18px">' + escapeHtml(r.char) + "</td>" +
+        "<td>" + readingsHtml + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function pronunciationsCount() {
+    return buildPronunciationRows().length;
+  }
+
+  function setupPronunciationsControls() {
+    var panel = document.getElementById("panel-pronunciations");
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip[data-side]"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip[data-side]").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.pronunciations.side = chip.getAttribute("data-side");
+        renderPronunciationsTable();
+      });
+    });
+    document.getElementById("search-pronunciations").addEventListener("input", function (evt) {
+      state.pronunciations.search = evt.target.value.trim().toLowerCase();
+      renderPronunciationsTable();
+    });
+  }
+
+  // ---- format errors tab ---------------------------------------------------
+
+  function buildFormatErrorRows() {
+    var report = DATA.format_errors || { word_errors: [], expression_errors: [] };
+    var rows = [];
+    (report.word_errors || []).forEach(function (msg) { rows.push({ type: "words", message: msg }); });
+    (report.expression_errors || []).forEach(function (msg) { rows.push({ type: "expressions", message: msg }); });
+    return rows;
+  }
+
+  function renderFormatErrorsTable() {
+    var s = state.formatErrors;
+    var tbody = document.getElementById("tbody-format-errors");
+    var empty = document.getElementById("empty-format-errors");
+    var rows = buildFormatErrorRows().filter(function (r) {
+      return s.filter === "all" || r.type === s.filter;
+    });
+
+    if (!rows.length) { tbody.innerHTML = ""; empty.hidden = false; return; }
+    empty.hidden = true;
+
+    tbody.innerHTML = rows.map(function (r) {
+      return "<tr><td>" + escapeHtml(DUP_CATEGORY_LABELS[r.type] || r.type) + "</td><td>" + escapeHtml(r.message) + "</td></tr>";
+    }).join("");
+  }
+
+  function formatErrorsCount() {
+    return buildFormatErrorRows().length;
+  }
+
+  function setupFormatErrorsControls() {
+    var panel = document.getElementById("panel-format-errors");
+    Array.prototype.forEach.call(panel.querySelectorAll(".chip"), function (chip) {
+      chip.addEventListener("click", function () {
+        panel.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        chip.classList.add("active");
+        state.formatErrors.filter = chip.getAttribute("data-filter");
+        renderFormatErrorsTable();
+      });
+    });
+  }
+
+  // ---- statistics tab -------------------------------------------------------
+
+  function renderStatistics() {
+    var stats = DATA.statistics || {};
+    var overview = document.getElementById("statistics-overview");
+    var sides = [{ key: "vercel", label: "Vercel" }, { key: "e_reo", label: "E-reo" }];
+
+    overview.innerHTML = sides.map(function (s) {
+      var d = stats[s.key] || { words_total: 0, expressions_total: 0 };
+      return (
+        '<div class="card"><h2>' + s.label + "</h2>" +
+        '<div class="stat-row">' +
+        '<div class="stat-tile"><div class="value">' + d.words_total + '</div><div class="label"><span class="dot dot-good"></span>Words</div></div>' +
+        '<div class="stat-tile"><div class="value">' + d.expressions_total + '</div><div class="label"><span class="dot dot-warning"></span>Expressions</div></div>' +
+        "</div></div>"
+      );
+    }).join("");
+
+    function themeTable(title, key) {
+      var vercelThemes = (stats.vercel && stats.vercel[key]) || {};
+      var eReoThemes = (stats.e_reo && stats.e_reo[key]) || {};
+      var seen = {};
+      Object.keys(vercelThemes).forEach(function (t) { seen[t] = true; });
+      Object.keys(eReoThemes).forEach(function (t) { seen[t] = true; });
+      var allThemes = Object.keys(seen).sort(function (a, b) { return (eReoThemes[b] || 0) - (eReoThemes[a] || 0); });
+      var rowsHtml = allThemes.map(function (theme) {
+        return "<tr><td>" + escapeHtml(theme) + "</td><td>" + (vercelThemes[theme] || 0) + "</td><td>" + (eReoThemes[theme] || 0) + "</td></tr>";
+      }).join("");
+      return (
+        '<h3 style="font-size:13px;margin:20px 0 8px">' + title + "</h3>" +
+        '<table class="rows"><thead><tr><th>Theme</th><th>Vercel</th><th>E-reo</th></tr></thead><tbody>' + rowsHtml + "</tbody></table>"
+      );
+    }
+
+    document.getElementById("statistics-tables").innerHTML =
+      themeTable("Words by theme", "words_by_theme") + themeTable("Expressions by theme", "expressions_by_theme");
+  }
+
   // ---- overview ---------------------------------------------------------
 
   function renderOverview() {
@@ -920,6 +1122,8 @@
     document.getElementById("tab-count-expressions").textContent = se.added + se.modified + se.deleted;
     document.getElementById("tab-count-audio").textContent = audioIssueCount();
     document.getElementById("tab-count-duplicates").textContent = duplicatesCount();
+    document.getElementById("tab-count-pronunciations").textContent = pronunciationsCount();
+    document.getElementById("tab-count-format-errors").textContent = formatErrorsCount();
   }
 
   // ---- action bar / merge generation -------------------------------------
@@ -996,6 +1200,53 @@
     return (ids || []).map(function (id) { return THEMES[id] || id; }).join(", ");
   }
 
+  // Word.category is a single CharField(max_length=20) in the DB with no
+  // comma-splitting convention anywhere (unlike Expression.category, which
+  // the app already treats as comma-separated) -- a platform word can carry
+  // several theme ids, but only the first one fits here.
+  function primaryThemeName(ids, maxLength) {
+    if (!ids || !ids.length) return "";
+    var name = THEMES[ids[0]] || ids[0];
+    return name.slice(0, maxLength);
+  }
+
+  var TONE_CHARS = "¹²³⁴⁵⁶";
+
+  // Number of hanzi characters a pinyin "word" occupies. A real syllable
+  // always carries exactly one tone mark, so counting tone marks gives the
+  // syllable (= character) count directly -- e.g. "ngin²ga¹" has 2, so it's
+  // a 2-character word. A token with no tone mark at all isn't pinyin --
+  // it's a punctuation/symbol token (",", "?", "...") carried through
+  // verbatim on the hanzi side, so it occupies exactly as many characters
+  // as its own text (handles multi-char runs like "..." too).
+  function syllableCount(word) {
+    var toneCount = 0;
+    for (var i = 0; i < word.length; i++) {
+      if (TONE_CHARS.indexOf(word[i]) !== -1) toneCount++;
+    }
+    return toneCount || Math.max(word.length, 1);
+  }
+
+  // Reconstruct the space-separated hanzi phrase text_to_words.py expects
+  // directly from the authoritative hanzi text in `target`, by walking a
+  // cursor through it in syllable-count-sized steps -- rather than guessing
+  // from `components` (keyed "<word pinyin> <word hanzi>", but incomplete
+  // for words missing from the dictionary, and sometimes entirely empty).
+  // This always recovers the real hanzi, never a placeholder.
+  function segmentHanziByPinyin(pinyinWords, hanziConcat) {
+    var segments = [];
+    var cursor = 0;
+    pinyinWords.forEach(function (word) {
+      var n = syllableCount(word);
+      segments.push(hanziConcat.slice(cursor, cursor + n));
+      cursor += n;
+    });
+    if (segments.length && cursor < hanziConcat.length) {
+      segments[segments.length - 1] += hanziConcat.slice(cursor);
+    }
+    return segments;
+  }
+
   // target is "<space-separated pinyin words> <concatenated hanzi>" -- the
   // hanzi block has no internal spaces, so it's always the trailing token.
   function splitTarget(target) {
@@ -1013,32 +1264,18 @@
     row["PINYIN (auto)"] = parts.pinyin;
     row["SINOGRAMME"] = parts.hanzi;
     row["CW"] = ""; row["JFW"] = ""; row["GM"] = ""; row["DS"] = ""; row["TA"] = "";
-    row["THEMES"] = themeNames(payload && payload.themes);
+    row["THEMES"] = primaryThemeName(payload && payload.themes, 20);
     row["OBSERVATIONS "] = "";
     row["STATUT"] = "OK";
     row["ANGLAIS"] = tr.secondary || "";
     return row;
   }
 
-  // Expression components are keyed "<word pinyin> <word hanzi>" but stored
-  // sorted alphabetically, not in sentence order -- match each component's
-  // pinyin against the space-separated pinyin words in `target` (which ARE
-  // in order) to reconstruct the space-separated hanzi phrase the sheet
-  // expects. A word that can't be matched is left as "(pinyin?)" so it's
-  // obvious in the sheet what needs a human fix, rather than silently wrong.
   function expressionRowFromPayload(payload) {
     var tr = (payload && payload.translations) || {};
     var parts = splitTarget(tr.target);
     var pinyinWords = parts.pinyin ? parts.pinyin.split(" ") : [];
-
-    var pinyinToHanzi = {};
-    Object.keys((payload && payload.components) || {}).forEach(function (key) {
-      var idx = key.lastIndexOf(" ");
-      if (idx === -1) return;
-      pinyinToHanzi[key.slice(0, idx)] = key.slice(idx + 1);
-    });
-
-    var phrase = pinyinWords.map(function (w) { return pinyinToHanzi[w] || ("(" + w + "?)"); }).join(" ");
+    var phrase = segmentHanziByPinyin(pinyinWords, parts.hanzi).join(" ");
 
     var row = {};
     row["FRANCAIS"] = tr.primary || "";
@@ -1046,7 +1283,7 @@
     row["PINYIN (AUTO)"] = parts.pinyin;
     row["NOUVEAUX MOTS"] = "";
     row["CW"] = ""; row["JFW"] = ""; row["GM"] = ""; row["DS"] = ""; row["TA"] = "";
-    row["THEMES"] = themeNames(payload && payload.themes);
+    row["THEMES"] = themeNames(payload && payload.themes).slice(0, 50); // Expression.category is CharField(max_length=50)
     row["OBSERVATIONS "] = "";
     row["STATUT"] = "OK";
     row["ANGLAIS"] = tr.secondary || "";
@@ -1138,7 +1375,7 @@
         buttons.forEach(function (b) { b.classList.remove("active"); });
         btn.classList.add("active");
         var tab = btn.getAttribute("data-tab");
-        ["words", "expressions", "audio", "duplicates"].forEach(function (name) {
+        ["words", "expressions", "audio", "duplicates", "pronunciations", "format-errors", "statistics"].forEach(function (name) {
           document.getElementById("panel-" + name).hidden = name !== tab;
         });
       });
@@ -1258,6 +1495,9 @@
     renderAudioTable();
     renderUnmatchedAudio();
     renderDuplicatesTable();
+    renderPronunciationsTable();
+    renderFormatErrorsTable();
+    renderStatistics();
     refreshActionBar();
   }
 
@@ -1314,6 +1554,8 @@
   setupCategory("expressions");
   setupAudioControls();
   setupDuplicatesControls();
+  setupPronunciationsControls();
+  setupFormatErrorsControls();
   setupTheme();
   document.getElementById("generate-btn").addEventListener("click", generateMerge);
   document.getElementById("audio-player").addEventListener("ended", function () {

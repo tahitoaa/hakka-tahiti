@@ -14,6 +14,10 @@ def combo_exists(initial_id, final_id, combo_set):
     return (initial_id, final_id) in combo_set
 
 @register.simple_tag
+def combo_hanzi_list(initial_id, final_id, combo_hanzi):
+    return combo_hanzi.get((initial_id, final_id), [])
+
+@register.simple_tag
 def wenfa_py(initial, final, tone=""):
     return (initial or "") + (final or "") + superscript_map.get(str(tone), str(tone))
 
