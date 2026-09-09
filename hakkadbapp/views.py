@@ -28,11 +28,26 @@ s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
 
 from .management.commands import import_lexique
-from .management.commands.platform_to_vercel import split_target
 from django.db.models import Case, When, Value, IntegerField
 
 TONE_SUPERSCRIPT = {1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶"}
 SUPERSCRIPT_TO_DIGIT = str.maketrans("¹²³⁴⁵⁶", "123456")
+
+
+def split_target(target):
+    """target is "<space-separated pinyin words> <concatenated hanzi>" -- the
+    hanzi block has no internal spaces, so it's always the trailing token.
+    Duplicated from management/commands/platform_to_vercel.py rather than
+    imported: that module (via export.py -> read_themes_corpus ->
+    generate_images) loads TrueType fonts from a hardcoded Windows path at
+    *import time*, which crashes every request in production the moment
+    anything in views.py imports it -- this view module is loaded on every
+    request/cold start, unlike a management command run standalone by hand."""
+    target = target or ""
+    idx = target.rfind(" ")
+    if idx == -1:
+        return target, ""
+    return target[:idx], target[idx + 1:]
 
 # Fields shown in the duplicates "compared fields" table, in display order.
 DUP_FIELDS = ["french", "hakka", "secondary", "theme", "status"]
