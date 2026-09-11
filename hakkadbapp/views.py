@@ -21,6 +21,7 @@ from django.http import JsonResponse
 from .text_to_words import (
     build_all_words_for_tokens,
     convert_phrase_to_word_data,
+    resolve_hanzi,
 )
 from .illustrations import illustration_for
 
@@ -57,6 +58,57 @@ def _expressions_containing(hanzi_char):
             *(f'expressionword_set__word__{path}' for path in _WORD_PRONUNCIATION_PREFETCH)
         )
     )
+
+
+def _expression_segments(expr):
+    """Every position of the original phrase, in order -- including tokens
+    that didn't match any Word at import time. import_expressions.py skips
+    creating an ExpressionWord row entirely for an unmatched token (see its
+    "mot inconnu" branch), so those positions leave a silent gap in
+    expressionword_set rather than a placeholder row: the rosace poster used
+    to just drop them, which is why some characters were missing from an
+    expression's rendering. expr.text is the untouched original phrase (one
+    whitespace-separated token per position, same split import used) so it's
+    the only place those tokens still exist -- resolve_hanzi() is the same
+    function import_expressions.py uses to turn a raw token into displayable
+    hanzi (stripping ":gloss"/"(pinyin)" annotations), reused here so a gap
+    renders exactly as it would have if it had matched."""
+    words_by_position = {
+        ew.position: ew.word for ew in expr.expressionword_set.all() if ew.word
+    }
+    tokens = expr.text.split() if expr.text else []
+    segments = []
+    for pos, token in enumerate(tokens):
+        word = words_by_position.get(pos)
+        if word is not None:
+            segments.append({'word': word, 'hanzi': None})
+        else:
+            hanzi = resolve_hanzi(token)
+            if hanzi:
+                segments.append({'word': None, 'hanzi': hanzi})
+    return segments
+
+
+def _with_segments(expressions):
+    """Attach `.segments` to each Expression for template use (see the
+    rosace poster in components/hanzi_block.html)."""
+    expressions = list(expressions)
+    for expr in expressions:
+        expr.segments = _expression_segments(expr)
+    return expressions
+
+
+def _with_platform_target(expressions, components_by_hanzi):
+    """Attach `.platform_target` (the platform's own raw "pinyin hanzi"
+    string, e.g. "shit⁶ lang⁴ mi³ 食浪米") to each Expression, keyed the same
+    way build_expression_platform_components() is -- see the rosace poster
+    in components/hanzi_block.html, which shows this next to `.text` (the
+    excel-format string actually imported) so the two can be compared."""
+    for expr in expressions:
+        hanzi_concat = (expr.text or "").replace(" ", "")
+        entry = components_by_hanzi.get(hanzi_concat)
+        expr.platform_target = entry["target"] if entry else ""
+    return expressions
 
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
 s2t = OpenCC('s2t')
@@ -411,6 +463,7 @@ def reports(request):
     })
 
     context['title'] = "Rapports"
+    context['page'] = "reports"
     # cmd = import_lexique.Command()
     # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
     traces = Traces.objects.order_by('-timestamp')[:2]
@@ -648,6 +701,7 @@ def search(request):
         'finals': Final.objects.all(),
         'words': words,
         'title': "Recherche de mots",
+        'page': "search",
         "categories": Word.objects.values_list('category', flat=True).distinct(),
     }
 
@@ -685,21 +739,32 @@ def get_all_data():
         'initials': Initial.objects.all(),
         'finals': Final.objects.all(),
         'words': words,
-        'title': "Recherche de mots",
+        # No default 'title'/'page' here on purpose -- this context is shared
+        # by three different nav pages (converter, transcripter, expressions)
+        # that each need their own; a hardcoded default here previously leaked
+        # "Recherche de mots" (this function's original, single caller) into
+        # all three, and none of them set 'page' at all, so their nav link
+        # never highlighted as active either.
         "categories": Word.objects.values_list('category', flat=True).distinct(),
         "expressions": expressions,
         "expressions_count": expressions.count(),
     }
-    return context 
+    return context
 
 def pinyin_converter(request):
-    return render(request, "hakkadbapp/converter.html", get_all_data())
+    context = get_all_data()
+    context["title"] = "Écrire"
+    context["page"] = "converter"
+    return render(request, "hakkadbapp/converter.html", context)
 
 def transcripter(request):
-    return render(request, "hakkadbapp/transcripter.html", get_all_data())
+    context = get_all_data()
+    context["title"] = "Transcrire"
+    context["page"] = "transcripter"
+    return render(request, "hakkadbapp/transcripter.html", context)
 
 def caracters(request):
-    context = {"page": "caracters"}
+    context = {"page": "caracters", "title": "Caractères"}
     all_prons = Pronunciation.objects.order_by('initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
     context["all_prons"] = all_prons
 
@@ -785,7 +850,7 @@ def flashcards(request, category=None):
     word_ids = list(word_ids.values_list('id', flat=True).distinct())
 
     if not word_ids:
-        return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot"})
+        return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot", "page": "flashcards"})
 
     max_attempts = 10  # Prevent infinite loop
     word = None
@@ -831,7 +896,9 @@ def hanzi(request, hanzi_char):
     related_words = _with_illustrations(
         Word.objects.filter(pronunciations__in=prons).distinct()
     )
-    related_expressions = _expressions_containing(hanzi_char)
+    related_expressions = _with_segments(_expressions_containing(hanzi_char))
+    components_by_hanzi, _snapshot_timestamp = build_expression_platform_components()
+    related_expressions = _with_platform_target(related_expressions, components_by_hanzi)
 
     # Prepare data
     context = {
@@ -919,7 +986,8 @@ def phonemes(request):
         'finals': finals,
         'combo_set': combo_set,
         'combo_hanzi': dict(combo_hanzi),
-        'title': "Tableau des phonèmes"
+        'title': "Tableau des phonèmes",
+        'page': "phonemes",
     }
     return render(request, 'hakkadbapp/phonemes.html', context)
 
@@ -951,7 +1019,7 @@ def hanzi_by_pinyin(request, syllable):
             'trad': s2t.convert(hanzi_char),
             'pronunciations': prons_list,
             'related_words': words,
-            'related_expressions': _expressions_containing(hanzi_char),
+            'related_expressions': _with_segments(_expressions_containing(hanzi_char)),
         })
 
     context = {
@@ -1039,6 +1107,7 @@ def pronunciation(request):
         'combo_set': combo_set,
         'tones': tones,
         'title': "Prononciation",
+        'page': "pronunciation",
     }
     return render(request, "hakkadbapp/pronunciation.html", context)
 
@@ -1105,6 +1174,8 @@ def build_expression_platform_components():
 
 def expressions(request):
     context = get_all_data()
+    context["title"] = "Expressions"
+    context["page"] = "expressions"
     components_by_hanzi, snapshot_timestamp = build_expression_platform_components()
     context["platform_components_json"] = json.dumps(components_by_hanzi, ensure_ascii=False)
     context["platform_snapshot_timestamp"] = snapshot_timestamp

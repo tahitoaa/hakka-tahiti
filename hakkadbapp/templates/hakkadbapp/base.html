@@ -288,6 +288,11 @@
     <div class="container mx-auto px-4">
       <ul class="no-print flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1 text-sm sm:text-base font-medium font-display">
         <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'flashcards' %}" class="block py-2.5 sm:py-2 {% if page == 'flashcards' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Home
+          </a>
+        </li>
+        <li class="border-b border-white/10 sm:border-0">
           <a href="{% url 'transcripter' %}" class="block py-2.5 sm:py-2 {% if page == 'transcripter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Transcrire
           </a>
@@ -305,11 +310,6 @@
         <li class="border-b border-white/10 sm:border-0">
           <a href="{% url 'caracters' %}" class="block py-2.5 sm:py-2 {% if page == 'caracters' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Caractères
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'flashcards' %}" class="block py-2.5 sm:py-2 {% if page == 'flashcards' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Flashcards
           </a>
         </li>
         <li class="border-b border-white/10 sm:border-0">

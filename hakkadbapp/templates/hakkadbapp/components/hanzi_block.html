@@ -57,34 +57,65 @@
             {% for expr in related_expressions %}
             <div class="rosace-expr-card">
                 <div class="rosace-expr-main">
-                    <div class="rosace-expr-hanzi">
-                        {% for w in expr.words_ordered %}
-                            {% for wp in w.wordpronunciation_set.all %}
-                            <a href="{% url 'hanzi' wp.pronunciation.simp %}" class="hanzi-block rosace-char-link">
-                                <span class="hanzi simp">{{ wp.pronunciation.simp }}</span>
-                                <span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span>
-                            </a>
-                            {% endfor %}
+                    <div class="rosace-expr-furigana">
+                        {% for seg in expr.segments %}
+                            {% if seg.word %}
+                                {% for wp in seg.word.wordpronunciation_set.all %}
+                                <ruby class="rosace-ruby">
+                                    <a href="{% url 'hanzi' wp.pronunciation.simp %}" class="hanzi-block rosace-char-link">
+                                        <span class="hanzi simp">{{ wp.pronunciation.simp }}</span>
+                                        <span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span>
+                                    </a>
+                                    <rt class="rosace-ruby-pinyin">{% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}</rt>
+                                </ruby>
+                                {% endfor %}
+                            {% else %}
+                            <ruby class="rosace-ruby">
+                                <span class="hanzi rosace-char-unknown" title="Caractère absent de la base de données">{{ seg.hanzi }}</span>
+                                <rt class="rosace-ruby-pinyin">&nbsp;</rt>
+                            </ruby>
+                            {% endif %}
                         {% endfor %}
                     </div>
-                    <div class="rosace-expr-pinyin">
-                        {% for w in expr.words_ordered %}
-                            {% for wp in w.wordpronunciation_set.all %}
-                            {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
+                    <button type="button" class="rosace-copy-btn" title="Copier hakka (pinyin + hanzi)"
+                            onclick="rosaceCopy('{{ expr.rendering|escapejs }}', this)">📋</button>
                 </div>
                 <div class="rosace-expr-side">
                     <div class="rosace-expr-french">{{ expr.french }}</div>
+                    <button type="button" class="rosace-copy-btn" title="Copier le français"
+                            onclick="rosaceCopy('{{ expr.french|escapejs }}', this)">📋</button>
                     {% if expr.category %}<div class="rosace-block-category">{{ expr.category }}</div>{% endif %}
                 </div>
+                {% if expr.text or expr.platform_target %}
+                <div class="rosace-expr-source">
+                    {% if expr.text %}
+                    <div class="rosace-source-chip rosace-source-chip--excel">
+                        <span class="rosace-source-value">{{ expr.text }}</span>
+                    </div>
+                    {% endif %}
+                    {% if expr.platform_target %}
+                    <div class="rosace-source-chip rosace-source-chip--platform">
+                        <span class="rosace-source-value">{{ expr.platform_target }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
     </section>
     {% endif %}
 </div>
+
+<script>
+    function rosaceCopy(text, btn) {
+        navigator.clipboard.writeText(text).then(function () {
+            var original = btn.textContent;
+            btn.textContent = "✅";
+            setTimeout(function () { btn.textContent = original; }, 1200);
+        }).catch(function (err) { console.error("Copy failed:", err); });
+    }
+</script>
 
 <style>
     .rosace-poster {
@@ -220,26 +251,110 @@
         box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     }
 
-    .rosace-expr-main {
+    /* A token from the spreadsheet that didn't match any Word at import
+       time still needs to show up here -- see _expression_segments() in
+       views.py. It's plain, unlinked text (dashed underline, muted) since
+       there's no /hanzi/ page to send it to. */
+    .rosace-char-unknown {
+        color: var(--rosace-block-text-muted);
+        text-decoration: underline dashed;
+        text-underline-offset: 3px;
+    }
+
+    /* The untouched original phrase from the spreadsheet import (excel
+       format) alongside the platform's own raw "pinyin hanzi" string
+       (platform format), kept visible -- including when they disagree --
+       so every character has some verbatim representation on the page even
+       if the segments above couldn't resolve it to anything nicer. Same
+       blue/amber tint convention as expressions.html's Vercel/platform
+       comparison, so the two sources read consistently across the site. */
+    .rosace-expr-source {
+        flex-basis: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.75rem;
+        border-top: 1px dashed var(--rosace-block-border);
+        padding-top: 0.6rem;
+        margin-top: 0.2rem;
+    }
+    .rosace-source-chip {
         display: flex;
         align-items: baseline;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        border-radius: 0.4rem;
+        padding: 0.2rem 0.6rem;
+    }
+    .rosace-source-chip--excel { background: rgba(59,130,246,0.10); }
+    .rosace-source-chip--platform { background: rgba(217,119,6,0.10); }
+    .rosace-source-label {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-size: 0.7rem;
+        color: var(--rosace-block-text-muted);
+        white-space: nowrap;
+    }
+    .rosace-source-value {
+        color: var(--rosace-block-text);
+    }
+
+    /* Small inline icon buttons next to the hakka/french text -- flex
+       siblings of the text they copy, not absolutely pinned, so they sit
+       naturally in the row instead of overlapping neighboring content. */
+    .rosace-copy-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.6rem;
+        height: 1.6rem;
+        flex-shrink: 0;
+        border-radius: 9999px;
+        border: 1px solid var(--rosace-block-border);
+        background: transparent;
+        color: var(--rosace-block-text-muted);
+        font-size: 0.85rem;
+        line-height: 1;
+        cursor: pointer;
+        transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .rosace-copy-btn:hover,
+    .rosace-copy-btn:focus-visible {
+        color: var(--rosace-red);
+        border-color: var(--rosace-red);
+        background: color-mix(in srgb, var(--rosace-gold) 18%, transparent);
+    }
+
+    .rosace-expr-main {
+        display: flex;
+        align-items: center;
         flex-wrap: wrap;
         gap: 0.4rem 1rem;
         min-width: 0;
     }
 
-    .rosace-expr-hanzi .hanzi {
+    /* Furigana: pinyin sits directly above its own character via native
+       <ruby>/<rt> (browser-native alignment -- much more robust than two
+       separate flex-wrapped rows of hanzi and pinyin, which could only ever
+       line up by coincidence once either row wrapped to a second line).
+       Left as plain inline flow (not flex) so the <ruby> units wrap the way
+       ruby text is meant to: one atomic char+pinyin pair at a time. */
+    .rosace-expr-furigana {
+        line-height: 2.5;
+    }
+    .rosace-expr-furigana .hanzi {
         font-size: clamp(1.75rem, 3vw, 2.25rem) !important;
         color: var(--rosace-block-text);
     }
-
-    .rosace-expr-pinyin {
-        font-size: clamp(1rem, 1.6vw, 1.25rem);
+    .rosace-ruby {
+        margin: 0 0.08em;
+    }
+    .rosace-ruby-pinyin {
+        font-size: clamp(0.7rem, 1.1vw, 0.9rem);
         font-weight: 600;
         color: var(--rosace-red);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.3rem;
+        text-align: center;
+        white-space: nowrap;
     }
 
     .rosace-expr-side {
