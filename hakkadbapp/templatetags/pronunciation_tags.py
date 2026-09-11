@@ -1,8 +1,26 @@
 # myapp/templatetags/pronunciation_tags.py
 
 from django import template
+from opencc import OpenCC
 
 register = template.Library()
+
+# Same pair of converters models.py instantiates for Pronunciation/Word --
+# duplicated here rather than imported so this templatetags module has no
+# dependency on models.py (avoids the app-loading-order issues that can
+# come from templatetags importing models at module scope).
+_s2t = OpenCC('s2t')
+_t2s = OpenCC('t2s')
+
+
+@register.filter
+def to_simp(hanzi):
+    return _t2s.convert(hanzi) if hanzi else hanzi
+
+
+@register.filter
+def to_trad(hanzi):
+    return _s2t.convert(hanzi) if hanzi else hanzi
 
 # Convert tone to superscript if present
 superscript_map = {

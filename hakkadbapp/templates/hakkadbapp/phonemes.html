@@ -11,7 +11,12 @@
   <style>
     #phonemes-table-wrap .hanzi-label { display: none; }
     #phonemes-table-wrap.show-hanzi .py-label { display: none; }
-    #phonemes-table-wrap.show-hanzi .hanzi-label { display: inline; }
+    #phonemes-table-wrap.show-hanzi .hanzi-label {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.15rem 0.35rem;
+    }
     @media print {
       .no-print-overflow {
         overflow-x: visible !important;
@@ -67,7 +72,14 @@
                   <span class="font-bold px-1 py-0.5 rounded">
                     <span class="py-label">{% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=final.final%}</span>
                     {% combo_hanzi_list initial.id final.id combo_hanzi as hanzi_list %}
-                    <span class="hanzi-label hanzi">{{ hanzi_list|join:" " }}</span>
+                    <span class="hanzi-label">
+                      {% for char in hanzi_list %}
+                      <span class="hanzi-block hanzi">
+                        <span class="simp">{{ char|to_simp }}</span>
+                        <span class="trad hidden">{{ char|to_trad }}</span>
+                      </span>
+                      {% endfor %}
+                    </span>
                   </span>
                 </a>
               {% endif %}
