@@ -22,6 +22,41 @@ from .text_to_words import (
     build_all_words_for_tokens,
     convert_phrase_to_word_data,
 )
+from .illustrations import illustration_for
+
+# The rosace poster (components/hanzi_block.html) renders every syllable of
+# every word (and every word of every expression) through pinyin_switch.html,
+# which walks wp.pronunciation.initial/final/tone -- without prefetching
+# those, a well-connected character like 水 or 食 fans out into hundreds of
+# individual round trips to the (remote, Supabase-hosted) DB and the page
+# times out. These prefetch paths keep it to a handful of queries no matter
+# how many words/expressions come back.
+_WORD_PRONUNCIATION_PREFETCH = (
+    'wordpronunciation_set__pronunciation__initial',
+    'wordpronunciation_set__pronunciation__final',
+    'wordpronunciation_set__pronunciation__tone',
+)
+
+
+def _with_illustrations(words):
+    """Attach `.illustration` to each Word for template use (see the rosace
+    poster in components/hanzi_block.html)."""
+    words = list(words.prefetch_related(*_WORD_PRONUNCIATION_PREFETCH))
+    for word in words:
+        word.illustration = illustration_for(word)
+    return words
+
+
+def _expressions_containing(hanzi_char):
+    """Expressions built from a word that uses this character -- shown
+    alongside single words in the rosace poster (components/hanzi_block.html)."""
+    return (
+        Expression.objects.filter(words__pronunciations__hanzi=hanzi_char)
+        .distinct()
+        .prefetch_related(
+            *(f'expressionword_set__word__{path}' for path in _WORD_PRONUNCIATION_PREFETCH)
+        )
+    )
 
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
 s2t = OpenCC('s2t')
@@ -685,12 +720,69 @@ def caracters(request):
     return render(request, "hakkadbapp/caracters.html", context)
 
 
+def api_words_data(request):
+    """Dumps the entire word catalog as JSON, once, so flashcards.html can
+    cache it client-side (localStorage) and render every subsequent card --
+    and the hanzi links on it -- instantly instead of round-tripping to the
+    server (often a slow remote/serverless DB connection) on every click.
+
+    Reuses pinyin_switch.html (rendered once per syllable here) rather than
+    re-implementing the 4 transcription systems in JS, so there's a single
+    source of truth for that markup."""
+    from django.template.loader import get_template
+
+    pinyin_switch_tpl = get_template("hakkadbapp/components/pinyin_switch.html")
+
+    word_pron_qs = WordPronunciation.objects.select_related(
+        "pronunciation__initial", "pronunciation__final", "pronunciation__tone"
+    ).order_by("position")
+    words = Word.objects.prefetch_related(Prefetch("wordpronunciation_set", queryset=word_pron_qs))
+
+    payload = []
+    for word in words:
+        wps = list(word.wordpronunciation_set.all())
+        hanzi = "".join(wp.pronunciation.hanzi for wp in wps)
+        if not hanzi.strip():
+            continue  # matches flashcards()'s own "skip words with an empty __str__()" guard
+        chars = list(dict.fromkeys(wp.pronunciation.hanzi for wp in wps if wp.pronunciation.hanzi))
+        pinyin_html = "".join(
+            pinyin_switch_tpl.render({
+                "i": wp.pronunciation.initial.initial,
+                "f": wp.pronunciation.final.final,
+                "t": wp.pronunciation.tone.tone_number,
+            })
+            for wp in wps
+        )
+        payload.append({
+            "id": word.id,
+            "hanzi": hanzi,
+            "chars": chars,
+            "french": word.french,
+            "category": word.category or "",
+            "pinyin_html": pinyin_html,
+            "illustration": illustration_for(word),
+        })
+
+    return JsonResponse({"version": str(len(payload)), "words": payload})
+
+
 def flashcards(request, category=None):
+    # A rosace poster (see the `hanzi` view) can hand off into flashcard
+    # mode for just the words built around one character, so the two
+    # features stay connected instead of being dead ends.
+    hanzi_filter = unquote(request.GET.get('hanzi', '') or '')
+
     # Get all word IDs
+    word_ids = Word.objects.all()
     if category:
-        word_ids = Word.objects.filter(category=category).values_list('id', flat=True)
-    else:
-        word_ids = Word.objects.values_list('id', flat=True)
+        word_ids = word_ids.filter(category=category)
+    if hanzi_filter:
+        word_ids = word_ids.filter(pronunciations__hanzi=hanzi_filter)
+    # Materialized once up front -- random.choice() on a bare QuerySet works
+    # (it supports __len__/__getitem__) but issues a fresh SQL query for the
+    # length AND for every single indexed access, so the retry loop below
+    # used to cost up to 11 round trips to the DB instead of 1.
+    word_ids = list(word_ids.values_list('id', flat=True).distinct())
 
     if not word_ids:
         return render(request, "hakkadbapp/flashcards.html", {"word": None, "title": "Aucun mot"})
@@ -706,15 +798,26 @@ def flashcards(request, category=None):
     else:
         word = None  # No valid word found after N tries
 
+    word_chars = []
+    if word:
+        seen_chars = set()
+        for wp in word.wordpronunciation_set.all():
+            char = wp.pronunciation.hanzi
+            if char and char not in seen_chars:
+                seen_chars.add(char)
+                word_chars.append(char)
+
     context = {
         "page": "flashcards",
         "word": word,
+        "illustration": illustration_for(word),
+        "word_chars": word_chars,
         "title": f"Flashcard - {category}" if category else "Flashcard",
         "categories": Word.objects.values_list('category', flat=True).distinct(),
         "category": category,
+        "hanzi_filter": hanzi_filter,
     }
 
-    print(word)
     return render(request, "hakkadbapp/flashcards.html", context)
 
 
@@ -725,7 +828,10 @@ def hanzi(request, hanzi_char):
     prons = Pronunciation.objects.filter(hanzi=hanzi_char)
 
     # Get all related words that include one of those pronunciations
-    related_words = Word.objects.filter(pronunciations__in=prons).distinct()
+    related_words = _with_illustrations(
+        Word.objects.filter(pronunciations__in=prons).distinct()
+    )
+    related_expressions = _expressions_containing(hanzi_char)
 
     # Prepare data
     context = {
@@ -734,6 +840,7 @@ def hanzi(request, hanzi_char):
         'trad': s2t.convert(hanzi_char),
         'pronunciations': prons,
         'related_words': related_words,
+        'related_expressions': related_expressions,
         'title': f"{hanzi_char}"
     }
     return render(request, "hakkadbapp/hanzi.html", context)
@@ -835,13 +942,16 @@ def hanzi_by_pinyin(request, syllable):
     # Prepare full data per hanzi
     hanzi_data = []
     for hanzi_char, prons_list in hanzi_map.items():
-        words = Word.objects.filter(pronunciations__in=prons_list).distinct()
+        words = _with_illustrations(
+            Word.objects.filter(pronunciations__in=prons_list).distinct()
+        )
         hanzi_data.append({
             'hanzi': hanzi_char,
             'simp': t2s.convert(hanzi_char),
             'trad': s2t.convert(hanzi_char),
             'pronunciations': prons_list,
             'related_words': words,
+            'related_expressions': _expressions_containing(hanzi_char),
         })
 
     context = {

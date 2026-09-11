@@ -27,11 +27,15 @@ class Pronunciation {
     }
 
     char() {
-        if (document.getElementById('toggle-hanzi').hasAttribute('aria-pressed')){
-            return this.trad;
-        } else {
-            return this.simp;
-        }
+        // hasAttribute() alone is wrong here: the button ships with
+        // aria-pressed="false" already in the markup, so the attribute is
+        // *present* (just false-valued) before any click -- checking only
+        // for presence made this return trad by default, before the user
+        // ever touched the toggle. Compare the value instead, and don't
+        // assume the button exists (this class is also usable standalone).
+        const toggle = typeof document !== 'undefined' ? document.getElementById('toggle-hanzi') : null;
+        const showingTrad = toggle?.getAttribute('aria-pressed') === 'true';
+        return (showingTrad && this.trad) ? this.trad : this.simp;
     }
 }
 

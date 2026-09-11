@@ -1,0 +1,9 @@
+{
+  "name": "hakkadbapp-js-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Unit tests for the static JS in hakkadbapp/static/hakkadbapp/js/ -- see tests/README.md.",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}

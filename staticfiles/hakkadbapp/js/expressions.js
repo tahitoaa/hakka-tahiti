@@ -135,18 +135,49 @@ document.addEventListener("DOMContentLoaded", () => {
     // in it -- when there's no snapshot at all, every item would otherwise
     // look "missing" even though nothing has actually been compared.
     const notFoundOnPlatform = hasAnySnapshot && !hasPlatformMatch;
+    // Found on the platform, but its `components` dict is entirely empty --
+    // a different situation than "some words missing" below: the platform
+    // never decomposed this expression into words at all.
+    const emptyComponentsOnPlatform = hasPlatformMatch && platformTokens.length === 0;
+    // "No components in platform" (as asked) covers both: nothing to look
+    // up because the expression itself isn't there, or it's there but empty.
+    const noComponentsOnPlatform = notFoundOnPlatform || emptyComponentsOnPlatform;
+    // "Missing components" is the partial case: the platform DOES have a
+    // decomposition for this expression, just not a complete one.
+    const missingComponentsOnPlatform = hasPlatformMatch && platformTokens.length > 0 && componentMismatches.length > 0;
+
+    const pinyinLine = sentence.renderPinyinLine();
+    // forceSimp: this feeds the Vercel/platform comparison below, and the
+    // platform's own data is always simplified -- letting the sitewide
+    // Trad./Simp. toggle leak in here would make a correct match look like
+    // a spelling mismatch as soon as someone flips it to traditional.
+    const hanziLine = sentence.renderHanziLine(true);
+    const hakkaVercel = `${pinyinLine} ${hanziLine}`.trim();
+    // Plain literal-string comparison of the whole "pinyin hanzi" field, on
+    // top of (not instead of) the word-by-word decomposition checks above --
+    // it can catch a difference (e.g. stray formatting, a segmentation the
+    // component-level checks don't fully capture) even when no single word
+    // pair was individually flagged.
+    const hakkaDiffers = hasPlatformMatch && hakkaVercel !== (platformTarget || "").trim();
+
     const mismatchBadges = [
       notFoundOnPlatform
         ? `<span class="meta-chip mismatch" title="Aucune expression plateforme ne correspond à ce hanzi">&#9888; introuvable sur la plateforme</span>`
         : "",
+      emptyComponentsOnPlatform
+        ? `<span class="meta-chip mismatch" title="La plateforme n'a aucun composant enregistré pour cette expression">&#9888; aucun composant</span>`
+        : "",
       ...componentMismatches.map((m) =>
-        `<span class="meta-chip mismatch" title="Absent de la décomposition plateforme">&#9888; composant : ${escapeHtml(m.hanzi)}</span>`),
+        `<span class="meta-chip mismatch" title="Absent de la décomposition plateforme">&#9888; manque : ${escapeHtml(m.hanzi)}</span>`),
       ...pronunciationMismatches.map((m) =>
-        `<span class="meta-chip mismatch" title="Plateforme (brut) : ${escapeAttr(m.platformPinyin)} &mdash; Vercel/DB (calculé) : ${escapeAttr(m.vercelPinyins.join('/'))}">&#9888; ton : ${escapeHtml(m.hanzi)} &mdash; plateforme ${escapeHtml(m.platformPinyin)} / vercel ${escapeHtml(m.vercelPinyins.join('/'))}</span>`),
+        `<span class="meta-chip mismatch" title="Plateforme (brut) : ${escapeAttr(m.platformPinyin)} &mdash; Vercel/DB (calculé) : ${escapeAttr(m.vercelPinyins.join('/'))}">&#9888; ton ${escapeHtml(m.hanzi)} : ${escapeHtml(m.platformPinyin)} / ${escapeHtml(m.vercelPinyins.join('·'))}</span>`),
       ...extraComponents.map((m) =>
         `<span class="meta-chip mismatch" title="Présent côté plateforme mais absent de la décomposition Vercel">&#9888; en trop : ${escapeHtml(m.hanzi)}</span>`),
+      hakkaDiffers
+        ? `<span class="meta-chip mismatch" title="Plateforme (brut) : ${escapeAttr(platformTarget)} &mdash; Vercel/DB (calculé) : ${escapeAttr(hakkaVercel)}">&#9888; orthographe hakka différente</span>`
+        : "",
     ].join("");
-    const hasMismatch = notFoundOnPlatform || componentMismatches.length > 0 || pronunciationMismatches.length > 0 || extraComponents.length > 0;
+    const hasMismatch = noComponentsOnPlatform || missingComponentsOnPlatform || pronunciationMismatches.length > 0 || extraComponents.length > 0 || hakkaDiffers;
 
     return {
       index,
@@ -156,10 +187,15 @@ document.addEventListener("DOMContentLoaded", () => {
       text,
       french,
       english,
-      pinyinLine: sentence.renderPinyinLine(),
-      hanziLine: sentence.renderHanziLine(),
+      pinyinLine,
+      hanziLine,
+      hakkaVercel,
+      hakkaDiffers,
       hasPlatformMatch,
       notFoundOnPlatform,
+      emptyComponentsOnPlatform,
+      noComponentsOnPlatform,
+      missingComponentsOnPlatform,
       vercelTokens,
       platformTokens,
       platformPrimary,
@@ -169,7 +205,12 @@ document.addEventListener("DOMContentLoaded", () => {
       pronunciationMismatches,
       extraComponents,
       hasMismatch,
-      html: `<li class="expr-card${hasMismatch ? " has-mismatch" : ""}" data-category="${escapeAttr(category)}" data-status="${escapeAttr(status)}">
+      // sentence.render() bakes the current Trad./Simp. mode into a plain
+      // string rather than re-reading the DOM -- kept as a function (not
+      // just the initial `.html` value below) so refreshHanziMode() can
+      // regenerate it after the sitewide toggle changes.
+      buildHtml() {
+        return `<li class="expr-card${hasMismatch ? " has-mismatch" : ""}" data-category="${escapeAttr(category)}" data-status="${escapeAttr(status)}">
               <div class="expr-index">phrase ${index}</div>
               ${sentence.render()}
               <div class="expr-meta">
@@ -177,7 +218,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${status ? `<span class="meta-chip">${escapeHtml(status)}</span>` : ""}
                 ${mismatchBadges}
               </div>
-            </li>`,
+            </li>`;
+      },
+      get html() {
+        return this._html ?? (this._html = this.buildHtml());
+      },
+      refreshHtml() {
+        this._html = this.buildHtml();
+      },
       // Single precomputed lowercase haystack: one indexOf() per item per
       // search instead of several .includes() calls across separate fields.
       search: `${text} ${french} ${rendering} ${category} ${status}`.toLowerCase(),
@@ -297,7 +345,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   setupTheme();
+  // The comparison view forces simp regardless of the toggle (see
+  // hanziLine above) since it's checked against the platform's always-
+  // simplified data, so it never needs to react to this event.
   setupCompareTable(items);
+
+  // The card list's html is baked (via Sentence.render()) with whichever
+  // Trad./Simp. mode was active when it was built -- regenerate it when the
+  // sitewide toggle changes instead of only on the next filter interaction.
+  document.addEventListener("hanzi-mode-change", () => {
+    items.forEach((it) => it.refreshHtml());
+    rerender();
+  });
 
   // Initial render
   rerender();
@@ -329,7 +388,8 @@ function setupCompareTable(items) {
   // Anomalies-only by default: the whole point of this view is to surface
   // the expressions that need manual fixing on the platform, not to re-list
   // every expression (the card view above already does that).
-  const state = { category: "", q: "", anomalyOnly: true };
+  // group: "" shows every group, otherwise only the one whose key matches.
+  const state = { category: "", q: "", anomalyOnly: true, group: "" };
 
   // isAnomaly flags the token in red; ambiguous (only ever true for a
   // Vercel token, via pinyinCandidates) shows every reading the dictionary
@@ -373,7 +433,7 @@ function setupCompareTable(items) {
     } else if (!it.hasPlatformMatch) {
       platformDecomp = `<span class="no-match">Aucun instantané</span>`;
     } else if (!it.platformTokens.length) {
-      platformDecomp = `<span class="no-match">&mdash;</span>`;
+      platformDecomp = `<span class="no-match mismatch">aucun composant</span>`;
     } else {
       platformDecomp = it.platformTokens.map((t) => renderDecompToken(
         t,
@@ -382,17 +442,17 @@ function setupCompareTable(items) {
     }
 
     const anomalyBadges = [
-      it.notFoundOnPlatform ? `<span class="meta-chip mismatch">introuvable sur la plateforme</span>` : "",
-      ...it.componentMismatches.map((m) => `<span class="meta-chip mismatch">manque côté plateforme : ${escapeHtml(m.hanzi)}</span>`),
+      it.notFoundOnPlatform ? `<span class="meta-chip mismatch">introuvable</span>` : "",
+      it.emptyComponentsOnPlatform ? `<span class="meta-chip mismatch">aucun composant</span>` : "",
+      ...it.componentMismatches.map((m) => `<span class="meta-chip mismatch">manque : ${escapeHtml(m.hanzi)}</span>`),
       ...it.pronunciationMismatches.map((m) =>
-        `<span class="meta-chip mismatch">ton ${escapeHtml(m.hanzi)} &mdash; plateforme : ${escapeHtml(m.platformPinyin)} / vercel : ${escapeHtml(m.vercelPinyins.join("·"))}</span>`),
-      ...it.extraComponents.map((m) => `<span class="meta-chip mismatch">en trop côté plateforme : ${escapeHtml(m.hanzi)}</span>`),
+        `<span class="meta-chip mismatch">ton ${escapeHtml(m.hanzi)} : ${escapeHtml(m.platformPinyin)} / ${escapeHtml(m.vercelPinyins.join("·"))}</span>`),
+      ...it.extraComponents.map((m) => `<span class="meta-chip mismatch">en trop : ${escapeHtml(m.hanzi)}</span>`),
+      it.hakkaDiffers ? `<span class="meta-chip mismatch">orthographe hakka différente</span>` : "",
     ].join("");
     const statusBadge = !it.hasPlatformMatch && !it.notFoundOnPlatform
       ? `<span class="no-match">n/a</span>`
       : (anomalyBadges || `<span class="ok-badge">&#10003; OK</span>`);
-
-    const hakkaVercel = `${it.pinyinLine} ${it.hanziLine}`.trim();
 
     return `<div class="compare-card${it.hasMismatch ? " has-mismatch" : ""}">
       <div class="compare-card-head">
@@ -406,9 +466,9 @@ function setupCompareTable(items) {
       <div class="diff-field">
         <div class="field-name">Hakka</div>
         <div class="field-value">
-          <div class="val-box col-vercel hanzi mono${it.hasPlatformMatch && hakkaVercel.trim() !== it.platformTarget.trim() ? " diff" : ""}">${escapeHtml(hakkaVercel) || '<span class="no-match">&mdash;</span>'}</div>
+          <div class="val-box col-vercel hanzi mono${it.hakkaDiffers ? " diff" : ""}">${escapeHtml(it.hakkaVercel) || '<span class="no-match">&mdash;</span>'}</div>
           ${it.hasPlatformMatch
-            ? `<div class="val-box col-platform hanzi mono${hakkaVercel.trim() !== it.platformTarget.trim() ? " diff" : ""}">${escapeHtml(it.platformTarget) || '<span class="no-match">&mdash;</span>'}</div>`
+            ? `<div class="val-box col-platform hanzi mono${it.hakkaDiffers ? " diff" : ""}">${escapeHtml(it.platformTarget) || '<span class="no-match">&mdash;</span>'}</div>`
             : `<div class="val-box empty col-platform">n/a</div>`}
         </div>
       </div>
@@ -426,6 +486,54 @@ function setupCompareTable(items) {
     </div>`;
   }
 
+  // Ordered by category, per the brief -- ties broken alphabetically by
+  // français so each group stays stable and scannable.
+  const byCategoryThenFrench = (a, b) => a.category.localeCompare(b.category) || a.french.localeCompare(b.french);
+
+  // Three named groups, so a given kind of platform-side problem can be
+  // worked through end-to-end instead of hunting for it in one long mixed
+  // list. Not mutually exclusive -- an expression can need fixing in more
+  // than one way and will show up once per group that applies to it.
+  // "other" is a catch-all for anomalies that fit none of the three (a
+  // stray extra word on the platform, or a tone-only mismatch that doesn't
+  // show up in the whole-string hakka comparison), so nothing silently
+  // disappears from view; "ok" only appears once "Écarts uniquement" is
+  // switched off, as the complete-audit counterpart to the other groups.
+  const GROUPS = [
+    { key: "no-components", title: "Sans composant sur la plateforme", match: (it) => it.noComponentsOnPlatform },
+    { key: "missing-components", title: "Composants manquants sur la plateforme", match: (it) => it.missingComponentsOnPlatform },
+    { key: "hakka-diff", title: "Orthographe hakka différente", match: (it) => it.hakkaDiffers },
+    {
+      key: "other", title: "Autres écarts",
+      match: (it) => it.hasMismatch && !it.noComponentsOnPlatform && !it.missingComponentsOnPlatform && !it.hakkaDiffers,
+    },
+  ];
+
+  // "Tous" plus one chip per group -- picking one narrows the view down to
+  // just that group instead of scrolling through all of them.
+  const groupChipsEl = document.getElementById("expr-compare-group-chips");
+  if (groupChipsEl) {
+    groupChipsEl.innerHTML = `<button type="button" class="chip active" data-role="group-chip" data-value="">Tous</button>` +
+      GROUPS.map((g) => `<button type="button" class="chip" data-role="group-chip" data-value="${escapeAttr(g.key)}">${escapeHtml(g.title)}</button>`).join("") +
+      `<button type="button" class="chip" data-role="group-chip" data-value="ok">Aucun écart</button>`;
+    groupChipsEl.querySelectorAll("[data-role='group-chip']").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        groupChipsEl.querySelectorAll("[data-role='group-chip']").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        state.group = chip.dataset.value;
+        // Picking the "Aucun écart" group only makes sense with the
+        // anomalies-only toggle off -- flip it automatically instead of
+        // showing an empty result the user has to puzzle over.
+        if (state.group === "ok" && state.anomalyOnly) {
+          state.anomalyOnly = false;
+          anomalyToggle.classList.remove("active");
+          anomalyToggle.dataset.active = "false";
+        }
+        apply();
+      });
+    });
+  }
+
   function apply() {
     let res = items.filter((it) => {
       if (state.category && !it.categories.includes(state.category)) return false;
@@ -433,10 +541,23 @@ function setupCompareTable(items) {
       if (state.q && it.search.indexOf(state.q) === -1) return false;
       return true;
     });
-    // Ordered by category, per the brief -- ties broken alphabetically by
-    // français so the grouping stays stable and scannable.
-    res = res.slice().sort((a, b) => a.category.localeCompare(b.category) || a.french.localeCompare(b.french));
-    list.innerHTML = res.map(cardHtml).join("");
+
+    let groups = GROUPS.map((g) => ({ ...g, items: res.filter(g.match).sort(byCategoryThenFrench) }));
+    if (!state.anomalyOnly) {
+      groups.push({ key: "ok", title: "Aucun écart", items: res.filter((it) => !it.hasMismatch).sort(byCategoryThenFrench) });
+    }
+    if (state.group) {
+      groups = groups.filter((g) => g.key === state.group);
+    }
+    const nonEmpty = groups.filter((g) => g.items.length > 0);
+
+    list.innerHTML = nonEmpty.map((g) => `
+      <div class="compare-group">
+        <h3 class="compare-group-title">${escapeHtml(g.title)} <span class="count-badge">${g.items.length}</span></h3>
+        ${g.items.map(cardHtml).join("")}
+      </div>
+    `).join("");
+
     if (emptyEl) emptyEl.hidden = res.length !== 0;
     if (countEl) countEl.textContent = `${res.length} / ${items.length}`;
   }
@@ -446,6 +567,12 @@ function setupCompareTable(items) {
     state.anomalyOnly = !state.anomalyOnly;
     e.target.classList.toggle("active", state.anomalyOnly);
     e.target.dataset.active = String(state.anomalyOnly);
+    // The "Aucun écart" group only exists when this toggle is off -- back
+    // out to "Tous" instead of leaving that chip active over an empty result.
+    if (state.anomalyOnly && state.group === "ok" && groupChipsEl) {
+      state.group = "";
+      groupChipsEl.querySelectorAll("[data-role='group-chip']").forEach((c) => c.classList.toggle("active", c.dataset.value === ""));
+    }
     apply();
   });
   searchInput.addEventListener("input", debounce((e) => { state.q = e.target.value.trim().toLowerCase(); apply(); }, 120));

@@ -5,6 +5,7 @@ from typing import Any
 from django.db.models import Prefetch
 
 from hakkadbapp.models import Pronunciation, Word, WordPronunciation
+from hakkadbapp.management.commands.import_utils_v2 import split_compact_pinyin_into_syllables
 
 
 # Optional: improves French collation if available on the system
@@ -153,8 +154,17 @@ def _lookup_first_pron(hanzi: str, all_prons: Any) -> str:
 def resolve_pinyin(token: str, all_prons: Any) -> str:
     """
     Resolve one pinyin string for a token, including:
-    - inline override: 陳(chin2)
+    - inline override on real hanzi: 浪(lang4) -- forces this reading instead
+      of whatever _lookup_first_pron guesses from the (possibly ambiguous,
+      possibly absent) global Pronunciation table; used for hanzi that are
+      real but missing their own dictionary Word entry, so there's no
+      authoritative word.pinyin() to fall back on.
     - placeholder: -(hak6)
+    - multi-syllable placeholder/override: --(but5xin1) / 浪米(lang4mi3) -- a
+      run of several dashes, or several consecutive real hanzi, sharing one
+      inline override is split back into one syllable per character (in
+      order) via split_compact_pinyin_into_syllables, same as the MOTS sheet
+      import already does for compact pinyin cells.
     - raw latin/punctuation passthrough
     """
     if token is None:
@@ -165,7 +175,11 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
         return ""
 
     out = []
-    last_hanzi_out_index = None
+    # Indices in `out` of the current unbroken run of "-" placeholders or
+    # real hanzi -- reset on any other character (including a switch between
+    # the two), so only a run immediately followed by "(...)" gets the
+    # override (matching resolve_hanzi's `base` grouping).
+    pending_indices = []
 
     i = 0
     n = len(token)
@@ -177,8 +191,13 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
             match = _PAREN_PINYIN_RE.match(token, i)
             if match:
                 inline_py = match.group(1).strip()
-                if last_hanzi_out_index is not None:
-                    out[last_hanzi_out_index] = _tone_to_exponent(inline_py) if inline_py else "*"
+                if pending_indices:
+                    syllables = split_compact_pinyin_into_syllables(inline_py) if inline_py else []
+                    if not syllables and inline_py:
+                        syllables = [inline_py]
+                    for pos, idx in enumerate(pending_indices):
+                        out[idx] = _tone_to_exponent(syllables[pos]) if pos < len(syllables) else "*"
+                    pending_indices = []
                 i = match.end()
                 continue
 
@@ -188,23 +207,25 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
 
         if ch.isspace():
             out.append(ch)
+            pending_indices = []
             i += 1
             continue
 
         if ch == "-":
             out.append("*")
-            last_hanzi_out_index = len(out) - 1
+            pending_indices.append(len(out) - 1)
             i += 1
             continue
 
         if _is_cjk(ch):
             py = _lookup_first_pron(ch, all_prons)
             out.append(_tone_to_exponent(py))
-            last_hanzi_out_index = len(out) - 1
+            pending_indices.append(len(out) - 1)
             i += 1
             continue
 
         out.append(ch)
+        pending_indices = []
         i += 1
 
     return "".join(out)
@@ -213,10 +234,12 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
 def resolve_hanzi(token: str) -> str:
     """
     Examples:
-      想:souhaiter -> 想
-      陈(chin2)    -> 陈
-      -(hak6)      -> (hak⁶)
-      -            -> *
+      想:souhaiter    -> 想
+      陈(chin2)       -> 陈
+      浪(lang4)       -> 浪  (pinyin override resolved separately, see resolve_pinyin)
+      -(hak6)         -> (hak⁶)
+      --(but5xin1)    -> (but⁵ xin¹)
+      -               -> *
     """
     if token is None:
         return ""
@@ -231,8 +254,11 @@ def resolve_hanzi(token: str) -> str:
     inline = match.group(1).strip() if match else ""
     base = _PAREN_PINYIN_RE.sub("", text).strip()
 
-    if base == "-":
-        return f"({_tone_to_exponent(inline)})" if inline else "*"
+    if base and set(base) == {"-"}:
+        if not inline:
+            return "*"
+        syllables = split_compact_pinyin_into_syllables(inline) or [inline]
+        return "(" + " ".join(_tone_to_exponent(s) for s in syllables) + ")"
 
     return base
 

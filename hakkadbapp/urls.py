@@ -49,4 +49,5 @@ urlpatterns = [
     path('pronunciation/', views.pronunciation, name='pronunciation'),
     path('expressions/', views.expressions, name='expressions'),
     path("api/convert-text/", views.api_convert_text, name="api_convert_text"),
+    path("api/words-data/", views.api_words_data, name="api_words_data"),
 ]

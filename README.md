@@ -24,3 +24,14 @@ git clone https://github.com/your-username/hakkadb.git
 cd hakkadb
 ```
 
+---
+
+## 🧪 JS tests
+
+```bash
+npm test
+```
+
+No install needed (zero dependencies, uses Node's built-in test runner).
+See [tests/README.md](tests/README.md) for what's covered and how it works.
+

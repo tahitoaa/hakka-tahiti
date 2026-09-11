@@ -22,10 +22,10 @@
     color-scheme: light;
     background: var(--page-plane);
     color: var(--text-primary);
-    font-size: 14px;
-    line-height: 1.45;
+    font-size: 15px;
+    line-height: 1.4;
     border-radius: 12px;
-    padding: 20px;
+    padding: 16px;
   }
   @media (prefers-color-scheme: dark) {
     html:not([data-theme="light"]) #expr-app {
@@ -64,92 +64,99 @@
 
   #expr-app * { box-sizing: border-box; }
   #expr-app a { color: inherit; }
-  #expr-app header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-  #expr-app header.top h1 { font-size: 20px; margin: 0 0 4px; }
-  #expr-app header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  #expr-app header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+  #expr-app header.top h1 { font-size: 21px; margin: 0 0 3px; }
+  #expr-app header.top p { margin: 0; color: var(--text-secondary); font-size: 13.5px; }
   #expr-app .theme-toggle {
     border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
-    border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+    border-radius: 8px; padding: 6px 11px; font-size: 12.5px; cursor: pointer; flex-shrink: 0;
   }
   #expr-app .theme-toggle:hover { border-color: var(--text-muted); }
 
-  #expr-app .overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  #expr-app .overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
   @media (max-width: 640px) { #expr-app .overview { grid-template-columns: repeat(2, 1fr); } }
-  #expr-app .stat-tile { border-radius: 10px; padding: 10px 12px; background: var(--surface-1); border: 1px solid var(--border); }
-  #expr-app .stat-tile .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  #expr-app .stat-tile .label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  #expr-app .stat-tile { border-radius: 10px; padding: 8px 10px; background: var(--surface-1); border: 1px solid var(--border); }
+  #expr-app .stat-tile .value { font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #expr-app .stat-tile .label { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
 
-  #expr-app .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; position: sticky; top: 0; background: var(--page-plane); padding: 8px 0; z-index: 5; }
-  #expr-app .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  #expr-app .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; position: sticky; top: 0; background: var(--page-plane); padding: 6px 0; z-index: 5; }
+  #expr-app .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
   #expr-app .chip {
     border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary);
-    border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+    border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer;
   }
   #expr-app .chip.active { background: var(--chip-bg-active); color: var(--chip-fg-active); border-color: transparent; }
   #expr-app select.sort-select {
     border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
-    border-radius: 8px; padding: 6px 10px; font-size: 12px;
+    border-radius: 8px; padding: 5px 8px; font-size: 13px;
   }
   #expr-app .search {
     margin-left: auto; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
-    border-radius: 8px; padding: 6px 10px; font-size: 13px; min-width: 240px;
+    border-radius: 8px; padding: 5px 8px; font-size: 13.5px; min-width: 200px;
   }
   #expr-app .search:focus { outline: 2px solid var(--status-good); outline-offset: -1px; }
 
-  #expr-app ol.expr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  #expr-app ol.expr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   /* Sentence.render() below (shared with converter/transcripter) draws its
      token badges and preview box with hardcoded light backgrounds
      (bg-green-200, bg-slate-50, ...) and isn't theme-aware; several of its
      inner text nodes set no color of their own and just inherit, so in dark
      mode they'd inherit white-on-still-light-badge and vanish. Anchor the
      card's default text color instead of touching that shared file. */
-  #expr-app .expr-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface-1); color: #1e293b; }
-  #expr-app .expr-card .expr-index { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  #expr-app .expr-card .expr-meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  #expr-app .expr-card { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface-1); color: #1e293b; }
+  #expr-app .expr-card .expr-index { font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px; }
+  #expr-app .expr-card .expr-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
   /* Shared by card meta chips and the comparison table's écarts column. */
   #expr-app .meta-chip {
-    display: inline-block; font-size: 11px; background: var(--chip-bg); color: var(--text-secondary);
-    border-radius: 999px; padding: 2px 9px;
+    display: inline-block; font-size: 11.5px; background: var(--chip-bg); color: var(--text-secondary);
+    border-radius: 999px; padding: 2px 8px;
   }
   #expr-app .meta-chip.mismatch { background: rgba(208,59,59,0.14); color: #d03b3b; font-weight: 600; }
   #expr-app .expr-card.has-mismatch { border-color: rgba(208,59,59,0.4); }
-  #expr-app .empty-state { color: var(--text-muted); font-size: 13px; padding: 30px 10px; text-align: center; }
-  #expr-app .mono { font-family: var(--mono); font-size: 12px; }
+  #expr-app .empty-state { color: var(--text-muted); font-size: 13.5px; padding: 24px 10px; text-align: center; }
+  #expr-app .mono { font-family: var(--mono); font-size: 12.5px; }
 
   /* Comparative view -- one card per expression, laid out like the
      E-reo/Vercel diff panel in commands/analytics.html: a left-hand field
      label, then the two sources side by side in parallel columns, with a
      red outline on whichever pair of values actually differs. */
-  #expr-app .compare-section { margin-bottom: 24px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); padding: 14px 16px; }
-  #expr-app .compare-head h2 { font-size: 15px; margin: 0 0 4px; }
-  #expr-app .compare-head p.hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 10px; max-width: 72ch; }
-  #expr-app .compare-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
-  #expr-app .compare-controls .count-badge { margin-left: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-  #expr-app select.sort-select { border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
-  #expr-app .legend-swatch { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 600; font-size: 11.5px; }
+  #expr-app .compare-section { margin-bottom: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); padding: 12px 14px; }
+  #expr-app .compare-head h2 { font-size: 16px; margin: 0 0 3px; }
+  #expr-app .compare-head p.hint { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 8px; max-width: 72ch; }
+  #expr-app .compare-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+  #expr-app .compare-controls .count-badge { margin-left: auto; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  #expr-app select.sort-select { border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary); border-radius: 8px; padding: 5px 8px; font-size: 13px; }
+  #expr-app .legend-swatch { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 600; font-size: 12px; }
   #expr-app .legend-swatch.col-vercel { background: rgba(59,130,246,0.16); }
   #expr-app .legend-swatch.col-platform { background: rgba(217,119,6,0.16); }
 
-  #expr-app .compare-list { display: flex; flex-direction: column; gap: 10px; }
-  #expr-app .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--page-plane); }
+  #expr-app .compare-list { display: flex; flex-direction: column; gap: 14px; }
+  #expr-app .compare-group { display: flex; flex-direction: column; gap: 8px; }
+  #expr-app .compare-group-title {
+    font-size: 13.5px; font-weight: 700; margin: 0; padding-bottom: 4px;
+    border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px;
+    position: sticky; top: 0; background: var(--surface-1); z-index: 1;
+  }
+  #expr-app .compare-group-title .count-badge { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
+  #expr-app .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--page-plane); }
   #expr-app .compare-card.has-mismatch { border-color: rgba(208,59,59,0.4); }
-  #expr-app .compare-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-  #expr-app .compare-card-head .idx { font-size: 11px; color: var(--text-muted); }
-  #expr-app .compare-card-head .cat { background: var(--chip-bg); color: var(--text-secondary); border-radius: 999px; padding: 1px 9px; font-size: 11px; }
+  #expr-app .compare-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #expr-app .compare-card-head .idx { font-size: 11.5px; color: var(--text-muted); }
+  #expr-app .compare-card-head .cat { background: var(--chip-bg); color: var(--text-secondary); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; }
 
-  #expr-app .diff-header { display: flex; gap: 10px; margin-bottom: 4px; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.02em; }
-  #expr-app .diff-header span:first-child { width: 100px; flex-shrink: 0; }
-  #expr-app .diff-header .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; }
+  #expr-app .diff-header { display: flex; gap: 8px; margin-bottom: 3px; color: var(--text-muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.02em; }
+  #expr-app .diff-header span:first-child { width: 90px; flex-shrink: 0; }
+  #expr-app .diff-header .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
   #expr-app .diff-header .cols span:first-child { color: #3b82f6; }
   #expr-app .diff-header .cols span:last-child { color: #d97706; }
 
-  #expr-app .diff-field { display: grid; grid-template-columns: 100px 1fr; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--gridline); align-items: start; }
+  #expr-app .diff-field { display: grid; grid-template-columns: 90px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--gridline); align-items: start; }
   #expr-app .diff-field:last-child { border-bottom: none; }
-  #expr-app .diff-field .field-name { font-size: 11px; color: var(--text-muted); padding-top: 5px; }
-  #expr-app .diff-field .field-value { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #expr-app .diff-field .field-name { font-size: 11.5px; color: var(--text-muted); padding-top: 4px; }
+  #expr-app .diff-field .field-value { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   #expr-app .diff-field.single .field-value { grid-template-columns: 1fr; }
 
-  #expr-app .val-box { font-size: 12.5px; padding: 5px 8px; border-radius: 6px; background: var(--chip-bg); word-break: break-word; }
+  #expr-app .val-box { font-size: 13.5px; padding: 4px 7px; border-radius: 6px; background: var(--chip-bg); word-break: break-word; }
   /* Same blue/amber tint as the field labels -- immediately visible which
      side is computed live (Vercel/base) vs. the platform's raw stored
      value, on every field, not just the decomposition. */
@@ -160,27 +167,27 @@
      a pair don't match, layered on top of the source tint above. */
   #expr-app .val-box.diff { outline: 1.5px solid rgba(208,59,59,0.6); outline-offset: -1px; color: #d03b3b; font-weight: 600; }
 
-  #expr-app .decomp-token { display: inline-flex; flex-direction: column; align-items: center; margin: 0 6px 4px 0; font-size: 12.5px; }
-  #expr-app .decomp-token .py { font-size: 9.5px; color: var(--text-muted); line-height: 1.2; }
+  #expr-app .decomp-token { display: inline-flex; flex-direction: column; align-items: center; margin: 0 5px 3px 0; font-size: 13.5px; }
+  #expr-app .decomp-token .py { font-size: 10px; color: var(--text-muted); line-height: 1.2; }
   #expr-app .decomp-token.mismatch { color: #d03b3b; font-weight: 600; }
   #expr-app .decomp-token.mismatch .py { color: #d03b3b; }
   /* Several valid readings for the same hanzi -- shown side by side instead
      of picking one, so a platform pinyin matching a non-first candidate
      doesn't look like an unexplained mismatch. */
   #expr-app .decomp-token.ambiguous .py { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
-  #expr-app .no-match { color: var(--text-muted); font-style: italic; font-size: 12px; }
+  #expr-app .no-match { color: var(--text-muted); font-style: italic; font-size: 12.5px; }
   #expr-app .no-match.mismatch { color: #d03b3b; font-style: normal; font-weight: 600; }
-  #expr-app .ok-badge { color: var(--status-good); font-weight: 600; font-size: 12px; }
+  #expr-app .ok-badge { color: var(--status-good); font-weight: 600; font-size: 12.5px; }
 </style>
 
   <header class="top">
     <div>
       <h1>Phrases et expressions</h1>
-      <p>{{ expressions_count }} entrées dans la base actuelle.
+      <p>{{ expressions_count }} expressions.
         {% if platform_snapshot_timestamp %}
-          Comparé à l'instantané plateforme du {{ platform_snapshot_timestamp|date:"j F Y à H:i" }}.
+          Instantané plateforme : {{ platform_snapshot_timestamp|date:"j F Y à H:i" }}.
         {% else %}
-          Aucun instantané plateforme enregistré (lancez <span class="mono">platform_to_vercel --yes</span>) : les écarts ne peuvent pas être calculés.
+          Aucun instantané plateforme (lancez <span class="mono">platform_to_vercel --yes</span>).
         {% endif %}
       </p>
     </div>
@@ -191,23 +198,18 @@
 
   <section class="compare-section" id="expr-compare-section">
     <div class="compare-head">
-      <h2>Comparaison décomposition Vercel / plateforme</h2>
+      <h2>Comparaison Vercel / plateforme</h2>
       <p class="hint">
-        Chaque expression est comparée champ par champ, en deux colonnes parallèles :
-        <span class="legend-swatch col-vercel">Vercel / base</span> (<strong>calculé</strong> aujourd'hui à partir du
-        dictionnaire actuel : français, anglais/tahitien, hakka et découpage en mots tels que Vercel les résout, plus
-        le texte brut hanzi+désambiguïsation utilisé à l'import) contre <span class="legend-swatch col-platform">Plateforme</span>
-        (la valeur <strong>brute</strong>, telle quelle, enregistrée dans l'instantané du dernier
-        <span class="mono">platform_to_vercel --yes</span> &mdash; rien n'y est recalculé). Toute paire de valeurs qui
-        diffère est encadrée en rouge. Pour le hakka, quand un caractère a plusieurs prononciations valides dans le
-        dictionnaire, elles sont toutes affichées (séparées par <span class="mono">/</span>, soulignées en pointillés) :
-        ce n'est un écart de ton que si le pinyin de la plateforme ne correspond à <strong>aucune</strong> d'entre elles.
+        <span class="legend-swatch col-vercel">Vercel / base</span> = calculé aujourd'hui &middot;
+        <span class="legend-swatch col-platform">Plateforme</span> = valeur brute du dernier
+        <span class="mono">platform_to_vercel --yes</span>. Écarts en rouge.
       </p>
     </div>
     <div class="compare-controls">
       <select class="sort-select" id="expr-compare-category"></select>
+      <div class="chip-group" id="expr-compare-group-chips"></div>
       <button type="button" class="chip active" id="expr-compare-anomaly-filter" data-active="true">&#9888; Écarts uniquement</button>
-      <input class="search" type="search" id="expr-compare-search" placeholder="Rechercher (texte, français, hakka)&hellip;">
+      <input class="search" type="search" id="expr-compare-search" placeholder="Rechercher&hellip;">
       <span class="count-badge" id="expr-compare-count"></span>
     </div>
     <div style="overflow-y:auto; max-height:44rem">
@@ -218,7 +220,7 @@
 
   <div class="controls" id="expr-controls">
     <button type="button" class="chip" id="expr-mismatch-filter" data-active="false">&#9888; Écarts uniquement</button>
-    <input class="search" type="search" id="expr-search" placeholder="Rechercher (texte, français, hakka)&hellip;">
+    <input class="search" type="search" id="expr-search" placeholder="Rechercher&hellip;">
   </div>
 
   <ol id="output" class="expr-list"></ol>

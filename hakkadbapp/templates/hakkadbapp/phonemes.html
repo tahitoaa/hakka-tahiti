@@ -5,7 +5,7 @@
     Cliquez sur un phonème pour voir les caractères associés.
   </p>
   <label class="inline-flex items-center gap-2 mb-2 text-sm print:hidden">
-    <input type="checkbox" id="toggle-hanzi">
+    <input type="checkbox" id="toggle-phoneme-hanzi">
     Afficher les caractères correspondants
   </label>
   <style>
@@ -81,7 +81,7 @@
 </div>
 <script>
   (function () {
-    var toggle = document.getElementById('toggle-hanzi');
+    var toggle = document.getElementById('toggle-phoneme-hanzi');
     var wrap = document.getElementById('phonemes-table-wrap');
     if (toggle && wrap) {
       toggle.addEventListener('change', function () {

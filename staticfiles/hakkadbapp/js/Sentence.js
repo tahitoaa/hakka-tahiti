@@ -1,3 +1,19 @@
+// Sitewide simp/trad toggle (the "Trad. / Simp." button in base.html's
+// header, present on every page): reads its aria-pressed value directly
+// rather than caching it, since it can change between renders. Falls back
+// to simp whenever no trad variant was recorded for a match (buildUnknownEntry
+// entries, punctuation, etc. only ever set `simp`).
+function isShowingTrad() {
+    if (typeof document === 'undefined') return false;
+    const toggle = document.getElementById('toggle-hanzi');
+    return toggle?.getAttribute('aria-pressed') === 'true';
+}
+
+function pickHanzi(data) {
+    if (!data) return '';
+    return (isShowingTrad() && data.trad) ? data.trad : (data.simp || '');
+}
+
 class Sentence {
     constructor(dico, text = '', french = '', rendering = '') {
         this.dico = dico;
@@ -140,7 +156,7 @@ renderFurigana() {
                 const data = best?.dataset || best || {};
                 const tokenObj = this.parseToken(this.words?.[i] || '');
 
-                const hanzi = data.simp || tokenObj.hanzi || tokenObj.raw || '?';
+                const hanzi = pickHanzi(data) || tokenObj.hanzi || tokenObj.raw || '?';
 
                 let pinyin = data.pinyin || '';
                 if (!pinyin) {
@@ -155,7 +171,7 @@ renderFurigana() {
                             ${this.renderPinyin(pinyin)}
                         </span>
 
-                        <span class="hanzi text-base leading-tight font-semibold text-[var(--sentence-text-strong)]">
+                        <span class="hanzi text-base leading-tight font-semibold">
                             ${hanzi}
                         </span>
 
@@ -184,12 +200,16 @@ renderFurigana() {
         }).join(' ');
     }
 
-    renderHanziLine() {
+    // forceSimp bypasses the sitewide Trad./Simp. toggle -- for callers that
+    // compare this text against a platform/DB value that's always
+    // simplified (e.g. the expressions comparison view), where honoring the
+    // toggle would make an otherwise-correct match look like a mismatch.
+    renderHanziLine(forceSimp = false) {
         return this.matches.map((group, i) => {
             const best = group?.[0];
             const data = best?.dataset || best;
 
-            if (data?.simp) return data.simp;
+            if (data?.simp) return forceSimp ? data.simp : pickHanzi(data);
 
             const t = this.parseToken(this.words[i]);
             return t.hanzi || t.raw || '?';
@@ -237,8 +257,8 @@ renderFurigana() {
                 ${this.renderPinyin(data.pinyin)}
             </div>
 
-            <div class="text-base font-semibold leading-tight truncate w-full text-center">
-                ${data.simp}
+            <div class="hanzi text-base font-semibold leading-tight truncate w-full text-center">
+                ${pickHanzi(data)}
             </div>
 
             <div class="text-[9px] leading-none truncate w-full text-center" title="${escapeAttr(isUnknown ? data.raw : data.french)}">
@@ -255,7 +275,7 @@ renderFurigana() {
                         const d = w.dataset || w;
                         return `
                             <div class="text-center text-[11px] leading-tight py-0.5">
-                                ${this.renderPinyin(d.pinyin)} ${d.simp}
+                                ${this.renderPinyin(d.pinyin)} <span class="hanzi">${pickHanzi(d)}</span>
                             </div>
                         `;
                     }).join('')}

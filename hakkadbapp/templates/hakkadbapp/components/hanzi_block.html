@@ -1,57 +1,273 @@
+<div class="rosace-poster max-w-5xl mx-auto px-4 py-8">
 
-<div class="max-w-4xl mx-auto px-4 py-6">
-    
-    <!-- Main Character -->
-    <header class="mb-8">
-        <h1 class="hanzi text-5xl font-extrabold text-center text-gray-800">
-            <span class="hanzi-block">
-                <span class="simp">{{simp }}</span>
-                <span class="trad hidden">{{ trad }}</span>
-            </span>
-        </h1>
-    </header>
-
-    <!-- Pronunciations Section -->
-    <section class="mb-10">
+    <!-- The character itself, as a medallion -->
+    <div class="rosace-header">
+        <div class="rosace-medallion hanzi-block">
+            <span class="hanzi simp">{{ simp }}</span>
+            <span class="hanzi trad hidden">{{ trad }}</span>
+        </div>
         {% if pronunciations %}
-        <div>{{pronunciations|length}} prononciations trouvées </div>
-        <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="rosace-pinyin">
             {% for p in pronunciations %}
-            <li class="bg-white shadow-sm rounded-lg border p-4">
-                <p class="text-xl font-medium text-gray-800">{{ p.pinyin }}</p>
-            </li>
+            <span class="rosace-pinyin-pill">{{ p.pinyin }}</span>
             {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-gray-500">Aucune prononciation trouvée.</p>
+        </div>
         {% endif %}
-    </section>
+    </div>
 
-    <!-- Related Words Section -->
-    <section>
-        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Mots associés.
-        </h2>
-
+    <!-- Words built around this character, one block each -->
+    <section class="rosace-section">
+        <h2 class="rosace-section-title">Mots</h2>
         {% if related_words %}
-        <ul class="space-y-4">
+        <div class="rosace-grid">
             {% for word in related_words %}
-            <li class="bg-gray-50 rounded-lg p-4 shadow-sm border">
-                <p class="font-semibold text-gray-800">
-                    <span class="hanzi hanzi-block text-xl">
-                        <span class="simp">{{ word.simp }}</span>
-                        <span class="trad hidden">{{ word.trad }}</span>
-                    </span>
-                    — {{ word.pinyin }}</p>
-                <div class="text-sm text-gray-600 mt-2">
-                    <p><strong>fr.</strong> {{ word.french }}</p>
-                    <p><strong>cat.</strong> {{ word.category }}</p>
+            <div class="rosace-block">
+                {% if word.illustration %}
+                <img src="{{ word.illustration.url }}" alt="" class="rosace-block-emoji"
+                     loading="lazy" onerror="this.remove()">
+                {% endif %}
+                <div class="hanzi-block rosace-block-hanzi">
+                    <span class="hanzi simp">{{ word.simp }}</span>
+                    <span class="hanzi trad hidden">{{ word.trad }}</span>
                 </div>
-            </li>
+                <div class="rosace-block-pinyin">
+                    {% for wp in word.wordpronunciation_set.all %}
+                    {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
+                    {% endfor %}
+                </div>
+                <div class="rosace-block-french">{{ word.french }}</div>
+                {% if word.category %}<div class="rosace-block-category">{{ word.category }}</div>{% endif %}
+            </div>
             {% endfor %}
-        </ul>
+        </div>
         {% else %}
-        <p class="text-gray-500">Aucun mot trouvé pour ce caractère.</p>
+        <p class="rosace-empty">Aucun mot trouvé pour ce caractère.</p>
         {% endif %}
     </section>
 
+    <!-- Expressions built from a word that uses this character -->
+    {% if related_expressions %}
+    <section class="rosace-section">
+        <h2 class="rosace-section-title">Expressions</h2>
+        <div class="rosace-expr-list">
+            {% for expr in related_expressions %}
+            <div class="rosace-expr-card">
+                <div class="rosace-expr-main">
+                    <div class="hanzi-block rosace-expr-hanzi">
+                        <span class="hanzi simp">{{ expr.simp }}</span>
+                        <span class="hanzi trad hidden">{{ expr.trad }}</span>
+                    </div>
+                    <div class="rosace-expr-pinyin">
+                        {% for w in expr.words_ordered %}
+                            {% for wp in w.wordpronunciation_set.all %}
+                            {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="rosace-expr-side">
+                    <div class="rosace-expr-french">{{ expr.french }}</div>
+                    {% if expr.category %}<div class="rosace-block-category">{{ expr.category }}</div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 </div>
+
+<style>
+    .rosace-poster {
+        --rosace-red: var(--color-brand, #8B1A1A);
+        --rosace-gold: var(--color-brand-gold, #F2A93D);
+        --rosace-block-bg: #ffffff;
+        --rosace-block-border: #e5d9c8;
+        --rosace-block-text: #1e293b;
+        --rosace-block-text-muted: #6b7280;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .rosace-poster {
+            --rosace-block-bg: #201c14;
+            --rosace-block-border: rgba(242,169,61,0.25);
+            --rosace-block-text: #f5e3c6;
+            --rosace-block-text-muted: #9ca3af;
+        }
+    }
+    :root[data-theme="dark"] .rosace-poster {
+        --rosace-block-bg: #201c14;
+        --rosace-block-border: rgba(242,169,61,0.25);
+        --rosace-block-text: #f5e3c6;
+        --rosace-block-text-muted: #9ca3af;
+    }
+
+    /* ---- header medallion ---------------------------------------------- */
+    .rosace-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 2.5rem;
+    }
+
+    .rosace-medallion {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: clamp(7rem, 20vw, 10rem);
+        aspect-ratio: 1 / 1;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 35% 30%, var(--rosace-red), var(--rosace-red) 55%, #5a0f0f 100%);
+        border: 3px solid var(--rosace-gold);
+        box-shadow: 0 10px 25px -8px rgba(139, 26, 26, 0.55), inset 0 0 0 3px rgba(255,255,255,0.08);
+    }
+    .rosace-medallion .hanzi {
+        color: #fff8ec;
+        font-size: clamp(2.5rem, 8vw, 4.5rem) !important;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    }
+
+    .rosace-pinyin {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+    .rosace-pinyin-pill {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--rosace-red);
+        background: color-mix(in srgb, var(--rosace-gold) 20%, white 80%);
+        border: 1px solid color-mix(in srgb, var(--rosace-gold) 60%, transparent);
+        border-radius: 9999px;
+        padding: 0.15rem 0.75rem;
+    }
+
+    /* ---- sections & grid of blocks -------------------------------------- */
+    .rosace-section + .rosace-section {
+        margin-top: 2.5rem;
+    }
+    .rosace-section-title {
+        font-family: var(--font-display, inherit);
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--rosace-red);
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .rosace-empty {
+        text-align: center;
+        color: var(--rosace-block-text-muted);
+    }
+
+    .rosace-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+        gap: 1.25rem;
+    }
+
+    .rosace-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.5rem;
+        background: var(--rosace-block-bg);
+        border: 1px solid var(--rosace-block-border);
+        border-radius: 1rem;
+        padding: 1.5rem 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .rosace-block-emoji { width: 3rem; height: 3rem; }
+
+    /* ---- expressions: full-width rows, not grid cells --------------------
+       Phrases run much longer than a single word and read poorly squeezed
+       into a narrow centered grid cell, so each one gets its own full-width
+       row instead, with hanzi/pinyin on the left and the translation on the
+       right (wrapping below it on narrow screens). The red left accent bar
+       is this section's "dedicated format" cue, replacing the plain
+       border-color tint the old .rosace-block--expression variant used. */
+    .rosace-expr-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+    }
+
+    .rosace-expr-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem 1.5rem;
+        width: 100%;
+        background: var(--rosace-block-bg);
+        border: 1px solid var(--rosace-block-border);
+        border-left: 4px solid var(--rosace-red);
+        border-radius: 0.85rem;
+        padding: 1rem 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+
+    .rosace-expr-main {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+        min-width: 0;
+    }
+
+    .rosace-expr-hanzi .hanzi {
+        font-size: clamp(1.75rem, 3vw, 2.25rem) !important;
+        color: var(--rosace-block-text);
+    }
+
+    .rosace-expr-pinyin {
+        font-size: clamp(1rem, 1.6vw, 1.25rem);
+        font-weight: 600;
+        color: var(--rosace-red);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+
+    .rosace-expr-side {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        text-align: right;
+    }
+
+    .rosace-expr-french {
+        font-size: clamp(1rem, 1.6vw, 1.2rem);
+        font-weight: 600;
+        color: var(--rosace-block-text);
+    }
+
+    .rosace-block-hanzi .hanzi {
+        font-size: clamp(2.25rem, 4vw, 3rem) !important;
+        color: var(--rosace-block-text);
+    }
+
+    .rosace-block-pinyin {
+        font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+        font-weight: 600;
+        color: var(--rosace-red);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.35rem;
+    }
+
+    .rosace-block-french {
+        font-size: clamp(1.15rem, 2vw, 1.4rem);
+        font-weight: 600;
+        color: var(--rosace-block-text);
+    }
+
+    .rosace-block-category {
+        font-size: 0.85rem;
+        color: var(--rosace-block-text-muted);
+    }
+</style>

@@ -84,6 +84,12 @@ class Controller{
         this.view.input.dispatchEvent(new Event('change'));
 
         this.bindKeyboard();
+
+        // Sentence.render() bakes simp/trad into a plain string at render
+        // time rather than re-reading the DOM, so flipping the sitewide
+        // Trad./Simp. toggle needs an explicit re-render to actually show
+        // up here instead of only taking effect on the next keystroke.
+        document.addEventListener('hanzi-mode-change', () => this.view.render(this.model.text));
     }
 
     /** Shift+1..9 picks a suggestion by its keyboard hint, mirroring the

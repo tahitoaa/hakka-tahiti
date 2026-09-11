@@ -91,30 +91,74 @@ def syllable_count(pinyin_word):
     return tone_count or max(len(pinyin_word), 1)
 
 
-def segment_hanzi_by_pinyin(pinyin_words, hanzi_concat):
+def segment_hanzi_by_pinyin(pinyin_words, hanzi_concat, known_word_pinyin=None):
     """Reconstruct the space-separated hanzi phrase text_to_words.py expects
     directly from the authoritative hanzi text in `target`, by walking a
     cursor through it in syllable-count-sized steps -- rather than guessing
     from `components` (keyed "<word pinyin> <word hanzi>", but incomplete
     for words missing from the dictionary, and sometimes entirely empty).
-    This always recovers the real hanzi, never a placeholder."""
+    This always recovers the real hanzi, never a placeholder.
+
+    A segment that comes out as nothing but dashes ("-", "--", ...) means
+    the platform knows this word's pinyin but has no real hanzi for it yet
+    -- the DB already has many *different* placeholder Words sharing that
+    exact same dash-only hanzi (e.g. several unrelated words are all "--"),
+    so leaving the segment bare would make text_to_words.py's exact-hanzi
+    lookup match this word to whichever one of those happens to sort first,
+    silently giving it a random unrelated pronunciation. Appending the
+    pinyin inline ("--(pinyin)") uses the "-(pinyin)" placeholder-override
+    syntax text_to_words.py's resolve_hanzi/resolve_pinyin already
+    understand: since no real word's hanzi ever contains "(", this can't
+    collide with an existing dash-only word, and the expression keeps its
+    own actual reading.
+
+    A segment can also be real hanzi that simply has no *standalone* Word of
+    its own in wordCorpus.json (e.g. it only ever shows up inside larger
+    expressions) -- `known_word_pinyin` maps each dictionary word's hanzi to
+    the pinyin reading(s) it's imported with. When a segment's hanzi isn't in
+    there with this exact reading, there's no Word row for
+    convert_phrase_to_word_data to match against, so it would otherwise fall
+    back to a global per-character Pronunciation lookup that may be missing
+    or ambiguous (multiple homonyms). Appending the same "(pinyin)" override
+    used for dashes pins it to the platform's actual reading, e.g.
+    "shit⁶ lang⁴ mi³ 食浪米" (浪 missing from the dictionary) renders as
+    "食 浪(lang4) 米" -- 食 and 米 are real dictionary words so are left bare."""
+    known_word_pinyin = known_word_pinyin or {}
     segments = []
     cursor = 0
     for word in pinyin_words:
         n = syllable_count(word)
-        segments.append(hanzi_concat[cursor:cursor + n])
+        segment = hanzi_concat[cursor:cursor + n]
+        if segment and set(segment) == {"-"}:
+            segment = f"{segment}({to_digit_pinyin(word)})"
+        elif segment and word not in known_word_pinyin.get(segment, ()):
+            segment = f"{segment}({to_digit_pinyin(word)})"
+        segments.append(segment)
         cursor += n
     if segments and cursor < len(hanzi_concat):
         segments[-1] += hanzi_concat[cursor:]
     return segments
 
 
-def expression_row(payload, theme_map):
+def known_word_pinyin_map(words):
+    """Maps each dictionary word's hanzi to the pinyin reading(s) it's
+    imported with, so segment_hanzi_by_pinyin can tell a real dictionary
+    word apart from hanzi that only ever appears inside expressions."""
+    known = {}
+    for payload in words.values():
+        tr = payload.get("translations", {}) or {}
+        w_pinyin, w_hanzi = split_target(tr.get("target"))
+        if w_hanzi:
+            known.setdefault(w_hanzi, set()).add((w_pinyin or "").replace(" ", ""))
+    return known
+
+
+def expression_row(payload, theme_map, known_word_pinyin=None):
     """Mirrors analytics.html's expressionRowFromPayload() -- keep both in sync."""
     tr = payload.get("translations", {}) or {}
     pinyin, hanzi_concat = split_target(tr.get("target"))
     pinyin_words = pinyin.split(" ") if pinyin else []
-    phrase = " ".join(segment_hanzi_by_pinyin(pinyin_words, hanzi_concat))
+    phrase = " ".join(segment_hanzi_by_pinyin(pinyin_words, hanzi_concat, known_word_pinyin))
 
     return {
         "FRANCAIS": tr.get("primary", ""),
@@ -203,7 +247,10 @@ class Command(BaseCommand):
         word_rows = [word_row(payload, theme_map) for payload in words.values()]
         word_rows.sort(key=lambda r: r["SINOGRAMME"])
 
-        expression_rows = [expression_row(payload, theme_map) for payload in expressions.values()]
+        known_word_pinyin = known_word_pinyin_map(words)
+        expression_rows = [
+            expression_row(payload, theme_map, known_word_pinyin) for payload in expressions.values()
+        ]
         expression_rows.sort(key=lambda r: r["SINOGRAMME"])
 
         # Written unconditionally: an audit trail of exactly what will be (or

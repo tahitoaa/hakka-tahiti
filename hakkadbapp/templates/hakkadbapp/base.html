@@ -38,7 +38,14 @@
   .hanzi {
     font-family: "KaiTi", "STKaiti", "Kaiti SC", "SimSun-ExtB", "SimSun", "Songti SC", "Noto Serif SC", serif;
     font-weight: 600;
-    font-size: 1.2em;
+    /* !important: several pages pair this class with a Tailwind text-size
+       utility on the same element (e.g. class="hanzi text-base") -- without
+       this, whichever rule the Tailwind CDN happens to inject later in the
+       cascade silently wins and this site-wide bump has no visible effect
+       there. Hanzi is the one thing on this page that should always read
+       larger than its surrounding text, regardless of what utility class
+       shares the element. */
+    font-size: 1.4em !important;
     line-height: 1.5;
     letter-spacing: 0.02em;
     -webkit-font-smoothing: antialiased;
@@ -359,16 +366,28 @@
     let showingTrad = false;
 
     toggleButton.addEventListener('click', () => {
-      toggleButton.toggleAttribute("aria-pressed");
-
       showingTrad = !showingTrad;
+      // A toggle button's aria-pressed must be present with an explicit
+      // "true"/"false" value (WAI-ARIA button pattern) -- toggling its mere
+      // *presence* (the previous code) left it stuck permanently-present
+      // (just with a stale "false" string) after the very first click,
+      // since the markup already ships with aria-pressed="false" baked in.
+      // Pronunciation.js's char() reads this same attribute to decide
+      // simp vs. trad, so that was silently broken sitewide until now.
+      toggleButton.setAttribute("aria-pressed", String(showingTrad));
 
       document.querySelectorAll('.hanzi-block').forEach(el => {
-        el.querySelector('.simp').classList.toggle('hidden', showingTrad);
-        el.querySelector('.trad').classList.toggle('hidden', !showingTrad);
+        el.querySelector('.simp')?.classList.toggle('hidden', showingTrad);
+        el.querySelector('.trad')?.classList.toggle('hidden', !showingTrad);
       });
 
       toggleButton.textContent = showingTrad ? 'Afficher simplifié' : 'Afficher traditionnel';
+
+      // Lets any page's own JS (Sentence.js-based rendering, which caches
+      // its output as plain strings rather than re-reading the DOM) redo
+      // its rendering immediately instead of only picking up the new mode
+      // on the next unrelated re-render.
+      document.dispatchEvent(new CustomEvent('hanzi-mode-change', { detail: { trad: showingTrad } }));
     });
   });
 </script>
