@@ -194,6 +194,8 @@
     <button class="theme-toggle" id="expr-theme-toggle" type="button">Thème</button>
   </header>
 
+  {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
+
   <div class="overview" id="expr-overview"></div>
 
   <section class="compare-section" id="expr-compare-section">
@@ -247,4 +249,5 @@
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/expressions.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
 {% endblock %}

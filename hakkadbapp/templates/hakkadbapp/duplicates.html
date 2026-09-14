@@ -1,4 +1,5 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
 
 {% block content %}
 
@@ -158,6 +159,8 @@
     </div>
     <button class="theme-toggle" id="dup-theme-toggle" type="button">Thème</button>
   </header>
+
+  {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
 
   <p class="tip">
     <strong>Astuce :</strong> gardez cette page ouverte à côté de la plateforme e-reo. Copiez le français ou le
@@ -506,5 +509,6 @@
   setupTheme();
 })();
 </script>
+<script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
 
 {% endblock %}

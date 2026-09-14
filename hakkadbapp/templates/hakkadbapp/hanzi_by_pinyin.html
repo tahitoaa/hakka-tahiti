@@ -1,6 +1,8 @@
 {% extends "hakkadbapp/base.html" %}
-  
+{% load static %}
+
 {% block content %}
+{% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
 <ul class="divide-y divide-gray-300 space-y-8">
   {% for entry in hanzi_data %}
     <li class="pt-8 first:pt-0">
@@ -8,4 +10,5 @@
     </li>
   {% endfor %}
 </ul>
+<script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
 {% endblock %}

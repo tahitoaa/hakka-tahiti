@@ -338,6 +338,12 @@
 </header>
 
 
+    <!-- Renders nothing visible -- its only job is to make Django set the
+         csrftoken cookie on every page, so any page's own JS can read it
+         for an AJAX POST (e.g. the expression mesh editor/toolbar) without
+         that page needing its own <form> with a CSRF token. -->
+    {% csrf_token %}
+
     <!-- Main Content -->
     <main class="flex-grow container mx-auto px-4 py-6">
         {% block content %}

@@ -50,4 +50,9 @@ urlpatterns = [
     path('expressions/', views.expressions, name='expressions'),
     path("api/convert-text/", views.api_convert_text, name="api_convert_text"),
     path("api/words-data/", views.api_words_data, name="api_words_data"),
+    path("expression-mesh/download", views.expression_mesh_download, name="expression_mesh_download"),
+    path("expression-mesh/upload", views.expression_mesh_upload, name="expression_mesh_upload"),
+    path("expression-mesh/<int:expr_id>", views.expression_mesh_entry, name="expression_mesh_entry"),
+    path("expression-mesh/generate/corpus", views.expression_corpus_generate, name="expression_corpus_generate"),
+    path("expression-mesh/sync", views.expression_mesh_sync, name="expression_mesh_sync"),
 ]

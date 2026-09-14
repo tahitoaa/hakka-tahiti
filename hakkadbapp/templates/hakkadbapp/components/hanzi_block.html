@@ -77,15 +77,17 @@
                             {% endif %}
                         {% endfor %}
                     </div>
-                    <button type="button" class="rosace-copy-btn" title="Copier hakka (pinyin + hanzi)"
-                            onclick="rosaceCopy('{{ expr.rendering|escapejs }}', this)">📋</button>
                 </div>
                 <div class="rosace-expr-side">
                     <div class="rosace-expr-french">{{ expr.french }}</div>
                     <button type="button" class="rosace-copy-btn" title="Copier le français"
                             onclick="rosaceCopy('{{ expr.french|escapejs }}', this)">📋</button>
                     {% if expr.category %}<div class="rosace-block-category">{{ expr.category }}</div>{% endif %}
+                    <button type="button" class="rosace-copy-btn" title="Éditer le maillage (liaison mots)"
+                            data-mesh-toggle="{{ expr.id }}">🧩</button>
                 </div>
+                <div class="rosace-mesh-panel" data-mesh-panel="{{ expr.id }}"
+                     data-entry-url="{% url 'expression_mesh_entry' expr.id %}" hidden></div>
                 {% if expr.text or expr.platform_target %}
                 <div class="rosace-expr-source">
                     {% if expr.text %}
@@ -96,6 +98,8 @@
                     {% if expr.platform_target %}
                     <div class="rosace-source-chip rosace-source-chip--platform">
                         <span class="rosace-source-value">{{ expr.platform_target }}</span>
+                        <button type="button" class="rosace-copy-btn" title="Copier le format plateforme"
+                                onclick="rosaceCopy('{{ expr.platform_target|escapejs }}', this)">📋</button>
                     </div>
                     {% endif %}
                 </div>
@@ -411,4 +415,65 @@
         font-size: 0.85rem;
         color: var(--rosace-block-text-muted);
     }
+
+    /* Per-expression mesh editor (see static/hakkadbapp/js/ExpressionMesh.js)
+       -- generic classes there, styled here to match this page. */
+    .rosace-mesh-panel {
+        flex-basis: 100%;
+        border-top: 1px dashed var(--rosace-block-border);
+        margin-top: 0.2rem;
+        padding-top: 0.6rem;
+    }
+    .rosace-mesh-panel:empty { display: none; }
+    .expr-mesh-loading { color: var(--rosace-block-text-muted); font-size: 0.85rem; }
+    .expr-mesh-textarea {
+        width: 100%;
+        border: 1px solid var(--rosace-block-border);
+        border-radius: 0.4rem;
+        padding: 0.4rem 0.6rem;
+        background: var(--rosace-block-bg);
+        color: var(--rosace-block-text);
+        font-size: 0.95rem;
+        font-family: inherit;
+        resize: vertical;
+    }
+    .expr-mesh-preview-wrap { margin-top: 0.5rem; }
+    .expr-mesh-preview {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .expr-mesh-chip {
+        font-size: 0.78rem;
+        border-radius: 0.35rem;
+        padding: 0.15rem 0.5rem;
+        background: color-mix(in srgb, var(--rosace-gold) 15%, transparent);
+        color: var(--rosace-block-text);
+    }
+    .expr-mesh-chip--unresolved {
+        color: var(--rosace-block-text-muted);
+        text-decoration: underline dashed;
+    }
+    .expr-mesh-chip--ambiguous {
+        background: color-mix(in srgb, #d97706 20%, transparent);
+    }
+    .expr-mesh-editor-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+    .expr-mesh-save {
+        cursor: pointer;
+        border: 1px solid var(--rosace-red);
+        background: var(--rosace-red);
+        color: white;
+        border-radius: 0.4rem;
+        padding: 0.3rem 0.8rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .expr-mesh-save:hover { background: color-mix(in srgb, var(--rosace-red) 85%, black); }
+    .expr-mesh-status { font-size: 0.8rem; color: var(--rosace-block-text-muted); }
+    .expr-mesh-status--error { color: #d03b3b; font-weight: 600; }
 </style>

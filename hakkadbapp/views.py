@@ -24,6 +24,7 @@ from .text_to_words import (
     resolve_hanzi,
 )
 from .illustrations import illustration_for
+from . import expression_mesh
 
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
@@ -1180,6 +1181,140 @@ def expressions(request):
     context["platform_components_json"] = json.dumps(components_by_hanzi, ensure_ascii=False)
     context["platform_snapshot_timestamp"] = snapshot_timestamp
     return render(request, "hakkadbapp/expressions.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Expression mesh: a two-column (platform_id, excel_format) table persisted
+# to a local CSV (see expression_mesh.py), editable from duplicates/
+# expressions/the hanzi rosace, and used to generate a proper
+# expressionCorpus.json (components mesh) for the platform import. The
+# excel_format text itself carries any disambiguation needed (":gloss"
+# hints, same syntax import_expressions.py already understands) -- there is
+# no separate word_id table to keep in sync.
+# ---------------------------------------------------------------------------
+
+def _expression_mesh_preview(excel_format):
+    """Per-token resolution of `excel_format` against the DB, for the
+    editor to show what a save would actually produce: which Word (if any)
+    each token resolves to, and whether it's ambiguous without a ":gloss"
+    hint -- same function (find_words_by_hanzi_with_disambiguation) the
+    generator itself uses, run here on just this one phrase's tokens."""
+    from .text_to_words import build_all_words_for_tokens, find_words_by_hanzi_with_disambiguation
+
+    tokens = excel_format.split()
+    all_words = list(build_all_words_for_tokens(tokens))
+    preview = []
+    for token in tokens:
+        matches = find_words_by_hanzi_with_disambiguation(token, all_words)
+        word = matches[0]
+        entry = {"token": token, "word": None, "ambiguous": False, "candidates": []}
+        if word:
+            entry["word"] = {"char": word.char(), "pinyin": word.pinyin(), "french": word.french}
+            if len(matches) > 1 and ":" not in token:
+                entry["ambiguous"] = True
+                entry["candidates"] = [
+                    {"char": m.char(), "pinyin": m.pinyin(), "french": m.french} for m in matches if m
+                ]
+        preview.append(entry)
+    return preview
+
+
+def expression_mesh_download(request):
+    buf = StringIO()
+    writer = csv.DictWriter(buf, fieldnames=expression_mesh.FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(expression_mesh.load_mesh())
+    response = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="expression_mesh.csv"'
+    return response
+
+
+@require_POST
+def expression_mesh_upload(request):
+    uploaded = request.FILES.get("file")
+    if not uploaded:
+        return JsonResponse({"error": "Aucun fichier reçu."}, status=400)
+    try:
+        text = uploaded.read().decode("utf-8-sig")  # tolerate a BOM from Excel's own CSV export
+    except UnicodeDecodeError as exc:
+        return JsonResponse({"error": f"Encodage invalide : {exc}"}, status=400)
+
+    reader = csv.DictReader(StringIO(text))
+    if reader.fieldnames is None or set(expression_mesh.FIELDNAMES) - set(reader.fieldnames):
+        return JsonResponse(
+            {"error": f"Colonnes attendues : {', '.join(expression_mesh.FIELDNAMES)}."}, status=400
+        )
+    rows = [
+        {"platform_id": (row.get("platform_id") or "").strip(), "excel_format": row.get("excel_format") or ""}
+        for row in reader
+    ]
+    if any(not row["platform_id"] for row in rows):
+        return JsonResponse({"error": "Chaque ligne doit avoir un platform_id non vide."}, status=400)
+
+    expression_mesh.save_mesh(rows)
+    return JsonResponse({"ok": True, "count": len(rows)})
+
+
+def expression_mesh_entry(request, expr_id):
+    """GET: return (creating from expr.text if needed) this Expression's
+    row, plus a per-token preview of what it currently resolves to. POST:
+    save an edited excel_format string for that same expression -- always
+    a full read-modify-write of the whole table, never a partial patch,
+    per the file being the single source of truth."""
+    expr = get_object_or_404(Expression, id=expr_id)
+    rows = expression_mesh.load_mesh()
+    rows_index = expression_mesh.index_rows(rows)
+
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({"error": "JSON invalide."}, status=400)
+        excel_format = payload.get("excel_format")
+        if not isinstance(excel_format, str) or not excel_format.strip():
+            return JsonResponse({"error": "'excel_format' est requis."}, status=400)
+
+        row, _created = expression_mesh.get_or_create_row(rows, rows_index, expr)
+        row["excel_format"] = excel_format
+        expression_mesh.save_mesh(rows)
+        return JsonResponse({
+            "ok": True,
+            "platform_id": row["platform_id"],
+            "excel_format": row["excel_format"],
+            "preview": _expression_mesh_preview(row["excel_format"]),
+        })
+
+    row, created = expression_mesh.get_or_create_row(rows, rows_index, expr)
+    if created:
+        expression_mesh.save_mesh(rows)
+
+    return JsonResponse({
+        "platform_id": row["platform_id"],
+        "excel_format": row["excel_format"],
+        "preview": _expression_mesh_preview(row["excel_format"]),
+    })
+
+
+def expression_corpus_generate(request):
+    """Runs the generator and returns {corpus, warnings} as JSON -- the
+    front end turns `corpus` into a downloadable expressionCorpus.json
+    client-side (as a Blob) so warnings can be shown inline first rather
+    than only surfacing problems after the file's already saved to disk."""
+    rows = expression_mesh.load_mesh()
+    corpus, warnings = expression_mesh.build_expression_corpus(rows)
+    return JsonResponse({"corpus": corpus, "warnings": warnings})
+
+
+@require_POST
+def expression_mesh_sync(request):
+    """Ensure every current DB expression has a row in the table (adding
+    any missing ones verbatim from expr.text) without running the full
+    generator -- lets someone review/annotate new expressions before
+    generating, rather than only discovering them mid-generate."""
+    rows = expression_mesh.load_mesh()
+    added = expression_mesh.sync_rows(rows)
+    return JsonResponse({"added": added, "total": len(rows)})
+
 
 def api_convert_text(request):
     text = (request.GET.get("text") or "").strip()
