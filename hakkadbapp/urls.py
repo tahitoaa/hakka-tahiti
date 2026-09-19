@@ -53,6 +53,9 @@ urlpatterns = [
     path("expression-mesh/download", views.expression_mesh_download, name="expression_mesh_download"),
     path("expression-mesh/upload", views.expression_mesh_upload, name="expression_mesh_upload"),
     path("expression-mesh/<int:expr_id>", views.expression_mesh_entry, name="expression_mesh_entry"),
-    path("expression-mesh/generate/corpus", views.expression_corpus_generate, name="expression_corpus_generate"),
+    path("expression-mesh/<int:expr_id>/reset", views.expression_mesh_reset, name="expression_mesh_reset"),
+    path("export-corpus", views.export_corpus_generate, name="export_corpus_generate"),
+    path("export-corpus/expressions.xlsx", views.export_expressions_spreadsheet, name="export_expressions_spreadsheet"),
     path("expression-mesh/sync", views.expression_mesh_sync, name="expression_mesh_sync"),
+    path("word-notes/<int:word_id>", views.word_note_entry, name="word_note_entry"),
 ]

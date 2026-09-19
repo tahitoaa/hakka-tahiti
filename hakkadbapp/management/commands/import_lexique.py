@@ -250,7 +250,7 @@ class Command(BaseCommand):
         word_pron_objs = []
 
         for french, syllables, category, status, english in self.word_data:
-            word = Word(french=french, category=category, status=status, tahitian=english)
+            word = Word(french=french, category=category, status=status, english=english)
             word_objs.append(word)
 
         # Create words to get IDs

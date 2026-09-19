@@ -35,6 +35,7 @@ class WordImportRow:
     status: str
     syllables: list[tuple[str, str, str, int]]
     details: str = ""
+    platform_id: str = ""
 
 
 @dataclass
@@ -64,6 +65,7 @@ def parse_words_df(df: pd.DataFrame) -> WordImportParseResult:
         theme = normalize_theme(getattr(row, "THEMES", ""))
         status = normalize_status(getattr(row, "STATUT", ""))
         english = clean_cell(getattr(row, "ANGLAIS", ""))
+        platform_id = clean_cell(getattr(row, "platform_id", ""))
         if not any([french, raw_pinyin, raw_hanzi]):
             continue
 
@@ -124,6 +126,7 @@ def parse_words_df(df: pd.DataFrame) -> WordImportParseResult:
                 category=theme,
                 status=status,
                 syllables=parsed_pairs,
+                platform_id=platform_id,
             )
         )
 
@@ -192,10 +195,11 @@ def import_words_from_df(df: pd.DataFrame, *, reset: bool = False, traces_detail
     word_objects = [
         Word(
             french=item.french,
-            tahitian=item.english,
+            english=item.english,
             mandarin="",
             category=item.category or None,
             status=item.status or None,
+            platform_id=item.platform_id or None,
         )
         for item in parsed.rows
     ]

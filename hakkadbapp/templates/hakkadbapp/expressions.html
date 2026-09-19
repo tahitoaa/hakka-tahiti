@@ -79,7 +79,7 @@
   #expr-app .stat-tile .value { font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; }
   #expr-app .stat-tile .label { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
 
-  #expr-app .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; position: sticky; top: 0; background: var(--page-plane); padding: 6px 0; z-index: 5; }
+  #expr-app .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; position: sticky; top: 0; background: var(--page-plane); padding: 6px 0; z-index: 5; }
   #expr-app .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
   #expr-app .chip {
     border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary);
@@ -95,54 +95,36 @@
     border-radius: 8px; padding: 5px 8px; font-size: 13.5px; min-width: 200px;
   }
   #expr-app .search:focus { outline: 2px solid var(--status-good); outline-offset: -1px; }
+  #expr-app .count-badge { margin-left: auto; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-  #expr-app ol.expr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  /* Sentence.render() below (shared with converter/transcripter) draws its
-     token badges and preview box with hardcoded light backgrounds
-     (bg-green-200, bg-slate-50, ...) and isn't theme-aware; several of its
-     inner text nodes set no color of their own and just inherit, so in dark
-     mode they'd inherit white-on-still-light-badge and vanish. Anchor the
-     card's default text color instead of touching that shared file. */
-  #expr-app .expr-card { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface-1); color: #1e293b; }
-  #expr-app .expr-card .expr-index { font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px; }
-  #expr-app .expr-card .expr-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
-  /* Shared by card meta chips and the comparison table's écarts column. */
   #expr-app .meta-chip {
     display: inline-block; font-size: 11.5px; background: var(--chip-bg); color: var(--text-secondary);
     border-radius: 999px; padding: 2px 8px;
   }
   #expr-app .meta-chip.mismatch { background: rgba(208,59,59,0.14); color: #d03b3b; font-weight: 600; }
-  #expr-app .expr-card.has-mismatch { border-color: rgba(208,59,59,0.4); }
   #expr-app .empty-state { color: var(--text-muted); font-size: 13.5px; padding: 24px 10px; text-align: center; }
   #expr-app .mono { font-family: var(--mono); font-size: 12.5px; }
 
-  /* Comparative view -- one card per expression, laid out like the
+  /* One table -- one row (.compare-card) per expression, laid out like the
      E-reo/Vercel diff panel in commands/analytics.html: a left-hand field
      label, then the two sources side by side in parallel columns, with a
-     red outline on whichever pair of values actually differs. */
-  #expr-app .compare-section { margin-bottom: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); padding: 12px 14px; }
-  #expr-app .compare-head h2 { font-size: 16px; margin: 0 0 3px; }
-  #expr-app .compare-head p.hint { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 8px; max-width: 72ch; }
-  #expr-app .compare-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
-  #expr-app .compare-controls .count-badge { margin-left: auto; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-  #expr-app select.sort-select { border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary); border-radius: 8px; padding: 5px 8px; font-size: 13px; }
+     red outline on whichever pair of values actually differs. This is the
+     single source of comparison + editing now -- no separate "browse"
+     list alongside it. */
   #expr-app .legend-swatch { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 600; font-size: 12px; }
   #expr-app .legend-swatch.col-vercel { background: rgba(59,130,246,0.16); }
   #expr-app .legend-swatch.col-platform { background: rgba(217,119,6,0.16); }
+  #expr-app p.hint { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 10px; max-width: 72ch; }
 
-  #expr-app .compare-list { display: flex; flex-direction: column; gap: 14px; }
-  #expr-app .compare-group { display: flex; flex-direction: column; gap: 8px; }
-  #expr-app .compare-group-title {
-    font-size: 13.5px; font-weight: 700; margin: 0; padding-bottom: 4px;
-    border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px;
-    position: sticky; top: 0; background: var(--surface-1); z-index: 1;
-  }
-  #expr-app .compare-group-title .count-badge { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
-  #expr-app .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--page-plane); }
+  #expr-app .compare-list { display: flex; flex-direction: column; gap: 10px; }
+  #expr-app .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-1); }
   #expr-app .compare-card.has-mismatch { border-color: rgba(208,59,59,0.4); }
-  #expr-app .compare-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #expr-app .compare-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
   #expr-app .compare-card-head .idx { font-size: 11.5px; color: var(--text-muted); }
   #expr-app .compare-card-head .cat { background: var(--chip-bg); color: var(--text-secondary); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; }
+  #expr-app .use-export-toggle { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  #expr-app .use-export-toggle input { cursor: pointer; }
+  #expr-app .use-export-toggle.is-on { color: var(--status-good); font-weight: 600; }
 
   #expr-app .diff-header { display: flex; gap: 8px; margin-bottom: 3px; color: var(--text-muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.02em; }
   #expr-app .diff-header span:first-child { width: 90px; flex-shrink: 0; }
@@ -157,27 +139,52 @@
   #expr-app .diff-field.single .field-value { grid-template-columns: 1fr; }
 
   #expr-app .val-box { font-size: 13.5px; padding: 4px 7px; border-radius: 6px; background: var(--chip-bg); word-break: break-word; }
-  /* Same blue/amber tint as the field labels -- immediately visible which
-     side is computed live (Vercel/base) vs. the platform's raw stored
-     value, on every field, not just the decomposition. */
   #expr-app .val-box.col-vercel { background: rgba(59,130,246,0.10); }
   #expr-app .val-box.col-platform { background: rgba(217,119,6,0.10); }
   #expr-app .val-box.empty { color: var(--text-muted); font-style: italic; background: transparent; }
-  /* The actual divergence signal: outline + red text on whichever values in
-     a pair don't match, layered on top of the source tint above. */
   #expr-app .val-box.diff { outline: 1.5px solid rgba(208,59,59,0.6); outline-offset: -1px; color: #d03b3b; font-weight: 600; }
 
   #expr-app .decomp-token { display: inline-flex; flex-direction: column; align-items: center; margin: 0 5px 3px 0; font-size: 13.5px; }
   #expr-app .decomp-token .py { font-size: 10px; color: var(--text-muted); line-height: 1.2; }
   #expr-app .decomp-token.mismatch { color: #d03b3b; font-weight: 600; }
   #expr-app .decomp-token.mismatch .py { color: #d03b3b; }
-  /* Several valid readings for the same hanzi -- shown side by side instead
-     of picking one, so a platform pinyin matching a non-first candidate
-     doesn't look like an unexplained mismatch. */
   #expr-app .decomp-token.ambiguous .py { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
   #expr-app .no-match { color: var(--text-muted); font-style: italic; font-size: 12.5px; }
   #expr-app .no-match.mismatch { color: #d03b3b; font-style: normal; font-weight: 600; }
   #expr-app .ok-badge { color: var(--status-good); font-weight: 600; font-size: 12.5px; }
+
+  /* Editable commentaire/split fields + the live Sentence.js analysis
+     under split -- the only two fields in a row that aren't read-only. */
+  #expr-app .note-textarea {
+    width: 100%; border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 7px;
+    font-size: 13.5px; background: var(--page-plane); color: var(--text-primary); font-family: inherit; resize: vertical;
+  }
+  /* The split field is where hakka tokens get typed/edited directly, so it
+     should read at the same size as the rendered hanzi elsewhere on this
+     page (base.html's sitewide .hanzi rule: 1.4em off the #expr-app 15px
+     base = 21px) rather than the smaller 13.5px shared by every other
+     .note-textarea. */
+  #expr-app .note-textarea.mono { font-family: var(--mono); font-size: 1.4em; }
+  #expr-app .split-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  #expr-app .split-save, #expr-app .split-reset {
+    cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600;
+  }
+  #expr-app .split-save:hover, #expr-app .split-reset:hover { border-color: var(--text-muted); }
+  #expr-app .split-status { font-size: 11.5px; color: var(--text-muted); }
+  #expr-app .split-status--error { color: #d03b3b; font-weight: 600; }
+  #expr-app .split-analysis { margin-top: 6px; }
+  /* Sentence.render() (shared with converter/transcripter) draws its token
+     badges/preview box with hardcoded light backgrounds and isn't
+     theme-aware on its own -- these CSS variables are what it reads, kept
+     legible in dark mode without touching that shared file. */
+  #expr-app .split-analysis {
+    --sentence-preview-border: var(--border-strong);
+    --sentence-preview-bg: var(--page-plane);
+    --sentence-text-primary: var(--text-secondary);
+    --sentence-text-strong: var(--text-primary);
+    color: var(--text-primary);
+  }
 </style>
 
   <header class="top">
@@ -198,46 +205,52 @@
 
   <div class="overview" id="expr-overview"></div>
 
-  <section class="compare-section" id="expr-compare-section">
-    <div class="compare-head">
-      <h2>Comparaison Vercel / plateforme</h2>
-      <p class="hint">
-        <span class="legend-swatch col-vercel">Vercel / base</span> = calculé aujourd'hui &middot;
-        <span class="legend-swatch col-platform">Plateforme</span> = valeur brute du dernier
-        <span class="mono">platform_to_vercel --yes</span>. Écarts en rouge.
-      </p>
-    </div>
-    <div class="compare-controls">
-      <select class="sort-select" id="expr-compare-category"></select>
-      <div class="chip-group" id="expr-compare-group-chips"></div>
-      <button type="button" class="chip active" id="expr-compare-anomaly-filter" data-active="true">&#9888; Écarts uniquement</button>
-      <input class="search" type="search" id="expr-compare-search" placeholder="Rechercher&hellip;">
-      <span class="count-badge" id="expr-compare-count"></span>
-    </div>
-    <div style="overflow-y:auto; max-height:44rem">
-      <div class="compare-list" id="expr-compare-list"></div>
-    </div>
-    <div class="empty-state" id="expr-compare-empty" hidden>Aucune expression ne correspond à ces filtres.</div>
-  </section>
+  <p class="hint">
+    <span class="legend-swatch col-vercel">Vercel / base</span> = calculé aujourd'hui &middot;
+    <span class="legend-swatch col-platform">Plateforme</span> = valeur brute du dernier
+    <span class="mono">platform_to_vercel --yes</span>. Écarts en rouge. Commentaire et Split sont éditables ;
+    "Utiliser dans l'export" décide si le Split d'une expression remplace ses données d'origine dans
+    <span class="mono">ExportCorpus</span> (désactivé par défaut).
+  </p>
 
   <div class="controls" id="expr-controls">
-    <button type="button" class="chip" id="expr-mismatch-filter" data-active="false">&#9888; Écarts uniquement</button>
+    <select class="sort-select" id="expr-category"></select>
+    <select class="sort-select" id="expr-anomaly-filter">
+      <option value="">Tous</option>
+      <option value="any">&#9888; Écarts uniquement</option>
+      <option value="no-components">Sans composant</option>
+      <option value="missing-components">Composants manquants</option>
+      <option value="hakka-diff">Orthographe différente</option>
+      <option value="other">Autres écarts</option>
+      <option value="ok">Aucun écart</option>
+    </select>
     <input class="search" type="search" id="expr-search" placeholder="Rechercher&hellip;">
+    <span class="count-badge" id="expr-count"></span>
   </div>
 
-  <ol id="output" class="expr-list"></ol>
+  <div class="compare-list" id="output"></div>
   <div class="empty-state" id="expr-empty" hidden>Aucune expression ne correspond à ces filtres.</div>
 </div>
 
 <div id="expressions" hidden>
     {% for e in expressions %}
         <div
+            data-id="{{ e.id }}"
+            data-platform-id="{{ e.platform_id|default:'' }}"
             data-text="{{e.text}}"
             data-rendering="{{e.rendering}}"
             data-french="{{e.french}}"
             data-english="{{e.english}}"
             data-category="{{e.category}}"
             data-status="{{e.status}}"
+            data-excel-format="{{ e.note.excel_format|default:'' }}"
+            data-platform-split="{{ e.platform_split|default:'' }}"
+            data-commentaire="{{ e.note.commentaire|default:'' }}"
+            data-use-in-export="{% if e.note.use_in_export %}1{% else %}0{% endif %}"
+            {% if e.platform_id %}
+            data-entry-url="{% url 'expression_mesh_entry' e.id %}"
+            data-reset-url="{% url 'expression_mesh_reset' e.id %}"
+            {% endif %}
             >
         </div>
     {% endfor %}

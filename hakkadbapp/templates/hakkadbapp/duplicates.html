@@ -29,8 +29,8 @@
     color-scheme: light;
     background: var(--page-plane);
     color: var(--text-primary);
-    font-size: 14px;
-    line-height: 1.45;
+    font-size: 15px;
+    line-height: 1.4;
     border-radius: 12px;
     padding: 20px;
   }
@@ -133,9 +133,25 @@
   #dup-app .resolve-toggle { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
   #dup-app .resolve-toggle input { cursor: pointer; }
 
-  #dup-app table.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-  #dup-app table.compare-table th { width: 110px; color: var(--text-muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--gridline); padding: 5px 12px 5px 0; vertical-align: top; white-space: nowrap; }
-  #dup-app table.compare-table td { border-bottom: 1px solid var(--gridline); padding: 5px 12px 5px 0; vertical-align: top; }
+  /* Same "field label + boxed value(s)" comparison language as
+     expressions.html's .diff-field/.val-box (there, exactly two columns --
+     Vercel/base vs Plateforme; here, one box per duplicate-group entry,
+     however many there are), so the two review pages read as one
+     consistent tool instead of two different designs. */
+  #dup-app .diff-field { display: grid; grid-template-columns: 110px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--gridline); align-items: start; }
+  #dup-app .diff-field:last-child { border-bottom: none; }
+  #dup-app .diff-field .field-name { font-size: 12px; color: var(--text-muted); padding-top: 5px; white-space: nowrap; }
+  #dup-app .diff-field .field-value { display: flex; flex-wrap: wrap; gap: 8px; }
+  #dup-app .val-box { font-size: 13px; padding: 4px 8px; border-radius: 6px; background: var(--chip-bg); word-break: break-word; flex: 1 1 140px; min-width: 90px; }
+  #dup-app .val-box.mono { font-family: var(--mono); font-size: 12px; flex: 0 1 auto; min-width: 0; }
+  #dup-app .val-box.empty { color: var(--text-muted); font-style: italic; background: transparent; }
+  /* A field the group's entries don't all agree on -- same red as
+     expressions.html's own .val-box.diff. The Hakka field of an
+     Expression group gets the finer-grained .diff-char treatment instead
+     (only the differing characters, not the whole box), since that's more
+     precise than "the whole reading differs" for what's usually a single
+     tone digit. */
+  #dup-app .val-box.diff { outline: 1.5px solid var(--status-critical); outline-offset: -1px; color: var(--status-critical); font-weight: 600; background: var(--status-critical-bg); }
   #dup-app .diff-char { background: var(--status-critical-bg); color: var(--status-critical); border-radius: 3px; padding: 0 1px; font-weight: 700; }
   #dup-app .mono { font-family: var(--mono); font-size: 12px; }
 
@@ -192,8 +208,9 @@
   "use strict";
 
   var DATA = JSON.parse(document.getElementById("dup-data").textContent);
-  var SECTION_ORDER = ["words-hakka", "expressions-hakka", "words-french", "expressions-french", "words-tahitian", "expressions-english"];
+  var SECTION_ORDER = ["words-hakka", "expressions-hakka", "words-french", "expressions-french", "words-english", "expressions-english"];
   var FIELD_LABELS = { french: "Français", hakka: "Hakka", secondary: null, theme: "Thème", status: "Statut" };
+  var EXPRESSIONS_URL = "{% url 'expressions' %}";
 
   var app = document.getElementById("dup-app");
   var RESOLVED_KEY = "hakka-dup-resolved-v1";
@@ -335,32 +352,61 @@
 
   function renderCompareTable(section, g) {
     var rows = [
-      { key: "id", label: "ID", render: function (e) { return '<span class="mono">' + escapeHtml(e.id) + "</span>"; } },
+      { key: "id", label: "ID", mono: true, render: function (e) { return escapeHtml(e.id); } },
       { key: "french", label: "Français", copy: true },
       { key: "hakka", label: "Hakka", copy: true, wrap: function (html) { return '<span class="hanzi">' + html + "</span>"; } },
       { key: "secondary", label: section.secondary_label },
       { key: "theme", label: "Thème" },
       { key: "status", label: "Statut" }
     ];
-    var body = rows.map(function (row) {
-      var cells;
+    var divergent = g.divergent_fields || [];
+    var fields = rows.map(function (row) {
+      var isDivergent = divergent.indexOf(row.key) !== -1;
+      var boxesHtml;
       if (row.render) {
-        cells = g.entries.map(function (e) { return "<td>" + row.render(e) + "</td>"; }).join("");
+        boxesHtml = g.entries.map(function (e) {
+          return '<div class="val-box mono">' + row.render(e) + "</div>";
+        }).join("");
       } else {
         // Character-level red highlighting is only meaningful (and only
         // asked for) on the Hakka field of Expression duplicates -- words
-        // and the other fields show the plain value, no highlighting.
-        var useDiff = section.category === "expressions" && row.key === "hakka";
+        // and the other fields get the coarser whole-box highlight
+        // instead, same as expressions.html's own field comparison.
+        var useCharDiff = section.category === "expressions" && row.key === "hakka";
         var values = g.entries.map(function (e) { return e[row.key] || ""; });
-        var rendered = useDiff ? charDiffSpans(values) : values.map(function (v) { return escapeHtml(v); });
-        cells = g.entries.map(function (e, idx) {
-          var html = row.wrap ? row.wrap(rendered[idx]) : rendered[idx];
-          return "<td>" + html + (row.copy ? copyButtonHtml(e[row.key]) : "") + "</td>";
+        var rendered = useCharDiff ? charDiffSpans(values) : values.map(function (v) { return escapeHtml(v); });
+        boxesHtml = g.entries.map(function (e, idx) {
+          var value = values[idx];
+          if (!value) return '<div class="val-box empty">vide</div>';
+          var inner = row.wrap ? row.wrap(rendered[idx]) : rendered[idx];
+          var boxClass = "val-box" + (isDivergent && !useCharDiff ? " diff" : "");
+          return '<div class="' + boxClass + '">' + inner + (row.copy ? copyButtonHtml(value) : "") + "</div>";
         }).join("");
       }
-      return "<tr><th>" + escapeHtml(row.label) + "</th>" + cells + "</tr>";
+      return '<div class="diff-field"><div class="field-name">' + escapeHtml(row.label) +
+        '</div><div class="field-value">' + boxesHtml + "</div></div>";
     }).join("");
-    return '<table class="compare-table no-auto-csv"><tbody>' + body + "</tbody></table>";
+    return '<div class="compare-fields">' + fields + "</div>";
+  }
+
+  function disambiguateLinkHtml(section, g) {
+    // Only a same-hakka word group is actually ambiguous for maillage
+    // resolution: several Words sharing one hanzi+pinyin means any
+    // expression whose Split just writes that hanzi as a bare token could
+    // silently resolve to the wrong one (find_words_by_hanzi_with_
+    // disambiguation() picks one, quietly, unless a ":gloss" hint is
+    // added -- see text_to_words.py). Same-french/english word groups
+    // have distinct hanzi, so a maillage token for either already
+    // resolves unambiguously -- nothing to fix there. Jumps to the
+    // Expressions page's own search (expressions.js reads ?q= on load)
+    // pre-filtered to this hanzi, so every expression that might need a
+    // ":gloss" hint added to its Split field shows up right away.
+    if (section.key !== "words-hakka") return "";
+    var hanzi = ((g.entries[0] && g.entries[0].hakka) || "").split(" ")[0];
+    if (!hanzi) return "";
+    var url = EXPRESSIONS_URL + "?q=" + encodeURIComponent(hanzi);
+    return '<a class="chip" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' +
+      "&#128279; Désambiguïser dans les expressions</a>";
   }
 
   function renderGroup(section, g) {
@@ -372,6 +418,7 @@
       '<div class="dup-group-head">' +
       '<span class="dup-target">' + (targetHtml || "(vide)") + "</span>" + copyButtonHtml(g.value) +
       '<span class="count-badge">&mdash; ' + g.entries.length + " entrées</span>" +
+      disambiguateLinkHtml(section, g) +
       '<label class="resolve-toggle"><input type="checkbox" class="resolve-checkbox"' + (isResolved ? " checked" : "") + "> Traité</label>" +
       "</div>" +
       '<div style="overflow-x:auto">' + renderCompareTable(section, g) + "</div>" +
@@ -388,7 +435,7 @@
         '<div class="dup-section"><h2>' + escapeHtml(section.title) +
         ' <span class="badge">' + visible.length + "</span></h2>" +
         '<p class="hint">Base actuelle uniquement. Une même lecture hakka est en général un vrai doublon ; ' +
-        "un même français/tahitien/anglais peut n'être qu'un synonyme.</p>" +
+        "un même français/anglais peut n'être qu'un synonyme.</p>" +
         visible.map(function (g) { return renderGroup(section, g); }).join("") +
         "</div>"
       );

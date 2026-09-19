@@ -1,11 +1,12 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
 
-{% block content %} 
-<div class="max-w-4xl mx-auto px-4 py-6 space-y-12">
+{% block content %}
+{% include "hakkadbapp/components/rosace_card_styles.html" %}
+<div class="rosace-cards max-w-5xl mx-auto px-4 py-6 space-y-12">
 
   <!-- 🟩 Vocabulaire Section -->
   <section>
-    <!-- Title and Search -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
       <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
         Vocabulaire
@@ -26,50 +27,42 @@
       </select>
     </div>
 
-    <!-- Table header -->
-    <div class="hidden sm:grid grid-cols-5 gap-4 px-3 py-2 text-gray-500 text-sm font-medium border-b border-gray-300">
-      <div>Word</div><div>Pinyin</div><div>Category</div><div>French</div><div>Statut</div>
-    </div>
-
-    <!-- Word rows -->
-    <div id="word-list" class="divide-y divide-gray-100 text-sm max-h-80 overflow-y-auto">
+    <div id="word-list" class="rosace-grid">
       {% for word in words %}
-        <div class="grid grid-cols-5 gap-4 items-start px-3 py-2 bg-white hover:bg-gray-50 transition"
-          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} th:{{ word.tahitian|default:'' }}"
+        <div class="search-filter-item"
+          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} en:{{ word.english|default:'' }}"
           data-category="{{ word.category|default:'' }}">
-          <!-- Word -->
-          <div class="hanzi text-2xl font-bold text-black">           
-                    <span class="hanzi-block">
-                    <span class="simp">
-                  {% for wp in word.wordpronunciation_set.all %}
-                    {{ wp.pronunciation.simp }}
-                  {% endfor %}
-                    </span>
-                    <span class="trad hidden">                  
-                  {% for wp in word.wordpronunciation_set.all %}
-                    {{ wp.pronunciation.trad }}
-                  {% endfor %}</span>
-                    </span>
-            </div>
-          <!-- Pinyin -->
-          <div class="flex flex-wrap gap-1">
-            {% for wp in word.wordpronunciation_set.all %}
-              {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
-            {% endfor %}
-          </div>
-
-          <!-- Category -->
-          <div>
-              <span class="font-sm">{{ word.category }}</span>
-          </div>
-
-          <!-- French -->
-          <div>{{ word.french|default:"" }}</div>
-
-          <div>{{ word.status|default:"" }}</div>
+          {% include "hakkadbapp/components/word_card.html" with word=word %}
         </div>
       {% empty %}
-        <p class="text-gray-500 italic px-3 py-2">No words found.</p>
+        <p class="text-gray-500 italic px-3 py-2">Aucun mot trouvé.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- 🟨 Expressions Section -->
+  <section>
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
+        Expressions
+        <span class="text-gray-500 text-base font-normal">(<span id="expr-count">{{ expressions|length }}</span> expressions)</span>
+      </h1>
+      <input
+        type="text"
+        id="expr-search"
+        placeholder="Ex. 客家话样般喊 ou français"
+        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
+      />
+    </div>
+
+    <div id="expr-list" class="rosace-expr-list">
+      {% for expr in expressions %}
+        <div class="search-filter-item"
+          data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hanzi:{{ expr.text|default:'' }} rendering:{{ expr.rendering|default:'' }}">
+          {% include "hakkadbapp/components/expression_card.html" with expr=expr %}
+        </div>
+      {% empty %}
+        <p class="text-gray-500 italic px-3 py-2">Aucune expression trouvée.</p>
       {% endfor %}
     </div>
   </section>
@@ -152,6 +145,13 @@ setupSearch({
 });
 
 setupSearch({
+  inputId: 'expr-search',
+  itemSelector: 'div',
+  containerId: '#expr-list',
+  countId: 'expr-count'
+});
+
+setupSearch({
   inputId: 'char-search',
   itemSelector: 'li',
   containerId: '#pron-list',
@@ -171,5 +171,7 @@ document.getElementById('category-select').addEventListener('change', function()
   const visibleCount = Array.from(items).filter(item => item.style.display !== 'none').length;
   document.getElementById('word-count').textContent = visibleCount;
 });</script>
+<script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/WordNotes.js' %}"></script>
 
 {% endblock %}

@@ -244,13 +244,22 @@ class Command(BaseCommand):
             for theme_id, payload in themes.items()
         }
 
-        word_rows = [word_row(payload, theme_map) for payload in words.values()]
+        # word_row/expression_row don't see the dict key themselves -- stashed
+        # onto the row right after, as "platform_id", so it survives the sort
+        # below and rides along into the DataFrame handed to the importer.
+        word_rows = []
+        for platform_id, payload in words.items():
+            row = word_row(payload, theme_map)
+            row["platform_id"] = platform_id
+            word_rows.append(row)
         word_rows.sort(key=lambda r: r["SINOGRAMME"])
 
         known_word_pinyin = known_word_pinyin_map(words)
-        expression_rows = [
-            expression_row(payload, theme_map, known_word_pinyin) for payload in expressions.values()
-        ]
+        expression_rows = []
+        for platform_id, payload in expressions.items():
+            row = expression_row(payload, theme_map, known_word_pinyin)
+            row["platform_id"] = platform_id
+            expression_rows.append(row)
         expression_rows.sort(key=lambda r: r["SINOGRAMME"])
 
         # Written unconditionally: an audit trail of exactly what will be (or
@@ -285,8 +294,14 @@ class Command(BaseCommand):
         # import functions import_v2 uses for the Google Sheet, rather than
         # re-reading the .xlsx just written -- same columns, same dtypes
         # (plain strings throughout, never NaN), so behaves identically.
-        words_df = pd.DataFrame(word_rows, columns=MOTS_HEADERS)
-        expressions_df = pd.DataFrame(expression_rows, columns=EXPRESSIONS_HEADERS)
+        # "platform_id" rides alongside the sheet's own columns rather than
+        # inside MOTS_HEADERS/EXPRESSIONS_HEADERS: those two lists stay
+        # byte-for-byte the real GONG HAKKA sheet layout (see module
+        # docstring), and a plain-identifier extra column doesn't disturb
+        # parse_words_df/normalize_expressions_df's positional access to the
+        # other (non-identifier) header names via itertuples/iterrows.
+        words_df = pd.DataFrame(word_rows, columns=MOTS_HEADERS + ["platform_id"])
+        expressions_df = pd.DataFrame(expression_rows, columns=EXPRESSIONS_HEADERS + ["platform_id"])
 
         self.stdout.write(self.style.WARNING(
             "Importing into the Vercel DB -- Word/Expression/Pronunciation tables will be wiped and rebuilt."

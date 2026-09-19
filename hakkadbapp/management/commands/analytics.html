@@ -325,7 +325,7 @@
         <button class="chip" data-filter="added">Added</button>
         <button class="chip" data-filter="modified">Modified</button>
         <button class="chip" data-filter="deleted">Deleted</button>
-        <input class="search" type="search" placeholder="Search target / french / tahitian / id&hellip;" id="search-words">
+        <input class="search" type="search" placeholder="Search target / french / english / id&hellip;" id="search-words">
       </div>
       <div class="bulk-actions">
         Set all visible rows to:
@@ -335,7 +335,7 @@
         </select>
       </div>
       <table class="rows">
-        <thead><tr><th>Decision</th><th>Status</th><th>Target</th><th>French</th><th>Tahitian</th><th>ID</th></tr></thead>
+        <thead><tr><th>Decision</th><th>Status</th><th>Target</th><th>French</th><th>English</th><th>ID</th></tr></thead>
         <tbody id="tbody-words"></tbody>
       </table>
       <div class="empty-state" id="empty-words" hidden>No rows match this filter.</div>
@@ -514,7 +514,7 @@
 
   var WORD_FIELDS = [
     { key: "translations.primary", label: "French" },
-    { key: "translations.secondary", label: "Tahitian" },
+    { key: "translations.secondary", label: "English" },
     { key: "translations.target", label: "Target" },
     { key: "themes", label: "Themes", kind: "themes" },
     { key: "part_of_speech", label: "Part of speech" },

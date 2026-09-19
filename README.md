@@ -1,6 +1,6 @@
 # 🈶 HakkaDB Django App
 
-A web-based tool to manage Mandarin Chinese pronunciations (initials, finals, tones), associate them with Hanzi characters, and construct words with translations in French and Tahitian.
+A web-based tool to manage Mandarin Chinese pronunciations (initials, finals, tones), associate them with Hanzi characters, and construct words with translations in French and English.
 
 ---
 

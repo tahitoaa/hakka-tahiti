@@ -196,7 +196,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Fetched {expressions.count()} expressions."))
 
         words = (
-            Word.objects.only("id", "french", "tahitian", "category", "status")
+            Word.objects.only("id", "french", "english", "category", "status")
             .prefetch_related(
                 models.Prefetch(
                     "wordpronunciation_set",
@@ -264,7 +264,7 @@ class Command(BaseCommand):
             hanzi = "".join(wp.pronunciation.hanzi for wp in getattr(word, "wps", []))
             target = f"{pinyin} {hanzi}".strip()
             fr = (word.french or "").lower()
-            ty = (word.tahitian or "").lower()
+            en = (word.english or "").lower()
 
             # Expected audio filename from pronunciation.
             expected_audio = f"{pinyin.translate(trans)}.wav"
@@ -280,7 +280,7 @@ class Command(BaseCommand):
             json_word = jsonm.Word(
                 target=target,
                 primary=fr,
-                secondary=ty,
+                secondary=en,
                 id=ref["id"] if ref else None,
                 themes=deepcopy(ref_data.get("themes", [])),
                 # Prefer the real filename found in the source dir; fall back to reference audio.
@@ -300,7 +300,7 @@ class Command(BaseCommand):
             word_target_occurrences.setdefault(target, []).append({
                 "db_id": word.id,
                 "french": fr,
-                "tahitian": ty,
+                "english": en,
                 "resulting_id": json_word.id,
                 "matched_reference_id": ref["id"] if ref else None,
             })
@@ -314,7 +314,7 @@ class Command(BaseCommand):
                 "",
                 target,
                 fr,
-                ty,
+                en,
                 self.render_theme_names(json_word.themes),
                 json_word.audio,
                 json_word.image,

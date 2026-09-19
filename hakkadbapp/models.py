@@ -72,11 +72,22 @@ class Pronunciation(models.Model):
 class Word(models.Model):
     pronunciations = models.ManyToManyField(Pronunciation, through='WordPronunciation')
     french = models.TextField()
-    tahitian = models.TextField()
+    # Renamed from "tahitian" -- the field was mislabeled from the very
+    # first migration; it has only ever held English translations (see
+    # import_words_v2.py's WordImportRow).
+    english = models.TextField()
     mandarin = models.TextField()
     category = models.CharField(max_length=20, default=None, null=True, blank=True)  # Category of the word (e.g., "HSK 1", "Beginner Vocabulary")
     status = models.CharField(max_length=20, default=None, null=True, blank=True)  # Status of the word (e.g., "common", "rare", etc.)
     # audio = models.TextField(defalut=None, null=True, blank=True)
+    # The e_reo platform's own id for this word (wordCorpus.json's dict key),
+    # carried through verbatim by platform_to_vercel on every import so it
+    # stays the same across a reset+rebuild -- unlike this row's own pk,
+    # which is destroyed and reassigned every time. Lets persistent
+    # side-data (e.g. per-word comments) key off something stable instead
+    # of a pk or a recomputed match. Null for rows never imported from the
+    # platform (there is currently no other creation path).
+    platform_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     def __str__(self):
         return f'{self.char()}'
@@ -105,6 +116,11 @@ class Expression(models.Model):
     category = models.CharField(max_length=50, blank=True, null=True)
     status = models.CharField(max_length=20, blank=True, null=True)
     english = models.TextField(help_text="English", blank=True, null=True, default="")
+    # The e_reo platform's own id for this expression (expressionCorpus.json's
+    # dict key) -- see Word.platform_id for why this is carried through
+    # verbatim instead of relying on this row's pk, which a reset+rebuild
+    # destroys and reassigns.
+    platform_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     # M2M through ExpressionWord to preserve order
     words = models.ManyToManyField(
@@ -182,3 +198,45 @@ class Traces(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.details or 'No Details'}"
+
+
+class WordNote(models.Model):
+    """A word's persistent, human-edited comment -- kept in its own table
+    (never touched by import_words_from_df's reset=True, which only wipes
+    Word/WordPronunciation/Pronunciation/Initial/Final/Tone) so it survives
+    every `platform_to_vercel --yes` reset+rebuild. Keyed by the e_reo
+    platform's own id (Word.platform_id), not by the Word's own pk, since
+    that pk is destroyed and reassigned on every reset."""
+    platform_id = models.CharField(max_length=64, unique=True)
+    commentaire = models.TextField(blank=True, default="")
+    # Opt-in, off by default: export_corpus() only includes this word in
+    # wordCorpus.json when this is True -- same reasoning and default as
+    # ExpressionNote.use_in_export.
+    use_in_export = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"note for word {self.platform_id}"
+
+
+class ExpressionNote(models.Model):
+    """An expression's persistent, human-edited data -- the "maillage"
+    (excel_format: a space-per-word hanzi phrase, see expression_mesh.py)
+    plus a free-text comment. Same reasoning as WordNote: its own table,
+    outside reset=True's reach, keyed by Expression.platform_id rather
+    than the Expression's own reset-and-reassigned pk."""
+    platform_id = models.CharField(max_length=64, unique=True)
+    excel_format = models.TextField(blank=True, default="")
+    commentaire = models.TextField(blank=True, default="")
+    # Opt-in, off by default: export_corpus() only uses this expression's
+    # maillage (excel_format) for its recomputed "hakka" target,
+    # `components`, and contribution to words' `in_expression` when this is
+    # True. Left False, export_corpus() falls back to the expression's
+    # original import data (Expression.rendering / its DB ExpressionWord
+    # links) instead -- so a hand-edited maillage never affects the
+    # exported corpus until someone deliberately vouches for it.
+    use_in_export = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"note for expression {self.platform_id}"

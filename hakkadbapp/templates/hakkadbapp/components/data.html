@@ -23,7 +23,7 @@
                data-tones="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone_number|default:'' }} {% endfor %}"
                data-simp="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.simp }}{% endfor %}"
                data-trad="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.trad }}{% endfor %}"
-               data-tahitian="{{ word.tahitian|default:'' }}"
+               data-english="{{ word.english|default:'' }}"
                data-category="{{ word.category|default:'' }}"
                data-status="{{ word.status|default:'' }}"
                ></li>

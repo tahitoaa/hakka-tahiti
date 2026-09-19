@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from hakkadbapp.models import Pronunciation, WordPronunciation, Word, Initial, Tone, Final
 
 class Command(BaseCommand):
-    help = 'Populate Word and WordPronunciation from CSV with char|french|tahitian'
+    help = 'Populate Word and WordPronunciation from CSV with char|french|english'
 
     def add_arguments(self, parser):
         parser.add_argument('csv_file', type=str, help='Path to the CSV file')
@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
                 mandarin = row[0].strip()
                 french = row[1].strip()
-                tahitian = row[2].strip() if len(row) > 2 else ''
+                english = row[2].strip() if len(row) > 2 else ''
 
                 if not mandarin or not french:
                     self.stdout.write(self.style.WARNING(f"Line {line_num}: Skipped (missing mandarin or french)"))
@@ -64,7 +64,7 @@ class Command(BaseCommand):
 
                 word = Word.objects.create(
                     french=french,
-                    tahitian=tahitian,
+                    english=english,
                     mandarin=mandarin,
                     category=Word.Category.OTHER
                 )

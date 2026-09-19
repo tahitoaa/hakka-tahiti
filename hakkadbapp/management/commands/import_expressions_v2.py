@@ -31,6 +31,7 @@ def normalize_expressions_df(df: pd.DataFrame) -> pd.DataFrame:
     keep["comments"] = df.get("OBSERVATIONS")
     keep["english"] = df.get("ANGLAIS")
     keep["status"] = ""
+    keep["platform_id"] = df.get("platform_id")
     return keep
 
 
@@ -62,6 +63,7 @@ def import_expressions_from_df(df: pd.DataFrame, *, reset: bool = True) -> dict:
         status = str(row.status).strip() if hasattr(row, "status") else ""
         category = str(row.themes).strip() if not pd.isna(row.themes) else ""
         english = str(row.english).strip() if not pd.isna(row.english) else ""
+        platform_id = str(row.platform_id).strip() if not pd.isna(row.platform_id) else ""
 
         expr = Expression(
             french=french,
@@ -69,6 +71,7 @@ def import_expressions_from_df(df: pd.DataFrame, *, reset: bool = True) -> dict:
             status=status,
             category=category,
             english=english,
+            platform_id=platform_id or None,
         )
 
         token_data = convert_phrase_to_word_data(

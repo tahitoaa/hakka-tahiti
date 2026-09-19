@@ -18,7 +18,7 @@ class WordForm(forms.ModelForm):
 
     class Meta:
         model = Word
-        fields = ['french', 'tahitian', 'mandarin', 'category']
+        fields = ['french', 'english', 'mandarin', 'category']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

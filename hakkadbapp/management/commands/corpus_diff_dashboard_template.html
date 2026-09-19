@@ -345,10 +345,10 @@
       <button class="chip" data-filter="added">Add</button>
       <button class="chip" data-filter="modified">Modified</button>
       <button class="chip" data-filter="deleted">Delete from E-reo</button>
-      <input class="search" type="search" placeholder="Search target / french / tahitian / id&hellip;" id="search-words">
+      <input class="search" type="search" placeholder="Search target / french / english / id&hellip;" id="search-words">
     </div>
     <table class="rows">
-      <thead><tr><th>Status</th><th>Target</th><th>French</th><th>Tahitian</th><th>ID</th></tr></thead>
+      <thead><tr><th>Status</th><th>Target</th><th>French</th><th>English</th><th>ID</th></tr></thead>
       <tbody id="tbody-words"></tbody>
     </table>
     <div class="empty-state" id="empty-words" hidden>No rows match this filter.</div>
@@ -376,7 +376,7 @@
       <button class="chip" data-filter="lost">Lost</button>
       <button class="chip" data-filter="renamed">Renamed</button>
       <button class="chip" data-filter="gained">Gained</button>
-      <input class="search" type="search" placeholder="Search target / french / tahitian&hellip;" id="search-audio">
+      <input class="search" type="search" placeholder="Search target / french / english&hellip;" id="search-audio">
     </div>
     <table class="rows">
       <thead><tr><th>Audio status</th><th>Target</th><th>French</th><th>Reference audio</th><th>Current audio</th></tr></thead>
@@ -404,7 +404,7 @@
 
   var WORD_FIELDS = [
     { key: "translations.primary", label: "French" },
-    { key: "translations.secondary", label: "Tahitian" },
+    { key: "translations.secondary", label: "English" },
     { key: "translations.target", label: "Target" },
     { key: "themes", label: "Themes", kind: "themes" },
     { key: "part_of_speech", label: "Part of speech" },
@@ -801,7 +801,7 @@
     if (category.indexOf("words") !== -1) {
       return '<div class="dup-entry">' +
         '<span>db id <span class="mono">' + escapeHtml(entry.db_id) + "</span></span>" +
-        "<span>" + escapeHtml(entry.french || "&mdash;") + " / " + escapeHtml(entry.tahitian || "&mdash;") + "</span>" +
+        "<span>" + escapeHtml(entry.french || "&mdash;") + " / " + escapeHtml(entry.english || "&mdash;") + "</span>" +
         '<span>&rarr; resulting id <span class="mono">' + escapeHtml(entry.resulting_id) + "</span></span>" +
         "</div>";
     }
