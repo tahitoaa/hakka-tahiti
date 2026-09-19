@@ -1,0 +1,38 @@
+<div class="expr-mesh-toolbar">
+    <button type="button" class="expr-mesh-btn expr-mesh-btn--primary" data-action="export-corpus"
+            data-url="{% url 'export_corpus_generate' %}"
+            data-spreadsheet-url="{% url 'export_expressions_spreadsheet' %}">
+        ⚙ ExportCorpus
+    </button>
+    <span class="expr-mesh-status"></span>
+</div>
+
+<style>
+    .expr-mesh-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        background: color-mix(in srgb, var(--color-brand, #8B1A1A) 6%, white 94%);
+        border: 1px solid color-mix(in srgb, var(--color-brand-gold, #F2A93D) 40%, transparent);
+        border-radius: 0.6rem;
+        padding: 0.6rem 0.9rem;
+        font-size: 0.85rem;
+        margin-bottom: 1.25rem;
+    }
+    .expr-mesh-btn {
+        cursor: pointer;
+        border: 1px solid color-mix(in srgb, var(--color-brand, #8B1A1A) 30%, transparent);
+        background: white;
+        color: var(--color-brand, #8B1A1A);
+        border-radius: 0.4rem;
+        padding: 0.3rem 0.7rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .expr-mesh-btn:hover { background: color-mix(in srgb, var(--color-brand-gold, #F2A93D) 15%, white); }
+    .expr-mesh-btn--primary { background: var(--color-brand, #8B1A1A); color: white; }
+    .expr-mesh-btn--primary:hover { background: var(--color-brand-dark, #6B1313); }
+    .expr-mesh-status { color: #4b5563; }
+    .expr-mesh-status--error { color: #b91c1c; font-weight: 600; }
+</style>

@@ -1,0 +1,25 @@
+<div class="rosace-block">
+    {% if word.illustration %}
+    <img src="{{ word.illustration.url }}" alt="" class="rosace-block-emoji"
+         loading="lazy" onerror="this.remove()">
+    {% endif %}
+    <div class="rosace-block-hanzi">
+        {% for wp in word.wordpronunciation_set.all %}
+        <a href="{% url 'hanzi' wp.pronunciation.simp %}" class="hanzi-block rosace-char-link">
+            <span class="hanzi simp">{{ wp.pronunciation.simp }}</span>
+            <span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    <div class="rosace-block-pinyin">
+        {% for wp in word.wordpronunciation_set.all %}
+        {% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}
+        {% endfor %}
+    </div>
+    <div class="rosace-block-french">{{ word.french }}</div>
+    {% if word.category %}<div class="rosace-block-category">{{ word.category }}</div>{% endif %}
+    <button type="button" class="rosace-copy-btn" title="Éditer le commentaire"
+            data-note-toggle="{{ word.id }}">💬</button>
+    <div class="rosace-note-panel" data-note-panel="{{ word.id }}"
+         data-entry-url="{% url 'word_note_entry' word.id %}" hidden></div>
+</div>
