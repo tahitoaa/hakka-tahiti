@@ -15,6 +15,25 @@
     --border-strong:  rgba(11,11,11,0.18);
     --status-good:      #0ca30c;
     --status-good-bg:   rgba(12,163,12,0.10);
+    /* Status legend palette -- one hue per anomaly category (see the
+       legend under the page hint), deliberately more saturated/"impacting"
+       than the old flat red so each kind reads apart at a glance:
+       components = red (structural, needs a maillage fix), pronunciation =
+       purple (a tone/reading disagreement), spelling = amber (content
+       genuinely differs -- exporting creates a platform duplicate to clean
+       up by hand), punctuation = blue (formatting-only, lowest stakes),
+       platform = slate (nothing to compare against at all, a different
+       kind of gap than a mismatch). */
+    --status-components:    #d03b3b;
+    --status-components-bg: rgba(208,59,59,0.16);
+    --status-pronunciation:    #7c3aed;
+    --status-pronunciation-bg: rgba(124,58,237,0.14);
+    --status-spelling:    #b5790a;
+    --status-spelling-bg: rgba(250,178,25,0.20);
+    --status-punctuation:    #0284c7;
+    --status-punctuation-bg: rgba(2,132,199,0.14);
+    --status-platform:    #6b7280;
+    --status-platform-bg: rgba(107,114,128,0.16);
     --chip-bg:        #f0efec;
     --chip-bg-active: #0b0b0b;
     --chip-fg-active: #fcfcfb;
@@ -40,6 +59,16 @@
       --border-strong:  rgba(255,255,255,0.18);
       --status-good:      #0ca30c;
       --status-good-bg:   rgba(12,163,12,0.18);
+      --status-components:    #e66767;
+      --status-components-bg: rgba(230,103,103,0.20);
+      --status-pronunciation:    #a78bfa;
+      --status-pronunciation-bg: rgba(167,139,250,0.20);
+      --status-spelling:    #fab219;
+      --status-spelling-bg: rgba(250,178,25,0.18);
+      --status-punctuation:    #38bdf8;
+      --status-punctuation-bg: rgba(56,189,248,0.18);
+      --status-platform:    #9ca3af;
+      --status-platform-bg: rgba(156,163,175,0.18);
       --chip-bg:        #262623;
       --chip-bg-active: #ffffff;
       --chip-fg-active: #1a1a19;
@@ -57,6 +86,16 @@
     --border-strong:  rgba(255,255,255,0.18);
     --status-good:      #0ca30c;
     --status-good-bg:   rgba(12,163,12,0.18);
+    --status-components:    #e66767;
+    --status-components-bg: rgba(230,103,103,0.20);
+    --status-pronunciation:    #a78bfa;
+    --status-pronunciation-bg: rgba(167,139,250,0.20);
+    --status-spelling:    #fab219;
+    --status-spelling-bg: rgba(250,178,25,0.18);
+    --status-punctuation:    #38bdf8;
+    --status-punctuation-bg: rgba(56,189,248,0.18);
+    --status-platform:    #9ca3af;
+    --status-platform-bg: rgba(156,163,175,0.18);
     --chip-bg:        #262623;
     --chip-bg-active: #ffffff;
     --chip-fg-active: #1a1a19;
@@ -99,9 +138,17 @@
 
   #expr-app .meta-chip {
     display: inline-block; font-size: 11.5px; background: var(--chip-bg); color: var(--text-secondary);
-    border-radius: 999px; padding: 2px 8px;
+    border-radius: 999px; padding: 2px 8px; font-weight: 600;
   }
-  #expr-app .meta-chip.mismatch { background: rgba(208,59,59,0.14); color: #d03b3b; font-weight: 600; }
+  /* Categorized status colors -- see the legend under the page hint and
+     the --status-* palette above. Each category gets its own hue so the
+     *kind* of anomaly (and what it implies -- fix the maillage? edit the
+     platform by hand? ignore it?) is visible without reading the label. */
+  #expr-app .meta-chip.cat-components { background: var(--status-components-bg); color: var(--status-components); }
+  #expr-app .meta-chip.cat-pronunciation { background: var(--status-pronunciation-bg); color: var(--status-pronunciation); }
+  #expr-app .meta-chip.cat-spelling { background: var(--status-spelling-bg); color: var(--status-spelling); }
+  #expr-app .meta-chip.cat-punctuation { background: var(--status-punctuation-bg); color: var(--status-punctuation); }
+  #expr-app .meta-chip.cat-platform { background: var(--status-platform-bg); color: var(--status-platform); }
   #expr-app .empty-state { color: var(--text-muted); font-size: 13.5px; padding: 24px 10px; text-align: center; }
   #expr-app .mono { font-family: var(--mono); font-size: 12.5px; }
 
@@ -116,6 +163,22 @@
   #expr-app .legend-swatch.col-platform { background: rgba(217,119,6,0.16); }
   #expr-app p.hint { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 10px; max-width: 72ch; }
 
+  /* Status-category legend -- one swatch per --status-* hue above, spelled
+     out so the color coding doesn't have to be memorized. */
+  #expr-app .status-legend {
+    display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+    font-size: 12px; color: var(--text-secondary); margin: 0 0 12px; padding: 8px 10px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  }
+  #expr-app .status-legend .legend-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #expr-app .status-legend .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  #expr-app .status-legend .legend-dot.cat-components { background: var(--status-components); }
+  #expr-app .status-legend .legend-dot.cat-pronunciation { background: var(--status-pronunciation); }
+  #expr-app .status-legend .legend-dot.cat-spelling { background: var(--status-spelling); }
+  #expr-app .status-legend .legend-dot.cat-punctuation { background: var(--status-punctuation); }
+  #expr-app .status-legend .legend-dot.cat-platform { background: var(--status-platform); }
+  #expr-app .status-legend .legend-dot.cat-ok { background: var(--status-good); }
+
   #expr-app .compare-list { display: flex; flex-direction: column; gap: 10px; }
   #expr-app .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface-1); }
   #expr-app .compare-card.has-mismatch { border-color: rgba(208,59,59,0.4); }
@@ -125,6 +188,14 @@
   #expr-app .use-export-toggle { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
   #expr-app .use-export-toggle input { cursor: pointer; }
   #expr-app .use-export-toggle.is-on { color: var(--status-good); font-weight: 600; }
+  /* Split has an unresolved "~" hanzi or an undisambiguated term -- see
+     expression_mesh.compute_export_readiness. Checked+not-ready (an
+     export flag set before the Split regressed) gets a warning color
+     instead of the disabled treatment, since unchecking must stay
+     possible; unchecked+not-ready is flatly disabled -- see cardHtml. */
+  #expr-app .use-export-toggle.needs-review { color: var(--status-spelling); font-weight: 600; cursor: help; }
+  #expr-app .use-export-toggle input:disabled { cursor: not-allowed; }
+  #expr-app .use-export-toggle:has(input:disabled) { color: var(--text-muted); cursor: not-allowed; }
 
   #expr-app .diff-header { display: flex; gap: 8px; margin-bottom: 3px; color: var(--text-muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.02em; }
   #expr-app .diff-header span:first-child { width: 90px; flex-shrink: 0; }
@@ -208,10 +279,20 @@
   <p class="hint">
     <span class="legend-swatch col-vercel">Vercel / base</span> = calculé aujourd'hui &middot;
     <span class="legend-swatch col-platform">Plateforme</span> = valeur brute du dernier
-    <span class="mono">platform_to_vercel --yes</span>. Écarts en rouge. Commentaire et Split sont éditables ;
+    <span class="mono">platform_to_vercel --yes</span>. Commentaire et Split sont éditables ;
     "Utiliser dans l'export" décide si le Split d'une expression remplace ses données d'origine dans
-    <span class="mono">ExportCorpus</span> (désactivé par défaut).
+    <span class="mono">ExportCorpus</span> (désactivé par défaut) -- décochable, mais ne peut être coché que si le
+    Split se résout entièrement (aucun terme ambigu, aucun caractère non résolu "~").
   </p>
+
+  <div class="status-legend">
+    <span class="legend-item"><span class="legend-dot cat-components"></span>Composants (manque/en trop, DB &harr; plateforme)</span>
+    <span class="legend-item"><span class="legend-dot cat-pronunciation"></span>Prononciation/ton différent</span>
+    <span class="legend-item"><span class="legend-dot cat-spelling"></span>Orthographe différente &rarr; export = doublon, suppression manuelle sur la plateforme</span>
+    <span class="legend-item"><span class="legend-dot cat-punctuation"></span>Ponctuation différente uniquement</span>
+    <span class="legend-item"><span class="legend-dot cat-platform"></span>Pas de plateforme / introuvable</span>
+    <span class="legend-item"><span class="legend-dot cat-ok"></span>Aucun écart</span>
+  </div>
 
   <div class="controls" id="expr-controls">
     <select class="sort-select" id="expr-category"></select>
@@ -220,7 +301,9 @@
       <option value="any">&#9888; Écarts uniquement</option>
       <option value="no-components">Sans composant</option>
       <option value="missing-components">Composants manquants</option>
-      <option value="hakka-diff">Orthographe différente</option>
+      <option value="pronunciation-diff">Prononciation différente</option>
+      <option value="spelling-diff">Orthographe différente</option>
+      <option value="punctuation-diff">Ponctuation différente</option>
       <option value="other">Autres écarts</option>
       <option value="ok">Aucun écart</option>
     </select>
@@ -247,6 +330,8 @@
             data-platform-split="{{ e.platform_split|default:'' }}"
             data-commentaire="{{ e.note.commentaire|default:'' }}"
             data-use-in-export="{% if e.note.use_in_export %}1{% else %}0{% endif %}"
+            data-export-ok="{% if e.export_ok %}1{% else %}0{% endif %}"
+            data-export-block-reason="{{ e.export_block_reason|default:'' }}"
             {% if e.platform_id %}
             data-entry-url="{% url 'expression_mesh_entry' e.id %}"
             data-reset-url="{% url 'expression_mesh_reset' e.id %}"

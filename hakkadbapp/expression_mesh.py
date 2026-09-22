@@ -344,6 +344,159 @@ def reference_theme_names():
     }
 
 
+def _token_data_resolver(tokens):
+    """Build a memoized token_data_for(token) callable over every token in
+    `tokens`, resolving each maillage token (ExpressionNote.excel_format,
+    e.g. "样般" or "样般:comment") to the Word it matches -- or, when
+    unmatched, a raw hanzi/pinyin guess (resolve_hanzi/resolve_pinyin) so
+    the caller still has *something* to render for it. Shared by
+    export_corpus() and compute_split_platform_diffs(), which both need to
+    turn a maillage phrase into the same "pinyin hanzi" target text."""
+    from .text_to_words import (
+        build_all_words_for_tokens,
+        find_words_by_hanzi_with_disambiguation,
+        resolve_hanzi,
+        resolve_pinyin,
+    )
+
+    all_words = list(build_all_words_for_tokens(tokens))
+    cached_prons = _CachedPronsByHanzi()
+    token_match_cache = {}
+
+    def match_token(token):
+        if token not in token_match_cache:
+            token_match_cache[token] = find_words_by_hanzi_with_disambiguation(token, all_words)
+        return token_match_cache[token]
+
+    token_data_cache = {}
+
+    def token_data_for(token):
+        if token in token_data_cache:
+            return token_data_cache[token]
+        matches = match_token(token)
+        word = matches[0]
+        if word is None:
+            data = {
+                "word": None, "hanzi": resolve_hanzi(token),
+                "pinyin": resolve_pinyin(token, cached_prons), "matched": False, "ambiguous": False,
+            }
+        else:
+            data = {
+                "word": word, "hanzi": token.split(":", 1)[0], "pinyin": word.pinyin(),
+                "matched": True, "ambiguous": len(matches) > 1 and ":" not in token,
+            }
+        token_data_cache[token] = data
+        return data
+
+    return token_data_for
+
+
+def compute_split_platform_diffs(expressions):
+    """For every given Expression that has a non-empty maillage
+    (ExpressionNote.excel_format) and a platform_id present in the latest
+    platform snapshot, recompute its hakka target from that maillage --
+    the same resolution export_corpus() uses -- and compare it to the
+    platform's current target for that same expression.
+
+    Returns {platform_id: {"computed": str, "platform": str}} for every
+    expression where the two differ. Unlike export_corpus(), this isn't
+    restricted to ExpressionNote.use_in_export: the point here is to warn
+    about a hand-entered Split *before* it's ever selected for export,
+    wherever expressions are shown for review (duplicates.html).
+
+    A platform_id showing up here is exactly what export_corpus()'s own
+    hakka_changes warning flags: if the platform's own import matches
+    expressions by this hakka text rather than by id, exporting this one
+    as-is creates a brand new row next to the existing one instead of
+    updating it in place -- an orphaned duplicate that needs manual
+    cleanup on the platform afterwards.
+    """
+    from .text_to_words import render_expression_from_token_data
+
+    platform_ids = [e.platform_id for e in expressions if e.platform_id]
+    if not platform_ids:
+        return {}
+    notes_by_id = {
+        n.platform_id: n
+        for n in ExpressionNote.objects.filter(platform_id__in=platform_ids).exclude(excel_format="")
+    }
+    relevant = [e for e in expressions if e.platform_id in notes_by_id]
+    if not relevant:
+        return {}
+
+    _reference_words, reference_expressions = reference_corpora()
+    all_tokens = [tok for e in relevant for tok in notes_by_id[e.platform_id].excel_format.split()]
+    token_data_for = _token_data_resolver(all_tokens)
+
+    diffs = {}
+    for expr in relevant:
+        platform_expr = reference_expressions.get(expr.platform_id)
+        if platform_expr is None:
+            continue
+        tokens = notes_by_id[expr.platform_id].excel_format.split()
+        target = render_expression_from_token_data([token_data_for(tok) for tok in tokens])
+        old_target = (platform_expr.get("translations") or {}).get("target", "")
+        if old_target.strip() != target.strip():
+            diffs[expr.platform_id] = {"computed": target, "platform": old_target}
+    return diffs
+
+
+def _summarize_export_readiness(tokens, token_data_for):
+    """{"ok", "has_unresolved", "has_ambiguous", "target"} for one Split
+    phrase (already-tokenized), given a token_data_for resolver (from
+    _token_data_resolver). Shared by compute_export_readiness (one phrase)
+    and compute_export_readiness_map (many, sharing one resolver) below."""
+    from .text_to_words import render_expression_from_token_data
+
+    if not tokens:
+        return {"ok": False, "has_unresolved": False, "has_ambiguous": False, "target": ""}
+    token_data = [token_data_for(tok) for tok in tokens]
+    target = render_expression_from_token_data(token_data)
+    has_ambiguous = any(item["ambiguous"] for item in token_data)
+    # "~" is resolve_pinyin's own placeholder (text_to_words._lookup_first_pron)
+    # for a hanzi with literally no Pronunciation row at all -- it can only
+    # end up in `target` via an unmatched token's fallback pinyin, never via
+    # a matched Word (which always has a real word.pinyin()).
+    has_unresolved = "~" in target
+    return {
+        "ok": not has_ambiguous and not has_unresolved,
+        "has_unresolved": has_unresolved,
+        "has_ambiguous": has_ambiguous,
+        "target": target,
+    }
+
+
+def compute_export_readiness(excel_format):
+    """Whether this Split text is safe to mark "Utiliser dans l'export":
+    every token must resolve to exactly one Word (no ":gloss"-less
+    ambiguity -- a "blue token" in the Split preview, see Sentence.js'
+    renderToken) and the recomputed hakka target must not contain "~" (a
+    hanzi with no Pronunciation entry at all). Either one left as-is means
+    expressionCorpus.json would carry an incomplete or arbitrarily-chosen
+    reading for this expression. Single-phrase version, used by
+    expression_mesh_entry's own POST validation; see
+    compute_export_readiness_map for the batched, whole-page version."""
+    tokens = (excel_format or "").split()
+    token_data_for = _token_data_resolver(tokens)
+    return _summarize_export_readiness(tokens, token_data_for)
+
+
+def compute_export_readiness_map(excel_format_by_platform_id):
+    """Same check as compute_export_readiness, batched across every given
+    {platform_id: excel_format} pair at once (one shared Word/Pronunciation
+    resolution instead of one per expression) -- for the expressions page,
+    which needs this for every row up front to decide whether its "Utiliser
+    dans l'export" checkbox may be turned on at all. Returns
+    {platform_id: {"ok", "has_unresolved", "has_ambiguous", "target"}}."""
+    tokens_by_id = {pid: (ef or "").split() for pid, ef in excel_format_by_platform_id.items()}
+    all_tokens = [tok for tokens in tokens_by_id.values() for tok in tokens]
+    token_data_for = _token_data_resolver(all_tokens)
+    return {
+        pid: _summarize_export_readiness(tokens, token_data_for)
+        for pid, tokens in tokens_by_id.items()
+    }
+
+
 def export_corpus():
     """Generate BOTH wordCorpus.json and expressionCorpus.json from the DB
     -- but only for the words and expressions explicitly marked "use in
@@ -378,13 +531,7 @@ def export_corpus():
     """
     from .models import Expression, Word, WordNote, WordPronunciation
     from django.db.models import Prefetch
-    from .text_to_words import (
-        build_all_words_for_tokens,
-        find_words_by_hanzi_with_disambiguation,
-        render_expression_from_token_data,
-        resolve_hanzi,
-        resolve_pinyin,
-    )
+    from .text_to_words import render_expression_from_token_data
 
     reference_words, reference_expressions = reference_corpora()
     theme_payloads = reference_theme_payloads()
@@ -410,35 +557,7 @@ def export_corpus():
 
     # ---- 2. Resolve every selected maillage token to a Word, memoized -----
     all_tokens = [tok for note in selected_notes.values() for tok in note.excel_format.split()]
-    all_words = list(build_all_words_for_tokens(all_tokens))
-    cached_prons = _CachedPronsByHanzi()
-
-    token_match_cache = {}
-
-    def match_token(token):
-        if token not in token_match_cache:
-            token_match_cache[token] = find_words_by_hanzi_with_disambiguation(token, all_words)
-        return token_match_cache[token]
-
-    token_data_cache = {}
-
-    def token_data_for(token):
-        if token in token_data_cache:
-            return token_data_cache[token]
-        matches = match_token(token)
-        word = matches[0]
-        if word is None:
-            data = {
-                "word": None, "hanzi": resolve_hanzi(token),
-                "pinyin": resolve_pinyin(token, cached_prons), "matched": False, "ambiguous": False,
-            }
-        else:
-            data = {
-                "word": word, "hanzi": token.split(":", 1)[0], "pinyin": word.pinyin(),
-                "matched": True, "ambiguous": len(matches) > 1 and ":" not in token,
-            }
-        token_data_cache[token] = data
-        return data
+    token_data_for = _token_data_resolver(all_tokens)
 
     expression_corpus = {}
     expression_rows = []

@@ -160,11 +160,14 @@ def _dup_word_entry(w):
     }
 
 
-def _dup_expression_entry(e):
-    return {
+def _dup_expression_entry(e, split_diffs=None):
+    entry = {
         "id": e.id, "french": e.french, "hakka": e.rendering,
         "secondary": e.english, "theme": e.category or "", "status": e.status or "",
     }
+    if split_diffs and e.platform_id in split_diffs:
+        entry["split_diff"] = split_diffs[e.platform_id]
+    return entry
 
 
 def _duplicate_groups(items, key_fn, entry_fn):
@@ -213,6 +216,22 @@ def get_latest_platform_snapshot():
     return Traces.objects.exclude(platform_data__isnull=True).order_by("-timestamp").first()
 
 
+def _expression_hanzi_tokens():
+    """Bare hanzi tokens (the part before an optional ":gloss") that appear
+    anywhere across all expressions -- either in the raw imported
+    Expression.text or in a hand-entered ExpressionNote.excel_format
+    (the "Split" field). Used to tell whether a words-hakka duplicate's
+    hanzi is actually used in some expression at all, instead of offering
+    "Désambiguïser" for every same-hanzi duplicate regardless of whether
+    it's ever referenced by an expression."""
+    tokens = set()
+    for text in Expression.objects.exclude(text__isnull=True).exclude(text="").values_list("text", flat=True):
+        tokens.update(text.split())
+    for excel_format in ExpressionNote.objects.exclude(excel_format="").values_list("excel_format", flat=True):
+        tokens.update(tok.split(":", 1)[0] for tok in excel_format.split())
+    return tokens
+
+
 def build_duplicate_sections():
     words_for_dup = list(
         Word.objects.prefetch_related(
@@ -226,6 +245,23 @@ def build_duplicate_sections():
     )
     expressions_for_dup = list(Expression.objects.all())
 
+    words_hakka_groups = _duplicate_groups(words_for_dup, lambda w: f"{w.pinyin()} {w.char()}", _dup_word_entry)
+    expression_hanzi_tokens = _expression_hanzi_tokens()
+    for group in words_hakka_groups:
+        hanzi = group["entries"][0]["hakka"].split(" ")[0] if group["entries"] else ""
+        group["used_in_expressions"] = bool(hanzi) and hanzi in expression_hanzi_tokens
+
+    # Per-expression: does its current Split (ExpressionNote.excel_format)
+    # recompute a hakka target different from what the platform already has
+    # for it? If so, exporting it as-is won't update the existing platform
+    # row -- it'll create a new one next to it (the platform almost
+    # certainly matches by this hakka text, not by id), leaving an orphaned
+    # duplicate to clean up by hand. Surfaced per entry below rather than
+    # only in export_corpus()'s warnings, so it's visible while reviewing
+    # duplicates -- before anyone actually runs an export.
+    split_platform_diffs = expression_mesh.compute_split_platform_diffs(expressions_for_dup)
+    expression_entry_fn = lambda e: _dup_expression_entry(e, split_platform_diffs)
+
     return [
         {
             "key": "words-french", "category": "words",
@@ -235,7 +271,7 @@ def build_duplicate_sections():
         {
             "key": "words-hakka", "category": "words",
             "title": "Mots -- même hakka", "secondary_label": "Anglais",
-            "groups": _duplicate_groups(words_for_dup, lambda w: f"{w.pinyin()} {w.char()}", _dup_word_entry),
+            "groups": words_hakka_groups,
         },
         {
             "key": "words-english", "category": "words",
@@ -245,17 +281,17 @@ def build_duplicate_sections():
         {
             "key": "expressions-french", "category": "expressions",
             "title": "Expressions -- même français", "secondary_label": "Anglais",
-            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.french, _dup_expression_entry),
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.french, expression_entry_fn),
         },
         {
             "key": "expressions-hakka", "category": "expressions",
             "title": "Expressions -- même hakka", "secondary_label": "Anglais",
-            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.rendering, _dup_expression_entry),
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.rendering, expression_entry_fn),
         },
         {
             "key": "expressions-english", "category": "expressions",
             "title": "Expressions -- même anglais", "secondary_label": "Anglais",
-            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.english, _dup_expression_entry),
+            "groups": _duplicate_groups(expressions_for_dup, lambda e: e.english, expression_entry_fn),
         },
     ]
 
@@ -680,6 +716,7 @@ def duplicates_view(request):
                         "divergent_fields": group["divergent_fields"],
                         "search": group["search"],
                         "entries": group["entries"],
+                        "used_in_expressions": group.get("used_in_expressions", False),
                     }
                     for group in section["groups"]
                 ],
@@ -1214,6 +1251,7 @@ def expressions(request):
             platform_id__in=[e.platform_id for e in expressions if e.platform_id]
         )
     }
+    effective_excel_format_by_id = {}
     for expr in expressions:
         expr.note = notes_by_id.get(expr.platform_id)
         # Reconstructed here (Python) rather than in expressions.js: turning
@@ -1231,6 +1269,33 @@ def expressions(request):
             expression_mesh.excel_format_from_platform_target(platform_entry["target"])
             if platform_entry else None
         ) or ""
+        if expr.platform_id:
+            # The Split text that would actually end up on this expression's
+            # ExpressionNote the moment anyone saves anything on it (see
+            # expression_mesh.get_or_create_entry/_seed_excel_format) -- an
+            # existing note's own excel_format, or this same platform/text
+            # seed if there's no note yet. Used below to decide up front
+            # whether "Utiliser dans l'export" may be turned on for a row
+            # that doesn't even have a note row yet.
+            effective_excel_format_by_id[expr.platform_id] = (
+                expr.note.excel_format if expr.note else (expr.platform_split or expr.text or "")
+            )
+
+    # Gates "Utiliser dans l'export": only an expression whose Split resolves
+    # with no ambiguous term and no unresolved ("~") hanzi may have it turned
+    # on -- see expression_mesh.compute_export_readiness's docstring. Batched
+    # for the whole page at once, same reasoning as notes_by_id above.
+    export_readiness = expression_mesh.compute_export_readiness_map(effective_excel_format_by_id)
+    for expr in expressions:
+        readiness = export_readiness.get(expr.platform_id) if expr.platform_id else None
+        expr.export_ok = bool(readiness and readiness["ok"])
+        reasons = []
+        if readiness and readiness["has_unresolved"]:
+            reasons.append("le hakka calculé contient un caractère non résolu (« ~ »)")
+        if readiness and readiness["has_ambiguous"]:
+            reasons.append("un ou plusieurs termes du Split restent ambigus (aucun « :précision »)")
+        expr.export_block_reason = " ; ".join(reasons)
+
     context["expressions"] = expressions
     return render(request, "hakkadbapp/expressions.html", context)
 
@@ -1371,6 +1436,22 @@ def expression_mesh_entry(request, expr_id):
                 use_in_export = payload.get("use_in_export")
                 if not isinstance(use_in_export, bool):
                     return JsonResponse({"error": "'use_in_export' doit être un booléen."}, status=400)
+                # Enforced here too, not just in the UI (which just disables
+                # the checkbox): a stale page or a direct API call must not
+                # be able to mark an expression exportable while its Split
+                # still has an unresolved ("~") hanzi or an undisambiguated
+                # term -- see expression_mesh.compute_export_readiness.
+                if use_in_export and not note.use_in_export:
+                    readiness = expression_mesh.compute_export_readiness(note.excel_format)
+                    if not readiness["ok"]:
+                        reasons = []
+                        if readiness["has_unresolved"]:
+                            reasons.append("le hakka calculé contient un caractère non résolu (« ~ »)")
+                        if readiness["has_ambiguous"]:
+                            reasons.append("un ou plusieurs termes du Split restent ambigus (aucun « :précision »)")
+                        return JsonResponse({
+                            "error": "Export impossible tant que " + " et que ".join(reasons) + ".",
+                        }, status=400)
                 note.use_in_export = use_in_export
             note.save()
             return JsonResponse({"ok": True, **_expression_note_json(expr, note)})

@@ -152,6 +152,18 @@
      precise than "the whole reading differs" for what's usually a single
      tone digit. */
   #dup-app .val-box.diff { outline: 1.5px solid var(--status-critical); outline-offset: -1px; color: var(--status-critical); font-weight: 600; background: var(--status-critical-bg); }
+  /* Not a disagreement between duplicate entries (that's .val-box.diff,
+     critical red) -- a warning about a single entry's own data: its Split
+     recomputes a hakka different from what the platform already has for
+     it, so exporting as-is will create a fresh duplicate on the platform
+     instead of updating this row. Amber/warning, same vocabulary as the
+     rest of the app's --status-warning. */
+  #dup-app .val-box.split-warn { outline: 1.5px solid var(--status-warning); outline-offset: -1px; color: var(--status-warning); font-weight: 600; background: var(--status-warning-bg); }
+  #dup-app .split-warn-badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
+    color: var(--status-warning); background: var(--status-warning-bg);
+    border-radius: 999px; padding: 1px 8px;
+  }
   #dup-app .diff-char { background: var(--status-critical-bg); color: var(--status-critical); border-radius: 3px; padding: 0 1px; font-weight: 700; }
   #dup-app .mono { font-family: var(--mono); font-size: 12px; }
 
@@ -365,7 +377,22 @@
       var boxesHtml;
       if (row.render) {
         boxesHtml = g.entries.map(function (e) {
-          return '<div class="val-box mono">' + row.render(e) + "</div>";
+          // split_diff (only ever set on an expression entry, see
+          // views._dup_expression_entry/expression_mesh.compute_split_
+          // platform_diffs) means this entry's own Split field recomputes a
+          // hakka different from what's already on the platform for it --
+          // exporting as-is won't update that platform row, it'll create a
+          // fresh duplicate next to it. Flagged on the ID box since that's
+          // the one cell that's always unique to a single entry, unlike the
+          // other fields which are compared across the whole group.
+          var splitWarn = row.key === "id" && e.split_diff;
+          var cls = "val-box mono" + (splitWarn ? " split-warn" : "");
+          var title = splitWarn
+            ? ' title="Split ≠ hakka plateforme -- export = doublon : « ' +
+              escapeHtml(e.split_diff.computed) + ' » au lieu de « ' +
+              escapeHtml(e.split_diff.platform) + ' »"'
+            : "";
+          return '<div class="' + cls + '"' + title + '>' + row.render(e) + "</div>";
         }).join("");
       } else {
         // Character-level red highlighting is only meaningful (and only
@@ -397,11 +424,15 @@
     // disambiguation() picks one, quietly, unless a ":gloss" hint is
     // added -- see text_to_words.py). Same-french/english word groups
     // have distinct hanzi, so a maillage token for either already
-    // resolves unambiguously -- nothing to fix there. Jumps to the
+    // resolves unambiguously -- nothing to fix there. g.used_in_expressions
+    // (computed server-side in build_duplicate_sections/_expression_hanzi_
+    // tokens) further restricts this to hanzi that actually occur in some
+    // expression's text or Split field -- no point offering to disambiguate
+    // a duplicate that no expression ever references. Jumps to the
     // Expressions page's own search (expressions.js reads ?q= on load)
     // pre-filtered to this hanzi, so every expression that might need a
     // ":gloss" hint added to its Split field shows up right away.
-    if (section.key !== "words-hakka") return "";
+    if (section.key !== "words-hakka" || !g.used_in_expressions) return "";
     var hanzi = ((g.entries[0] && g.entries[0].hakka) || "").split(" ")[0];
     if (!hanzi) return "";
     var url = EXPRESSIONS_URL + "?q=" + encodeURIComponent(hanzi);
@@ -413,11 +444,18 @@
     var isResolved = !!resolved[g.id];
     var isHakka = section.key.indexOf("hakka") !== -1;
     var targetHtml = isHakka ? '<span class="hanzi">' + escapeHtml(g.value) + "</span>" : escapeHtml(g.value);
+    var splitWarnCount = g.entries.filter(function (e) { return !!e.split_diff; }).length;
+    var splitWarnBadge = splitWarnCount
+      ? '<span class="split-warn-badge" title="Le Split de ' + splitWarnCount +
+        ' entrée(s) recalcule un hakka différent de la plateforme -- export = doublon à nettoyer">' +
+        "&#9888; " + splitWarnCount + " à nettoyer</span>"
+      : "";
     return (
       '<div class="dup-group' + (isResolved ? " resolved" : "") + '" data-group-id="' + escapeHtml(g.id) + '">' +
       '<div class="dup-group-head">' +
       '<span class="dup-target">' + (targetHtml || "(vide)") + "</span>" + copyButtonHtml(g.value) +
       '<span class="count-badge">&mdash; ' + g.entries.length + " entrées</span>" +
+      splitWarnBadge +
       disambiguateLinkHtml(section, g) +
       '<label class="resolve-toggle"><input type="checkbox" class="resolve-checkbox"' + (isResolved ? " checked" : "") + "> Traité</label>" +
       "</div>" +

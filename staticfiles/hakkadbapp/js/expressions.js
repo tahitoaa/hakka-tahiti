@@ -172,6 +172,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const hanziLine = sentence.renderHanziLine(true);
     const hakkaVercel = `${pinyinLine} ${hanziLine}`.trim();
     const hakkaDiffers = hasPlatformMatch && hakkaVercel !== (platformTarget || "").trim();
+    // Split further into two distinct anomaly categories (see the legend):
+    // if stripping punctuation marks from both sides makes them equal, the
+    // only actual disagreement is punctuation -- a formatting nit, not a
+    // real spelling/segmentation difference. Otherwise the underlying
+    // content itself differs, which is the "-> nettoyage manuel sur la
+    // plateforme" case: export_corpus() would create a new platform row
+    // next to the old one instead of updating it (see duplicates.html's
+    // own split_diff, computed the same way server-side).
+    const punctuationMismatch = hakkaDiffers && stripPunctuationMarks(hakkaVercel) === stripPunctuationMarks(platformTarget);
+    const spellingMismatch = hakkaDiffers && !punctuationMismatch;
 
     const hasMismatch = noComponentsOnPlatform || missingComponentsOnPlatform || pronunciationMismatches.length > 0 || extraComponents.length > 0 || hakkaDiffers;
 
@@ -188,6 +198,8 @@ document.addEventListener("DOMContentLoaded", () => {
       hanziLine,
       hakkaVercel,
       hakkaDiffers,
+      punctuationMismatch,
+      spellingMismatch,
       hasPlatformMatch,
       missingPlatformId,
       notFoundOnPlatform,
@@ -209,6 +221,14 @@ document.addEventListener("DOMContentLoaded", () => {
       commentaire: div.dataset.commentaire ?? "",
       excelFormat,
       useInExport: div.dataset.useInExport === "1",
+      // Computed server-side (views.expressions/expression_mesh.
+      // compute_export_readiness_map) from the Split's actual token
+      // resolution -- whether every token disambiguates to exactly one
+      // Word and the recomputed hakka has no unresolved ("~") hanzi. Only
+      // gates turning the checkbox ON; see the "change" handler below and
+      // expression_mesh_entry's own server-side re-check.
+      exportOk: div.dataset.exportOk === "1",
+      exportBlockReason: div.dataset.exportBlockReason || "",
       entryUrl: div.dataset.entryUrl || "",
       resetUrl: div.dataset.resetUrl || "",
       // Single precomputed lowercase haystack: one indexOf() per item per
@@ -227,6 +247,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const pyDisplay = ambiguous ? t.pinyinCandidates.map(escapeHtml).join(" / ") : escapeHtml(t.pinyin || "");
     const title = ambiguous ? ` title="Plusieurs lectures possibles pour ce caractère dans le dictionnaire"` : "";
     return `<span class="decomp-token${isAnomaly ? " mismatch" : ""}${ambiguous ? " ambiguous" : ""}"${title}><span class="py">${pyDisplay}</span>${escapeHtml(t.hanzi)}</span>`;
+  }
+
+  // One colored chip per anomaly *category* (see the legend in the page
+  // header) -- `label` may contain raw HTML (an already-escaped hanzi plus
+  // an HTML entity like &#9888;), `title` is plain text and gets escaped here.
+  function metaChip(kind, label, title) {
+    return `<span class="meta-chip cat-${kind}"${title ? ` title="${escapeAttr(title)}"` : ""}>${label}</span>`;
   }
 
   function valBox(value, extraClass, isDiff) {
@@ -288,17 +315,24 @@ document.addEventListener("DOMContentLoaded", () => {
       )).join("");
     }
 
+    // Categorized instead of one flat red "mismatch" -- see the legend in
+    // the page header. Each category maps to a distinct, high-contrast
+    // color so the *kind* of anomaly (and what to do about it) is visible
+    // at a glance across a whole list of cards, not just "something's off".
     const anomalyBadges = [
       it.missingPlatformId
-        ? `<span class="meta-chip mismatch" title="Relancez platform_to_vercel --yes pour le renseigner">&#9888; pas de platform_id</span>`
+        ? metaChip("platform", "&#9888; pas de platform_id", "Relancez platform_to_vercel --yes pour le renseigner")
         : "",
-      it.notFoundOnPlatform ? `<span class="meta-chip mismatch">introuvable</span>` : "",
-      it.emptyComponentsOnPlatform ? `<span class="meta-chip mismatch">aucun composant</span>` : "",
-      ...it.componentMismatches.map((m) => `<span class="meta-chip mismatch">manque : ${escapeHtml(m.hanzi)}</span>`),
+      it.notFoundOnPlatform ? metaChip("platform", "introuvable sur la plateforme") : "",
+      it.emptyComponentsOnPlatform ? metaChip("components", "aucun composant plateforme") : "",
+      ...it.componentMismatches.map((m) => metaChip("components", `manque : ${escapeHtml(m.hanzi)}`)),
+      ...it.extraComponents.map((m) => metaChip("components", `en trop : ${escapeHtml(m.hanzi)}`)),
       ...it.pronunciationMismatches.map((m) =>
-        `<span class="meta-chip mismatch">ton ${escapeHtml(m.hanzi)} : ${escapeHtml(m.platformPinyin)} / ${escapeHtml(m.vercelPinyins.join("·"))}</span>`),
-      ...it.extraComponents.map((m) => `<span class="meta-chip mismatch">en trop : ${escapeHtml(m.hanzi)}</span>`),
-      it.hakkaDiffers ? `<span class="meta-chip mismatch">orthographe hakka différente</span>` : "",
+        metaChip("pronunciation", `ton ${escapeHtml(m.hanzi)} : ${escapeHtml(m.platformPinyin)} / ${escapeHtml(m.vercelPinyins.join("·"))}`)),
+      it.spellingMismatch
+        ? metaChip("spelling", "orthographe différente", "Export = doublon sur la plateforme -- suppression manuelle de l'ancienne entrée après import")
+        : "",
+      it.punctuationMismatch ? metaChip("punctuation", "ponctuation différente") : "",
     ].join("");
     const statusBadge = !it.hasPlatformMatch && !it.notFoundOnPlatform && !it.missingPlatformId
       ? `<span class="no-match">n/a</span>`
@@ -332,9 +366,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ${it.category ? `<span class="cat">${escapeHtml(it.category)}</span>` : ""}
         ${statusBadge}
         ${it.entryUrl ? `
-        <label class="use-export-toggle${it.useInExport ? " is-on" : ""}" data-role="use-export-label">
-          <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""}>
-          Utiliser dans l'export
+        <label class="use-export-toggle${it.useInExport ? " is-on" : ""}${(it.useInExport && !it.exportOk) ? " needs-review" : ""}"
+          data-role="use-export-label"${it.exportBlockReason ? ` title="${escapeAttr(it.exportBlockReason)}"` : ""}>
+          <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""} ${(!it.useInExport && !it.exportOk) ? "disabled" : ""}>
+          Utiliser dans l'export${(it.useInExport && !it.exportOk) ? " &#9888;" : ""}
         </label>` : ""}
       </div>
       <div class="diff-header"><span>Champ</span><div class="cols"><span>Vercel / base</span><span>Plateforme</span></div></div>
@@ -397,8 +432,11 @@ document.addEventListener("DOMContentLoaded", () => {
     any: (it) => it.hasMismatch,
     "no-components": (it) => it.noComponentsOnPlatform,
     "missing-components": (it) => it.missingComponentsOnPlatform,
-    "hakka-diff": (it) => it.hakkaDiffers,
-    other: (it) => it.hasMismatch && !it.noComponentsOnPlatform && !it.missingComponentsOnPlatform && !it.hakkaDiffers,
+    "pronunciation-diff": (it) => it.pronunciationMismatches.length > 0,
+    "spelling-diff": (it) => it.spellingMismatch,
+    "punctuation-diff": (it) => it.punctuationMismatch,
+    other: (it) => it.hasMismatch && !it.noComponentsOnPlatform && !it.missingComponentsOnPlatform &&
+      !it.pronunciationMismatches.length && !it.spellingMismatch && !it.punctuationMismatch,
     ok: (it) => !it.hasMismatch,
   };
 
@@ -552,6 +590,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const it = rowFor(checkbox);
     if (!it || !it.entryUrl) return;
     const label = checkbox.closest('[data-role="use-export-label"]');
+    // The checkbox is `disabled` while off and not exportOk, so this only
+    // matters for the "needs-review" case: already on despite no longer
+    // meeting the conditions (Split edited since), unchecked then re-checked
+    // by hand. Caught client-side to skip the round trip, and again
+    // server-side in expression_mesh_entry regardless (never trust the UI
+    // state alone for what ends up in expressionCorpus.json).
+    if (checkbox.checked && !it.exportOk) {
+      checkbox.checked = false;
+      console.warn("[expressions] export bloqué :", it.exportBlockReason);
+      return;
+    }
     fetch(it.entryUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
@@ -616,6 +665,18 @@ function uniq(arr) {
 const PUNCTUATION_ONLY_RE = /^[，。？！、,.!?…\s]+$/;
 function isPunctuationToken(hanzi) {
   return PUNCTUATION_ONLY_RE.test(hanzi);
+}
+
+// Same character class as PUNCTUATION_ONLY_RE, minus \s -- used to tell a
+// pure punctuation mismatch (e.g. a missing "。") apart from a real
+// spelling/segmentation difference between the Vercel/base and platform
+// hakka strings (see punctuationMismatch/spellingMismatch above). Deliberately
+// leaves whitespace alone: pinyin syllables are always single-space-joined
+// on both sides, so a real spacing difference would mean a real word-
+// boundary difference, not a formatting nit.
+const PUNCT_MARKS_RE = /[，。？！、,.!?…]/g;
+function stripPunctuationMarks(s) {
+  return (s || "").replace(PUNCT_MARKS_RE, "").trim();
 }
 
 function debounce(fn, ms) {

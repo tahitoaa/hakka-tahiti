@@ -289,7 +289,7 @@ renderFurigana() {
                             <div class="flex items-center gap-2 text-[13px] leading-snug py-1.5 px-1" title="${escapeAttr(d.french || '?')}">
                                 <span class="hanzi text-base font-semibold shrink-0">${pickHanzi(d) || '?'}</span>
                                 <span class="italic text-[var(--sentence-text-muted)] text-[11px] shrink-0">${this.renderPinyin(d.pinyin)}</span>
-                                <span class="flex-1 min-w-0 truncate">${escapeAttr(d.french || '?')}</span>
+                                <span class="flex-1 min-w-0">${escapeAttr(d.french || '?')}</span>
                                 ${d.category ? `<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[var(--sentence-preview-border)]">${escapeAttr(d.category)}</span>` : ""}
                             </div>
                         `;
