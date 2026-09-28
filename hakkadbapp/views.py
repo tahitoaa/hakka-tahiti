@@ -26,6 +26,7 @@ from django.http import JsonResponse
 from .text_to_words import (
     build_all_words_for_tokens,
     convert_phrase_to_word_data,
+    normalize_punctuation,
     resolve_hanzi,
 )
 from .illustrations import illustration_for
@@ -687,6 +688,33 @@ def reports(request):
         }
     else:
         context["audio_snapshot"] = None
+
+    # ---- dashboard (reports.html's own bar charts + meters) ----------------
+    # Same numbers as the stat cards/tables above, bundled as JSON for the
+    # page's inline chart script -- one payload instead of re-deriving
+    # percentages in JS from scattered template values, and it stays in sync
+    # with the tables/cards automatically since it's built from the exact
+    # same context values.
+    context["dashboard_data_json"] = json.dumps({
+        "words_total": words_total,
+        "expressions_total": Expression.objects.count(),
+        "pronunciations_total": Pronunciation.objects.count(),
+        "duplicates_count": duplicates_count,
+        "format_errors_count": len(format_errors),
+        "words_by_category": context["words_by_category"],
+        "expressions_by_category": context["expressions_by_category"],
+        "words_in_expressions": words_in_expressions,
+        "coverage_pct": coverage_pct,
+        "audio": (
+            {
+                "total_words": context["audio_snapshot"]["total_words"],
+                "missing_words": len(context["audio_snapshot"]["missing_words"]),
+                "total_expressions": context["audio_snapshot"]["total_expressions"],
+                "missing_expressions": len(context["audio_snapshot"]["missing_expressions"]),
+            }
+            if context["audio_snapshot"] else None
+        ),
+    }, ensure_ascii=False)
 
     return render(request, "hakkadbapp/reports.html", context)
 
@@ -1380,7 +1408,10 @@ def expression_mesh_upload(request):
             return JsonResponse({"error": "Chaque ligne doit avoir un platform_id non vide."}, status=400)
         rows.append({
             "platform_id": platform_id,
-            "excel_format": row.get("excel_format") or "",
+            # Same punctuation canonicalization as a single-row save
+            # (expression_mesh_entry) -- a bulk CSV round-trip through Excel
+            # is exactly the kind of place ASCII punctuation creeps back in.
+            "excel_format": normalize_punctuation(row.get("excel_format") or ""),
             "commentaire": row.get("commentaire") or "",
         })
 
@@ -1426,7 +1457,13 @@ def expression_mesh_entry(request, expr_id):
                 excel_format = payload.get("excel_format")
                 if not isinstance(excel_format, str) or not excel_format.strip():
                     return JsonResponse({"error": "'excel_format' est requis."}, status=400)
-                note.excel_format = excel_format
+                # Canonicalize punctuation-only tokens to their full-width
+                # form on every save, regardless of which form (ASCII
+                # shorthand or full-width) was actually typed -- see
+                # text_to_words.normalize_punctuation's docstring for the
+                # full scheme. Never touches word/gloss/override/placeholder
+                # tokens.
+                note.excel_format = normalize_punctuation(excel_format)
             if "commentaire" in payload:
                 commentaire = payload.get("commentaire")
                 if not isinstance(commentaire, str):
@@ -1539,7 +1576,11 @@ def export_expressions_spreadsheet(request):
     thèmes) plus whether that expression's own recording (its "audio" uuid,
     see export_corpus_generate) was actually found on disk -- so this
     doubles as a recording checklist (blank/"MANQUANT" cells are the ones
-    still missing a recording)."""
+    still missing a recording). Also carries each row's own commentaire and
+    Split (ExpressionNote.excel_format) -- the maillage that produced this
+    row's PINYIN HANZI/SINOGRAMME columns in the first place -- so a
+    reviewer can see the source alongside the result without opening the
+    expressions page for every row."""
     result = expression_mesh.export_corpus()
     expression_rows = result["expression_rows"]
     warnings = result["warnings"]
@@ -1549,12 +1590,13 @@ def export_expressions_spreadsheet(request):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "EXPRESSIONS"
-    sheet.append(["FRANCAIS", "ANGLAIS", "SINOGRAMME", "PINYIN HANZI", "THEMES", "AUDIO"])
+    sheet.append(["FRANCAIS", "ANGLAIS", "SINOGRAMME", "PINYIN HANZI", "THEMES", "AUDIO", "COMMENTAIRE", "SPLIT"])
     for row in expression_rows:
         audio_path = expression_mesh.find_audio_path(audio_dirs, row["audio_id"])
         sheet.append([
             row["french"], row["english"], row["hanzi"], row["target"], row["theme_names"],
             row["audio_id"] if audio_path else "MANQUANT",
+            row["commentaire"], row["excel_format"],
         ])
 
     xlsx_buffer = BytesIO()

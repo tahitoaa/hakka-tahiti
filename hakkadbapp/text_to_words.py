@@ -15,8 +15,16 @@ except locale.Error:
     pass
 
 
-REVERSE_PUNCT_MAP = str.maketrans({
+# Canonical punctuation scheme for a Split (ExpressionNote.excel_format)
+# token that's punctuation and nothing else: the hanzi side keeps whatever
+# full-width/Chinese form was typed; the pinyin side always gets its plain-
+# Latin equivalent (see render_expression_from_token_data, REVERSE_PUNCT_MAP's
+# only caller). One dict is the single source for both directions --
+# REVERSE_PUNCT_MAP here, FORWARD_PUNCT_MAP below (normalize_punctuation) --
+# so they can't drift apart.
+_PUNCT_FULLWIDTH_TO_LATIN = {
     "，": ",",
+    "、": ",",   # Chinese enumeration comma -- no distinct Latin mark
     "。": ".",
     "；": ";",
     "：": ":",
@@ -28,13 +36,73 @@ REVERSE_PUNCT_MAP = str.maketrans({
     "】": "]",
     "｛": "{",
     "｝": "}",
+    "‘": "'",
     "’": "'",
+    "“": '"',
     "”": '"',
     "—": "-",
-})
+    "…": "...",
+}
+REVERSE_PUNCT_MAP = str.maketrans(_PUNCT_FULLWIDTH_TO_LATIN)
 
 _CJK_RE = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF]")
 _PAREN_PINYIN_RE = re.compile(r"\(([^()]*)\)")
+
+# Opposite direction from REVERSE_PUNCT_MAP: whichever ASCII shorthand
+# someone actually types for a punctuation-only Split token, normalize_
+# punctuation() below canonicalizes it to ONE full-width form on save, so
+# the hanzi side always reads as real Chinese punctuation no matter which
+# form was typed. Built from _PUNCT_FULLWIDTH_TO_LATIN's *values* (keeping
+# the first full-width source per Latin mark), minus two marks handled
+# separately in normalize_punctuation itself:
+#   - "\u2026" -> "..." is 3 Latin characters, and str.maketrans only accepts
+#     single-character keys -- normalize_punctuation replaces the "..."
+#     *substring* before ever touching this per-character table.
+#   - "-"/"--" is deliberately never mapped from ASCII at all: a lone or
+#     doubled hyphen is the reserved unresolved-hanzi placeholder syntax
+#     (resolve_hanzi's "-(hak6)", "--(but5xin1)", bare "-") and must never
+#     be rewritten into an em dash here. An em dash is typed as "\u2014" (the
+#     full-width mark itself) directly -- there's no ASCII shorthand for it
+#     on purpose.
+_forward_punct_source = dict(_PUNCT_FULLWIDTH_TO_LATIN)
+_forward_punct_source.pop("\u2014", None)
+_forward_punct_source.pop("\u2026", None)
+FORWARD_PUNCT_MAP = str.maketrans({
+    latin: fullwidth for fullwidth, latin in reversed(list(_forward_punct_source.items()))
+})
+
+# A whole Split token made up of nothing but punctuation (either form) --
+# never a real word. normalize_punctuation() only ever rewrites *these*
+# tokens wholesale: the same "punctuation-only token" test expressions.js's
+# isPunctuationToken()/PUNCTUATION_ONLY_RE use to exclude punctuation from
+# the Vercel/platform decomposition comparison. Deliberately excludes "-"
+# (see FORWARD_PUNCT_MAP's note above) so a placeholder token is never
+# mistaken for punctuation and rewritten.
+_PUNCT_ONLY_TOKEN_RE = re.compile(r"^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()\[\]{}'\"]+$")
+
+
+def normalize_punctuation(excel_format):
+    """Canonicalize every punctuation-only token of a Split phrase to its
+    full-width form (see _PUNCT_FULLWIDTH_TO_LATIN/FORWARD_PUNCT_MAP above),
+    leaving every other token -- words, ":gloss" hints, "(pinyin)" overrides,
+    bare "-"/"--" placeholders -- untouched. Applied on save
+    (expression_mesh_entry) so typing plain ASCII punctuation (a comma, a
+    question mark, "...") is always as valid as typing the full-width form:
+    whichever was typed, the stored Split ends up with one consistent
+    convention, and render_expression_from_token_data's REVERSE_PUNCT_MAP
+    can always turn it back into the right Latin mark for the pinyin side."""
+    if not excel_format:
+        return excel_format
+
+    def normalize_token(tok):
+        if not _PUNCT_ONLY_TOKEN_RE.match(tok):
+            return tok
+        # Substring replace first ("..." is 3 Latin characters, not a single
+        # translate-table entry -- see FORWARD_PUNCT_MAP's note), then the
+        # remaining single-character marks.
+        return tok.replace("...", "…").translate(FORWARD_PUNCT_MAP)
+
+    return " ".join(normalize_token(tok) for tok in excel_format.split())
 
 _SUPERSCRIPT = str.maketrans({
     "0": "⁰",

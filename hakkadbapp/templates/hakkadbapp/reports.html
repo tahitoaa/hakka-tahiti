@@ -23,6 +23,24 @@
     --status-critical-bg:rgba(230,103,103,0.16);
     --accent:         #7c95ee;
     --accent-bg:      rgba(124,149,238,0.16);
+    /* Dashboard bar-chart hues -- deliberately not --accent (#7c95ee is too
+       light for a data mark on this dark surface: it sits just above the
+       validator's OKLCH lightness band for the dark categorical range).
+       These two are the dataviz skill's own dark-mode categorical slots 1/2
+       (blue/orange), checked with scripts/validate_palette.js against this
+       exact surface (#1a1a19): lightness band, chroma floor, CVD separation
+       and contrast all pass. Two colors because two bar charts sit on screen
+       at once (mots vs expressions) -- same hue for both would read as one
+       comparable series instead of two independent breakdowns. */
+    --series-1:       #3987e5;
+    --series-1-track: #184f95;
+    --series-2:       #d95926;
+    --series-2-track: #6b2c10;
+    /* Meters are a plain ratio against a total, not a severity judgment the
+       app itself doesn't make -- so one neutral accent hue (reusing
+       series-1), never good/warning/critical. */
+    --meter-fill:     #3987e5;
+    --meter-track:    #184f95;
     background: var(--page-plane);
     color: var(--text-primary);
     border-radius: 12px;
@@ -39,6 +57,39 @@
   .reports-dark .stat-card .value { font-size: 26px; font-weight: 700; margin: 6px 0 2px; }
   .reports-dark .stat-card .desc { font-size: 12px; color: var(--text-muted); }
   .reports-dark .stat-card .stat-link { font-size: 12px; display: inline-block; margin-top: 6px; }
+
+  /* ---- Tableau de bord : répartition par thème + couverture ------------- */
+  .reports-dark .dashboard-title { font-size: 14px; font-weight: 600; margin: 20px 0 10px; }
+  .reports-dark .dashboard-charts { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 1024px) { .reports-dark .dashboard-charts { grid-template-columns: 1fr 1fr; } }
+  .reports-dark .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .reports-dark .chart-card h3 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+  .reports-dark .chart-card p.hint { margin: 0 0 12px; }
+
+  .reports-dark .bar-list { display: flex; flex-direction: column; gap: 2px; max-height: 26rem; overflow-y: auto; padding-right: 4px; }
+  .reports-dark .bar-row { display: grid; grid-template-columns: 128px 1fr 38px; align-items: center; gap: 8px; }
+  .reports-dark .bar-row .bar-label {
+    font-size: 12px; color: var(--text-secondary); text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .reports-dark .bar-row .bar-track { position: relative; height: 16px; }
+  .reports-dark .bar-row .bar-fill {
+    position: absolute; left: 0; top: 0; height: 16px; border-radius: 0 4px 4px 0;
+    transition: filter 0.1s ease;
+  }
+  .reports-dark .bar-row:hover .bar-fill { filter: brightness(1.15); }
+  .reports-dark .bar-row .bar-value { font-size: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .reports-dark .bar-row.cat-words .bar-fill { background: var(--series-1); }
+  .reports-dark .bar-row.cat-expr .bar-fill { background: var(--series-2); }
+
+  .reports-dark .meter-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 14px; margin-bottom: 6px; }
+  @media (min-width: 640px) { .reports-dark .meter-grid { grid-template-columns: repeat(3, 1fr); } }
+  .reports-dark .meter-item { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .reports-dark .meter-item .meter-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .reports-dark .meter-item .meter-pct { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .reports-dark .meter-item .meter-track { height: 10px; border-radius: 999px; background: var(--meter-track); overflow: hidden; }
+  .reports-dark .meter-item .meter-fill { height: 100%; border-radius: 999px; background: var(--meter-fill); }
+  .reports-dark .meter-item .meter-detail { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 
   .reports-dark details.drawer { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; margin-top: 12px; }
   .reports-dark details.drawer.nested { background: var(--surface-2); margin: 10px 0 0; }
@@ -78,6 +129,23 @@
       </div>
     {% endfor %}
   </div>
+
+  <h2 class="dashboard-title">Répartition par thème</h2>
+  <div class="dashboard-charts">
+    <div class="chart-card">
+      <h3>Mots par thème</h3>
+      <p class="hint" id="dash-words-sub"></p>
+      <div class="bar-list" id="dash-words-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Expressions par thème</h3>
+      <p class="hint" id="dash-expr-sub"></p>
+      <div class="bar-list" id="dash-expr-chart"></div>
+    </div>
+  </div>
+
+  <h2 class="dashboard-title">Couverture</h2>
+  <div class="meter-grid" id="dash-meter-grid"></div>
 
   <details class="drawer">
     <summary><span class="chevron">&#9656;</span> Mots par thème</summary>
@@ -198,5 +266,93 @@
   </details>
 
 </div>
+
+<script id="dashboard-data" type="application/json">{{ dashboard_data_json|safe }}</script>
+<script>
+(function () {
+  "use strict";
+  var dataEl = document.getElementById("dashboard-data");
+  if (!dataEl) return;
+  var DATA = JSON.parse(dataEl.textContent);
+  var fmt = function (n) { return n.toLocaleString("fr-FR"); };
+  var pct1 = function (n) { return (Math.round(n * 10) / 10).toLocaleString("fr-FR"); };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // One fixed hue per chart (not per bar): this is a single-series ranked
+  // list -- magnitude by category, not identity between bars -- so no
+  // legend box is needed (the card title already says what's plotted), see
+  // dataviz skill / choosing-a-form.md. catClass picks the chart's hue.
+  function renderBarChart(elId, rows, catClass) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    if (!rows || !rows.length) {
+      el.innerHTML = '<p class="hint" style="margin:0">Aucune donnée.</p>';
+      return;
+    }
+    var max = Math.max.apply(null, rows.map(function (r) { return r.n; }));
+    el.innerHTML = rows.map(function (r) {
+      var widthPct = max ? (100 * r.n / max) : 0;
+      return '<div class="bar-row ' + catClass + '" title="' + escapeHtml(r.category) + ' : ' + r.n + '">' +
+        '<div class="bar-label">' + escapeHtml(r.category) + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + widthPct.toFixed(1) + '%"></div></div>' +
+        '<div class="bar-value">' + fmt(r.n) + '</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  renderBarChart("dash-words-chart", DATA.words_by_category, "cat-words");
+  var wordsSub = document.getElementById("dash-words-sub");
+  if (wordsSub) {
+    wordsSub.textContent = DATA.words_by_category.length + " thèmes -- " +
+      fmt(DATA.words_total) + " mots au total, triés par effectif décroissant.";
+  }
+
+  renderBarChart("dash-expr-chart", DATA.expressions_by_category, "cat-expr");
+  var exprSub = document.getElementById("dash-expr-sub");
+  if (exprSub) {
+    exprSub.textContent = DATA.expressions_by_category.length + " thèmes -- " +
+      fmt(DATA.expressions_total) + " expressions au total (une expression peut porter plusieurs thèmes).";
+  }
+
+  // Meters: each is a ratio against its own total, not a severity judgment
+  // the app doesn't otherwise make -- one neutral accent hue throughout
+  // (--meter-fill/--meter-track), never good/warning/critical.
+  var meters = [{
+    label: "Mots couverts par au moins une expression",
+    pct: DATA.words_total ? 100 * DATA.words_in_expressions / DATA.words_total : 0,
+    detail: fmt(DATA.words_in_expressions) + " / " + fmt(DATA.words_total) + " mots",
+  }];
+  if (DATA.audio) {
+    var wordsWithAudio = DATA.audio.total_words - DATA.audio.missing_words;
+    var exprWithAudio = DATA.audio.total_expressions - DATA.audio.missing_expressions;
+    meters.push({
+      label: "Mots avec audio (plateforme)",
+      pct: DATA.audio.total_words ? 100 * wordsWithAudio / DATA.audio.total_words : 0,
+      detail: fmt(wordsWithAudio) + " / " + fmt(DATA.audio.total_words) + " mots",
+    });
+    meters.push({
+      label: "Expressions avec audio (plateforme)",
+      pct: DATA.audio.total_expressions ? 100 * exprWithAudio / DATA.audio.total_expressions : 0,
+      detail: fmt(exprWithAudio) + " / " + fmt(DATA.audio.total_expressions) + " expressions",
+    });
+  }
+  var meterGrid = document.getElementById("dash-meter-grid");
+  if (meterGrid) {
+    meterGrid.innerHTML = meters.map(function (m) {
+      return '<div class="meter-item">' +
+        '<div class="meter-label">' + escapeHtml(m.label) + '</div>' +
+        '<div class="meter-pct">' + pct1(m.pct) + ' %</div>' +
+        '<div class="meter-track"><div class="meter-fill" style="width:' + m.pct.toFixed(1) + '%"></div></div>' +
+        '<div class="meter-detail">' + m.detail + '</div>' +
+        '</div>';
+    }).join("");
+  }
+})();
+</script>
 
 {% endblock %}

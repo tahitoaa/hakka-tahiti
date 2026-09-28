@@ -23,6 +23,20 @@ Expression without one yet (imported before this field existed) simply
 can't be edited here until the next `platform_to_vercel --yes` populates
 it.
 
+Punctuation: type either the full-width/Chinese mark (， 。 、 ？ ！ ； ： （ ）
+【 】 ｛ ｝ ' ' " " -- ...) or its plain-ASCII shorthand (, . ? ! ; : ( ) [ ]
+{ } ' " ...) in a punctuation-only token -- normalize_punctuation()
+(text_to_words.py), applied on every save (views.expression_mesh_entry) and
+on every seed/reset (_seed_excel_format below), canonicalizes it to the
+full-width form either way. render_expression_from_token_data's
+REVERSE_PUNCT_MAP then always turns that back into the matching Latin mark
+for the pinyin half of the target -- so the hanzi half stays genuinely
+Chinese-punctuated and the pinyin half stays genuinely Latin-punctuated, no
+matter which form was actually typed. The one deliberate exception: a lone
+or doubled hyphen ("-", "--") is never touched by this -- that's the
+reserved unresolved-hanzi placeholder syntax (see resolve_hanzi's
+docstring), not punctuation; a real em dash is typed as "—" itself.
+
 Storage: models.ExpressionNote, an ordinary DB table in its own right --
 NOT touched by import_expressions_from_df's reset=True (which only wipes
 Expression/ExpressionWord). This deliberately isn't a local file: the app
@@ -158,15 +172,34 @@ def excel_format_from_platform_target(target):
     a resolved and an unresolved syllable with no separator, which this
     deliberately doesn't try to disambiguate further), so callers can fall
     back to something else rather than trust a misaligned split.
+
+    A bare hanzi group only round-trips correctly through this app's own
+    resolution later (export time, see _token_data_resolver) if either a
+    Word matches it exactly -- its own word.pinyin() is then authoritative
+    -- or every one of its characters has at least one Pronunciation row of
+    its own (text_to_words.resolve_pinyin's per-character fallback for an
+    unmatched token). Neither holding means that character comes back as
+    "~" (text_to_words._lookup_first_pron finding nothing) instead of the
+    platform's own reading -- e.g. a sentence-final particle like 啊 that
+    has no Pronunciation entry at all. Rather than seed a Split that's
+    silently wrong the moment anyone re-resolves it, such a group gets an
+    explicit "(pinyin)" override right here, using the platform's own
+    compact pinyin for that group (already in the exact "hak5ga1wa4"-style
+    text resolve_pinyin's override parser expects) -- same real-hanzi-plus-
+    override shape as "陈(chin2)" in resolve_hanzi's docstring (not the
+    "-(hak6)" placeholder shape: the hanzi itself is known here, only the
+    reading needs pinning down).
     """
     from .management.commands.import_utils_v2 import split_compact_pinyin_into_syllables
+    from .models import Pronunciation
+    from .text_to_words import _CJK_RE, build_all_words_for_tokens, find_words_by_hanzi_with_disambiguation
     from .views import split_target, SUPERSCRIPT_TO_DIGIT
 
     pinyin_part, hanzi_concat = split_target(target)
     if not hanzi_concat:
         return None
 
-    words = []
+    groups = []  # (compact-pinyin digits, hanzi group) pairs, in order
     pos = 0
     for group in pinyin_part.split():
         digits = group.translate(SUPERSCRIPT_TO_DIGIT)
@@ -174,12 +207,30 @@ def excel_format_from_platform_target(target):
             n = len(split_compact_pinyin_into_syllables(digits) or [digits])
         else:
             n = len(group)
-        words.append(hanzi_concat[pos:pos + n])
+        groups.append((digits, hanzi_concat[pos:pos + n]))
         pos += n
 
     if pos != len(hanzi_concat):
         return None
-    return " ".join(w for w in words if w)
+
+    hanzi_groups = [g for _, g in groups if g]
+    all_words = list(build_all_words_for_tokens(hanzi_groups))
+    known_hanzi = set(Pronunciation.objects.filter(
+        hanzi__in={ch for g in hanzi_groups for ch in _CJK_RE.findall(g)}
+    ).values_list("hanzi", flat=True))
+
+    words = []
+    for digits, hanzi_group in groups:
+        if not hanzi_group:
+            continue
+        has_word = find_words_by_hanzi_with_disambiguation(hanzi_group, all_words)[0] is not None
+        cjk_chars = _CJK_RE.findall(hanzi_group)
+        if not has_word and any(ch not in known_hanzi for ch in cjk_chars):
+            words.append(f"{hanzi_group}({digits})")
+        else:
+            words.append(hanzi_group)
+
+    return " ".join(words)
 
 
 def get_or_create_entry(expr, reference_expressions=None):
@@ -212,8 +263,16 @@ def _seed_excel_format(expr, reference_expressions):
     text is preferred. Shared by every place that needs "what the mesh
     should read absent any local edit": seeding a brand new
     ExpressionNote, and resetting an existing one back to it."""
+    from .text_to_words import normalize_punctuation
+
     ref_target = (reference_expressions.get(expr.platform_id, {}).get("translations") or {}).get("target", "")
-    return excel_format_from_platform_target(ref_target) or expr.text or ""
+    seed = excel_format_from_platform_target(ref_target) or expr.text or ""
+    # excel_format_from_platform_target already carries the platform's own
+    # (genuinely Chinese) hanzi punctuation verbatim, but the expr.text
+    # fallback is the raw original import phrase, which isn't guaranteed to
+    # be -- normalizing here means every seed/reset, not just a hand edit,
+    # ends up in the one canonical form (see normalize_punctuation).
+    return normalize_punctuation(seed)
 
 
 def reset_entry(expr, reference_expressions=None):
@@ -522,8 +581,9 @@ def export_corpus():
 
     Also returns a themeCorpus.json covering just the themes referenced by
     the exported words/expressions, and one "row" per exported expression
-    with a few extra fields (concatenated hanzi, theme names) that aren't
-    part of expressionCorpus.json's own shape but are needed to locate that
+    with a few extra fields (concatenated hanzi, theme names, commentaire,
+    the Split/excel_format it was computed from) that aren't part of
+    expressionCorpus.json's own shape but are needed to locate that
     expression's audio file on disk and to build the review spreadsheet --
     see views.export_corpus_generate / export_expressions_spreadsheet.
 
@@ -659,6 +719,12 @@ def export_corpus():
             "hanzi": hanzi_only,
             "theme_names": ", ".join(theme_name_by_id.get(t, t) for t in themes),
             "audio_id": existing_audio,
+            # The exact maillage this row's target/components were computed
+            # from, plus its free-text note -- so the review spreadsheet
+            # shows not just the result but what produced it, without
+            # anyone having to cross-reference the expressions page.
+            "commentaire": note.commentaire or "",
+            "excel_format": note.excel_format or "",
         })
 
     if words_missing_platform_id:
