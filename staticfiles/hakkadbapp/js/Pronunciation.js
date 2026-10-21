@@ -1,5 +1,6 @@
 class Pronunciation {
-    static toneMap = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "":""};
+    // 7/8: entering tones of the Bao'an dictionary notation (SourcePronunciation).
+    static toneMap = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "":""};
 
     constructor ({simp, trad, initial, final, tone}){
         this.simp = simp;
@@ -11,7 +12,56 @@ class Pronunciation {
     }
 
     abstractPinyin() {
-        return this.initial + this.final + Pronunciation.toneMap[this.tone];
+        return this.initial + this.final + (Pronunciation.toneMap[this.tone] ?? this.tone ?? '');
+    }
+
+    // -----------------------------------------------------------------
+    // Display, in the transcription system picked in the header menu.
+    //
+    // These static helpers are the one entry point every page's JS should
+    // use to *show* pinyin (Romanization.js does the conversion from
+    // romanization.json). Anything compared, matched or exported keeps the
+    // stored Wenfa notation instead: abstractPinyin(),
+    // Sentence.renderPinyinLine(), the `pinyin` fields of API payloads.
+    // Without Romanization loaded (unit tests, pages not extending
+    // base.html) they fall back to the stored notation, tones superscripted.
+    // -----------------------------------------------------------------
+
+    static romanizationActive() {
+        return typeof Romanization !== 'undefined' && Romanization.systems().length > 0;
+    }
+
+    /** One stored syllable -> display text. */
+    static format(initial, final, tone) {
+        if (Pronunciation.romanizationActive()) return Romanization.convert(initial, final, tone);
+        return (initial || '') + (final || '') + (Pronunciation.toneMap[tone ?? ''] ?? tone ?? '');
+    }
+
+    /** A stored pinyin string ("ba1ba1", "ba¹ba¹", "ngai2 / ngoi2"...) ->
+     *  display text; whatever isn't a stored syllable is kept as is. */
+    static formatStored(stored) {
+        if (Pronunciation.romanizationActive()) return Romanization.fromPinyin(stored);
+        return String(stored ?? '').replace(/[1-8]/g, (d) => Pronunciation.toneMap[d]);
+    }
+
+    /** Same as formatStored(), as HTML that follows later switches of the
+     *  header menu on its own (Romanization.refresh() rewrites every
+     *  [data-py] element) -- for content that isn't re-rendered on change.
+     *  Don't use it where the text gets copied/exported as plain text. */
+    static span(stored, className = '') {
+        const attr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const cls = className ? ` class="${attr(className)}"` : '';
+        return `<span${cls} data-py="${attr(stored)}">${attr(Pronunciation.formatStored(stored))}</span>`;
+    }
+
+    /** Display form of this reading (see format()). */
+    displayPinyin() {
+        return Pronunciation.format(this.initial, this.final, this.tone);
+    }
+
+    /** Self-updating HTML for this reading (see span()). */
+    pinyinSpan(className = '') {
+        return Pronunciation.span(this.initial + this.final + (this.tone ?? ''), className);
     }
 
     diacriticsPinyin() {
@@ -39,6 +89,27 @@ class Pronunciation {
     }
 }
 
+/** A reading from an external source (the Bao'an dictionary index, see
+ *  Dictionary.useSource()) rather than the Supabase lexicon: its syllable
+ *  isn't split into Wenfa initial/final, so it's kept whole in `initial`
+ *  and always shown in the source's own notation -- the header's
+ *  transcription-system menu only knows how to convert Wenfa syllables. */
+class SourcePronunciation extends Pronunciation {
+    constructor({simp, trad, syllable, tone}) {
+        super({simp, trad, initial: syllable, final: '', tone: String(tone ?? '')});
+        this.origin = "hakka-dict-index";
+    }
+
+    displayPinyin() {
+        return this.abstractPinyin();
+    }
+
+    pinyinSpan(className = '') {
+        const cls = className ? ` class="${className}"` : '';
+        return `<span${cls}>${this.abstractPinyin()}</span>`;
+    }
+}
+
 class NoHanziToken extends Pronunciation {
     constructor ({text}) {
         super({simp:text, trad:text, initial:"", final:"", tone:""})
@@ -47,6 +118,14 @@ class NoHanziToken extends Pronunciation {
 
     abstractPinyin() {
         return this.text;
+    }
+
+    displayPinyin() {
+        return this.text;
+    }
+
+    pinyinSpan() {
+        return String(this.text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
     }
 }
 

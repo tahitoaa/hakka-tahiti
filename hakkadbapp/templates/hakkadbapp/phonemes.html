@@ -52,7 +52,7 @@
         </th>
         {% for final in finals %}
           <th class="border p-2 whitespace-nowrap">
-            {{ final.final }}
+            {% include "hakkadbapp/components/pinyin_switch.html" with i="" f=final.final %}
           </th>
         {% endfor %}
       </tr>

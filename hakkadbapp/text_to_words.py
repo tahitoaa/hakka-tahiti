@@ -233,6 +233,8 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
       inline override is split back into one syllable per character (in
       order) via split_compact_pinyin_into_syllables, same as the MOTS sheet
       import already does for compact pinyin cells.
+    - partial override: 先生(sen1) -- fewer syllables than characters pin
+      the last ones (here only 生); the others keep their looked-up reading.
     - raw latin/punctuation passthrough
     """
     if token is None:
@@ -263,8 +265,16 @@ def resolve_pinyin(token: str, all_prons: Any) -> str:
                     syllables = split_compact_pinyin_into_syllables(inline_py) if inline_py else []
                     if not syllables and inline_py:
                         syllables = [inline_py]
-                    for pos, idx in enumerate(pending_indices):
-                        out[idx] = _tone_to_exponent(syllables[pos]) if pos < len(syllables) else "*"
+                    # Fewer syllables than characters pin the LAST ones
+                    # (先生(sen1) fixes only 生 -- what the converter writes
+                    # when a polyphone is picked); the others keep their
+                    # looked-up reading. Same rule as Sentence.pinnedReadings().
+                    if len(syllables) < len(pending_indices):
+                        targets = pending_indices[len(pending_indices) - len(syllables):]
+                    else:
+                        targets = pending_indices
+                    for idx, syllable in zip(targets, syllables):
+                        out[idx] = _tone_to_exponent(syllable)
                     pending_indices = []
                 i = match.end()
                 continue

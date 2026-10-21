@@ -1,10 +1,25 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-200 text-black">
+<html lang="en" class="bg-gray-200 text-black" data-rom="{{ romanization_default }}">
 <head>
     <meta charset="UTF-8">
     <title> {{ title }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Transcription systems (hakkadbapp/romanization.json). Server-rendered
+         pinyin carries one <span class="rom" data-rom="..."> per system
+         (components/pinyin_switch.html); only the one matching
+         <html data-rom> is shown, so switching is pure CSS and also covers
+         markup inserted later by JS. The saved choice is applied here, before
+         first paint, to avoid flashing the default system. -->
+    <style>
+      .rom { display: none; }
+      {% for s in romanization_systems %}html[data-rom="{{ s.id }}"] .rom[data-rom="{{ s.id }}"]{% if not forloop.last %},
+      {% endif %}{% endfor %} { display: inline; }
+    </style>
+    {{ romanization_config|json_script:"romanization-config" }}
+    <script src="{% static 'hakkadbapp/js/Romanization.js' %}"></script>
+    <script>Romanization.init();</script>
 
     <!-- Tailwind CSS -->
      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -259,13 +274,9 @@
             class="max-w-[10rem] sm:max-w-[16rem] truncate bg-transparent text-white text-sm focus:outline-none"
             aria-label="Système de transcription"
           >
-            <option value="wenfa_py" selected>Guide de prononciation de l'association Wenfa</option>
-            <option value="hakka_dict_py">Hakkadictionary.com 客家話大辭典</option>
-            <option value="chappell_py">A Grammar And Lexicon of Hakka, Hilary Chappell, Christine Lamarre</option>
-            <option value="sagart_py">Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart</option>
-            <option value="">Chinese English dictionary, the Hakka Dialect</option>
-            <option value="">Ernest Sin Chan</option>
-            <option value="">Manuel de Hakka de Francine Laufatte</option>
+            {% for s in romanization_systems %}
+            <option value="{{ s.id }}" title="{{ s.source }}"{% if s.id == romanization_default %} selected{% endif %}>{{ s.label }}</option>
+            {% endfor %}
           </select>
         </div>
       </div>
@@ -274,22 +285,7 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      const menu = document.getElementById('pinyin-menu');
-      menu.value = "wenfa_py";
-      function selectPinyin () {
-        if (menu.value) {
-          // Hide all pinyin classes
-          document.querySelectorAll('.wenfa_py, .hakka_dict_py, .chappell_py, .sagart_py').forEach(el => {
-            el.style.display = 'none';
-          });
-          // Show selected class
-          document.querySelectorAll('.' + menu.value).forEach(el => {
-            el.style.display = '';
-          });
-        }
-      }
-      selectPinyin();
-      menu.addEventListener('change', selectPinyin);
+      Romanization.bindMenu(document.getElementById('pinyin-menu'));
     });
   </script>
 

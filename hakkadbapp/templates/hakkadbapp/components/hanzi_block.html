@@ -10,7 +10,7 @@
         {% if pronunciations %}
         <div class="rosace-pinyin">
             {% for p in pronunciations %}
-            <span class="rosace-pinyin-pill">{{ p.pinyin }}</span>
+            <span class="rosace-pinyin-pill">{% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}</span>
             {% endfor %}
         </div>
         {% endif %}

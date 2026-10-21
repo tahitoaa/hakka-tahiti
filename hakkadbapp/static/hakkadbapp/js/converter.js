@@ -58,15 +58,17 @@ class View {
         // dedicated hanzi font, so pinyin (with its tone-superscript digits)
         // doesn't render in a calligraphic/serif face meant for characters.
         this.pinyinHanziLinesOutput.innerHTML = this.sentences
-            .map(s => `${s.renderPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`)
+            .map(s => `${s.renderDisplayPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`)
             .join('\n');
-        this.pinyinOnlyOutput.innerHTML = this.sentences.map(s => s.renderPinyinLine()).join('<br>');
+        this.pinyinOnlyOutput.innerHTML = this.sentences.map(s => s.renderDisplayPinyinLine()).join('<br>');
         this.hanziOnlyOutput.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
         this.expressionOutput.innerHTML = this.sentences.map(s => s.render()).join('<br>');
     }
 }
 
 class Controller{
+    static SOURCE_KEY = 'hakka-converter-source';
+
     constructor ({itemSelector, containerId }) {
         const dico = new Dictionary({containerId, itemSelector});
         this.model = new TextModel(dico);
@@ -84,12 +86,87 @@ class Controller{
         this.view.input.dispatchEvent(new Event('change'));
 
         this.bindKeyboard();
+        this.bindSourceSwitch();
 
         // Sentence.render() bakes simp/trad into a plain string at render
         // time rather than re-reading the DOM, so flipping the sitewide
         // Trad./Simp. toggle needs an explicit re-render to actually show
         // up here instead of only taking effect on the next keystroke.
         document.addEventListener('hanzi-mode-change', () => this.view.render(this.model.text));
+        // Display system: re-render; with "Saisie en: comme l'affichage" it
+        // is also the input system, so suggestions are recomputed too.
+        document.addEventListener('romanization-change', () => this.handleInput());
+        document.addEventListener('romanization-input-change', () => this.handleInput());
+    }
+
+    /** Two mutually exclusive sources for the readings offered while
+     *  typing: 'db' = the Supabase lexicon embedded in the page (default),
+     *  'dict' = the Bao'an dictionary index (hakka_dict_prons.json, fetched
+     *  on first use only). The choice is remembered per browser. */
+    bindSourceSwitch() {
+        this.sourceSwitch = document.getElementById('source-switch');
+        if (!this.sourceSwitch) return;
+        this.sourceStatus = document.getElementById('source-status');
+        this.sourceSwitch.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-source]');
+            if (btn) this.setSource(btn.dataset.source);
+        });
+        let saved = null;
+        try { saved = localStorage.getItem(Controller.SOURCE_KEY); } catch (e) { /* private mode */ }
+        this.setSource(saved === 'dict' ? 'dict' : 'db');
+    }
+
+    async setSource(source) {
+        this.source = source;
+        this.sourceSwitch.querySelectorAll('[data-source]').forEach((btn) => {
+            btn.setAttribute('aria-pressed', String(btn.dataset.source === source));
+        });
+        document.querySelectorAll('[data-source-hint]').forEach((el) => {
+            el.hidden = el.dataset.sourceHint !== source;
+        });
+        try { localStorage.setItem(Controller.SOURCE_KEY, source); } catch (e) { /* private mode */ }
+
+        // Typing in another system only applies to the lexicon (Wenfa
+        // storage); the Bao'an dictionary is typed in its own notation.
+        const inputMenu = document.getElementById('romanization-input-menu');
+        if (inputMenu) inputMenu.disabled = source !== 'db';
+
+        if (source === 'db') {
+            this.dico.useSource(null);
+            this.view.input.placeholder = Controller.inputExample();
+            this.sourceStatus.textContent =
+                `Lexique de la base : ${this.dico.pronunciations.length} prononciations, ${this.dico.words.length} mots.`;
+            this.handleInput();
+            return;
+        }
+
+        this.sourceStatus.textContent = 'Chargement du dictionnaire…';
+        try {
+            // One fetch per page load, shared by every later toggle.
+            this.dictPromise ??= Dictionary.fetchSourcePronunciations(this.sourceSwitch.dataset.dictUrl);
+            const { meta, prons } = await this.dictPromise;
+            if (this.source !== 'dict') return; // toggled back while loading
+            this.dico.useSource(prons);
+            this.view.input.placeholder = "Ex: wuk7 ka1 hau3 t'ai3";
+            this.sourceStatus.textContent =
+                `${meta.title || 'Dictionnaire'} — ${meta.author || ''} : ${prons.length} prononciations (sans mots ni traductions).`;
+            this.handleInput();
+        } catch (err) {
+            console.error(err);
+            this.dictPromise = null;
+            this.sourceStatus.textContent = 'Impossible de charger le dictionnaire : retour au lexique de la base.';
+            this.setSource('db');
+        }
+    }
+
+    /** "Ex: …" placeholder in the current input system, tones as digits
+     *  since that's how they're typed. */
+    static inputExample() {
+        const sample = 'wuk5 ga1 hao3 tai4';
+        if (typeof Romanization === 'undefined' || !Romanization.systems().length) return `Ex: ${sample}`;
+        const typed = Romanization.fromPinyin(sample, Romanization.inputSystem())
+            .replace(/[¹²³⁴⁵⁶⁷⁸]/g, (c) => '¹²³⁴⁵⁶⁷⁸'.indexOf(c) + 1);
+        return `Ex: ${typed}`;
     }
 
     /** Shift+1..9 picks a suggestion by its keyboard hint, mirroring the
@@ -177,6 +254,7 @@ class Controller{
 
     // Input change
     handleInput(event) {
+        if (this.source !== 'dict') this.view.input.placeholder = Controller.inputExample();
         this.dico.unknowns.clear();
         const text = this.view.input.value;
         this.model.update(text);
@@ -207,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () =>
         new CopyButton('#pinyin-sentence-results', {
             label: 'Copier le furigana',
             getText: () => converter.view.sentences
-                .map(s => `${s.renderPinyinLine()} ${s.renderHanziLine()}`)
+                .map(s => `${s.renderDisplayPinyinLine()} ${s.renderHanziLine()}`)
                 .join('\n'),
         });
         new CopyButton('#pinyin-hanzi-lines', { label: 'Copier pinyin + hanzi' });

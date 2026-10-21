@@ -6,7 +6,12 @@
 (function () {
   "use strict";
 
-  var CACHE_KEY = "hakka-flashcards-words-v1";
+  // The cached entries hold server-rendered pinyin markup (one span per
+  // transcription system), so the key also tracks romanization.json's
+  // version: editing a mapping invalidates the cache instead of showing
+  // stale transcriptions for up to CACHE_TTL_MS.
+  var CACHE_KEY = "hakka-flashcards-words-v2-" +
+    (typeof Romanization !== "undefined" ? Romanization.version() : "");
   // This dictionary only changes via admin import commands, never live user
   // edits, so a long TTL is safe and keeps repeat visits network-free.
   var CACHE_TTL_MS = 12 * 60 * 60 * 1000;
@@ -88,14 +93,6 @@
     });
   }
 
-  function applyPinyinSystemSelection(container) {
-    var menu = document.getElementById("pinyin-menu");
-    if (!menu || !menu.value || !container) return;
-    container.querySelectorAll(".wenfa_py, .hakka_dict_py, .chappell_py, .sagart_py").forEach(function (el) {
-      el.style.display = el.classList.contains(menu.value) ? "" : "none";
-    });
-  }
-
   function renderCard(word) {
     document.querySelectorAll("#fc-hanzi-front, #fc-hanzi-back").forEach(function (el) {
       el.textContent = word.hanzi;
@@ -103,8 +100,8 @@
 
     var pinyinRow = document.getElementById("fc-pinyin-row");
     if (pinyinRow) {
+      // Visibility of each system's span is handled by base.html's CSS.
       pinyinRow.innerHTML = word.pinyin_html;
-      applyPinyinSystemSelection(pinyinRow);
     }
 
     var heroMedia = document.getElementById("fc-hero-media");

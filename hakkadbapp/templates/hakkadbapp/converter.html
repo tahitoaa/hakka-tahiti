@@ -6,13 +6,49 @@
     Écrire en hakka
   </label>
 
+  <!-- Source of the readings offered while typing: the two are exclusive
+       alternatives (converter.js / Dictionary.useSource()). -->
+  <div id="source-switch" role="group" aria-label="Source des prononciations"
+       data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
+       class="inline-flex rounded-full bg-white border border-gray-300 p-1 shadow-sm text-sm mb-2">
+    <button type="button" data-source="db" aria-pressed="true"
+            class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
+      Lexique Wenfa
+    </button>
+    <button type="button" data-source="dict" aria-pressed="false"
+            class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
+      Dictionnaire Bao'an
+    </button>
+  </div>
+  <small id="source-status" class="text-gray-500 block mb-2" aria-live="polite"></small>
+  <div id="input-system" class="mb-3">
+    {% include "hakkadbapp/components/romanization_input_menu.html" %}
+  </div>
+
   <small class="text-gray-600 block mb-4">
-    Taper le pinyin (ex. <code>wuk5ga1</code>). <br>
-    Eventuellement, utiliser le caractère <code>_</code> pour ne pas signifier le ton, et séparer les syllables.
-    (ex. <code>wuk_ga_</code>) <br>
+    <span data-source-hint="db">
+      Taper le pinyin dans le système choisi en « Saisie en » (ex. Wenfa <code>wuk5ga1</code>,
+      Hakkadictionary <code>wuk5ka1</code>) ; tons en chiffres, <code>e</code>/<code>o</code>/<code>ng</code> pour ε/ɔ/ŋ. <br>
+      Eventuellement, utiliser le caractère <code>_</code> pour ne pas signifier le ton, et séparer les syllables.
+      (ex. <code>wuk_ga_</code>) <br>
+    </span>
+    <span data-source-hint="dict" hidden>
+      Taper la romanisation du dictionnaire 客家話大辭典（寶安腔）(ex. <code>wuk7ka1</code>, <code>k'ak7</code>) :
+      tons 1, 2, 3, 5, 7, 8 ; l'apostrophe marque l'aspiration.
+      <code>_</code> pour ne pas signifier le ton (ex. <code>wuk_ka_</code>). <br>
+      Seules les prononciations du dictionnaire sont utilisées (pas les mots ni les traductions du lexique). <br>
+    </span>
     Touchez ou cliquez un caractère suggéré pour l'insérer dans le champ de saisie
-    (ou <kbd>Maj</kbd> + <kbd>1</kbd>…<kbd>9</kbd> au clavier).
+    (ou <kbd>Maj</kbd> + <kbd>1</kbd>…<kbd>9</kbd> au clavier). <br>
+    Un caractère à plusieurs prononciations est inséré avec celle choisie, ex. <code>生(sen1)</code> :
+    elle reste fixée dans le texte. Dans <code>先生(sen1)</code>, la lecture ne fixe que le dernier caractère.
   </small>
+
+  <style>
+    .source-btn[aria-pressed="true"] { background: var(--color-brand, #8B1A1A); color: #fff; }
+    .source-btn[aria-pressed="false"] { color: #374151; }
+    .source-btn[aria-pressed="false"]:hover { background: #f3f4f6; }
+  </style>
 
   <div class="relative mt-4">
     <textarea id="pinyin-input"

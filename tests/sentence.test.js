@@ -37,7 +37,7 @@ test("parseToken splits hanzi, :constraints and (inline pinyin)", () => {
   // than this file's, so a direct assert.deepEqual would fail on that alone
   // even though every field matches.
   const plain = s.parseToken("好");
-  assert.deepEqual({ ...plain }, { hanzi: "好", constraints: null, inline: null, raw: "好" });
+  assert.deepEqual({ ...plain, readings: [...plain.readings] }, { hanzi: "好", constraints: null, inline: null, readings: [null], raw: "好" });
 
   const withConstraints = s.parseToken("好:bon,ok");
   assert.equal(withConstraints.hanzi, "好");

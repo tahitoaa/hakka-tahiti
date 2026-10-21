@@ -15,6 +15,39 @@ class Dictionary {
         this.unknowns = new Set();
         this.wordItems = Array.from(document.querySelectorAll(`#word-list > ${itemSelector}`))
         this.words = this.wordItems.map(el => new Word(el.dataset));
+        // 'wenfa': Supabase lexicon (the default); 'source': an external
+        // pronunciation list in its own notation, see useSource().
+        this.notation = 'wenfa';
+        this.dbPronunciations = this.pronunciations;
+        this.dbWords = this.words;
+    }
+
+    /** Swaps the whole dictionary to another pronunciation source, or back
+     *  to the Supabase lexicon with `useSource(null)`. An external source
+     *  has no words (only character readings), so word matching is off and
+     *  every hanzi is resolved character by character. */
+    useSource(pronunciations) {
+        this.unknowns.clear();
+        if (!pronunciations) {
+            this.pronunciations = this.dbPronunciations;
+            this.words = this.dbWords;
+            this.notation = 'wenfa';
+            return;
+        }
+        this.pronunciations = pronunciations;
+        this.words = [];
+        this.notation = 'source';
+    }
+
+    /** Fetches the compact Bao'an dictionary file written by
+     *  `manage.py build_dict_index`: rows of [trad, syllable, tone, simp?]. */
+    static async fetchSourcePronunciations(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+        const data = await response.json();
+        const prons = data.prons.map(([trad, syllable, tone, simp]) =>
+            new SourcePronunciation({ trad, simp: simp || trad, syllable, tone }));
+        return { meta: data.meta || {}, prons };
     }
 
     parsePronunciation(el) {
@@ -41,6 +74,17 @@ class Dictionary {
                 this.pronunciations.push(newPron);
             }
         });
+    }
+
+    /** Pronunciations for stored-notation candidates, as returned by
+     *  Romanization.toStored() for a syllable typed in another system:
+     *  [{initial, final, tones}] (tones null = any tone). */
+    getMatchesForStored(candidates) {
+        if (!candidates?.length) return [];
+        return this.pronunciations.filter(p => candidates.some(c =>
+            p.initial === c.initial && p.final === c.final
+            && (!c.tones || c.tones.includes(String(p.tone ?? '')))
+        ));
     }
 
     getMatchesForSyllable(syl) {

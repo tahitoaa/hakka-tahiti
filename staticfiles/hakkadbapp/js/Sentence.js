@@ -29,7 +29,7 @@ class Sentence {
     // Parsing
     // -----------------------------
     parseToken(token) {
-        if (!token) return { hanzi: '', constraints: null, inline: null, raw: token };
+        if (!token) return { hanzi: '', constraints: null, inline: null, readings: [], raw: token };
 
         const parts = token.split(':');
         const base = parts[0];
@@ -43,13 +43,74 @@ class Sentence {
 
         const hanzi = base.replace(/\([^)]*\)/g, '').trim();
 
-        return { hanzi, constraints, inline, raw: token };
+        return { hanzi, constraints, inline, readings: Sentence.pinnedReadings(base), raw: token };
+    }
+
+    /** Readings pinned with the (pinyin) syntax, one slot per character of
+     *  the token's hanzi (null where nothing is pinned). An annotation
+     *  covers the run of hanzi (or "-" placeholders) right before it:
+     *    掃墳墓(sao4fun2mu4)  one syllable per character
+     *    先生(sen1)           fewer syllables: they go to the LAST characters
+     *    先(xien1)生(sen1)    one annotation per character
+     *  Same rule as text_to_words.resolve_pinyin() on the server. */
+    static pinnedReadings(base) {
+        const chars = [];
+        const readings = [];
+        let pending = [];
+        const isRun = (ch) => ch === '-' || /\p{Script=Han}/u.test(ch);
+        const re = /\(([^()]*)\)|([\s\S])/gu;
+        for (const m of String(base || '').matchAll(re)) {
+            if (m[2] !== undefined) {
+                chars.push(m[2]);
+                readings.push(null);
+                if (isRun(m[2])) pending.push(chars.length - 1);
+                else pending = [];
+                continue;
+            }
+            const syllables = m[1].match(/[a-zü][a-zü'’]*[0-8]?/gi) || [];
+            if (pending.length && syllables.length) {
+                const targets = syllables.length < pending.length
+                    ? pending.slice(pending.length - syllables.length)
+                    : pending;
+                targets.forEach((idx, k) => { readings[idx] = syllables[k]; });
+            }
+            pending = [];
+        }
+        return readings;
+    }
+
+    /** A word's syllables in stored notation (["sen1", "ngin2"]), from the
+     *  per-syllable data-initials/finals/tones when present, else split out
+     *  of its pinyin string after each tone digit. */
+    static wordSyllables(d) {
+        if (d.initials !== undefined && d.finals !== undefined) {
+            const is = String(d.initials).split(' ');
+            const fs = String(d.finals).split(' ');
+            const ts = String(d.tones || '').split(' ');
+            is.pop(); fs.pop(); ts.pop();
+            if (is.length && is.length === fs.length) return is.map((i, k) => `${i}${fs[k]}${ts[k] || ''}`);
+        }
+        return String(d.pinyin || '').match(/[^\d\s]+\d?/g) || [];
+    }
+
+    /** Does word dataset `d` read the way the token pins it? A pinned
+     *  reading without tone ("sen") accepts any tone. */
+    static agreesWithReadings(d, readings) {
+        if (!readings?.some(Boolean)) return true;
+        const syllables = Sentence.wordSyllables(d);
+        if (syllables.length !== readings.length) return false;
+        return readings.every((r, k) => {
+            if (!r) return true;
+            const pinned = r.toLowerCase().replace(/’/g, "'");
+            const actual = syllables[k].toLowerCase();
+            return pinned === actual || (!/\d$/.test(pinned) && actual.replace(/\d$/, '') === pinned);
+        });
     }
 
     // -----------------------------
     // Dictionary matching
     // -----------------------------
-    findMatches(hanzi, constraints) {
+    findMatches(hanzi, constraints, readings = null) {
         if (!hanzi) return [];
 
         let matches = this.dico.words.filter(w => {
@@ -58,6 +119,8 @@ class Sentence {
 
             if (!simp) return false;
             if (simp !== hanzi && trad !== hanzi) return false;
+            // A pinned reading (生(sen1)) rules out homophones read otherwise.
+            if (!Sentence.agreesWithReadings(d, readings)) return false;
 
             if (!constraints) return true;
 
@@ -92,12 +155,16 @@ class Sentence {
     // Unknown resolution
     // -----------------------------
     resolveUnknownPinyin(token) {
-        const { hanzi, inline } = this.parseToken(token);
+        const { hanzi, inline, readings } = this.parseToken(token);
+        const pinned = readings.some(Boolean);
 
-        if (inline) return inline;
-        if (!hanzi || hanzi === '-') return '';
+        // An annotation that isn't attached to any hanzi run is kept whole.
+        if (inline && !pinned) return inline;
+        if (!hanzi || (hanzi === '-' && !pinned)) return '';
 
-        return Array.from(hanzi).map(char => {
+        return Array.from(hanzi).map((char, k) => {
+            if (readings[k]) return readings[k];
+            if (char === '-') return '';
             const matches = this.dico.getMatchesForHanzi(char);
             if (!matches.length) return '?';
 
@@ -129,9 +196,9 @@ class Sentence {
         this.words = text ? text.trim().split(/\s+/) : [];
 
         this.matches = this.words.map(token => {
-            const { hanzi, constraints } = this.parseToken(token);
+            const { hanzi, constraints, readings } = this.parseToken(token);
 
-            const matches = this.findMatches(hanzi, constraints);
+            const matches = this.findMatches(hanzi, constraints, readings);
 
             return matches.length ? matches : [this.buildUnknownEntry(token)];
         });
@@ -141,12 +208,41 @@ class Sentence {
     // Helpers
     // -----------------------------
     superscriptTone(pinyin) {
-        const map = { "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶" };
-        return String(pinyin || '').replace(/[1-6]/g, d => map[d]);
+        const map = { "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸" };
+        return String(pinyin || '').replace(/[1-8]/g, d => map[d]);
     }
 
     renderPinyin(pinyin) {
         return this.superscriptTone(pinyin);
+    }
+
+    // Display-only pinyin in the transcription system picked in the header
+    // (Romanization.js / romanization.json). renderPinyin() above stays in
+    // the stored notation: expressions.js compares it against platform data
+    // and the transcripter exports it, so it must not depend on the menu.
+    // Without Romanization loaded (pages not extending base.html, unit
+    // tests) this is the stored notation with superscript tones.
+    displayPinyin(dataOrPinyin) {
+        const R = typeof Romanization !== 'undefined' ? Romanization : null;
+        const isData = dataOrPinyin && typeof dataOrPinyin === 'object';
+        // A dictionary fed from another notation (Dictionary.useSource())
+        // can't be converted: Romanization only parses Wenfa syllables.
+        if (!R || !R.systems().length || this.dico?.notation === 'source') {
+            return this.renderPinyin(isData ? dataOrPinyin.pinyin : dataOrPinyin);
+        }
+        return isData ? R.fromDataset(dataOrPinyin) : R.fromPinyin(dataOrPinyin);
+    }
+
+    // displayPinyin() as self-updating HTML (Pronunciation.span()): badges,
+    // popups and furigana then follow the header menu without the page
+    // re-rendering (expressions.js builds its rows once). Not for text
+    // that gets copied -- renderDisplayPinyinLine() stays plain.
+    displayPinyinHtml(dataOrPinyin) {
+        const text = this.displayPinyin(dataOrPinyin);
+        const stored = dataOrPinyin && typeof dataOrPinyin === 'object' ? dataOrPinyin.pinyin : dataOrPinyin;
+        const live = typeof Romanization !== 'undefined' && Romanization.systems().length
+            && this.dico?.notation !== 'source' && stored;
+        return live ? `<span data-py="${escapeAttr(stored)}">${text}</span>` : text;
     }
 
 renderFurigana() {
@@ -158,17 +254,17 @@ renderFurigana() {
 
                 const hanzi = pickHanzi(data) || tokenObj.hanzi || tokenObj.raw || '?';
 
-                let pinyin = data.pinyin || '';
+                let pinyin = data.pinyin ? this.displayPinyinHtml(data) : '';
                 if (!pinyin) {
                     const resolved = this.resolveUnknownPinyin(this.words?.[i] || '');
-                    pinyin = resolved || '?';
+                    pinyin = resolved ? this.displayPinyinHtml(resolved) : '?';
                 }
 
                 return `
                     <span class="inline-flex flex-col items-center text-center align-top gap-[1px] mr-1">
 
                         <span class="text-[10px] italic leading-none text-[var(--sentence-text-muted)]">
-                            ${this.renderPinyin(pinyin)}
+                            ${pinyin}
                         </span>
 
                         <span class="hanzi text-base leading-tight font-semibold">
@@ -197,6 +293,20 @@ renderFurigana() {
 
             const resolved = this.resolveUnknownPinyin(this.words[i]);
             return resolved ? this.renderPinyin(resolved) : '?';
+        }).join(' ');
+    }
+
+    // Same as renderPinyinLine(), in the selected transcription system --
+    // for what's shown to the reader, never for comparisons/exports.
+    renderDisplayPinyinLine() {
+        return this.matches.map((group, i) => {
+            const best = group?.[0];
+            const data = best?.dataset || best;
+
+            if (data?.pinyin) return this.displayPinyin(data);
+
+            const resolved = this.resolveUnknownPinyin(this.words[i]);
+            return resolved ? this.displayPinyin(resolved) : '?';
         }).join(' ');
     }
 
@@ -260,7 +370,7 @@ renderFurigana() {
         <span onclick="toggleDetail(${index})" class="relative inline-flex flex-col justify-between items-center rounded-lg px-1.5 py-1 ${colorClass} min-w-[3.5rem] max-w-[5.5rem] h-[3.75rem] cursor-pointer">
 
             <div class="text-[9px] italic leading-none truncate w-full text-center">
-                ${this.renderPinyin(data.pinyin)}
+                ${this.displayPinyinHtml(data)}
             </div>
 
             <div class="hanzi text-base font-semibold leading-tight truncate w-full text-center">
@@ -288,7 +398,7 @@ renderFurigana() {
                         return `
                             <div class="flex items-center gap-2 text-[13px] leading-snug py-1.5 px-1" title="${escapeAttr(d.french || '?')}">
                                 <span class="hanzi text-base font-semibold shrink-0">${pickHanzi(d) || '?'}</span>
-                                <span class="italic text-[var(--sentence-text-muted)] text-[11px] shrink-0">${this.renderPinyin(d.pinyin)}</span>
+                                <span class="italic text-[var(--sentence-text-muted)] text-[11px] shrink-0">${this.displayPinyinHtml(d)}</span>
                                 <span class="flex-1 min-w-0">${escapeAttr(d.french || '?')}</span>
                                 ${d.category ? `<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[var(--sentence-preview-border)]">${escapeAttr(d.category)}</span>` : ""}
                             </div>
@@ -319,7 +429,7 @@ renderFurigana() {
         }
 
         const rows = [
-            ['Pinyin', this.renderPinyin(data.pinyin)],
+            ['Pinyin', this.displayPinyinHtml(data)],
             ['Simplifié', data.simp],
             ['Traditionnel', data.trad],
             ['Français', data.french],
@@ -365,7 +475,7 @@ renderFurigana() {
     // Main render
     // -----------------------------
     render() {
-        const pinyinLine = this.renderPinyinLine();
+        const pinyinLine = this.renderDisplayPinyinLine();
         const hanziLine = this.renderHanziLine();
 
         return `

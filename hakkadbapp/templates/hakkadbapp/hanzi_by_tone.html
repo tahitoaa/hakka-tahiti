@@ -8,7 +8,7 @@
                 <span class="trad hidden">{{ p.trad }}</span>
               </span>
               <span class="text-sm">
-                {{ p.pinyin }}
+                {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
               </span>
             </a>
   {% endfor %}

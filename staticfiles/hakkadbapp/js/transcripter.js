@@ -520,8 +520,8 @@ class LabelView {
             // Sans-serif container: only the hanzi run below gets the dedicated
             // hanzi font, so pinyin (tone-superscript digits included) doesn't
             // render in a calligraphic face meant for characters.
-            pinyinHanzi: createEl('div', '', {}, this.sentences.map((s) => `${s.renderPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`).join('<br>')),
-            pinyin: createEl('div', '', {}, this.sentences.map((s) => s.renderPinyinLine()).join('<br>')),
+            pinyinHanzi: createEl('div', '', {}, this.sentences.map((s) => `${s.renderDisplayPinyinLine()} <span class="hanzi">${s.renderHanziLine()}</span>`).join('<br>')),
+            pinyin: createEl('div', '', {}, this.sentences.map((s) => s.renderDisplayPinyinLine()).join('<br>')),
             french: createEl('div', '', {}, frenchLine),
             words: createEl('div', '', {},
                 `<span class="block mb-2 text-sm italic text-gray-700">${frenchLine}</span>` +
@@ -754,6 +754,21 @@ class Controller {
 
         this.bindStaticControls();
         this.bindKeyboard();
+
+        // Pinyin is baked into each label's rendered strings, so switching
+        // the transcription system in the header needs an explicit redraw.
+        // ...and the input system (header display system when "Saisie en"
+        // is "comme l'affichage") changes which hanzi each typed syllable
+        // suggests, so every label is re-parsed first.
+        const refreshLabels = () => {
+            this.view.views.forEach((labelView) => {
+                labelView.label.model.update({ hanzi: labelView.label.model.text });
+                labelView.render(labelView.label);
+            });
+            this.view.renderDisplays();
+        };
+        document.addEventListener('romanization-change', refreshLabels);
+        document.addEventListener('romanization-input-change', refreshLabels);
 
         goToLabel(1);
     }
