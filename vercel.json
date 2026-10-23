@@ -1,5 +1,4 @@
 {
-  "regions": ["sfo1"],
   "routes": [
     { "src": "/static/(.*)", "dest": "/staticfiles/$1" },
     { "src": "/(.*)", "dest": "api/index.py" }
