@@ -3,3 +3,14 @@ __pycache__/
 hakkadbapp/data/*
 *.sqlite3
 *.log
+*.env
+
+# Outils de dev, tests et docs (inutiles en production)
+Dockerfile
+deploy.bat
+README.md
+populate_db.py
+package.json
+tests/
+node_modules/
+venv/
