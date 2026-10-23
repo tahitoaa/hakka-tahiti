@@ -126,19 +126,9 @@ class Controller{
         });
         try { localStorage.setItem(Controller.SOURCE_KEY, source); } catch (e) { /* private mode */ }
 
-        // Typing in another system only applies to the lexicon (Wenfa
-        // storage); the Bao'an dictionary is typed in its own notation.
-        const inputMenu = document.getElementById('romanization-input-menu');
-        if (inputMenu) {
-            inputMenu.disabled = source !== 'db';
-            inputMenu.title = source === 'db'
-                ? ''
-                : "Désactivé en mode Dictionnaire Bao'an : la saisie se fait dans la notation du dictionnaire.";
-        }
-
         if (source === 'db') {
             this.dico.useSource(null);
-            this.view.input.placeholder = Controller.inputExample();
+            this.view.input.placeholder = this.inputExample();
             this.sourceStatus.textContent =
                 `Lexique de la base : ${this.dico.pronunciations.length} prononciations, ${this.dico.words.length} mots.`;
             this.handleInput();
@@ -151,8 +141,11 @@ class Controller{
             this.dictPromise ??= Dictionary.fetchSourcePronunciations(this.sourceSwitch.dataset.dictUrl);
             const { meta, prons } = await this.dictPromise;
             if (this.source !== 'dict') return; // toggled back while loading
-            this.dico.useSource(prons);
-            this.view.input.placeholder = "Ex: wuk7 ka1 hau3 t'ai3";
+            // The dictionary is spelled in the "baoan" system of
+            // romanization.json: typed in Bao'an it's matched directly, typed
+            // in Wenfa (or another system) through its Wenfa equivalents.
+            this.dico.useSource(prons, { system: this.sourceSwitch.dataset.dictSystem || null });
+            this.view.input.placeholder = this.inputExample();
             this.sourceStatus.textContent =
                 `${meta.title || 'Dictionnaire'} — ${meta.author || ''} : ${prons.length} prononciations (sans mots ni traductions).`;
             this.handleInput();
@@ -166,9 +159,12 @@ class Controller{
 
     /** "Ex: …" placeholder in the current input system, tones as digits
      *  since that's how they're typed. */
-    static inputExample() {
+    inputExample() {
         const sample = 'wuk5 ga1 hao3 tai4';
         if (typeof Romanization === 'undefined' || !Romanization.systems().length) return `Ex: ${sample}`;
+        if (this.source === 'dict' && Romanization.inputSystem() === this.dico.sourceSystem) {
+            return "Ex: wuk7 ka1 hau3 t'ai3"; // the dictionary's own spelling
+        }
         const typed = Romanization.fromPinyin(sample, Romanization.inputSystem())
             .replace(/[¹²³⁴⁵⁶⁷⁸]/g, (c) => '¹²³⁴⁵⁶⁷⁸'.indexOf(c) + 1);
         return `Ex: ${typed}`;
@@ -259,7 +255,7 @@ class Controller{
 
     // Input change
     handleInput(event) {
-        if (this.source !== 'dict') this.view.input.placeholder = Controller.inputExample();
+        this.view.input.placeholder = this.inputExample();
         this.dico.unknowns.clear();
         const text = this.view.input.value;
         this.model.update(text);

@@ -26,17 +26,107 @@ class Dictionary {
      *  to the Supabase lexicon with `useSource(null)`. An external source
      *  has no words (only character readings), so word matching is off and
      *  every hanzi is resolved character by character. */
-    useSource(pronunciations) {
+    useSource(pronunciations, { system = null } = {}) {
         this.unknowns.clear();
+        this.sourceIndex = null;
         if (!pronunciations) {
             this.pronunciations = this.dbPronunciations;
             this.words = this.dbWords;
             this.notation = 'wenfa';
+            this.sourceSystem = null;
             return;
         }
         this.pronunciations = pronunciations;
         this.words = [];
         this.notation = 'source';
+        // Transcription system (romanization.json id) the source is spelled
+        // in, when there is one: lets it be typed in Wenfa too, see
+        // getSourceMatchesForStored().
+        this.sourceSystem = system;
+    }
+
+    /** External-source readings for stored-notation candidates (typed in
+     *  Wenfa, or converted to it by Romanization.typedToStored): each
+     *  source reading is mapped once to its Wenfa equivalents
+     *  (Romanization.sourceToStored, e.g. Bao'an tsai3 -> zai/zhai/jai in
+     *  tone 3 or 4), and matches when initial/final agree and the tones
+     *  overlap (typed tone null = any). */
+    getSourceMatchesForStored(candidates) {
+        if (!candidates?.length || !this.sourceSystem || typeof Romanization === 'undefined') return [];
+        if (!this.sourceIndex) {
+            this.sourceIndex = new Map();
+            this.pronunciations.forEach((pron) => {
+                Romanization.sourceToStored(pron.initial + pron.final, pron.tone, this.sourceSystem).forEach((c) => {
+                    const key = `${c.initial}|${c.final}`;
+                    if (!this.sourceIndex.has(key)) this.sourceIndex.set(key, []);
+                    this.sourceIndex.get(key).push({ pron, tones: c.tones });
+                });
+            });
+        }
+        const found = new Set();
+        candidates.forEach((c) => {
+            (this.sourceIndex.get(`${c.initial}|${c.final}`) || []).forEach((entry) => {
+                if (!c.tones || !entry.tones || entry.tones.some((t) => c.tones.includes(t))) found.add(entry.pron);
+            });
+        });
+        return [...found];
+    }
+
+    /** The Wenfa reading to pin in the text for a picked pronunciation:
+     *  pinned readings (生(sen1)) are always written in the stored notation,
+     *  whatever the source of the suggestions. A lexicon reading is already
+     *  Wenfa. A reading of the external dictionary (Bao'an ka¹) is mapped to
+     *  its Wenfa equivalents and one is chosen, in this order:
+     *    1. a reading the Wenfa lexicon has for this very character;
+     *    2. the syllable as typed (`typed`, in `inputSystem`), if it fits;
+     *    3. the mapping's most likely equivalent (its exact tone first).
+     *  Falls back to the source spelling only if nothing maps at all. */
+    wenfaReadingFor(pron, typed = '', inputSystem = null) {
+        const stored = (i, f, t) => `${i}${f}${t ?? ''}`;
+        const R = typeof Romanization !== 'undefined' ? Romanization : null;
+        if (this.notation !== 'source' || !this.sourceSystem || !R?.systems().length) {
+            return stored(pron.initial, pron.final, pron.tone);
+        }
+        const tone = String(pron.tone ?? '');
+        const candidates = R.sourceToStored(pron.initial + pron.final, tone, this.sourceSystem);
+        if (!candidates.length) return stored(pron.initial, pron.final, tone);
+        const fits = (i, f, t) => candidates.some((c) => c.initial === i && c.final === f && (!c.tones || c.tones.includes(t)));
+        const typedCandidates = typed ? R.typedToStored(typed, inputSystem || R.storedSystem()) : [];
+        const wasTyped = (i, f, t) => typedCandidates.some((c) => c.initial === i && c.final === f && (!c.tones || c.tones.includes(t)));
+
+        // 1. The lexicon's own reading of this character.
+        const sameChar = (p) => [p.simp, p.trad].some((h) => h && (h === pron.simp || h === pron.trad));
+        const lexicon = (this.dbPronunciations || []).filter((p) => sameChar(p) && fits(p.initial, p.final, String(p.tone ?? '')));
+        if (lexicon.length) {
+            const p = lexicon.find((q) => wasTyped(q.initial, q.final, String(q.tone ?? ''))) || lexicon[0];
+            return stored(p.initial, p.final, p.tone);
+        }
+
+        // 2. What was typed, when it's a complete (toned) fitting reading.
+        for (const c of typedCandidates) {
+            if (c.tones?.length === 1 && fits(c.initial, c.final, c.tones[0])) return stored(c.initial, c.final, c.tones[0]);
+        }
+
+        // 3. Most likely equivalent: typed initial/final if they fit, then
+        //    the exact reverse of the tone map, then any allowed tone.
+        const c = candidates.find((x) => typedCandidates.some((y) => y.initial === x.initial && y.final === x.final)) || candidates[0];
+        const likely = R.exactStoredTones(tone, this.sourceSystem);
+        const t = likely.find((x) => !c.tones || c.tones.includes(x)) || c.tones?.[0] || tone;
+        return stored(c.initial, c.final, t);
+    }
+
+    /** Readings of the external dictionary for `char` that a pinned Wenfa
+     *  reading stands for (家 + "ga1" -> ka¹): how a Wenfa annotation is
+     *  shown while the page displays the dictionary's own notation. */
+    sourceReadingsFor(char, wenfaReading) {
+        const R = typeof Romanization !== 'undefined' ? Romanization : null;
+        if (this.notation !== 'source' || !this.sourceSystem || !R?.systems().length) return [];
+        const [w] = R.typedToStored(wenfaReading, R.storedSystem());
+        if (!w) return [];
+        return this.pronunciations.filter((p) => (p.simp === char || p.trad === char)
+            && R.sourceToStored(p.initial + p.final, p.tone, this.sourceSystem).some((c) =>
+                c.initial === w.initial && c.final === w.final
+                && (!c.tones || !w.tones || c.tones.some((t) => w.tones.includes(t)))));
     }
 
     /** Fetches the compact Bao'an dictionary file written by

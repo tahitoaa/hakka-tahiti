@@ -35,7 +35,7 @@ class HakkaText extends SyllableInputModel {
     select(selectionIndex){
         const suggestion = this.suggestions[selectionIndex];
         if (!suggestion) return;
-        this.replace(suggestion.for, this.textFor(suggestion.pron));
+        this.replace(suggestion.for, this.textFor(suggestion.pron, this.syllables[suggestion.for]));
         this.update({"hanzi": this.text});
     }
 }

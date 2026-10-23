@@ -10,6 +10,7 @@
        alternatives (converter.js / Dictionary.useSource()). -->
   <div id="source-switch" role="group" aria-label="Source des prononciations"
        data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
+       data-dict-system="baoan"
        class="inline-flex rounded-full bg-white border border-gray-300 p-1 shadow-sm text-sm mb-2">
     <button type="button" data-source="db" aria-pressed="true"
             class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
@@ -33,8 +34,11 @@
       (ex. <code>wuk_ga_</code>) <br>
     </span>
     <span data-source-hint="dict" hidden>
-      Taper la romanisation du dictionnaire 客家話大辭典（寶安腔）(ex. <code>wuk7ka1</code>, <code>k'ak7</code>) :
-      tons 1, 2, 3, 5, 7, 8 ; l'apostrophe marque l'aspiration.
+      Saisie en Wenfa (par défaut) : taper le pinyin Wenfa habituel (ex. <code>wuk5ga1</code>) ; les lectures
+      du dictionnaire 客家話大辭典（寶安腔）sont retrouvées via leur équivalent Wenfa, avec des tons approchés
+      (un ton 4 Wenfa trouve les tons ³ et ⁵ du dictionnaire). <br>
+      Saisie en Bao'an : taper la romanisation du dictionnaire (ex. <code>wuk7ka1</code>, <code>k'ak7</code>) :
+      tons 1, 2, 3, 5, 7, 8 ; l'apostrophe marque l'aspiration. <br>
       <code>_</code> pour ne pas signifier le ton (ex. <code>wuk_ka_</code>). <br>
       Seules les prononciations du dictionnaire sont utilisées (pas les mots ni les traductions du lexique). <br>
     </span>

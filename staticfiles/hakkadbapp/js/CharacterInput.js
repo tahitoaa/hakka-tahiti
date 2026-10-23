@@ -58,7 +58,16 @@ class SyllableInputModel {
     lookup(syl) {
         const R = typeof Romanization !== 'undefined' ? Romanization : null;
         const system = R?.systems().length ? R.inputSystem() : null;
-        if (system && system !== R.storedSystem() && this.dico.notation !== 'source' && this.dico.getMatchesForStored) {
+        if (this.dico.notation === 'source') {
+            // External dictionary (Bao'an): typed in its own spelling, matched
+            // directly; typed in any other system (Wenfa by default), matched
+            // through the Wenfa equivalents of its readings.
+            if (system && this.dico.sourceSystem && system !== this.dico.sourceSystem && this.dico.getSourceMatchesForStored) {
+                return this.dico.getSourceMatchesForStored(R.typedToStored(syl, system));
+            }
+            return this.dico.getMatchesForSyllable(syl.split('_')[0].replace(/’/g, "'"));
+        }
+        if (system && system !== R.storedSystem() && this.dico.getMatchesForStored) {
             return this.dico.getMatchesForStored(R.toStored(syl, system));
         }
         return this.dico.getMatchesForSyllable(syl.split('_')[0].replace(/’/g, "'"));
@@ -69,21 +78,28 @@ class SyllableInputModel {
      *  the character with the chosen reading pinned, 生(sen1), so the
      *  transcription keeps that reading instead of guessing between
      *  homophones later. Same (pinyin) syntax Sentence.parseToken() and the
-     *  server's text_to_words.resolve_pinyin() read back. */
-    textFor(pron) {
+     *  server's text_to_words.resolve_pinyin() read back. The pinned reading
+     *  is always Wenfa (the stored notation), even when the suggestion came
+     *  from the Bao'an dictionary (Dictionary.wenfaReadingFor); `typed` is
+     *  the syllable that was typed, to help choose between equivalents. */
+    textFor(pron, typed = '') {
         const char = pron.simp;
         if (!char || !this.dico?.getMatchesForHanzi) return char;
         const readings = new Set(
             this.dico.getMatchesForHanzi(char).map((p) => `${p.initial}${p.final}${p.tone ?? ''}`)
         );
         if (readings.size < 2) return char;
-        return `${char}(${pron.initial}${pron.final}${pron.tone ?? ''})`;
+        const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
+        const reading = this.dico.wenfaReadingFor
+            ? this.dico.wenfaReadingFor(pron, typed, R ? R.inputSystem() : null)
+            : `${pron.initial}${pron.final}${pron.tone ?? ''}`;
+        return `${char}(${reading})`;
     }
 
     select(selectionIndex) {
         const suggestion = this.suggestions[selectionIndex];
         if (!suggestion) return;
-        this.replace(suggestion.for, this.textFor(suggestion.pron));
+        this.replace(suggestion.for, this.textFor(suggestion.pron, this.syllables[suggestion.for]));
         this.parse(this.text);
     }
 

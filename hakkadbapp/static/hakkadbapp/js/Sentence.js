@@ -163,7 +163,7 @@ class Sentence {
         if (!hanzi || (hanzi === '-' && !pinned)) return '';
 
         return Array.from(hanzi).map((char, k) => {
-            if (readings[k]) return readings[k];
+            if (readings[k]) return this.pinnedForDisplay(char, readings[k]);
             if (char === '-') return '';
             const matches = this.dico.getMatchesForHanzi(char);
             if (!matches.length) return '?';
@@ -174,6 +174,16 @@ class Sentence {
 
             return prons.length ? [...new Set(prons)].join('/') : '?';
         }).join('');
+    }
+
+    /** A pinned reading is Wenfa; with the Bao'an dictionary loaded the
+     *  page shows that dictionary's notation, so it's shown as the
+     *  dictionary reading(s) it stands for (家(ga1) -> ka¹), or as written
+     *  when none matches. */
+    pinnedForDisplay(char, reading) {
+        if (this.dico?.notation !== 'source' || !this.dico.sourceReadingsFor) return reading;
+        const prons = this.dico.sourceReadingsFor(char, reading);
+        return prons.length ? [...new Set(prons.map((p) => p.abstractPinyin()))].join('/') : reading;
     }
 
     buildUnknownEntry(token) {
