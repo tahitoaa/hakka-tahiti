@@ -129,7 +129,12 @@ class Controller{
         // Typing in another system only applies to the lexicon (Wenfa
         // storage); the Bao'an dictionary is typed in its own notation.
         const inputMenu = document.getElementById('romanization-input-menu');
-        if (inputMenu) inputMenu.disabled = source !== 'db';
+        if (inputMenu) {
+            inputMenu.disabled = source !== 'db';
+            inputMenu.title = source === 'db'
+                ? ''
+                : "Désactivé en mode Dictionnaire Bao'an : la saisie se fait dans la notation du dictionnaire.";
+        }
 
         if (source === 'db') {
             this.dico.useSource(null);
