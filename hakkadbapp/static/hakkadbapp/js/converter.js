@@ -95,8 +95,8 @@ class Controller{
         document.addEventListener('hanzi-mode-change', () => this.view.render(this.model.text));
         // Display system: re-render; with "Saisie en: comme l'affichage" it
         // is also the input system, so suggestions are recomputed too.
-        document.addEventListener('romanization-change', () => this.handleInput());
-        document.addEventListener('romanization-input-change', () => this.handleInput());
+        document.addEventListener('romanization-change', () => { this.handleInput(); this.renderSummary(); });
+        document.addEventListener('romanization-input-change', () => { this.handleInput(); this.renderSummary(); });
     }
 
     /** Mutually exclusive sources for the readings offered while typing:
@@ -121,6 +121,22 @@ class Controller{
         this.setSource(this.sourceButton(saved) ? saved : 'db');
     }
 
+    /** One sentence saying what the three settings add up to, with
+     *  something to type: "Tapez en Wenfa (ex. wuk5 ga1 hao3 tai4) →
+     *  lectures de l'index McIver → affichées en McIver". */
+    renderSummary() {
+        const el = document.getElementById('settings-summary');
+        if (!el || typeof Romanization === 'undefined' || !Romanization.systems().length) return;
+        const button = this.sourceButton(this.source);
+        const source = this.source === 'db' || !button
+            ? 'mots et lectures du lexique Wenfa'
+            : `lectures du dictionnaire ${button.textContent.trim()}`;
+        const example = this.inputExample().replace(/^Ex: /, '');
+        el.innerHTML = `Tapez en <b>${Romanization.label(Romanization.inputSystem())}</b> `
+            + `(ex. <code>${example.replace(/</g, '&lt;')}</code>) → ${source} → `
+            + `affichage en <b>${Romanization.label(Romanization.current())}</b>.`;
+    }
+
     sourceButton(source) {
         return source ? this.sourceSwitch.querySelector(`[data-source="${CSS.escape(source)}"]`) : null;
     }
@@ -136,12 +152,14 @@ class Controller{
             el.hidden = el.dataset.sourceHint !== (source === 'db' ? 'db' : 'dict');
         });
         try { localStorage.setItem(Controller.SOURCE_KEY, source); } catch (e) { /* private mode */ }
+        this.renderSummary();
 
         if (source === 'db' || !button?.dataset.dictUrl) {
             this.dico.useSource(null);
             this.view.input.placeholder = this.inputExample();
             this.sourceStatus.textContent = status
-                || `Lexique de la base : ${this.dico.pronunciations.length} prononciations, ${this.dico.words.length} mots.`;
+                || `Lexique de l'association · ${this.dico.pronunciations.length.toLocaleString('fr-FR')} lectures · `
+                + `${this.dico.words.length.toLocaleString('fr-FR')} mots`;
             this.handleInput();
             return;
         }
@@ -156,9 +174,10 @@ class Controller{
             // typed in Wenfa (or another system) through its Wenfa equivalents.
             this.dico.useSource(prons, { system: button.dataset.dictSystem || null });
             this.view.input.placeholder = this.inputExample();
+            this.renderSummary();
             this.sourceStatus.textContent =
-                `${meta.title || button.textContent.trim()}${meta.author ? ` — ${meta.author}` : ''} : `
-                + `${prons.length} prononciations (sans mots ni traductions).`;
+                `${meta.title || button.textContent.trim()}${meta.author ? `, ${meta.author}` : ''} · `
+                + `${prons.length.toLocaleString('fr-FR')} lectures · sans mots ni traductions`;
             this.handleInput();
         } catch (err) {
             console.error(err);
