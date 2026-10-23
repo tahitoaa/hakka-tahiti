@@ -99,61 +99,71 @@ class Controller{
         document.addEventListener('romanization-input-change', () => this.handleInput());
     }
 
-    /** Two mutually exclusive sources for the readings offered while
-     *  typing: 'db' = the Supabase lexicon embedded in the page (default),
-     *  'dict' = the Bao'an dictionary index (hakka_dict_prons.json, fetched
-     *  on first use only). The choice is remembered per browser. */
+    /** Mutually exclusive sources for the readings offered while typing:
+     *  'db' = the Supabase lexicon embedded in the page (default), or one of
+     *  the dictionary indexes declared as buttons in converter.html
+     *  (data-source="baoan", "mciver"... with data-dict-url, its compact
+     *  file fetched on first use only, and data-dict-system, the system of
+     *  romanization.json it's spelled in). The choice is remembered per
+     *  browser. */
     bindSourceSwitch() {
         this.sourceSwitch = document.getElementById('source-switch');
         if (!this.sourceSwitch) return;
         this.sourceStatus = document.getElementById('source-status');
+        this.dictPromises = {};
         this.sourceSwitch.addEventListener('click', (event) => {
             const btn = event.target.closest('[data-source]');
             if (btn) this.setSource(btn.dataset.source);
         });
         let saved = null;
         try { saved = localStorage.getItem(Controller.SOURCE_KEY); } catch (e) { /* private mode */ }
-        this.setSource(saved === 'dict' ? 'dict' : 'db');
+        if (saved === 'dict') saved = 'baoan'; // value saved before there were several dictionaries
+        this.setSource(this.sourceButton(saved) ? saved : 'db');
     }
 
-    async setSource(source) {
+    sourceButton(source) {
+        return source ? this.sourceSwitch.querySelector(`[data-source="${CSS.escape(source)}"]`) : null;
+    }
+
+    async setSource(source, { status = null } = {}) {
+        const button = this.sourceButton(source);
         this.source = source;
         this.sourceSwitch.querySelectorAll('[data-source]').forEach((btn) => {
             btn.setAttribute('aria-pressed', String(btn.dataset.source === source));
         });
+        // Hints: data-source-hint="db" for the lexicon, "dict" for any dictionary.
         document.querySelectorAll('[data-source-hint]').forEach((el) => {
-            el.hidden = el.dataset.sourceHint !== source;
+            el.hidden = el.dataset.sourceHint !== (source === 'db' ? 'db' : 'dict');
         });
         try { localStorage.setItem(Controller.SOURCE_KEY, source); } catch (e) { /* private mode */ }
 
-        if (source === 'db') {
+        if (source === 'db' || !button?.dataset.dictUrl) {
             this.dico.useSource(null);
             this.view.input.placeholder = this.inputExample();
-            this.sourceStatus.textContent =
-                `Lexique de la base : ${this.dico.pronunciations.length} prononciations, ${this.dico.words.length} mots.`;
+            this.sourceStatus.textContent = status
+                || `Lexique de la base : ${this.dico.pronunciations.length} prononciations, ${this.dico.words.length} mots.`;
             this.handleInput();
             return;
         }
 
         this.sourceStatus.textContent = 'Chargement du dictionnaire…';
         try {
-            // One fetch per page load, shared by every later toggle.
-            this.dictPromise ??= Dictionary.fetchSourcePronunciations(this.sourceSwitch.dataset.dictUrl);
-            const { meta, prons } = await this.dictPromise;
-            if (this.source !== 'dict') return; // toggled back while loading
-            // The dictionary is spelled in the "baoan" system of
-            // romanization.json: typed in Bao'an it's matched directly, typed
-            // in Wenfa (or another system) through its Wenfa equivalents.
-            this.dico.useSource(prons, { system: this.sourceSwitch.dataset.dictSystem || null });
+            // One fetch per dictionary and page load, shared by later toggles.
+            this.dictPromises[source] ??= Dictionary.fetchSourcePronunciations(button.dataset.dictUrl);
+            const { meta, prons } = await this.dictPromises[source];
+            if (this.source !== source) return; // switched again while loading
+            // Typed in the dictionary's own system it's matched directly;
+            // typed in Wenfa (or another system) through its Wenfa equivalents.
+            this.dico.useSource(prons, { system: button.dataset.dictSystem || null });
             this.view.input.placeholder = this.inputExample();
             this.sourceStatus.textContent =
-                `${meta.title || 'Dictionnaire'} — ${meta.author || ''} : ${prons.length} prononciations (sans mots ni traductions).`;
+                `${meta.title || button.textContent.trim()}${meta.author ? ` — ${meta.author}` : ''} : `
+                + `${prons.length} prononciations (sans mots ni traductions).`;
             this.handleInput();
         } catch (err) {
             console.error(err);
-            this.dictPromise = null;
-            this.sourceStatus.textContent = 'Impossible de charger le dictionnaire : retour au lexique de la base.';
-            this.setSource('db');
+            delete this.dictPromises[source];
+            this.setSource('db', { status: 'Impossible de charger le dictionnaire : retour au lexique de la base.' });
         }
     }
 
@@ -162,8 +172,9 @@ class Controller{
     inputExample() {
         const sample = 'wuk5 ga1 hao3 tai4';
         if (typeof Romanization === 'undefined' || !Romanization.systems().length) return `Ex: ${sample}`;
-        if (this.source === 'dict' && Romanization.inputSystem() === this.dico.sourceSystem) {
-            return "Ex: wuk7 ka1 hau3 t'ai3"; // the dictionary's own spelling
+        const button = this.source !== 'db' ? this.sourceButton(this.source) : null;
+        if (button?.dataset.dictExample && Romanization.inputSystem() === this.dico.sourceSystem) {
+            return `Ex: ${button.dataset.dictExample}`; // the dictionary's own spelling
         }
         const typed = Romanization.fromPinyin(sample, Romanization.inputSystem())
             .replace(/[¹²³⁴⁵⁶⁷⁸]/g, (c) => '¹²³⁴⁵⁶⁷⁸'.indexOf(c) + 1);

@@ -6,19 +6,32 @@
     Écrire en hakka
   </label>
 
-  <!-- Source of the readings offered while typing: the two are exclusive
-       alternatives (converter.js / Dictionary.useSource()). -->
+  <!-- Source of the readings offered while typing: exclusive alternatives
+       (converter.js / Dictionary.useSource()). A dictionary is one button:
+       data-dict-url = its compact file (manage.py build_dict_index),
+       data-dict-system = the romanization.json system it's spelled in,
+       data-dict-example = a sample typed in that spelling. -->
   <div id="source-switch" role="group" aria-label="Source des prononciations"
-       data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
-       data-dict-system="baoan"
-       class="inline-flex rounded-full bg-white border border-gray-300 p-1 shadow-sm text-sm mb-2">
+       class="inline-flex flex-wrap justify-center rounded-full bg-white border border-gray-300 p-1 shadow-sm text-sm mb-2">
     <button type="button" data-source="db" aria-pressed="true"
             class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
       Lexique Wenfa
     </button>
-    <button type="button" data-source="dict" aria-pressed="false"
+    <button type="button" data-source="baoan" aria-pressed="false"
+            data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
+            data-dict-system="baoan"
+            data-dict-example="wuk7 ka1 hau3 t'ai3"
+            title="客家話大辭典（寶安腔）, 陳志明"
             class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
       Dictionnaire Bao'an
+    </button>
+    <button type="button" data-source="mciver" aria-pressed="false"
+            data-dict-url="{% static 'hakkadbapp/data/mciver_prons.json' %}"
+            data-dict-system="mciver"
+            data-dict-example="vuk7 ka1 hau3 thai5"
+            title="McIver, A Chinese-English Dictionary, Hakka-Dialect (Hakka Index)"
+            class="source-btn min-h-9 px-3 py-1.5 rounded-full touch-manipulation">
+      McIver
     </button>
   </div>
   <small id="source-status" class="text-gray-500 block mb-2" aria-live="polite"></small>
@@ -35,10 +48,11 @@
     </span>
     <span data-source-hint="dict" hidden>
       Saisie en Wenfa (par défaut) : taper le pinyin Wenfa habituel (ex. <code>wuk5ga1</code>) ; les lectures
-      du dictionnaire 客家話大辭典（寶安腔）sont retrouvées via leur équivalent Wenfa, avec des tons approchés
-      (un ton 4 Wenfa trouve les tons ³ et ⁵ du dictionnaire). <br>
-      Saisie en Bao'an : taper la romanisation du dictionnaire (ex. <code>wuk7ka1</code>, <code>k'ak7</code>) :
-      tons 1, 2, 3, 5, 7, 8 ; l'apostrophe marque l'aspiration. <br>
+      du dictionnaire choisi sont retrouvées via leur équivalent Wenfa, avec des tons approchés
+      (ex. un ton 4 Wenfa trouve les tons ³ et ⁵ du dictionnaire Bao'an). <br>
+      Saisie dans la notation du dictionnaire (« Saisie en » Bao'an ou McIver) : ex. Bao'an <code>wuk7ka1</code>,
+      <code>k'ak7</code> (l'apostrophe marque l'aspiration) ; McIver <code>vuk7ka1</code>, <code>khak7</code>
+      (le h marque l'aspiration). Tons notés 1, 2, 3, 5, 7, 8 pour les deux. <br>
       <code>_</code> pour ne pas signifier le ton (ex. <code>wuk_ka_</code>). <br>
       Seules les prononciations du dictionnaire sont utilisées (pas les mots ni les traductions du lexique). <br>
     </span>
