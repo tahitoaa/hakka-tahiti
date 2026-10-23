@@ -7,7 +7,7 @@
     {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
 </div>
 {% endif %}
-{% include "hakkadbapp/components/hanzi_block.html" with hanzi=hanzi simp=simp trad=trad pronunciations=pronunciations related_words=related_words related_expressions=related_expressions %}
+{% include "hakkadbapp/components/hanzi_block.html" with hanzi=hanzi simp=simp trad=trad pronunciations=pronunciations related_words=related_words related_expressions=related_expressions comparison=comparison %}
 <script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/WordNotes.js' %}"></script>
 {% endblock %}

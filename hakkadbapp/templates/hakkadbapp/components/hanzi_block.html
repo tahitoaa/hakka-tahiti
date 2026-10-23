@@ -16,6 +16,10 @@
         {% endif %}
     </div>
 
+    {% if comparison %}
+    {% include "hakkadbapp/components/source_comparison.html" with comparison=comparison %}
+    {% endif %}
+
     <!-- Words built around this character, one block each -->
     <section class="rosace-section">
         <h2 class="rosace-section-title">Mots</h2>

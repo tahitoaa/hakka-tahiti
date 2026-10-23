@@ -32,6 +32,7 @@ from .text_to_words import (
 from .illustrations import illustration_for
 from . import expression_mesh
 from . import word_notes
+from . import pronunciation_sources
 
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
@@ -969,7 +970,7 @@ def hanzi(request, hanzi_char):
     hanzi_char = unquote(hanzi_char)
     context = {}
     # Get all pronunciations for this character
-    prons = Pronunciation.objects.filter(hanzi=hanzi_char)
+    prons = Pronunciation.objects.filter(hanzi=hanzi_char).select_related('initial', 'final', 'tone')
 
     # Get all related words that include one of those pronunciations
     related_words = _with_illustrations(
@@ -987,6 +988,7 @@ def hanzi(request, hanzi_char):
         'pronunciations': prons,
         'related_words': related_words,
         'related_expressions': related_expressions,
+        'comparison': pronunciation_sources.compare_pronunciations(hanzi_char, prons),
         'title': f"{hanzi_char}"
     }
     return render(request, "hakkadbapp/hanzi.html", context)
@@ -1099,6 +1101,12 @@ def hanzi_by_pinyin(request, syllable):
             'pronunciations': prons_list,
             'related_words': words,
             'related_expressions': _with_segments(_expressions_containing(hanzi_char)),
+            # Every lexicon reading of the character, not only this syllable's,
+            # compared with the dictionaries' readings.
+            'comparison': pronunciation_sources.compare_pronunciations(
+                hanzi_char,
+                Pronunciation.objects.filter(hanzi=hanzi_char).select_related('initial', 'final', 'tone'),
+            ),
         })
 
     context = {
@@ -1108,6 +1116,46 @@ def hanzi_by_pinyin(request, syllable):
     }
 
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
+
+def pronunciation_comparison(request):
+    """Every character of the lexicon: its Wenfa readings against the
+    readings of the external dictionaries (pronunciation_sources), with
+    per-source agreement statistics."""
+    by_char = defaultdict(list)
+    for p in Pronunciation.objects.select_related('initial', 'final', 'tone'):
+        if p.hanzi:
+            by_char[p.hanzi].append(p)
+
+    rows = [pronunciation_sources.compare_pronunciations(char, prons) for char, prons in by_char.items()]
+    rows.sort(key=lambda r: ([w["stored"] for w in r["wenfa"]], r["char"]))
+
+    stats = []
+    for k, source in enumerate(pronunciation_sources.SOURCES):
+        chars = Counter(r["sources"][k]["status"] for r in rows)
+        readings = Counter(s for r in rows for s in r["sources"][k]["per_wenfa"] if s != "absent")
+        present = sum(readings.values()) or 1
+        stats.append({
+            **source,
+            "chars": [
+                {"status": s, "label": pronunciation_sources.STATUS_LABELS[s], "count": chars.get(s, 0)}
+                for s in ("ok", "tone", "diff", "absent")
+            ],
+            "present_chars": len(rows) - chars.get("absent", 0),
+            "readings_ok": round(100 * readings.get("ok", 0) / present),
+            "readings_tone": round(100 * readings.get("tone", 0) / present),
+            "readings_diff": round(100 * readings.get("diff", 0) / present),
+        })
+
+    context = {
+        "page": "pronunciation_comparison",
+        "title": "Comparaison des prononciations",
+        "rows": rows,
+        "stats": stats,
+        "sources": pronunciation_sources.SOURCES,
+        "total_chars": len(rows),
+    }
+    return render(request, "hakkadbapp/pronunciation_comparison.html", context)
+
 
 def hanzi_by_tone(request, tone):
     # Filter all relevant pronunciations, prefetch related fields for efficiency

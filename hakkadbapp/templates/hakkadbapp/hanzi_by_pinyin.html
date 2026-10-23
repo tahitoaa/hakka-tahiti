@@ -6,7 +6,7 @@
 <ul class="divide-y divide-gray-300 space-y-8">
   {% for entry in hanzi_data %}
     <li class="pt-8 first:pt-0">
-        {% include "hakkadbapp/components/hanzi_block.html" with hanzi=entry.hanzi simp=entry.simp trad=entry.trad pronunciations=entry.pronunciations related_words=entry.related_words related_expressions=entry.related_expressions %}
+        {% include "hakkadbapp/components/hanzi_block.html" with hanzi=entry.hanzi simp=entry.simp trad=entry.trad pronunciations=entry.pronunciations related_words=entry.related_words related_expressions=entry.related_expressions comparison=entry.comparison %}
     </li>
   {% endfor %}
 </ul>
