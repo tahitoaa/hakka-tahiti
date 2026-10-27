@@ -15,6 +15,17 @@ class Pronunciation {
         return this.initial + this.final + (Pronunciation.toneMap[this.tone] ?? this.tone ?? '');
     }
 
+    /** This reading in the stored notation (Wenfa): what pinned readings,
+     *  pinyin lines and comparisons use. A lexicon reading already is. */
+    storedPinyin() {
+        return this.abstractPinyin();
+    }
+
+    /** Same, as a plain key ("sen1"), to compare readings across sources. */
+    storedKey() {
+        return `${this.initial}${this.final}${this.tone ?? ''}`;
+    }
+
     // -----------------------------------------------------------------
     // Display, in the transcription system picked in the header menu.
     //
@@ -95,18 +106,57 @@ class Pronunciation {
  *  and always shown in the source's own notation -- the header's
  *  transcription-system menu only knows how to convert Wenfa syllables. */
 class SourcePronunciation extends Pronunciation {
-    constructor({simp, trad, syllable, tone}) {
+    /** `system`: the romanization.json system the dictionary is spelled in
+     *  ("baoan", "mciver"); `source`/`sourceLabel`: which dictionary. */
+    constructor({simp, trad, syllable, tone, system = null, source = null, sourceLabel = null}) {
         super({simp, trad, initial: syllable, final: '', tone: String(tone ?? '')});
         this.origin = "hakka-dict-index";
+        this.system = system;
+        this.source = source;
+        this.sourceLabel = sourceLabel;
     }
 
+    /** Most likely Wenfa equivalent of this reading through the system's
+     *  mapping ({initial, final, tone}), or null when it doesn't map.
+     *  Dictionary.wenfaReadingFor() refines the choice when pinning (lexicon
+     *  reading, what was typed); this is the context-free guess. */
+    storedReading() {
+        if (this._stored !== undefined) return this._stored;
+        this._stored = null;
+        if (typeof Romanization === 'undefined' || !this.system || !Romanization.systems().length) return null;
+        const candidates = Romanization.sourceToStored(this.initial, this.tone, this.system);
+        if (!candidates.length) return null;
+        const c = candidates[0];
+        const likely = Romanization.exactStoredTones(this.tone, this.system);
+        const tone = likely.find((t) => !c.tones || c.tones.includes(t)) || c.tones?.[0] || '';
+        this._stored = { initial: c.initial, final: c.final, tone };
+        return this._stored;
+    }
+
+    storedPinyin() {
+        const s = this.storedReading();
+        return s ? s.initial + s.final + (Pronunciation.toneMap[s.tone] ?? s.tone) : this.abstractPinyin();
+    }
+
+    storedKey() {
+        const s = this.storedReading();
+        return s ? `${s.initial}${s.final}${s.tone}` : `${this.source || ''}:${this.initial}${this.tone}`;
+    }
+
+    /** Shown in the dictionary's own spelling when that's the displayed
+     *  system, else its Wenfa equivalent converted to the displayed system
+     *  (tones then follow the mapping, so they can be approximate). */
     displayPinyin() {
-        return this.abstractPinyin();
+        const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
+        const stored = this.storedReading();
+        if (!R || !stored || R.current() === this.system) return this.abstractPinyin();
+        return Pronunciation.format(stored.initial, stored.final, stored.tone);
     }
 
     pinyinSpan(className = '') {
         const cls = className ? ` class="${className}"` : '';
-        return `<span${cls}>${this.abstractPinyin()}</span>`;
+        const title = `${this.sourceLabel || 'Dictionnaire'} : ${this.abstractPinyin()}`;
+        return `<span${cls} title="${title.replace(/"/g, '&quot;')}">${this.displayPinyin()}</span>`;
     }
 }
 
@@ -121,6 +171,10 @@ class NoHanziToken extends Pronunciation {
     }
 
     displayPinyin() {
+        return this.text;
+    }
+
+    storedKey() {
         return this.text;
     }
 

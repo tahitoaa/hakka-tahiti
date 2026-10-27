@@ -1,96 +1,144 @@
 {% extends "hakkadbapp/base.html" %}
 {% load static %}
 {% block content %}
-<div class="mt-4"></div>
+{% comment %}
+  ELAN transcription editor: open one .eaf file (+ its audio), complete each
+  speaker's segments with the converter's input method, download the .eaf.
+  Only annotation values change; the file keeps its ELAN structure
+  (EafDocument.js). Logic: transcripter.js.
+{% endcomment %}
+<div id="eaf-app" class="max-w-7xl mx-auto px-3 sm:px-4 py-4">
 
-<div class="no-print flex justify-center">
-    <div class="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 bg-white rounded-xl shadow-sm px-4 py-3">
-        <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Import</span>
-            <button id="import-prons" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                🔤 Prononciations
-            </button>
-            <button id="import-project" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                📁 Dossier local
-            </button>
-            <select id="select-project" class="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md shadow-sm hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                <option> Transcription existante </option>
-                <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/annette-levin/"> Transcription 1 </option>
-                <option value="https://kstf6u74zryk2zsy.public.blob.vercel-storage.com/paulette_than/"> Transcription 2 </option>
-            </select>
-        </div>
-
-        <div class="w-px self-stretch bg-gray-200 hidden sm:block"></div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            {% include "hakkadbapp/components/romanization_settings.html" %}
-        </div>
-
-        <div class="w-px self-stretch bg-gray-200 hidden sm:block"></div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Export</span>
-            <button id="export-project" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-md shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300">
-                💾 Fichiers texte
-            </button>
-            <button id="export-eaf" class="px-3 py-1.5 text-sm bg-emerald-700 text-white rounded-md shadow-sm hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
-                🎞️ Exporter EAF…
-            </button>
-        </div>
+  <!-- Files + settings -->
+  <section class="eaf-toolbar no-print" aria-label="Fichiers et paramètres">
+    <div class="eaf-files">
+      <label class="eaf-btn eaf-btn-primary">
+        Ouvrir .eaf + audio
+        <input id="eaf-file-input" type="file" accept=".eaf,audio/*,video/*" multiple hidden>
+      </label>
+      <div id="eaf-file-info" class="eaf-file-info">
+        Glissez-déposez ici un fichier ELAN (.eaf) et son enregistrement audio.
+      </div>
     </div>
+    <div class="eaf-settings">
+      {% include "hakkadbapp/components/reading_settings.html" %}
+    </div>
+    <div class="eaf-actions">
+      <span id="eaf-progress" class="eaf-progress"></span>
+      <button id="eaf-download" type="button" class="eaf-btn eaf-btn-save" disabled>Télécharger le .eaf</button>
+    </div>
+  </section>
+
+  <div id="eaf-draft" class="eaf-banner no-print" hidden></div>
+  <div id="eaf-messages" class="eaf-banner eaf-banner-warn no-print" hidden></div>
+
+  <!-- Audio -->
+  <div id="eaf-audio-bar" class="eaf-audio no-print" hidden>
+    <audio id="eaf-audio" controls preload="metadata"></audio>
+  </div>
+
+  <!-- Conversation: one column per speaker -->
+  <section id="eaf-board" class="eaf-board" aria-label="Transcription" hidden>
+    <div id="eaf-header" class="eaf-row eaf-head"></div>
+    <div id="eaf-rows"></div>
+  </section>
+
+  <details class="eaf-help no-print">
+    <summary>Aide</summary>
+    <ul>
+      <li>Ouvrez ensemble le fichier <b>.eaf</b> et son <b>audio</b> (ou l'un puis l'autre). Chaque tier principal du fichier est un locuteur (une colonne).</li>
+      <li><b>Lectures</b> : lexique, un dictionnaire ou toutes les sources ; <b>Je tape en</b> et <b>J'affiche en</b> : systèmes de saisie et d'affichage, indépendants de la source (mêmes réglages que la page Écrire).</li>
+      <li>Cliquez un segment pour l'éditer : la <b>romanisation</b> (tier principal) sert de point de départ ; choisissez les caractères dans les suggestions pour remplir le tier <b>Hanzi</b>, ajoutez la <b>traduction</b>. Le <b>pinyin</b> (dans le système « J'affiche en ») et la ligne <b>mixte</b> sont recalculés automatiquement.</li>
+      <li>Les tiers Hanzi, Traduction, Pinyin et Mixte sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
+      <li>Clavier : <kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> segment suivant/précédent, <kbd>Alt</kbd>+<kbd>Entrée</kbd> réécouter, <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd> choisir une suggestion, <kbd>Échap</kbd> fermer.</li>
+      <li>Le travail est gardé en brouillon dans ce navigateur ; « Télécharger le .eaf » produit le fichier à rouvrir dans ELAN.</li>
+    </ul>
+  </details>
 </div>
-
-<div class="no-print mt-4 flex justify-center">
-    <div class="flex items-center gap-1 bg-white rounded-full shadow-sm px-2 py-1.5">
-        <button id="nav-prev" type="button" title="Étiquette précédente (Page précédente)"
-            class="px-3 py-1 text-sm rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-            ◀ Précédent
-        </button>
-
-        <div class="flex items-center gap-1 px-1">
-            <label for="label-index" class="sr-only">Index de l'étiquette</label>
-            <input id="label-index" type="number" min="1" step="1" value="1" inputmode="numeric" pattern="\d*" aria-label="Index de l'étiquette" title="Numéro d'étiquette"
-                class="w-16 text-center bg-gray-50 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-            <span id="label-total" class="text-xs text-gray-400 whitespace-nowrap"></span>
-        </div>
-
-        <button id="nav-next" type="button" title="Étiquette suivante (Page suivante)"
-            class="px-3 py-1 text-sm rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-            Suivant ▶
-        </button>
-
-        <span class="w-px h-5 bg-gray-200 mx-1"></span>
-
-        <button id="nav-new-label" type="button" title="Nouvelle étiquette après la courante (Ctrl+Entrée)"
-            class="px-3 py-1 text-sm rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-            + Étiquette
-        </button>
-    </div>
-</div>
-
-<dialog id="eaf-meta-dialog" class="rounded-lg shadow-xl p-0 border-0 bg-white text-black w-full max-w-2xl backdrop:bg-black/50 max-h-[85vh] overflow-y-auto">
-    <div class="p-5">
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">Métadonnées EAF (export ELAN)</h2>
-        <div id="eaf-meta-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-        <div class="flex justify-end gap-2 mt-5">
-            <button type="button" id="eaf-dialog-cancel" class="px-4 py-2 text-sm rounded-md border hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300">
-                Annuler
-            </button>
-            <button type="button" id="eaf-dialog-export" class="px-4 py-2 text-sm rounded-md bg-emerald-700 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
-                Exporter
-            </button>
-        </div>
-    </div>
-</dialog>
 
 <style>
-    /* hide all rendered chunks by default, show only the one with .visible */
-    div[id^="chunk-"] { display: none; }
-    div[id^="chunk-"].visible { display: block; }
-</style>
+  .eaf-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; background: #fff;
+                 border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0.75rem 1rem; }
+  .eaf-files { display: flex; align-items: center; gap: 0.75rem; flex: 1 1 22rem; min-width: 0; }
+  .eaf-file-info { font-size: 0.8rem; color: #6b7280; min-width: 0; }
+  .eaf-settings { flex: 1 1 26rem; max-width: 36rem; }
+  .eaf-actions { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
+  .eaf-progress { font-size: 0.8rem; color: #4b5563; white-space: nowrap; }
+  .eaf-btn { display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0.35rem 0.9rem; border-radius: 0.5rem;
+             font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid transparent; }
+  .eaf-btn-primary { background: #4338ca; color: #fff; }
+  .eaf-btn-primary:hover { background: #3730a3; }
+  .eaf-btn-save { background: #047857; color: #fff; }
+  .eaf-btn-save:hover:not(:disabled) { background: #065f46; }
+  .eaf-btn-save:disabled { opacity: 0.45; cursor: default; }
+  .eaf-btn-light { background: #fff; color: #374151; border-color: #d1d5db; font-weight: 500; }
+  .eaf-btn-light:hover { background: #f3f4f6; }
+  #eaf-app.eaf-dragging .eaf-toolbar { outline: 3px dashed #6366f1; outline-offset: 4px; }
 
-<div id="viewer">
-</div>
+  .eaf-banner { margin-top: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 0.5rem; font-size: 0.875rem;
+                background: #eef2ff; color: #3730a3; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+  .eaf-banner[hidden] { display: none; }
+  .eaf-banner-warn { background: #fef3c7; color: #92400e; }
+
+  .eaf-audio { position: sticky; top: 0; z-index: 20; margin-top: 0.75rem; padding: 0.4rem 0.5rem;
+               background: rgb(229 231 235 / 0.95); backdrop-filter: blur(4px); border-radius: 0.5rem; }
+  .eaf-audio audio { width: 100%; height: 2.25rem; }
+
+  /* No overflow:hidden here: it would stop the column header from sticking. */
+  .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; }
+  .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #f3f4f6; }
+  .eaf-head { position: sticky; top: 0; z-index: 10; background: #f9fafb; border-top: 0; border-bottom: 1px solid #e5e7eb;
+              border-radius: 0.75rem 0.75rem 0 0; }
+  #eaf-app.has-audio .eaf-head { top: 3.1rem; } /* below the sticky audio bar */
+  .eaf-head > div { padding: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #374151; }
+  .eaf-speaker-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+  .eaf-speaker-head label { display: flex; align-items: center; gap: 0.4rem; min-width: 0; cursor: pointer; }
+  .eaf-speaker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eaf-speaker-count { font-weight: 400; color: #6b7280; white-space: nowrap; }
+  .eaf-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--c); flex: none; }
+
+  .eaf-time { padding: 0.45rem 0.4rem; font-size: 0.72rem; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .eaf-time button { color: #4338ca; } .eaf-time button:hover { text-decoration: underline; }
+  .eaf-cell { padding: 0.25rem; min-width: 0; }
+  .eaf-seg { display: block; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 0.5rem; cursor: pointer;
+             border: 1px solid #e5e7eb; border-left: 4px solid var(--c); background: #fff; min-width: 0; }
+  .eaf-seg:hover { background: #f9fafb; }
+  .eaf-seg.is-active { background: #eef2ff; border-color: #a5b4fc; border-left-color: var(--c); }
+  .eaf-seg.is-playing { box-shadow: 0 0 0 2px #f59e0b; }
+  .eaf-seg-main { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+  .eaf-seg-main.is-todo { color: #9ca3af; font-style: italic; font-size: 0.875rem; }
+  .eaf-seg-sub { font-size: 0.72rem; color: #6b7280; overflow-wrap: anywhere; }
+  .eaf-seg-state { float: right; margin-left: 0.25rem; font-size: 0.65rem; }
+  .eaf-speaker-tag { display: none; font-size: 0.7rem; font-weight: 600; color: var(--c); }
+
+  .eaf-editor { grid-column: 1 / -1; margin: 0.25rem 0.5rem 0.75rem; padding: 0.75rem; border-radius: 0.75rem;
+                border: 1px solid #c7d2fe; border-left: 5px solid var(--c); background: #fafaff; }
+  .eaf-editor-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
+  .eaf-editor-head .grow { flex: 1; }
+  .eaf-field { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.25rem 0.75rem; align-items: start; margin-top: 0.5rem; }
+  .eaf-field > span { font-size: 0.75rem; color: #6b7280; padding-top: 0.45rem; }
+  .eaf-field textarea { width: 100%; min-height: 2.4rem; padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
+                        background: #fff; font-size: 1rem; resize: vertical; }
+  .eaf-field textarea:focus { outline: 2px solid #a5b4fc; outline-offset: 0; }
+  .eaf-field .hanzi-input { font-size: 1.15rem; }
+  .eaf-derived { font-size: 0.85rem; color: #374151; padding-top: 0.4rem; overflow-wrap: anywhere; }
+  .eaf-ime { position: relative; }
+  .eaf-preview { margin-top: 0.4rem; }
+
+  .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #4b5563; }
+  .eaf-help summary { cursor: pointer; font-size: 0.875rem; color: #374151; }
+  .eaf-help ul { list-style: disc; padding-left: 1.25rem; margin-top: 0.4rem; display: grid; gap: 0.3rem; }
+
+  /* Phone: one column, the speaker shown on each segment instead. */
+  @media (max-width: 640px) {
+    .eaf-row { grid-template-columns: 3.2rem minmax(0, 1fr); }
+    .eaf-head { display: none; }
+    .eaf-cell:empty { display: none; }
+    .eaf-speaker-tag { display: block; }
+    .eaf-field { grid-template-columns: 1fr; }
+    .eaf-field > span { padding-top: 0; }
+  }
+</style>
 
 {% include  "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words%}
     <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
@@ -99,7 +147,6 @@
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>
-    <script src="{% static 'hakkadbapp/js/CopyButton.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/EafDocument.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/transcripter.js' %}"></script>
-    <script src="{% static 'hakkadbapp/js/AudioController.js' %}"></script>
 {% endblock %}

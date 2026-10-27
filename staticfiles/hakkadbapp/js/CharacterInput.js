@@ -41,8 +41,8 @@ class SyllableInputModel {
 
         this.syllables.forEach((syl, i) => {
             this.suggestions.push(
-                ...this.lookup(syl).map((pron) => ({
-                    pron, for: i, start: 0, end: 0,
+                ...this.lookup(syl).map(({ pron, sources }) => ({
+                    pron, sources, for: i, start: 0, end: 0,
                 }))
             );
         });
@@ -50,27 +50,14 @@ class SyllableInputModel {
         this.text = text;
     }
 
-    /** Readings for one typed syllable. Typed in the stored notation
-     *  (Wenfa), or with an external dictionary loaded (Dictionary.useSource,
-     *  its own notation): matched directly. Typed in another system picked
-     *  in the "Saisie en…" menu: converted back to stored candidates first
-     *  (Romanization.toStored), so "ts'am1" (Hakkadictionary) finds cam1/cham1. */
+    /** Suggestions for one typed syllable ([{pron, sources}]), in the
+     *  system picked in "Je tape en", from every pronunciation source in
+     *  use (Dictionary.suggestionsFor). */
     lookup(syl) {
-        const R = typeof Romanization !== 'undefined' ? Romanization : null;
-        const system = R?.systems().length ? R.inputSystem() : null;
-        if (this.dico.notation === 'source') {
-            // External dictionary (Bao'an): typed in its own spelling, matched
-            // directly; typed in any other system (Wenfa by default), matched
-            // through the Wenfa equivalents of its readings.
-            if (system && this.dico.sourceSystem && system !== this.dico.sourceSystem && this.dico.getSourceMatchesForStored) {
-                return this.dico.getSourceMatchesForStored(R.typedToStored(syl, system));
-            }
-            return this.dico.getMatchesForSyllable(syl.split('_')[0].replace(/’/g, "'"));
-        }
-        if (system && system !== R.storedSystem() && this.dico.getMatchesForStored) {
-            return this.dico.getMatchesForStored(R.toStored(syl, system));
-        }
-        return this.dico.getMatchesForSyllable(syl.split('_')[0].replace(/’/g, "'"));
+        const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
+        if (this.dico.suggestionsFor) return this.dico.suggestionsFor(syl, R ? R.inputSystem() : null);
+        // Minimal dictionaries (tests): spelling match only.
+        return this.dico.getMatchesForSyllable(syl.split('_')[0].replace(/’/g, "'")).map((pron) => ({ pron, sources: [] }));
     }
 
     /** What picking `pron` writes into the text: the bare character, or --
@@ -86,7 +73,7 @@ class SyllableInputModel {
         const char = pron.simp;
         if (!char || !this.dico?.getMatchesForHanzi) return char;
         const readings = new Set(
-            this.dico.getMatchesForHanzi(char).map((p) => `${p.initial}${p.final}${p.tone ?? ''}`)
+            this.dico.getMatchesForHanzi(char).map((p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`))
         );
         if (readings.size < 2) return char;
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
@@ -167,6 +154,14 @@ const SUGGESTION_BAR_CSS = `
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sugg .sugg-key { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #9ca3af; }
+/* Source stripe along the bottom edge, one coloured segment per source
+   (colours: ReadingSourceSwitch.injectColors); never covers the character. */
+.sugg .sugg-src { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; display: flex; gap: 1px;
+                  border-radius: 9999px; overflow: hidden; }
+.sugg .src-bar { flex: 1 1 0; background: #9ca3af; }
+.sugg:has(.sugg-src) { padding-bottom: 0.5rem; }
+.src-pill { display: inline-block; min-width: 0.8rem; padding: 0 0.2rem; border-radius: 9999px; background: #6b7280;
+            color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.8rem; text-align: center; }
 @media (hover: none) and (pointer: coarse) { .sugg .sugg-key { display: none; } }
 `;
 
@@ -179,9 +174,10 @@ function injectSuggestionBarCss() {
 }
 
 class SuggestionBar {
-    constructor(container, { onSelect, anchorTo } = {}) {
+    constructor(container, { onSelect, anchorTo, shortcutLabel = 'Maj' } = {}) {
         injectSuggestionBarCss();
         this.container = container;
+        this.shortcutLabel = shortcutLabel; // modifier shown in the tooltips
         this.container.classList.add('sugg-bar');
         this.onSelect = onSelect;
         this.anchorTo = anchorTo;
@@ -232,6 +228,9 @@ class SuggestionBar {
             return;
         }
 
+        // As soon as a dictionary is in use, every tile shows where it comes
+        // from -- lexicon-only ones included, or they'd look unmarked.
+        const showSources = this.suggestions.some((s) => s.sources?.some((src) => src !== 'L'));
         this.container.innerHTML = this.suggestions.map((s, i) => {
             const keyHint = suggestionKeyHint(i);
             // Main form follows the sitewide Trad./Simp. toggle (char()); the
@@ -242,8 +241,13 @@ class SuggestionBar {
             const alt = main === simp ? trad : simp;
             const hanzi = alt && alt !== main ? `${main}<span class="sugg-alt">${alt}</span>` : main;
             const pinyin = s.pron.pinyinSpan ? s.pron.pinyinSpan() : (s.pron.abstractPinyin ? s.pron.abstractPinyin() : '?');
-            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : Maj+${keyHint}">`
-                + `<span class="sugg-key">${keyHint}</span>`
+            // Where it comes from, when more than the lexicon is in use (L·B·M).
+            const marks = showSources && s.sources?.length
+                ? `<span class="sugg-src">${s.sources.map((src) => `<i class="src-bar" data-src="${src}"></i>`).join('')}</span>`
+                : '';
+            const sourceTitle = showSources && s.sources?.length ? ` · sources : ${s.sources.join(', ')}` : '';
+            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}">`
+                + `<span class="sugg-key">${keyHint}</span>${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
                 + `<span class="sugg-py">${pinyin}</span>`
                 + `</button>`;

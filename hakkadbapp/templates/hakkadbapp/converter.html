@@ -6,41 +6,10 @@
     Écrire en hakka
   </label>
 
-  <!-- Reading settings: where the readings come from, what is typed, what
-       is shown. Sources are exclusive (converter.js / Dictionary.useSource());
-       a dictionary is one button: data-dict-url = its compact file
-       (manage.py build_dict_index), data-dict-system = the romanization.json
-       system it's spelled in, data-dict-example = a sample in that spelling. -->
+  <!-- Reading settings: source, input system, display system. -->
   <section id="reading-settings" aria-label="Paramètres de saisie"
            class="mx-auto max-w-xl text-left bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4">
-    <div class="settings-row">
-      <span class="rom-setting-label" id="source-label">Lectures</span>
-      <div id="source-switch" role="group" aria-labelledby="source-label" class="segmented">
-        <button type="button" data-source="db" aria-pressed="true" class="source-btn"
-                title="Lexique de l'association (base Wenfa) : prononciations, mots et traductions">
-          Lexique
-        </button>
-        <button type="button" data-source="baoan" aria-pressed="false" class="source-btn"
-                data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
-                data-dict-system="baoan"
-                data-dict-example="wuk7 ka1 hau3 t'ai3"
-                title="客家話大辭典（寶安腔）, 陳志明 : prononciations seules">
-          Bao'an
-        </button>
-        <button type="button" data-source="mciver" aria-pressed="false" class="source-btn"
-                data-dict-url="{% static 'hakkadbapp/data/mciver_prons.json' %}"
-                data-dict-system="mciver"
-                data-dict-example="vuk7 ka1 hau3 thai5"
-                title="McIver, A Chinese-English Dictionary, Hakka-Dialect (Hakka Index) : prononciations seules">
-          McIver
-        </button>
-      </div>
-    </div>
-    <div class="settings-rows">
-      {% include "hakkadbapp/components/romanization_settings.html" %}
-    </div>
-    <p id="settings-summary" class="mt-3 text-sm text-gray-800" aria-live="polite"></p>
-    <p id="source-status" class="mt-1 text-xs text-gray-500" aria-live="polite"></p>
+    {% include "hakkadbapp/components/reading_settings.html" %}
   </section>
 
   <details class="mx-auto max-w-xl mt-2 text-left text-xs text-gray-600">
@@ -52,7 +21,10 @@
       <p><b>Je tape en</b> : le système dans lequel vous écrivez les syllabes. Hors Wenfa, tapez
         <code>e</code>, <code>o</code>, <code>ng</code> pour ε, ɔ, ŋ. Bao'an et McIver notent leurs tons
         1, 2, 3, 5, 7, 8 ; l'aspiration s'écrit <code>k'</code> en Bao'an, <code>kh</code> en McIver.</p>
-      <p data-source-hint="dict" hidden>Avec un dictionnaire (Bao'an, McIver), seules ses prononciations
+      <p><b>Lectures</b> : d'où viennent les prononciations proposées — le lexique (avec ses mots et
+        traductions), un dictionnaire, ou <b>Toutes</b> les sources ensemble (les suggestions indiquent leur
+        origine : L lexique, B Bao'an, M McIver). Le choix vaut aussi pour la page Transcrire.</p>
+      <p data-source-hint="dict" hidden>Avec un dictionnaire seul (Bao'an, McIver), seules ses prononciations
         sont utilisées, sans mots ni traductions. Tapé en Wenfa, chaque lecture est retrouvée via son
         équivalent Wenfa, avec des tons approchés (un ton 4 Wenfa trouve les tons ³ et ⁵ du dictionnaire
         Bao'an).</p>
@@ -65,28 +37,6 @@
     </div>
   </details>
 
-  <style>
-    #reading-settings .settings-row,
-    #reading-settings .rom-setting {
-      display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); align-items: center; gap: 0.5rem;
-    }
-    #reading-settings .settings-rows { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
-    #reading-settings .rom-setting-select { width: 100%; }
-    .segmented {
-      display: flex; gap: 2px; padding: 2px; border-radius: 9999px;
-      background: #f3f4f6; border: 1px solid #e5e7eb;
-    }
-    .source-btn {
-      flex: 1 1 0; min-width: 0; min-height: 2.25rem; padding: 0.25rem 0.5rem; border-radius: 9999px;
-      font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      color: #374151; touch-action: manipulation;
-    }
-    .source-btn[aria-pressed="true"] { background: var(--color-brand, #8B1A1A); color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .15); }
-    .source-btn[aria-pressed="false"]:hover { background: #e5e7eb; }
-    @media (max-width: 380px) {
-      #reading-settings .settings-row, #reading-settings .rom-setting { grid-template-columns: 1fr; gap: 0.25rem; }
-    }
-  </style>
 
   <div class="relative mt-4">
     <textarea id="pinyin-input"

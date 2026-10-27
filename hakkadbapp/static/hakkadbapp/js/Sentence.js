@@ -163,27 +163,19 @@ class Sentence {
         if (!hanzi || (hanzi === '-' && !pinned)) return '';
 
         return Array.from(hanzi).map((char, k) => {
-            if (readings[k]) return this.pinnedForDisplay(char, readings[k]);
+            if (readings[k]) return readings[k];
             if (char === '-') return '';
             const matches = this.dico.getMatchesForHanzi(char);
             if (!matches.length) return '?';
 
+            // Stored (Wenfa) readings, whatever the source: the display
+            // conversion applies to them like to lexicon words.
             const prons = matches
-                .map(p => p.abstractPinyin?.())
+                .map(p => (p.storedPinyin ? p.storedPinyin() : p.abstractPinyin?.()))
                 .filter(Boolean);
 
             return prons.length ? [...new Set(prons)].join('/') : '?';
         }).join('');
-    }
-
-    /** A pinned reading is Wenfa; with the Bao'an dictionary loaded the
-     *  page shows that dictionary's notation, so it's shown as the
-     *  dictionary reading(s) it stands for (家(ga1) -> ka¹), or as written
-     *  when none matches. */
-    pinnedForDisplay(char, reading) {
-        if (this.dico?.notation !== 'source' || !this.dico.sourceReadingsFor) return reading;
-        const prons = this.dico.sourceReadingsFor(char, reading);
-        return prons.length ? [...new Set(prons.map((p) => p.abstractPinyin()))].join('/') : reading;
     }
 
     buildUnknownEntry(token) {
@@ -237,7 +229,7 @@ class Sentence {
         const isData = dataOrPinyin && typeof dataOrPinyin === 'object';
         // A dictionary fed from another notation (Dictionary.useSource())
         // can't be converted: Romanization only parses Wenfa syllables.
-        if (!R || !R.systems().length || this.dico?.notation === 'source') {
+        if (!R || !R.systems().length) {
             return this.renderPinyin(isData ? dataOrPinyin.pinyin : dataOrPinyin);
         }
         return isData ? R.fromDataset(dataOrPinyin) : R.fromPinyin(dataOrPinyin);
@@ -250,8 +242,7 @@ class Sentence {
     displayPinyinHtml(dataOrPinyin) {
         const text = this.displayPinyin(dataOrPinyin);
         const stored = dataOrPinyin && typeof dataOrPinyin === 'object' ? dataOrPinyin.pinyin : dataOrPinyin;
-        const live = typeof Romanization !== 'undefined' && Romanization.systems().length
-            && this.dico?.notation !== 'source' && stored;
+        const live = typeof Romanization !== 'undefined' && Romanization.systems().length && stored;
         return live ? `<span data-py="${escapeAttr(stored)}">${text}</span>` : text;
     }
 

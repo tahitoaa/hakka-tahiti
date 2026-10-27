@@ -11,72 +11,149 @@ function isHanzi(ch) {
 class Dictionary {
     constructor ({containerId, itemSelector}) {
         this.pronItems = Array.from(document.querySelectorAll(`${containerId} > ${itemSelector}`));
-        this.pronunciations = this.pronItems.map(el => this.parsePronunciation(el));
+        this.lexiconPronunciations = this.pronItems.map(el => this.parsePronunciation(el));
         this.unknowns = new Set();
         this.wordItems = Array.from(document.querySelectorAll(`#word-list > ${itemSelector}`))
-        this.words = this.wordItems.map(el => new Word(el.dataset));
-        // 'wenfa': Supabase lexicon (the default); 'source': an external
-        // pronunciation list in its own notation, see useSource().
-        this.notation = 'wenfa';
-        this.dbPronunciations = this.pronunciations;
-        this.dbWords = this.words;
+        this.lexiconWords = this.wordItems.map(el => new Word(el.dataset));
+        // Pronunciation sources in use: the Supabase lexicon (Wenfa, with
+        // words and translations) and/or dictionary indexes, see useSources().
+        this.useLexicon = true;
+        this.sources = [];
+        this.rebuild();
     }
 
-    /** Swaps the whole dictionary to another pronunciation source, or back
-     *  to the Supabase lexicon with `useSource(null)`. An external source
-     *  has no words (only character readings), so word matching is off and
-     *  every hanzi is resolved character by character. */
-    useSource(pronunciations, { system = null } = {}) {
+    // Older names, kept for callers and tests.
+    get dbPronunciations() { return this.lexiconPronunciations; }
+    get dbWords() { return this.lexiconWords; }
+
+    rebuild() {
         this.unknowns.clear();
-        this.sourceIndex = null;
-        if (!pronunciations) {
-            this.pronunciations = this.dbPronunciations;
-            this.words = this.dbWords;
-            this.notation = 'wenfa';
-            this.sourceSystem = null;
-            return;
-        }
-        this.pronunciations = pronunciations;
-        this.words = [];
-        this.notation = 'source';
-        // Transcription system (romanization.json id) the source is spelled
-        // in, when there is one: lets it be typed in Wenfa too, see
-        // getSourceMatchesForStored().
-        this.sourceSystem = system;
+        this.pronunciations = [
+            ...(this.useLexicon ? this.lexiconPronunciations : []),
+            ...this.sources.flatMap((s) => s.prons),
+        ];
+        // Words (and their translations) only exist in the lexicon.
+        this.words = this.useLexicon ? this.lexiconWords : [];
     }
 
-    /** External-source readings for stored-notation candidates (typed in
-     *  Wenfa, or converted to it by Romanization.typedToStored): each
-     *  source reading is mapped once to its Wenfa equivalents
-     *  (Romanization.sourceToStored, e.g. Bao'an tsai3 -> zai/zhai/jai in
-     *  tone 3 or 4), and matches when initial/final agree and the tones
-     *  overlap (typed tone null = any). */
-    getSourceMatchesForStored(candidates) {
-        if (!candidates?.length || !this.sourceSystem || typeof Romanization === 'undefined') return [];
-        if (!this.sourceIndex) {
-            this.sourceIndex = new Map();
-            this.pronunciations.forEach((pron) => {
-                Romanization.sourceToStored(pron.initial + pron.final, pron.tone, this.sourceSystem).forEach((c) => {
+    /** Which pronunciations to use: the lexicon (`lexicon`) and/or
+     *  dictionary indexes (`sources`: [{id, label, short, system, prons}],
+     *  each spelled in a romanization.json system). Any combination works,
+     *  "Toutes les sources" being the lexicon plus every dictionary. */
+    useSources({ lexicon = true, sources = [] } = {}) {
+        this.useLexicon = lexicon;
+        this.sources = sources.map((s) => ({ ...s, index: null }));
+        // Readings must know their source's system (display, Wenfa equivalent);
+        // fetchSourcePronunciations() sets it, prons built elsewhere get it here.
+        this.sources.forEach((source) => source.prons.forEach((p) => {
+            if (p.system === null || p.system === undefined) p.system = source.system;
+            if (!p.source) { p.source = source.id; p.sourceLabel = source.label; }
+        }));
+        this.rebuild();
+    }
+
+    /** Single-source shortcut: `null` = the lexicon alone, else one
+     *  dictionary's readings (spelled in `system`) without the lexicon. */
+    useSource(pronunciations, { system = null } = {}) {
+        if (!pronunciations) this.useSources({ lexicon: true });
+        else this.useSources({ lexicon: false, sources: [{ id: system || 'source', label: system || 'source', system, prons: pronunciations }] });
+    }
+
+    /** Suggestions for one typed syllable, from every source in use:
+     *  [{pron, sources: [short labels]}]. `inputSystem` is the system the
+     *  syllable is typed in ("Je tape en"). The lexicon is matched in Wenfa
+     *  (converted back first when typed in another system); a dictionary is
+     *  matched in its own spelling when typed in its system, else through
+     *  the Wenfa equivalents of its readings. The same character with the
+     *  same Wenfa reading from several sources is one suggestion. */
+    suggestionsFor(syl, inputSystem = null) {
+        const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
+        const typed = String(syl || '').replace(/’/g, "'");
+        const plain = typed.split('_')[0];
+        const stored = !R || !inputSystem || inputSystem === R.storedSystem();
+        const found = [];
+        if (this.useLexicon) {
+            const prons = stored
+                ? Dictionary.matchSpelling(this.lexiconPronunciations, plain)
+                : this.lexiconMatchesForStored(R.toStored(typed, inputSystem));
+            prons.forEach((pron) => found.push({ pron, source: 'L' }));
+        }
+        this.sources.forEach((source) => {
+            const prons = !R || !source.system || inputSystem === source.system
+                ? Dictionary.matchSpelling(source.prons, plain)
+                : this.sourceMatchesForStored(source, R.typedToStored(typed, inputSystem || R.storedSystem()));
+            prons.forEach((pron) => found.push({ pron, source: source.short || source.label }));
+        });
+        const merged = new Map();
+        found.forEach(({ pron, source }) => {
+            // simp + trad: 傢 and 家 share the simplified form but are two characters.
+            const key = `${pron.simp}|${pron.trad}|${pron.storedKey ? pron.storedKey() : pron.abstractPinyin()}`;
+            if (!merged.has(key)) merged.set(key, { pron, sources: [] });
+            const entry = merged.get(key);
+            if (!entry.sources.includes(source)) entry.sources.push(source);
+        });
+        return [...merged.values()];
+    }
+
+    /** Readings whose own spelling is `syl` (with or without tone). */
+    static matchSpelling(prons, syl) {
+        return prons.filter(p => {
+            const pinyin = p.abstractPinyin();
+            const lowerTone = p.initial + p.final + p.tone;
+            return syl == [p.initial, p.final].join('')
+                    || syl == pinyin
+                    || syl == lowerTone
+                    || p.simp === syl
+                    || p.trad === syl;
+        });
+    }
+
+    /** Lexicon readings for stored-notation candidates, as returned by
+     *  Romanization.toStored() for a syllable typed in another system:
+     *  [{initial, final, tones}] (tones null = any tone). */
+    lexiconMatchesForStored(candidates) {
+        if (!candidates?.length) return [];
+        return this.lexiconPronunciations.filter(p => candidates.some(c =>
+            p.initial === c.initial && p.final === c.final
+            && (!c.tones || c.tones.includes(String(p.tone ?? '')))
+        ));
+    }
+
+    /** A dictionary's readings for stored-notation candidates: each reading
+     *  is mapped once to its Wenfa equivalents (Romanization.sourceToStored,
+     *  e.g. Bao'an tsai3 -> zai/zhai/jai in tone 3 or 4), and matches when
+     *  initial/final agree and the tones overlap (typed tone null = any). */
+    sourceMatchesForStored(source, candidates) {
+        if (!candidates?.length || !source.system || typeof Romanization === 'undefined') return [];
+        if (!source.index) {
+            source.index = new Map();
+            source.prons.forEach((pron) => {
+                Romanization.sourceToStored(pron.initial + pron.final, pron.tone, source.system).forEach((c) => {
                     const key = `${c.initial}|${c.final}`;
-                    if (!this.sourceIndex.has(key)) this.sourceIndex.set(key, []);
-                    this.sourceIndex.get(key).push({ pron, tones: c.tones });
+                    if (!source.index.has(key)) source.index.set(key, []);
+                    source.index.get(key).push({ pron, tones: c.tones });
                 });
             });
         }
         const found = new Set();
         candidates.forEach((c) => {
-            (this.sourceIndex.get(`${c.initial}|${c.final}`) || []).forEach((entry) => {
+            (source.index.get(`${c.initial}|${c.final}`) || []).forEach((entry) => {
                 if (!c.tones || !entry.tones || entry.tones.some((t) => c.tones.includes(t))) found.add(entry.pron);
             });
         });
         return [...found];
     }
 
+    // Older entry points (tests, other callers): every source at once.
+    getMatchesForStored(candidates) { return this.lexiconMatchesForStored(candidates); }
+    getSourceMatchesForStored(candidates) { return this.sources.flatMap((s) => this.sourceMatchesForStored(s, candidates)); }
+    getMatchesForSyllable(syl) { return Dictionary.matchSpelling(this.pronunciations, syl); }
+
     /** The Wenfa reading to pin in the text for a picked pronunciation:
      *  pinned readings (生(sen1)) are always written in the stored notation,
-     *  whatever the source of the suggestions. A lexicon reading is already
-     *  Wenfa. A reading of the external dictionary (Bao'an ka¹) is mapped to
-     *  its Wenfa equivalents and one is chosen, in this order:
+     *  whatever the source. A lexicon reading already is Wenfa. A dictionary
+     *  reading (Bao'an ka¹) is mapped to its Wenfa equivalents and one is
+     *  chosen, in this order:
      *    1. a reading the Wenfa lexicon has for this very character;
      *    2. the syllable as typed (`typed`, in `inputSystem`), if it fits;
      *    3. the mapping's most likely equivalent (its exact tone first).
@@ -84,11 +161,12 @@ class Dictionary {
     wenfaReadingFor(pron, typed = '', inputSystem = null) {
         const stored = (i, f, t) => `${i}${f}${t ?? ''}`;
         const R = typeof Romanization !== 'undefined' ? Romanization : null;
-        if (this.notation !== 'source' || !this.sourceSystem || !R?.systems().length) {
+        const system = pron.system;
+        if (!system || !R?.systems().length) {
             return stored(pron.initial, pron.final, pron.tone);
         }
         const tone = String(pron.tone ?? '');
-        const candidates = R.sourceToStored(pron.initial + pron.final, tone, this.sourceSystem);
+        const candidates = R.sourceToStored(pron.initial + pron.final, tone, system);
         if (!candidates.length) return stored(pron.initial, pron.final, tone);
         const fits = (i, f, t) => candidates.some((c) => c.initial === i && c.final === f && (!c.tones || c.tones.includes(t)));
         const typedCandidates = typed ? R.typedToStored(typed, inputSystem || R.storedSystem()) : [];
@@ -96,7 +174,7 @@ class Dictionary {
 
         // 1. The lexicon's own reading of this character.
         const sameChar = (p) => [p.simp, p.trad].some((h) => h && (h === pron.simp || h === pron.trad));
-        const lexicon = (this.dbPronunciations || []).filter((p) => sameChar(p) && fits(p.initial, p.final, String(p.tone ?? '')));
+        const lexicon = this.lexiconPronunciations.filter((p) => sameChar(p) && fits(p.initial, p.final, String(p.tone ?? '')));
         if (lexicon.length) {
             const p = lexicon.find((q) => wasTyped(q.initial, q.final, String(q.tone ?? ''))) || lexicon[0];
             return stored(p.initial, p.final, p.tone);
@@ -110,33 +188,22 @@ class Dictionary {
         // 3. Most likely equivalent: typed initial/final if they fit, then
         //    the exact reverse of the tone map, then any allowed tone.
         const c = candidates.find((x) => typedCandidates.some((y) => y.initial === x.initial && y.final === x.final)) || candidates[0];
-        const likely = R.exactStoredTones(tone, this.sourceSystem);
+        const likely = R.exactStoredTones(tone, system);
         const t = likely.find((x) => !c.tones || c.tones.includes(x)) || c.tones?.[0] || tone;
         return stored(c.initial, c.final, t);
     }
 
-    /** Readings of the external dictionary for `char` that a pinned Wenfa
-     *  reading stands for (家 + "ga1" -> ka¹): how a Wenfa annotation is
-     *  shown while the page displays the dictionary's own notation. */
-    sourceReadingsFor(char, wenfaReading) {
-        const R = typeof Romanization !== 'undefined' ? Romanization : null;
-        if (this.notation !== 'source' || !this.sourceSystem || !R?.systems().length) return [];
-        const [w] = R.typedToStored(wenfaReading, R.storedSystem());
-        if (!w) return [];
-        return this.pronunciations.filter((p) => (p.simp === char || p.trad === char)
-            && R.sourceToStored(p.initial + p.final, p.tone, this.sourceSystem).some((c) =>
-                c.initial === w.initial && c.final === w.final
-                && (!c.tones || !w.tones || c.tones.some((t) => w.tones.includes(t)))));
-    }
-
-    /** Fetches the compact Bao'an dictionary file written by
-     *  `manage.py build_dict_index`: rows of [trad, syllable, tone, simp?]. */
-    static async fetchSourcePronunciations(url) {
+    /** Fetches a compact dictionary file written by `manage.py
+     *  build_dict_index` (rows of [trad, syllable, tone, simp?]); its
+     *  readings are tagged with the dictionary (`source`) they come from. */
+    static async fetchSourcePronunciations(url, source = {}) {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
         const data = await response.json();
-        const prons = data.prons.map(([trad, syllable, tone, simp]) =>
-            new SourcePronunciation({ trad, simp: simp || trad, syllable, tone }));
+        const prons = data.prons.map(([trad, syllable, tone, simp]) => new SourcePronunciation({
+            trad, simp: simp || trad, syllable, tone,
+            system: source.system || null, source: source.id || null, sourceLabel: source.label || null,
+        }));
         return { meta: data.meta || {}, prons };
     }
 
@@ -153,7 +220,7 @@ class Dictionary {
 
     addPronunciations(newProns){
         newProns.forEach(newPron => {
-            const exists = this.pronunciations.some(p =>
+            const exists = this.lexiconPronunciations.some(p =>
                 p.simp === newPron.simp &&
                 p.trad === newPron.trad &&
                 p.initial === newPron.initial &&
@@ -161,35 +228,10 @@ class Dictionary {
                 p.tone === newPron.tone
             );
             if (!exists) {
-                this.pronunciations.push(newPron);
+                this.lexiconPronunciations.push(newPron);
             }
         });
-    }
-
-    /** Pronunciations for stored-notation candidates, as returned by
-     *  Romanization.toStored() for a syllable typed in another system:
-     *  [{initial, final, tones}] (tones null = any tone). */
-    getMatchesForStored(candidates) {
-        if (!candidates?.length) return [];
-        return this.pronunciations.filter(p => candidates.some(c =>
-            p.initial === c.initial && p.final === c.final
-            && (!c.tones || c.tones.includes(String(p.tone ?? '')))
-        ));
-    }
-
-    getMatchesForSyllable(syl) {
-        return this.pronunciations.filter(p => {
-            const pinyin = p.abstractPinyin();
-            const lowerTone = p.initial + p.final + p.tone;
-            return syl == [p.initial, p.final].join('') 
-                    // || syl == [p.initial+'h', p.final].join('') 
-                    // || syl == [p.initial.replace('h',''), p.final].join('') 
-                    || syl == pinyin
-                    || syl == lowerTone
-                    || p.simp === syl
-                    || p.trad === syl 
-                    ; 
-        });
+        this.rebuild();
     }
 
     getMatchesForHanzi(char) {

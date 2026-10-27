@@ -10,6 +10,14 @@ if "%~1"=="" (
     exit /b 1
 )
 
+echo === tests ===
+REM "call" is required: npm is a .cmd script and would otherwise end this one.
+call npm test
+if errorlevel 1 (
+    echo Tests failed, aborting deploy.
+    exit /b 1
+)
+
 echo === collectstatic ===
 python manage.py collectstatic --noinput
 if errorlevel 1 exit /b 1

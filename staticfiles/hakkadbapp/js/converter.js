@@ -67,8 +67,6 @@ class View {
 }
 
 class Controller{
-    static SOURCE_KEY = 'hakka-converter-source';
-
     constructor ({itemSelector, containerId }) {
         const dico = new Dictionary({containerId, itemSelector});
         this.model = new TextModel(dico);
@@ -86,7 +84,16 @@ class Controller{
         this.view.input.dispatchEvent(new Event('change'));
 
         this.bindKeyboard();
-        this.bindSourceSwitch();
+        // "Lectures" (components/reading_settings.html): lexicon, a
+        // dictionary, or all sources -- independent of the input and
+        // display systems.
+        window.readingSources = this.readingSources = new ReadingSourceSwitch({
+            root: document.getElementById('source-switch'),
+            status: document.getElementById('source-status'),
+            summary: document.getElementById('settings-summary'),
+            dico: this.dico,
+            onChange: () => this.handleInput(),
+        });
 
         // Sentence.render() bakes simp/trad into a plain string at render
         // time rather than re-reading the DOM, so flipping the sitewide
@@ -95,109 +102,8 @@ class Controller{
         document.addEventListener('hanzi-mode-change', () => this.view.render(this.model.text));
         // Display system: re-render; with "Saisie en: comme l'affichage" it
         // is also the input system, so suggestions are recomputed too.
-        document.addEventListener('romanization-change', () => { this.handleInput(); this.renderSummary(); });
-        document.addEventListener('romanization-input-change', () => { this.handleInput(); this.renderSummary(); });
-    }
-
-    /** Mutually exclusive sources for the readings offered while typing:
-     *  'db' = the Supabase lexicon embedded in the page (default), or one of
-     *  the dictionary indexes declared as buttons in converter.html
-     *  (data-source="baoan", "mciver"... with data-dict-url, its compact
-     *  file fetched on first use only, and data-dict-system, the system of
-     *  romanization.json it's spelled in). The choice is remembered per
-     *  browser. */
-    bindSourceSwitch() {
-        this.sourceSwitch = document.getElementById('source-switch');
-        if (!this.sourceSwitch) return;
-        this.sourceStatus = document.getElementById('source-status');
-        this.dictPromises = {};
-        this.sourceSwitch.addEventListener('click', (event) => {
-            const btn = event.target.closest('[data-source]');
-            if (btn) this.setSource(btn.dataset.source);
-        });
-        let saved = null;
-        try { saved = localStorage.getItem(Controller.SOURCE_KEY); } catch (e) { /* private mode */ }
-        if (saved === 'dict') saved = 'baoan'; // value saved before there were several dictionaries
-        this.setSource(this.sourceButton(saved) ? saved : 'db');
-    }
-
-    /** One sentence saying what the three settings add up to, with
-     *  something to type: "Tapez en Wenfa (ex. wuk5 ga1 hao3 tai4) →
-     *  lectures de l'index McIver → affichées en McIver". */
-    renderSummary() {
-        const el = document.getElementById('settings-summary');
-        if (!el || typeof Romanization === 'undefined' || !Romanization.systems().length) return;
-        const button = this.sourceButton(this.source);
-        const source = this.source === 'db' || !button
-            ? 'mots et lectures du lexique Wenfa'
-            : `lectures du dictionnaire ${button.textContent.trim()}`;
-        const example = this.inputExample().replace(/^Ex: /, '');
-        el.innerHTML = `Tapez en <b>${Romanization.label(Romanization.inputSystem())}</b> `
-            + `(ex. <code>${example.replace(/</g, '&lt;')}</code>) → ${source} → `
-            + `affichage en <b>${Romanization.label(Romanization.current())}</b>.`;
-    }
-
-    sourceButton(source) {
-        return source ? this.sourceSwitch.querySelector(`[data-source="${CSS.escape(source)}"]`) : null;
-    }
-
-    async setSource(source, { status = null } = {}) {
-        const button = this.sourceButton(source);
-        this.source = source;
-        this.sourceSwitch.querySelectorAll('[data-source]').forEach((btn) => {
-            btn.setAttribute('aria-pressed', String(btn.dataset.source === source));
-        });
-        // Hints: data-source-hint="db" for the lexicon, "dict" for any dictionary.
-        document.querySelectorAll('[data-source-hint]').forEach((el) => {
-            el.hidden = el.dataset.sourceHint !== (source === 'db' ? 'db' : 'dict');
-        });
-        try { localStorage.setItem(Controller.SOURCE_KEY, source); } catch (e) { /* private mode */ }
-        this.renderSummary();
-
-        if (source === 'db' || !button?.dataset.dictUrl) {
-            this.dico.useSource(null);
-            this.view.input.placeholder = this.inputExample();
-            this.sourceStatus.textContent = status
-                || `Lexique de l'association · ${this.dico.pronunciations.length.toLocaleString('fr-FR')} lectures · `
-                + `${this.dico.words.length.toLocaleString('fr-FR')} mots`;
-            this.handleInput();
-            return;
-        }
-
-        this.sourceStatus.textContent = 'Chargement du dictionnaire…';
-        try {
-            // One fetch per dictionary and page load, shared by later toggles.
-            this.dictPromises[source] ??= Dictionary.fetchSourcePronunciations(button.dataset.dictUrl);
-            const { meta, prons } = await this.dictPromises[source];
-            if (this.source !== source) return; // switched again while loading
-            // Typed in the dictionary's own system it's matched directly;
-            // typed in Wenfa (or another system) through its Wenfa equivalents.
-            this.dico.useSource(prons, { system: button.dataset.dictSystem || null });
-            this.view.input.placeholder = this.inputExample();
-            this.renderSummary();
-            this.sourceStatus.textContent =
-                `${meta.title || button.textContent.trim()}${meta.author ? `, ${meta.author}` : ''} · `
-                + `${prons.length.toLocaleString('fr-FR')} lectures · sans mots ni traductions`;
-            this.handleInput();
-        } catch (err) {
-            console.error(err);
-            delete this.dictPromises[source];
-            this.setSource('db', { status: 'Impossible de charger le dictionnaire : retour au lexique de la base.' });
-        }
-    }
-
-    /** "Ex: …" placeholder in the current input system, tones as digits
-     *  since that's how they're typed. */
-    inputExample() {
-        const sample = 'wuk5 ga1 hao3 tai4';
-        if (typeof Romanization === 'undefined' || !Romanization.systems().length) return `Ex: ${sample}`;
-        const button = this.source !== 'db' ? this.sourceButton(this.source) : null;
-        if (button?.dataset.dictExample && Romanization.inputSystem() === this.dico.sourceSystem) {
-            return `Ex: ${button.dataset.dictExample}`; // the dictionary's own spelling
-        }
-        const typed = Romanization.fromPinyin(sample, Romanization.inputSystem())
-            .replace(/[¹²³⁴⁵⁶⁷⁸]/g, (c) => '¹²³⁴⁵⁶⁷⁸'.indexOf(c) + 1);
-        return `Ex: ${typed}`;
+        document.addEventListener('romanization-change', () => this.handleInput());
+        document.addEventListener('romanization-input-change', () => this.handleInput());
     }
 
     /** Shift+1..9 picks a suggestion by its keyboard hint, mirroring the
@@ -285,7 +191,7 @@ class Controller{
 
     // Input change
     handleInput(event) {
-        this.view.input.placeholder = this.inputExample();
+        this.view.input.placeholder = `Ex: ${ReadingSourceSwitch.inputExample()}`;
         this.dico.unknowns.clear();
         const text = this.view.input.value;
         this.model.update(text);
