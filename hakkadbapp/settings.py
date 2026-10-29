@@ -64,6 +64,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'hakkadbapp.romanization.context_processor',
+                'hakkadbapp.permissions.context_processor',
             ],
         },
     },
@@ -132,6 +133,25 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Authentication: a handful of editors, created by hand in /admin/. Reads
+# stay public; writes need a session (permissions.editor_required). Long
+# sessions so editors rarely have to log in again.
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'flashcards'
+LOGOUT_REDIRECT_URL = 'flashcards'
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 60  # 60 days
+
+# Shared transcriptions (/ecouter/): their audio lives in a PRIVATE
+# Supabase Storage bucket, reached through short-lived signed URLs made
+# with the service_role key (Supabase > Project Settings > API) -- never
+# sent to the browser. See transcripts.py.
+SUPABASE_URL = config('SUPABASE_URL', default='')
+SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_KEY', default='')
+SUPABASE_TRANSCRIPTS_BUCKET = config('SUPABASE_TRANSCRIPTS_BUCKET', default='transcriptions')
+# Public address of the site ("https://….vercel.app"), for the links to
+# shared transcriptions when publishing from a local server.
+SITE_URL = config('SITE_URL', default='')
 
 # if not DEBUG:
 #     SECURE_HSTS_SECONDS = 31536000

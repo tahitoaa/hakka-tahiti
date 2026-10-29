@@ -31,6 +31,7 @@ Requires Node 20+ (the built-in test runner). Check with `node --version`.
 | `dictionary.test.js` | `Dictionary.js` | Reading pronunciations/words out of the (faked) DOM, looking up a syllable or a hanzi character, tracking unknown characters, de-duplicating on import. |
 | `characterInput.test.js` | `CharacterInput.js` | The shared `SyllableInputModel` (parse romanized text into syllables + suggestions, replace/select a suggestion) and `SuggestionBar` (renders suggestion buttons, handles clicks). Used by both the Converter and Transcripter pages. |
 | `converter.test.js` | `converter.js` | Just `TextModel`, the one bit of real logic converter.js adds on top of `SyllableInputModel`. See the "What's *not* covered" note below. |
+| `transcriptDocument.test.js` | `TranscriptDocument.js`, `EafDocument.js` | The segment list of a shared transcription (listening page and PDF): hanzi fallback, times, escaping; and the empty .eaf made from the participants' names (`EafDocument.create`). |
 
 ## How a test works, in plain terms
 

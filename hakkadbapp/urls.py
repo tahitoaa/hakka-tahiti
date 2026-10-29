@@ -17,11 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
+from . import additions
 # urls.py
 from django.urls import path, re_path
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
+    # Users are managed by hand there (2-3 editors); see permissions.py.
+    path('admin/', admin.site.urls),
+    path('connexion/', auth_views.LoginView.as_view(extra_context={"title": "Connexion", "page": "login"}), name='login'),
+    path('deconnexion/', auth_views.LogoutView.as_view(), name='logout'),
     path('', views.flashcards, name='flashcards'),
     # path('pronunciation/new/', views.newPronunciation, name='new_pronunciation'),
     # path('pronunciation/<int:pk>/edit/', views.edit_pronunciation, name='edit_pronunciation'),
@@ -38,6 +43,13 @@ urlpatterns = [
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
     path("transcripter/", views.transcripter, name="transcripter"),
+    # Shared transcriptions: logged-in members only (views.transcriptions).
+    path("ecouter/", views.transcriptions, name="transcriptions"),
+    path("ecouter/<uuid:transcript_id>/", views.transcription_listen, name="transcription_listen"),
+    path("api/transcriptions/publish", views.api_transcription_publish, name="api_transcription_publish"),
+    path("api/transcriptions/lookup", views.api_transcription_lookup, name="api_transcription_lookup"),
+    path("api/transcriptions/<uuid:transcript_id>/audio", views.api_transcription_audio, name="api_transcription_audio"),
+    path("api/transcriptions/<uuid:transcript_id>/delete", views.api_transcription_delete, name="api_transcription_delete"),
     path("caracters", views.caracters, name="caracters"),
     path("flashcards/", views.flashcards, name="flashcards"),
     path("flashcards/<str:category>", views.flashcards, name="flashcards"),
@@ -59,4 +71,8 @@ urlpatterns = [
     path("export-corpus/expressions.xlsx", views.export_expressions_spreadsheet, name="export_expressions_spreadsheet"),
     path("expression-mesh/sync", views.expression_mesh_sync, name="expression_mesh_sync"),
     path("word-notes/<int:word_id>", views.word_note_entry, name="word_note_entry"),
+    path("saisie/", additions.saisie, name="saisie"),
+    path("api/ajouts/", additions.additions_api, name="additions_api"),
+    path("api/ajouts/<int:addition_id>", additions.addition_update, name="addition_update"),
+    path("api/ajouts/<int:addition_id>/supprimer", additions.addition_delete, name="addition_delete"),
 ]

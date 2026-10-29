@@ -33,6 +33,7 @@ from .illustrations import illustration_for
 from . import expression_mesh
 from . import word_notes
 from . import pronunciation_sources
+from .permissions import editor_required
 
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
@@ -1434,6 +1435,7 @@ def expression_mesh_download(request):
 
 
 @require_POST
+@editor_required
 def expression_mesh_upload(request):
     uploaded = request.FILES.get("file")
     if not uploaded:
@@ -1481,6 +1483,7 @@ def _expression_note_json(expr, note):
     }
 
 
+@editor_required
 def expression_mesh_entry(request, expr_id):
     """GET: return (creating -- seeded from the platform's own published
     text where matched, see expression_mesh.get_or_create_entry -- if
@@ -1548,6 +1551,7 @@ def expression_mesh_entry(request, expr_id):
 
 
 @require_POST
+@editor_required
 def expression_mesh_reset(request, expr_id):
     """Reset one expression's maillage (excel_format) back to the platform
     state (see expression_mesh.reset_entry) -- leaves commentaire and
@@ -1664,6 +1668,7 @@ def export_expressions_spreadsheet(request):
 
 
 @require_POST
+@editor_required
 def expression_mesh_sync(request):
     """Ensure every current DB expression (with a platform_id) has an
     ExpressionNote (creating any missing ones verbatim from expr.text)
@@ -1686,6 +1691,7 @@ def _word_note_json(word, note):
     }
 
 
+@editor_required
 def word_note_entry(request, word_id):
     """GET/POST a single Word's persistent commentaire and use_in_export
     flag (see word_notes.py), keyed by Word.platform_id so it survives a
@@ -1784,3 +1790,170 @@ def api_convert_text(request):
         "unmatched": " | ".join(unmatched_parts),   # <-- NEW
         "unmatched_count": len(unmatched_parts),    # optional but useful
     }, json_dumps_params={"ensure_ascii": False})
+
+# ---------------------------------------------------------------------------
+# Shared transcriptions (/ecouter/): published from "Transcrire", read and
+# listened to by the working group's logged-in members (models.
+# SharedTranscript, transcripts.py).
+# ---------------------------------------------------------------------------
+
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from uuid import uuid4
+from . import transcripts
+from .models import SharedTranscript
+from .permissions import is_editor
+
+AUDIO_EXTENSIONS = {"audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/x-wav": "wav", "audio/wav": "wav"}
+
+
+def _listen_url(request, shared):
+    """Link to give the group: on the public site even when published from
+    a local server (settings.SITE_URL)."""
+    path = reverse("transcription_listen", args=[shared.id])
+    return f"{settings.SITE_URL.rstrip('/')}{path}" if settings.SITE_URL else request.build_absolute_uri(path)
+
+
+def _transcript_summary(shared):
+    data = shared.data or {}
+    return {
+        "id": str(shared.id),
+        "title": shared.title,
+        "participants": [p.get("name") for p in data.get("participants", [])],
+        "segments": len(data.get("segments", [])),
+        "updated_at": shared.updated_at,
+        "has_audio": bool(shared.audio_path),
+    }
+
+
+@login_required
+def transcriptions(request):
+    return render(request, "hakkadbapp/transcriptions.html", {
+        "title": "Écouter",
+        "page": "transcriptions",
+        "items": [_transcript_summary(t) for t in SharedTranscript.objects.all()],
+        "can_edit": is_editor(request.user),
+    })
+
+
+@login_required
+def transcription_listen(request, transcript_id):
+    shared = get_object_or_404(SharedTranscript, id=transcript_id)
+    audio_url, audio_error = None, None
+    if shared.audio_path:
+        try:
+            audio_url = transcripts.signed_audio_url(shared.audio_path)
+        except transcripts.StorageError as exc:
+            audio_error = str(exc)
+    return render(request, "hakkadbapp/transcription_listen.html", {
+        "title": shared.title,
+        "page": "transcriptions",
+        "shared": shared,
+        "transcript": {
+            "title": shared.title,
+            "updatedAt": shared.updated_at.isoformat(),
+            **(shared.data or {}),
+        },
+        "audio_url": audio_url,
+        "audio_error": audio_error,
+        "can_edit": is_editor(request.user),
+    })
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+@require_POST
+@editor_required
+def api_transcription_publish(request):
+    """Creates or updates the shared copy of one .eaf (keyed by its URN).
+    When `audio` names a recording not uploaded yet, answers an `upload`
+    URL to PUT the compressed audio to, then api_transcription_audio."""
+    payload = _json_body(request)
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "JSON invalide."}, status=400)
+    urn = str(payload.get("urn") or "").strip()[:200]
+    title = str(payload.get("title") or "").strip()[:200]
+    if not urn or not title:
+        return JsonResponse({"error": "Identifiant du fichier (URN) ou titre manquant."}, status=400)
+    try:
+        data = transcripts.clean_data(payload.get("data"))
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    shared = SharedTranscript.objects.filter(eaf_urn=urn).first()
+    created = shared is None
+    if created:
+        shared = SharedTranscript(eaf_urn=urn, created_by=request.user)
+    shared.title = title
+    shared.eaf_file_name = str(payload.get("fileName") or "")[:255]
+    shared.data = data
+    shared.updated_by = request.user
+    shared.save()
+
+    answer = {"ok": True, "id": str(shared.id), "created": created,
+              "url": _listen_url(request, shared)}
+    audio = payload.get("audio")
+    if isinstance(audio, dict) and audio.get("source") and audio.get("source") != shared.audio_source:
+        mime = str(audio.get("mime") or "")
+        if mime not in AUDIO_EXTENSIONS:
+            return JsonResponse({"error": f"Format audio non pris en charge : {mime or '?'}."}, status=400)
+        path = f"{shared.id}/{uuid4().hex}.{AUDIO_EXTENSIONS[mime]}"
+        try:
+            answer["upload"] = {"url": transcripts.signed_upload_url(path), "path": path}
+        except transcripts.StorageError as exc:
+            return JsonResponse({**answer, "error": str(exc)}, status=502)
+    return JsonResponse(answer)
+
+
+@require_POST
+@editor_required
+def api_transcription_audio(request, transcript_id):
+    """After the browser uploaded the audio: points the transcript at it
+    and deletes the previous recording."""
+    shared = get_object_or_404(SharedTranscript, id=transcript_id)
+    payload = _json_body(request) or {}
+    path = str(payload.get("path") or "")
+    if not path.startswith(f"{shared.id}/") or ".." in path:
+        return JsonResponse({"error": "Chemin audio invalide."}, status=400)
+    previous = shared.audio_path
+    shared.audio_path = path
+    shared.audio_mime = str(payload.get("mime") or "")[:60]
+    shared.audio_source = str(payload.get("source") or "")[:300]
+    shared.save(update_fields=["audio_path", "audio_mime", "audio_source", "updated_at"])
+    if previous and previous != path:
+        try:
+            transcripts.delete_objects([previous])
+        except transcripts.StorageError:
+            pass  # an orphan file in the bucket, not worth failing for
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+@editor_required
+def api_transcription_delete(request, transcript_id):
+    shared = get_object_or_404(SharedTranscript, id=transcript_id)
+    try:
+        transcripts.delete_objects([shared.audio_path])
+    except transcripts.StorageError as exc:
+        return JsonResponse({"error": str(exc)}, status=502)
+    shared.delete()
+    return JsonResponse({"ok": True})
+
+
+def api_transcription_lookup(request):
+    """Is this .eaf (URN) already shared? For the "Partager" dialog."""
+    if not is_editor(request.user):
+        return JsonResponse({"error": "Connexion requise (menu « Connexion »)."}, status=403)
+    shared = SharedTranscript.objects.filter(eaf_urn=request.GET.get("urn", "")).first()
+    if not shared:
+        return JsonResponse({"shared": None})
+    return JsonResponse({"shared": {
+        "id": str(shared.id), "title": shared.title, "audio_source": shared.audio_source,
+        "updated_at": shared.updated_at.isoformat(),
+        "url": _listen_url(request, shared),
+    }})

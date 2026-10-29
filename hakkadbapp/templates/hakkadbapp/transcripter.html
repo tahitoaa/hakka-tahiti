@@ -2,8 +2,10 @@
 {% load static %}
 {% block content %}
 {% comment %}
-  ELAN transcription editor: open one .eaf file (+ its audio), complete each
-  speaker's segments with the converter's input method, download the .eaf.
+  ELAN transcription editor: open the folder of one .eaf file and its audio,
+  write each segment's transcript with the converter's input method and its
+  French translation, save the .eaf in place (previous version kept in
+  sauvegardes/).
   Only annotation values change; the file keeps its ELAN structure
   (EafDocument.js). Logic: transcripter.js.
 {% endcomment %}
@@ -12,12 +14,15 @@
   <!-- Files + settings -->
   <section class="eaf-toolbar no-print" aria-label="Fichiers et paramètres">
     <div class="eaf-files">
-      <label class="eaf-btn eaf-btn-primary">
-        Ouvrir .eaf + audio
+      <button id="eaf-open-dir" type="button" class="eaf-btn eaf-btn-primary" title="Le dossier qui contient le .eaf et son audio">Ouvrir un dossier</button>
+      <label class="eaf-btn eaf-btn-light" title="Ouvrir le .eaf et l'audio un par un (le .eaf sera téléchargé au lieu d'être enregistré)">
+        Fichiers…
         <input id="eaf-file-input" type="file" accept=".eaf,audio/*,video/*" multiple hidden>
       </label>
+      <button id="eaf-new-open" type="button" class="eaf-btn eaf-btn-light" title="Créer un .eaf vide pour un enregistrement et ses participants">Nouveau fichier</button>
+      <button id="eaf-reopen" type="button" class="eaf-btn eaf-btn-light" hidden></button>
       <div id="eaf-file-info" class="eaf-file-info">
-        Glissez-déposez ici un fichier ELAN (.eaf) et son enregistrement audio.
+        Ouvrez (ou glissez-déposez) le dossier qui contient le fichier ELAN (.eaf) et son enregistrement audio.
       </div>
     </div>
     <div class="eaf-settings">
@@ -25,16 +30,96 @@
     </div>
     <div class="eaf-actions">
       <span id="eaf-progress" class="eaf-progress"></span>
-      <button id="eaf-download" type="button" class="eaf-btn eaf-btn-save" disabled>Télécharger le .eaf</button>
+      <span id="eaf-dirty" class="eaf-dirty" hidden>● non enregistré</span>
+      <button id="eaf-pdf" type="button" class="eaf-btn eaf-btn-light" disabled title="Le texte segment par segment (hanzi, pinyin, français), à enregistrer en PDF">PDF</button>
+      <button id="eaf-share-open" type="button" class="eaf-btn eaf-btn-light" disabled title="Publier pour le groupe : texte et audio, à écouter sur téléphone">Partager</button>
+      <button id="eaf-save" type="button" class="eaf-btn eaf-btn-save" disabled>Enregistrer</button>
     </div>
   </section>
+
+  <!-- New .eaf from the participants' names (EafDocument.create) -->
+  <section id="eaf-new" class="eaf-new no-print" aria-label="Nouveau fichier" hidden>
+    <div class="eaf-new-head">
+      <b>Nouveau fichier .eaf</b>
+      <span class="text-gray-500">— un tier par participant, avec ses tiers Traduction, Pinyin, Mixed et Hanzi ; la segmentation se fait ensuite dans ELAN.</span>
+      <span class="grow"></span>
+      <button type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" data-new="close" title="Fermer">✕</button>
+    </div>
+    <div class="eaf-new-grid">
+      <span>Audio</span>
+      <div class="eaf-new-line">
+        <button id="eaf-new-dir" type="button" class="eaf-btn eaf-btn-light">Choisir le dossier de l'audio…</button>
+        <select id="eaf-new-audio" hidden></select>
+        <label id="eaf-new-audio-label" class="eaf-btn eaf-btn-light">Choisir l'audio…
+          <input id="eaf-new-audio-file" type="file" accept="audio/*,video/*" hidden></label>
+        <span id="eaf-new-audio-info" class="text-gray-500"></span>
+      </div>
+      <span>Fichier</span>
+      <div class="eaf-new-line"><input id="eaf-new-name" type="text" placeholder="audio.eaf" autocomplete="off">
+        <small class="text-gray-500">créé à côté de l'audio</small></div>
+      <span>Annotateur</span>
+      <div class="eaf-new-line"><input id="eaf-new-annotator" type="text" placeholder="ex. Tahitoa" autocomplete="off"></div>
+      <span>Participants</span>
+      <div>
+        <div id="eaf-new-participants"></div>
+        <button id="eaf-new-add" type="button" class="eaf-btn eaf-btn-light eaf-btn-sm">+ Ajouter un participant</button>
+      </div>
+      <span>Tiers créés</span>
+      <div id="eaf-new-preview" class="eaf-new-preview"></div>
+    </div>
+    <div class="eaf-new-line" style="margin-top:0.75rem">
+      <button id="eaf-new-create" type="button" class="eaf-btn eaf-btn-save" disabled>Créer le fichier</button>
+      <span id="eaf-new-error" class="eaf-new-error"></span>
+    </div>
+  </section>
+
+  <!-- Share with the working group (/ecouter/) -->
+  <section id="eaf-share" class="eaf-new no-print" aria-label="Partager" hidden>
+    <div class="eaf-new-head">
+      <b>Partager avec le groupe</b>
+      <span class="text-gray-500">— une page à lire et écouter sur téléphone, pour les membres connectés (<a class="underline" href="{% url 'transcriptions' %}" target="_blank">Écouter</a>).</span>
+      <span class="grow"></span>
+      <button type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" data-share="close" title="Fermer">✕</button>
+    </div>
+    <div class="eaf-new-grid">
+      <span>Titre</span>
+      <div class="eaf-new-line"><input id="eaf-share-title" type="text" style="flex:1;max-width:30rem" autocomplete="off"></div>
+      <span>Contenu</span>
+      <div id="eaf-share-content" class="eaf-new-preview"></div>
+      <span>Audio</span>
+      <div id="eaf-share-audio" class="eaf-new-preview"></div>
+      <span>État</span>
+      <div id="eaf-share-status" class="eaf-new-preview"></div>
+    </div>
+    <div class="eaf-new-line" style="margin-top:0.75rem">
+      <button id="eaf-share-publish" type="button" class="eaf-btn eaf-btn-save">Publier</button>
+      <progress id="eaf-share-progress" max="1" value="0" hidden></progress>
+      <span id="eaf-share-step" class="eaf-progress"></span>
+    </div>
+    <div id="eaf-share-result" class="eaf-banner eaf-banner-ok" hidden></div>
+  </section>
+
+  <div id="eaf-choose" class="eaf-banner no-print" hidden></div>
+  <div id="eaf-saved" class="eaf-banner eaf-banner-ok no-print" hidden></div>
 
   <div id="eaf-draft" class="eaf-banner no-print" hidden></div>
   <div id="eaf-messages" class="eaf-banner eaf-banner-warn no-print" hidden></div>
 
-  <!-- Audio -->
+  <!-- Audio + overview of the whole recording -->
   <div id="eaf-audio-bar" class="eaf-audio no-print" hidden>
-    <audio id="eaf-audio" controls preload="metadata"></audio>
+    <audio id="eaf-audio" controls preload="metadata" hidden></audio>
+    <div class="eaf-overview">
+      <canvas id="eaf-overview" aria-label="Vue d'ensemble de l'enregistrement : cliquez ou glissez pour parcourir la page"></canvas>
+      <div id="eaf-overview-tip" class="eaf-overview-tip" hidden></div>
+    </div>
+    <div class="eaf-nav">
+      <span id="eaf-view-range"></span>
+      <span class="grow"></span>
+      <label title="Pendant la lecture depuis la barre audio, garder le segment entendu juste sous l'audio">
+        <input id="eaf-follow" type="checkbox" checked> suivre la lecture</label>
+      <button id="eaf-todo-prev" type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" title="Alt+Page↑">◂ à compléter</button>
+      <button id="eaf-todo-next" type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" title="Alt+Page↓">à compléter ▸</button>
+    </div>
   </div>
 
   <!-- Conversation: one column per speaker -->
@@ -46,12 +131,16 @@
   <details class="eaf-help no-print">
     <summary>Aide</summary>
     <ul>
-      <li>Ouvrez ensemble le fichier <b>.eaf</b> et son <b>audio</b> (ou l'un puis l'autre). Chaque tier principal du fichier est un locuteur (une colonne).</li>
+      <li><b>Ouvrir un dossier</b> : choisissez le dossier qui contient le <b>.eaf</b> et son <b>audio</b> (l'audio référencé par le fichier, sinon le seul du dossier). <b>Enregistrer</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) écrase le .eaf après avoir copié l'ancienne version dans le sous-dossier <b>sauvegardes/</b> (nom daté). « Rouvrir » reprend le dernier fichier ouvert. Sans cette fonction du navigateur (Chrome, Edge), « Fichiers… » ouvre le .eaf et l'audio, et le .eaf est téléchargé.</li>
+      <li><b>Nouveau fichier</b> : choisissez l'audio (son dossier), puis les participants (nom complet et nom du tier, le prénom par défaut). Le .eaf vide est créé à côté de l'audio, sur le modèle anavevo : pour chaque participant, un tier <i>transcription</i> et ses tiers enfants Traduction, Pinyin, Mixed et Hanzi. Découpez ensuite les segments dans ELAN, puis rouvrez le fichier ici.</li>
+      <li><b>PDF</b> : le texte segment par segment (locuteur, temps, hanzi, pinyin, français) dans un nouvel onglet ; choisissez « Enregistrer au format PDF » dans la fenêtre d'impression. <b>Partager</b> : publie la transcription et une copie compressée de l'audio (MP3, ~18 Mo par heure) sur la page <b>Écouter</b>, lisible sur téléphone par les membres connectés. Publiez à nouveau après une séance de travail pour mettre la page à jour (l'audio n'est renvoyé que s'il a changé). Les locuteurs masqués ne sont pas inclus.</li>
+      <li>Chaque tier principal du fichier est un locuteur (une colonne).</li>
       <li><b>Lectures</b> : lexique, un dictionnaire ou toutes les sources ; <b>Je tape en</b> et <b>J'affiche en</b> : systèmes de saisie et d'affichage, indépendants de la source (mêmes réglages que la page Écrire).</li>
-      <li>Cliquez un segment pour l'éditer : la <b>romanisation</b> (tier principal) sert de point de départ ; choisissez les caractères dans les suggestions pour remplir le tier <b>Hanzi</b>, ajoutez la <b>traduction</b>. Le <b>pinyin</b> (dans le système « J'affiche en ») et la ligne <b>mixte</b> sont recalculés automatiquement.</li>
-      <li>Les tiers Hanzi, Traduction, Pinyin et Mixte sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
-      <li>Clavier : <kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> segment suivant/précédent, <kbd>Alt</kbd>+<kbd>Entrée</kbd> réécouter, <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd> choisir une suggestion, <kbd>Échap</kbd> fermer.</li>
-      <li>Le travail est gardé en brouillon dans ce navigateur ; « Télécharger le .eaf » produit le fichier à rouvrir dans ELAN.</li>
+      <li>Cliquez un segment pour l'éditer. Vous éditez le <b>Transcript</b>, c'est-à-dire le tier principal du locuteur : la romanisation tapée dans ELAN, que vous convertissez en choisissant les caractères dans les suggestions (mots séparés par des espaces, lectures entre parenthèses : <code>吾(nga1) 爸(ba1)爸(ba1)</code>), et le <b>Français</b> (tier enfant Traduction). Les tiers enfants <b>Pinyin</b> (dans le système « J'affiche en »), <b>Mixte</b> et <b>Hanzi</b> (caractères seuls) sont recalculés automatiquement.</li>
+      <li>Les tiers Traduction, Pinyin, Mixte et Hanzi sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Dans un ancien fichier où le transcript était dans le tier Hanzi (ou un tier Transcript), il est repris dans le tier principal à l'ouverture. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
+      <li><b>Vue d'ensemble</b> (sous l'audio) : une ligne par locuteur, chaque segment pâle s'il est à faire, plein s'il est en hanzi ; le cadre bleu montre la partie de la page à l'écran, le trait rouge la position de lecture. Cliquez ou glissez pour parcourir la page, double-cliquez pour éditer un segment.</li>
+      <li>Clavier : <kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> segment suivant/précédent, <kbd>Alt</kbd>+<kbd>Page↓</kbd>/<kbd>Page↑</kbd> segment à compléter suivant/précédent, <kbd>Alt</kbd>+<kbd>Entrée</kbd> réécouter, <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd> choisir une suggestion, <kbd>Échap</kbd> fermer.</li>
+      <li>Les modifications non enregistrées sont aussi gardées dans ce navigateur, et proposées à la réouverture du fichier.</li>
     </ul>
   </details>
 </div>
@@ -73,23 +162,55 @@
   .eaf-btn-save:disabled { opacity: 0.45; cursor: default; }
   .eaf-btn-light { background: #fff; color: #374151; border-color: #d1d5db; font-weight: 500; }
   .eaf-btn-light:hover { background: #f3f4f6; }
+  .eaf-btn-sm { min-height: 1.75rem; padding: 0.15rem 0.6rem; font-size: 0.78rem; }
+  .eaf-btn[hidden] { display: none; }
+  .eaf-dirty { font-size: 0.8rem; color: #b45309; white-space: nowrap; }
+  .eaf-dirty[hidden] { display: none; }
   #eaf-app.eaf-dragging .eaf-toolbar { outline: 3px dashed #6366f1; outline-offset: 4px; }
 
   .eaf-banner { margin-top: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 0.5rem; font-size: 0.875rem;
                 background: #eef2ff; color: #3730a3; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
   .eaf-banner[hidden] { display: none; }
   .eaf-banner-warn { background: #fef3c7; color: #92400e; }
+  .eaf-banner-ok { background: #d1fae5; color: #065f46; }
+
+  .eaf-new { margin-top: 0.75rem; padding: 0.75rem 1rem; background: #fff; border: 1px solid #c7d2fe; border-radius: 0.75rem; font-size: 0.875rem; }
+  .eaf-new[hidden] { display: none; }
+  .eaf-new-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; margin-bottom: 0.6rem; }
+  .eaf-new-head .grow { flex: 1; }
+  .eaf-new-grid { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.6rem 0.75rem; align-items: start; }
+  .eaf-new-grid > span { font-size: 0.75rem; color: #6b7280; padding-top: 0.5rem; }
+  .eaf-new-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+  .eaf-new input[type="text"], .eaf-new select { min-height: 2.25rem; padding: 0.3rem 0.6rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
+                                                 background: #fff; font-size: 0.9rem; min-width: 0; }
+  .eaf-new select[hidden], .eaf-new label[hidden] { display: none; }
+  .eaf-new-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 0.4rem; margin-bottom: 0.4rem; max-width: 36rem; }
+  .eaf-new-preview { font-size: 0.8rem; color: #374151; padding-top: 0.45rem; display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
+  .eaf-new-error { font-size: 0.8rem; color: #b45309; }
+  .eaf-empty { padding: 1rem; font-size: 0.875rem; color: #6b7280; }
 
   .eaf-audio { position: sticky; top: 0; z-index: 20; margin-top: 0.75rem; padding: 0.4rem 0.5rem;
                background: rgb(229 231 235 / 0.95); backdrop-filter: blur(4px); border-radius: 0.5rem; }
-  .eaf-audio audio { width: 100%; height: 2.25rem; }
+  .eaf-audio audio { display: block; width: 100%; height: 2.25rem; margin-bottom: 0.3rem; }
+  .eaf-audio audio[hidden] { display: none; }
+  .eaf-overview { position: relative; }
+  .eaf-overview canvas { display: block; width: 100%; cursor: pointer; touch-action: none; border-radius: 0.25rem; background: #fff; }
+  .eaf-overview-tip { position: absolute; bottom: calc(100% + 4px); max-width: 28rem; padding: 0.2rem 0.5rem; border-radius: 0.35rem;
+                      background: #111827; color: #fff; font-size: 0.75rem; white-space: nowrap; overflow: hidden;
+                      text-overflow: ellipsis; pointer-events: none; z-index: 30; }
+  .eaf-overview-tip[hidden] { display: none; }
+  .eaf-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin-top: 0.3rem;
+             font-size: 0.75rem; color: #4b5563; font-variant-numeric: tabular-nums; }
+  .eaf-nav .grow { flex: 1; }
+  .eaf-nav label { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; }
 
   /* No overflow:hidden here: it would stop the column header from sticking. */
   .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; }
-  .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #f3f4f6; }
+  .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #f3f4f6;
+             scroll-margin-top: calc(var(--eaf-bar-h, 0px) + 2.75rem); }
   .eaf-head { position: sticky; top: 0; z-index: 10; background: #f9fafb; border-top: 0; border-bottom: 1px solid #e5e7eb;
               border-radius: 0.75rem 0.75rem 0 0; }
-  #eaf-app.has-audio .eaf-head { top: 3.1rem; } /* below the sticky audio bar */
+  .eaf-head { top: var(--eaf-bar-h, 0px); } /* below the sticky audio bar (height set by transcripter.js) */
   .eaf-head > div { padding: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #374151; }
   .eaf-speaker-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
   .eaf-speaker-head label { display: flex; align-items: center; gap: 0.4rem; min-width: 0; cursor: pointer; }
@@ -122,7 +243,7 @@
   .eaf-field textarea:focus { outline: 2px solid #a5b4fc; outline-offset: 0; }
   .eaf-field .hanzi-input { font-size: 1.15rem; }
   .eaf-derived { font-size: 0.85rem; color: #374151; padding-top: 0.4rem; overflow-wrap: anywhere; }
-  .eaf-ime { position: relative; }
+  .eaf-derived.hanzi { font-size: 1.05rem; }  .eaf-ime { position: relative; }
   .eaf-preview { margin-top: 0.4rem; }
 
   .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #4b5563; }
@@ -148,5 +269,16 @@
     <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/EafDocument.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/TranscriptDocument.js' %}"></script>
+    <script>
+      window.TRANSCRIPT_SHARE = {
+        lookup: "{% url 'api_transcription_lookup' %}",
+        publish: "{% url 'api_transcription_publish' %}",
+        audioDone: "{% url 'api_transcription_audio' '00000000-0000-0000-0000-000000000000' %}",
+        login: "{% url 'login' %}?next={{ request.path|urlencode }}",
+        worker: "{% static 'hakkadbapp/js/mp3-worker.js' %}",
+        lame: "{% static 'hakkadbapp/vendor/lamejs/lame.min.js' %}",
+      };
+    </script>
     <script src="{% static 'hakkadbapp/js/transcripter.js' %}"></script>
 {% endblock %}

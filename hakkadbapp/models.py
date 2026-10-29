@@ -1,3 +1,6 @@
+import uuid
+
+from django.conf import settings
 from django.db import models
 from itertools import product
 
@@ -240,3 +243,91 @@ class ExpressionNote(models.Model):
 
     def __str__(self):
         return f"note for expression {self.platform_id}"
+
+class LexiconAddition(models.Model):
+    """A new word or expression typed in by an editor on the "Saisie" page,
+    not (yet) in the Google Sheet / platform corpus. Same reasoning as
+    WordNote: its own table, outside import_words_from_df's reset=True
+    reach, so it survives every reset+rebuild. Gets its own platform_id up
+    front (a fresh uuid, the same kind of id json_model.Identified mints)
+    so a validated entry keeps one stable id across every corpus export."""
+    KIND_WORD = "word"
+    KIND_EXPRESSION = "expression"
+    KIND_CHOICES = [(KIND_WORD, "Mot"), (KIND_EXPRESSION, "Expression")]
+
+    STATUS_DRAFT = "draft"
+    STATUS_REVIEW = "review"
+    STATUS_VALIDATED = "validated"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_REVIEW, "À valider"),
+        (STATUS_VALIDATED, "Validé"),
+        (STATUS_REJECTED, "Rejeté"),
+    ]
+
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=KIND_WORD)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    # Word: the hanzi as one block ("屋家"). Expression: its maillage, one
+    # space-separated token per word, optional ":gloss" -- the same format
+    # as ExpressionNote.excel_format ("若 爸爸 在 屋家 么").
+    hanzi = models.TextField()
+    # Wenfa with digit tones, as typed in the converter ("wuk5 ka1").
+    pinyin = models.TextField(blank=True, default="")
+    french = models.TextField(blank=True, default="")
+    english = models.TextField(blank=True, default="")
+    # Comma-separated theme names, like Word.category / Expression.category.
+    themes = models.CharField(max_length=200, blank=True, default="")
+    observations = models.TextField(blank=True, default="")
+    platform_id = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} {self.hanzi} ({self.get_status_display()})"
+
+
+class SharedTranscript(models.Model):
+    """An ELAN transcription published from the "Transcrire" page so that
+    the working group can read and listen to it on a phone (page
+    /ecouter/<id>/, members logged in only). `data` is the transcript as
+    shown -- participants and segments with their hanzi, pinyin, french --
+    a snapshot, not the .eaf: the .eaf stays on the transcriber's disk and
+    is published again after each work session. The audio is a compressed
+    copy in Supabase Storage (transcripts.py), never served by Django.
+    One row per .eaf: `eaf_urn` is the URN ELAN writes in every file's
+    header, so publishing the same file again updates its row."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    eaf_urn = models.CharField(max_length=200, unique=True)
+    title = models.CharField(max_length=200)
+    eaf_file_name = models.CharField(max_length=255, blank=True, default="")
+    # {"participants": [{"name", "tier"}], "segments": [{"start", "end",
+    #  "speaker" (index), "hanzi", "pinyin", "translation", "transcript"}]}
+    data = models.JSONField(default=dict)
+    # Object path in the storage bucket ("" until the audio is uploaded),
+    # and the recording it was made from ("audio.wav:613456789"), so the
+    # same recording isn't compressed and sent again on each publication.
+    audio_path = models.CharField(max_length=255, blank=True, default="")
+    audio_mime = models.CharField(max_length=60, blank=True, default="")
+    audio_source = models.CharField(max_length=300, blank=True, default="")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return self.title

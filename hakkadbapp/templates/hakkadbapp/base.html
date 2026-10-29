@@ -303,6 +303,13 @@
             Transcrire
           </a>
         </li>
+        {% if user.is_authenticated %}
+        <li class="border-b border-white/10 sm:border-0">
+          <a href="{% url 'transcriptions' %}" class="block py-2.5 sm:py-2 {% if page == 'transcriptions' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Écouter
+          </a>
+        </li>
+        {% endif %}
         <li class="border-b border-white/10 sm:border-0">
           <a href="{% url 'pinyin_converter' %}" class="block py-2.5 sm:py-2 {% if page == 'converter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Écrire
@@ -342,6 +349,27 @@
           <a href="{% url 'expressions' %}" class="block py-2.5 sm:py-2 {% if page == 'expressions' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Expressions
           </a>
+        </li>
+        {% if can_edit %}
+        <li class="border-t border-white/10 sm:border-0">
+          <a href="{% url 'saisie' %}" class="block py-2.5 sm:py-2 {% if page == 'saisie' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Saisie
+          </a>
+        </li>
+        {% endif %}
+        <!-- Logout must be a POST since Django 5 (LogoutView). -->
+        <li class="border-t border-white/10 sm:border-0 sm:ml-auto">
+          {% if user.is_authenticated %}
+          <form method="post" action="{% url 'logout' %}" class="flex items-center gap-2 py-2.5 sm:py-2">
+            {% csrf_token %}
+            <span class="text-brand-gold">{{ user.get_short_name|default:user.username }}</span>
+            <button type="submit" class="text-white/90 hover:text-brand-gold underline-offset-2 hover:underline">Déconnexion</button>
+          </form>
+          {% else %}
+          <a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="block py-2.5 sm:py-2 {% if page == 'login' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Connexion
+          </a>
+          {% endif %}
         </li>
       </ul>
     </div>
