@@ -1,106 +1,143 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
 {% block content %}
-<div class="overflow-x-auto w-full max-w-full no-print-overflow">
-  <p class="print:text-black print:bg-white print:shadow-none print:p-0">
-    Cliquez sur un phonème pour voir les caractères associés.
-  </p>
-  <label class="inline-flex items-center gap-2 mb-2 text-sm print:hidden">
-    <input type="checkbox" id="toggle-phoneme-hanzi">
-    Afficher les caractères correspondants
-  </label>
-  <style>
-    #phonemes-table-wrap .hanzi-label { display: none; }
-    #phonemes-table-wrap.show-hanzi .py-label { display: none; }
-    #phonemes-table-wrap.show-hanzi .hanzi-label {
-      display: inline-flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.15rem 0.35rem;
-    }
-    @media print {
-      .no-print-overflow {
-        overflow-x: visible !important;
-        max-width: none !important;
-      }
-      table {
-        page-break-inside: auto;
-      }
-      tr {
-        page-break-inside: avoid;
-        page-break-after: auto;
-      }
-      thead {
-        display: table-header-group;
-      }
-      tfoot {
-        display: table-footer-group;
-      }
-      .sticky {
-        position: static !important;
-        background: #374151 !important; /* fallback for sticky bg */
-        color: #fff !important;
-        z-index: 0 !important;
-      }
-    }
-  </style>
-  <div id="phonemes-table-wrap">
-  <table class="table-auto border-collapse w-full text-sm">
-    <thead>
-      <tr class="bg-gray-700 text-white text-center">
-        <th class="border p-2 sticky left-0 bg-gray-700 z-20 text-left">
-          Initial \ Final
-        </th>
-        {% for final in finals %}
-          <th class="border p-2 whitespace-nowrap">
-            {% include "hakkadbapp/components/pinyin_switch.html" with i="" f=final.final %}
-          </th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% load pronunciation_tags %}
-      {% for initial in initials %}
-        <tr class="{% cycle 'bg-white' 'bg-gray-50' %}">
-          <td class="border p-2 font-semibold sticky left-0 bg-gray-700 z-10 whitespace-nowrap text-white">
-            {% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=""%}
-          </td>
-          {% for final in finals %}
-            <td class="border p-2 text-center">
-              {% combo_exists initial.id final.id combo_set as exists %}
-              {% if exists %}
-                <a href="{% url 'hanzi_by_pinyin' initial.initial|add:final.final %}">
-                  <span class="font-bold px-1 py-0.5 rounded">
-                    <span class="py-label">{% include "hakkadbapp/components/pinyin_switch.html" with i=initial.initial f=final.final%}</span>
-                    {% combo_hanzi_list initial.id final.id combo_hanzi as hanzi_list %}
-                    <span class="hanzi-label">
-                      {% for char in hanzi_list %}
-                      <span class="hanzi-block hanzi">
-                        <span class="simp">{{ char|to_simp }}</span>
-                        <span class="trad hidden">{{ char|to_trad }}</span>
-                      </span>
-                      {% endfor %}
-                    </span>
-                  </span>
-                </a>
-              {% endif %}
-            </td>
-          {% endfor %}
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-</div>
-<script>
-  (function () {
-    var toggle = document.getElementById('toggle-phoneme-hanzi');
-    var wrap = document.getElementById('phonemes-table-wrap');
-    if (toggle && wrap) {
-      toggle.addEventListener('change', function () {
-        wrap.classList.toggle('show-hanzi', toggle.checked);
-      });
-    }
-  })();
-</script>
+<style>
+  /* Tokens: a one-hue light->dark ramp for "characters per syllable"
+     (validated as an ordinal ramp on white), one brand hue for
+     single-series bars, and a red/amber pair (validated categorical) for
+     the two-series tone chart. Light only, like the rest of the site. */
+  .ph-root {
+    --ph-surface: #ffffff;
+    --ph-ink: #3A3430;
+    --ph-ink-muted: #8C8478;
+    --ph-grid: #ECE2D3;
+    --ph-empty: #FDFAF5;
+    --ph-bar: #9B1C1C;
+    --ph-bar-hover: #7A1414;
+    --ph-seq-1: #eea093;
+    --ph-seq-2: #dd7464;
+    --ph-seq-3: #c4493b;
+    --ph-seq-4: #9b2a20;
+    --ph-seq-5: #7A1414;
+    --ph-series-1: #b33a2e;
+    --ph-series-2: #c98500;
+  }
+  .ph-chip[aria-pressed="true"] { background: var(--ph-bar); color: #fff; border-color: var(--ph-bar); }
 
+  /* Table */
+  /* contain: its width must not push the page wider than the screen -- the
+     table scrolls inside it instead. */
+  .ph-wrap { contain: inline-size; overflow: auto; max-height: 75vh; border: 1px solid var(--ph-grid); border-radius: 0.5rem; background: var(--ph-surface); }
+  .ph-table { border-collapse: separate; border-spacing: 2px; font-size: 0.8rem; }
+  .ph-table th { position: sticky; background: #544D45; color: #fff; font-weight: 600; padding: 2px 4px; white-space: nowrap; z-index: 2; }
+  .ph-table thead th { top: 0; }
+  .ph-table tbody th { left: 0; text-align: left; z-index: 1; }
+  .ph-table thead th:first-child { left: 0; z-index: 3; }
+  .ph-table th.is-hot { background: var(--ph-bar); }
+  .ph-table td { min-width: 2.2rem; height: 1.9rem; padding: 0; border-radius: 4px; background: var(--ph-empty); text-align: center; }
+  .ph-table td button {
+    display: block; width: 100%; height: 100%; min-height: 1.9rem; padding: 1px 4px; border: 0; border-radius: 4px;
+    background: inherit; color: inherit; cursor: pointer; white-space: nowrap; line-height: 1.2;
+  }
+  .ph-table td button:hover, .ph-table td button:focus-visible, .ph-table td.is-selected button { outline: 2px solid var(--ph-ink); outline-offset: 1px; }
+  .ph-table td[data-step="1"], .ph-table td[data-step="2"] { color: var(--ph-ink); }
+  .ph-table td[data-step="3"], .ph-table td[data-step="4"], .ph-table td[data-step="5"] { color: #fff; }
+  .ph-table td .hanzi { font-size: 1.05rem !important; letter-spacing: 0; }
+  .ph-table.mode-chars td { min-width: 3rem; }
+  .ph-table.mode-chars td button { white-space: normal; max-width: 8rem; }
+  .ph-legend { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--ph-ink-muted); }
+  .ph-legend i { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 3px; vertical-align: -2px; margin-right: 3px; }
+
+  /* Details */
+  .ph-detail-tone { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--ph-grid); }
+  .ph-detail-tone:first-child { border-top: 0; }
+  .ph-detail-tone a { color: var(--ph-ink); text-decoration: none; padding: 0 2px; border-radius: 4px; }
+  .ph-detail-tone a:hover { background: #fdf6f5; }
+
+  /* Charts */
+  .ph-card { background: var(--ph-surface); border: 1px solid var(--ph-grid); border-radius: 0.75rem; padding: 1rem; }
+  .ph-card h3 { font-weight: 700; color: var(--ph-ink); }
+  .ph-card .ph-sub { font-size: 0.8rem; color: var(--ph-ink-muted); margin-bottom: 0.75rem; }
+  .ph-hbar { display: grid; grid-template-columns: 3.5rem 1fr 2.5rem; align-items: center; gap: 0.5rem; width: 100%; padding: 2px 0; background: none; border: 0; text-align: left; cursor: pointer; color: var(--ph-ink); }
+  .ph-hbar .ph-track { height: 0.75rem; }
+  .ph-hbar .ph-mark { display: block; height: 100%; background: var(--ph-bar); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .ph-hbar:hover .ph-mark, .ph-hbar:focus-visible .ph-mark { background: var(--ph-bar-hover); }
+  .ph-hbar .ph-val { font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .ph-hbar .ph-lab { font-size: 0.85rem; white-space: nowrap; }
+  .ph-stack-cols { display: flex; align-items: flex-end; gap: 8px; height: 12rem; border-bottom: 1px solid var(--ph-grid); }
+  .ph-stack { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 2px; cursor: pointer; background: none; border: 0; padding: 0; }
+  .ph-stack .ph-total { font-size: 0.75rem; color: var(--ph-ink); font-variant-numeric: tabular-nums; }
+  .ph-stack .ph-seg { width: 100%; max-width: 2.8rem; }
+  .ph-stack .ph-seg:first-of-type { border-radius: 4px 4px 0 0; }
+  .ph-stack:hover .ph-seg, .ph-stack:focus-visible .ph-seg { filter: brightness(0.9); }
+  .ph-stack-labels { display: flex; gap: 8px; margin-top: 4px; }
+  .ph-stack-labels span { flex: 1; text-align: center; font-size: 0.75rem; color: var(--ph-ink-muted); }
+
+  #ph-tooltip {
+    position: fixed; z-index: 50; pointer-events: none; max-width: 16rem;
+    background: #261F1C; color: #FDFAF5; font-size: 0.8rem; line-height: 1.35;
+    padding: 0.45rem 0.6rem; border-radius: 0.4rem; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  #ph-tooltip .hanzi { font-size: 1.1em !important; }
+  @media print {
+    .ph-wrap { max-height: none !important; overflow: visible !important; border: 0; }
+    .ph-table th { position: static !important; }
+  }
+</style>
+
+<div class="ph-root w-full max-w-screen-xl mx-auto space-y-4">
+  <section id="ph-kpis" class="grid grid-cols-2 sm:grid-cols-5 gap-2" aria-label="Chiffres clés"></section>
+
+  <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4 space-y-3">
+    <div class="no-print flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <div class="flex items-center gap-1.5" role="group" aria-label="Contenu des cases">
+        <span class="text-gray-500 mr-1">Afficher</span>
+        <button type="button" class="ph-chip min-h-9 px-3 rounded-full border border-gray-300" data-mode="syllable" aria-pressed="true">Syllabes</button>
+        <button type="button" class="ph-chip min-h-9 px-3 rounded-full border border-gray-300" data-mode="chars" aria-pressed="false">Caractères</button>
+        <button type="button" class="ph-chip min-h-9 px-3 rounded-full border border-gray-300" data-mode="count" aria-pressed="false">Nombre</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ton">
+        <span class="text-gray-500 mr-1">Ton</span>
+        <span id="ph-tones" class="contents"></span>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500">Initiales en lignes, finales en colonnes. Plus la case est foncée, plus la syllabe compte de caractères. Touchez une case pour voir ses caractères.</p>
+
+    <div class="flex flex-col lg:flex-row gap-3 items-start">
+      <div class="ph-wrap w-full lg:flex-1 min-w-0">
+        <table id="ph-table" class="ph-table no-auto-csv"></table>
+      </div>
+      <aside id="ph-detail" class="w-full lg:w-72 shrink-0 lg:sticky lg:top-2 bg-white rounded-lg border border-gray-200 p-3" aria-live="polite"></aside>
+    </div>
+    <div id="ph-legend" class="ph-legend"></div>
+  </section>
+
+  <section class="grid md:grid-cols-3 gap-4">
+    <div class="ph-card">
+      <h3>Caractères par initiale</h3>
+      <p class="ph-sub">Nombre de caractères distincts. Touchez une barre pour repérer la ligne.</p>
+      <div id="ph-chart-initials"></div>
+    </div>
+    <div class="ph-card">
+      <h3>Finales les plus fréquentes</h3>
+      <p class="ph-sub">Les 20 finales qui portent le plus de caractères.</p>
+      <div id="ph-chart-finals"></div>
+    </div>
+    <div class="ph-card">
+      <h3>Tons et finales occlusives</h3>
+      <p class="ph-sub">Lectures par ton, selon que la finale se termine par -p, -t, -k ou non.</p>
+      <div id="ph-chart-tones"></div>
+      <div class="ph-legend mt-2">
+        <span><i style="background:var(--ph-series-1)"></i>finale en -p, -t, -k</span>
+        <span><i style="background:var(--ph-series-2)"></i>autres finales</span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="ph-tooltip" hidden></div>
+
+{{ phonemes_data|json_script:"phonemes-data" }}
+<script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/phonemes.js' %}"></script>
 {% endblock %}

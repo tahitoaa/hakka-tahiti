@@ -147,21 +147,21 @@
 
 <style>
   .eaf-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; background: #fff;
-                 border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0.75rem 1rem; }
+                 border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.75rem 1rem; }
   .eaf-files { display: flex; align-items: center; gap: 0.75rem; flex: 1 1 22rem; min-width: 0; }
-  .eaf-file-info { font-size: 0.8rem; color: #6b7280; min-width: 0; }
+  .eaf-file-info { font-size: 0.8rem; color: #8C8478; min-width: 0; }
   .eaf-settings { flex: 1 1 26rem; max-width: 36rem; }
   .eaf-actions { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
-  .eaf-progress { font-size: 0.8rem; color: #4b5563; white-space: nowrap; }
+  .eaf-progress { font-size: 0.8rem; color: #6E665C; white-space: nowrap; }
   .eaf-btn { display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0.35rem 0.9rem; border-radius: 0.5rem;
              font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid transparent; }
-  .eaf-btn-primary { background: #4338ca; color: #fff; }
-  .eaf-btn-primary:hover { background: #3730a3; }
+  .eaf-btn-primary { background: #9B1C1C; color: #fff; }
+  .eaf-btn-primary:hover { background: #9B1C1C; }
   .eaf-btn-save { background: #047857; color: #fff; }
   .eaf-btn-save:hover:not(:disabled) { background: #065f46; }
   .eaf-btn-save:disabled { opacity: 0.45; cursor: default; }
-  .eaf-btn-light { background: #fff; color: #374151; border-color: #d1d5db; font-weight: 500; }
-  .eaf-btn-light:hover { background: #f3f4f6; }
+  .eaf-btn-light { background: #fff; color: #544D45; border-color: #DDD0BD; font-weight: 500; }
+  .eaf-btn-light:hover { background: #F6EFE4; }
   .eaf-btn-sm { min-height: 1.75rem; padding: 0.15rem 0.6rem; font-size: 0.78rem; }
   .eaf-btn[hidden] { display: none; }
   .eaf-dirty { font-size: 0.8rem; color: #b45309; white-space: nowrap; }
@@ -169,25 +169,25 @@
   #eaf-app.eaf-dragging .eaf-toolbar { outline: 3px dashed #6366f1; outline-offset: 4px; }
 
   .eaf-banner { margin-top: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 0.5rem; font-size: 0.875rem;
-                background: #eef2ff; color: #3730a3; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+                background: #FBF0E6; color: #9B1C1C; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
   .eaf-banner[hidden] { display: none; }
   .eaf-banner-warn { background: #fef3c7; color: #92400e; }
   .eaf-banner-ok { background: #d1fae5; color: #065f46; }
 
-  .eaf-new { margin-top: 0.75rem; padding: 0.75rem 1rem; background: #fff; border: 1px solid #c7d2fe; border-radius: 0.75rem; font-size: 0.875rem; }
+  .eaf-new { margin-top: 0.75rem; padding: 0.75rem 1rem; background: #fff; border: 1px solid #E8D9C2; border-radius: 0.75rem; font-size: 0.875rem; }
   .eaf-new[hidden] { display: none; }
   .eaf-new-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; margin-bottom: 0.6rem; }
   .eaf-new-head .grow { flex: 1; }
   .eaf-new-grid { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.6rem 0.75rem; align-items: start; }
-  .eaf-new-grid > span { font-size: 0.75rem; color: #6b7280; padding-top: 0.5rem; }
+  .eaf-new-grid > span { font-size: 0.75rem; color: #8C8478; padding-top: 0.5rem; }
   .eaf-new-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
-  .eaf-new input[type="text"], .eaf-new select { min-height: 2.25rem; padding: 0.3rem 0.6rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
+  .eaf-new input[type="text"], .eaf-new select { min-height: 2.25rem; padding: 0.3rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.5rem;
                                                  background: #fff; font-size: 0.9rem; min-width: 0; }
   .eaf-new select[hidden], .eaf-new label[hidden] { display: none; }
   .eaf-new-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 0.4rem; margin-bottom: 0.4rem; max-width: 36rem; }
-  .eaf-new-preview { font-size: 0.8rem; color: #374151; padding-top: 0.45rem; display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
+  .eaf-new-preview { font-size: 0.8rem; color: #544D45; padding-top: 0.45rem; display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
   .eaf-new-error { font-size: 0.8rem; color: #b45309; }
-  .eaf-empty { padding: 1rem; font-size: 0.875rem; color: #6b7280; }
+  .eaf-empty { padding: 1rem; font-size: 0.875rem; color: #8C8478; }
 
   .eaf-audio { position: sticky; top: 0; z-index: 20; margin-top: 0.75rem; padding: 0.4rem 0.5rem;
                background: rgb(229 231 235 / 0.95); backdrop-filter: blur(4px); border-radius: 0.5rem; }
@@ -196,58 +196,58 @@
   .eaf-overview { position: relative; }
   .eaf-overview canvas { display: block; width: 100%; cursor: pointer; touch-action: none; border-radius: 0.25rem; background: #fff; }
   .eaf-overview-tip { position: absolute; bottom: calc(100% + 4px); max-width: 28rem; padding: 0.2rem 0.5rem; border-radius: 0.35rem;
-                      background: #111827; color: #fff; font-size: 0.75rem; white-space: nowrap; overflow: hidden;
+                      background: #261F1C; color: #fff; font-size: 0.75rem; white-space: nowrap; overflow: hidden;
                       text-overflow: ellipsis; pointer-events: none; z-index: 30; }
   .eaf-overview-tip[hidden] { display: none; }
   .eaf-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin-top: 0.3rem;
-             font-size: 0.75rem; color: #4b5563; font-variant-numeric: tabular-nums; }
+             font-size: 0.75rem; color: #6E665C; font-variant-numeric: tabular-nums; }
   .eaf-nav .grow { flex: 1; }
   .eaf-nav label { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; }
 
   /* No overflow:hidden here: it would stop the column header from sticking. */
-  .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; }
-  .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #f3f4f6;
+  .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
+  .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #F6EFE4;
              scroll-margin-top: calc(var(--eaf-bar-h, 0px) + 2.75rem); }
-  .eaf-head { position: sticky; top: 0; z-index: 10; background: #f9fafb; border-top: 0; border-bottom: 1px solid #e5e7eb;
+  .eaf-head { position: sticky; top: 0; z-index: 10; background: #FDFAF5; border-top: 0; border-bottom: 1px solid #ECE2D3;
               border-radius: 0.75rem 0.75rem 0 0; }
   .eaf-head { top: var(--eaf-bar-h, 0px); } /* below the sticky audio bar (height set by transcripter.js) */
-  .eaf-head > div { padding: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #374151; }
+  .eaf-head > div { padding: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #544D45; }
   .eaf-speaker-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
   .eaf-speaker-head label { display: flex; align-items: center; gap: 0.4rem; min-width: 0; cursor: pointer; }
   .eaf-speaker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .eaf-speaker-count { font-weight: 400; color: #6b7280; white-space: nowrap; }
+  .eaf-speaker-count { font-weight: 400; color: #8C8478; white-space: nowrap; }
   .eaf-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--c); flex: none; }
 
-  .eaf-time { padding: 0.45rem 0.4rem; font-size: 0.72rem; color: #6b7280; font-variant-numeric: tabular-nums; }
-  .eaf-time button { color: #4338ca; } .eaf-time button:hover { text-decoration: underline; }
+  .eaf-time { padding: 0.45rem 0.4rem; font-size: 0.72rem; color: #8C8478; font-variant-numeric: tabular-nums; }
+  .eaf-time button { color: #9B1C1C; } .eaf-time button:hover { text-decoration: underline; }
   .eaf-cell { padding: 0.25rem; min-width: 0; }
   .eaf-seg { display: block; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 0.5rem; cursor: pointer;
-             border: 1px solid #e5e7eb; border-left: 4px solid var(--c); background: #fff; min-width: 0; }
-  .eaf-seg:hover { background: #f9fafb; }
-  .eaf-seg.is-active { background: #eef2ff; border-color: #a5b4fc; border-left-color: var(--c); }
+             border: 1px solid #ECE2D3; border-left: 4px solid var(--c); background: #fff; min-width: 0; }
+  .eaf-seg:hover { background: #FDFAF5; }
+  .eaf-seg.is-active { background: #FBF0E6; border-color: #a5b4fc; border-left-color: var(--c); }
   .eaf-seg.is-playing { box-shadow: 0 0 0 2px #f59e0b; }
   .eaf-seg-main { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
-  .eaf-seg-main.is-todo { color: #9ca3af; font-style: italic; font-size: 0.875rem; }
-  .eaf-seg-sub { font-size: 0.72rem; color: #6b7280; overflow-wrap: anywhere; }
+  .eaf-seg-main.is-todo { color: #B5AA9B; font-style: italic; font-size: 0.875rem; }
+  .eaf-seg-sub { font-size: 0.72rem; color: #8C8478; overflow-wrap: anywhere; }
   .eaf-seg-state { float: right; margin-left: 0.25rem; font-size: 0.65rem; }
   .eaf-speaker-tag { display: none; font-size: 0.7rem; font-weight: 600; color: var(--c); }
 
   .eaf-editor { grid-column: 1 / -1; margin: 0.25rem 0.5rem 0.75rem; padding: 0.75rem; border-radius: 0.75rem;
-                border: 1px solid #c7d2fe; border-left: 5px solid var(--c); background: #fafaff; }
+                border: 1px solid #E8D9C2; border-left: 5px solid var(--c); background: #fafaff; }
   .eaf-editor-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
   .eaf-editor-head .grow { flex: 1; }
   .eaf-field { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.25rem 0.75rem; align-items: start; margin-top: 0.5rem; }
-  .eaf-field > span { font-size: 0.75rem; color: #6b7280; padding-top: 0.45rem; }
-  .eaf-field textarea { width: 100%; min-height: 2.4rem; padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 0.5rem;
+  .eaf-field > span { font-size: 0.75rem; color: #8C8478; padding-top: 0.45rem; }
+  .eaf-field textarea { width: 100%; min-height: 2.4rem; padding: 0.4rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.5rem;
                         background: #fff; font-size: 1rem; resize: vertical; }
   .eaf-field textarea:focus { outline: 2px solid #a5b4fc; outline-offset: 0; }
   .eaf-field .hanzi-input { font-size: 1.15rem; }
-  .eaf-derived { font-size: 0.85rem; color: #374151; padding-top: 0.4rem; overflow-wrap: anywhere; }
+  .eaf-derived { font-size: 0.85rem; color: #544D45; padding-top: 0.4rem; overflow-wrap: anywhere; }
   .eaf-derived.hanzi { font-size: 1.05rem; }  .eaf-ime { position: relative; }
   .eaf-preview { margin-top: 0.4rem; }
 
-  .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #4b5563; }
-  .eaf-help summary { cursor: pointer; font-size: 0.875rem; color: #374151; }
+  .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #6E665C; }
+  .eaf-help summary { cursor: pointer; font-size: 0.875rem; color: #544D45; }
   .eaf-help ul { list-style: disc; padding-left: 1.25rem; margin-top: 0.4rem; display: grid; gap: 0.3rem; }
 
   /* Phone: one column, the speaker shown on each segment instead. */

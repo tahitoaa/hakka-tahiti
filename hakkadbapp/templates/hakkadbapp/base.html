@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-200 text-black" data-rom="{{ romanization_default }}">
+<html lang="en" class="bg-brand-cream text-gray-900" data-rom="{{ romanization_default }}">
 <head>
     <meta charset="UTF-8">
     <title> {{ title }}</title>
@@ -29,10 +29,28 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style type="text/tailwindcss">
+        /* Palette des visuels "Gong Hakka Tahiti" : rouge profond, or,
+           fond crème, sinogrammes rouge vif, français en gris chaud. */
         @theme {
-            --color-brand: #8B1A1A;
-            --color-brand-dark: #6B1313;
-            --color-brand-gold: #F2A93D;
+            --color-brand: #9B1C1C;
+            --color-brand-dark: #7A1414;
+            --color-brand-gold: #FFBE3B;
+            --color-brand-hanzi: #D2190F;
+            --color-brand-cream: #FBF6EE;
+            --color-brand-cream-dark: #F3E8D6;
+            --color-brand-line: #E8D9C2;
+            /* Gris Tailwind réchauffés pour s'accorder au fond crème : toutes
+               les classes gray-* existantes suivent sans toucher aux pages. */
+            --color-gray-50: #FDFAF5;
+            --color-gray-100: #F6EFE4;
+            --color-gray-200: #ECE2D3;
+            --color-gray-300: #DDD0BD;
+            --color-gray-400: #B5AA9B;
+            --color-gray-500: #8C8478;
+            --color-gray-600: #6E665C;
+            --color-gray-700: #544D45;
+            --color-gray-800: #3A3430;
+            --color-gray-900: #261F1C;
             --font-display: "Baloo 2", "Poppins", sans-serif;
         }
     </style>
@@ -224,7 +242,7 @@
 </style>
 
 </head>
-<body class="bg-gray-200 text-black min-h-screen flex flex-col font-sans">
+<body class="bg-brand-cream text-gray-900 min-h-screen flex flex-col font-sans">
 
 <!-- Header -->
 <header class="bg-brand text-white shadow-md">
@@ -479,7 +497,7 @@ document.addEventListener("DOMContentLoaded", attachExportButtons);
 
 <style>
   .export-csv-btn {
-  background-color: #e60023;
+  background-color: #9B1C1C;
   color: white;
   padding: 6px 12px;
   border: none;
@@ -487,6 +505,7 @@ document.addEventListener("DOMContentLoaded", attachExportButtons);
   font-size: 0.9rem;
   cursor: pointer;
 }
+  .export-csv-btn:hover { background-color: #7A1414; }
 </style>
 
 

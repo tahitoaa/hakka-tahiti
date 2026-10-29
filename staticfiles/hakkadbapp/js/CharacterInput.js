@@ -141,26 +141,26 @@ const SUGGESTION_BAR_CSS = `
     position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 2.75rem; padding: 0.25rem 0.125rem 0.2rem;
-    border: 1px solid #c7d2fe; border-radius: 0.5rem;
-    background: #fff; color: #3730a3; line-height: 1;
+    border: 1px solid #E8D9C2; border-radius: 0.5rem;
+    background: #fff; color: #9B1C1C; line-height: 1;
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-.sugg:active { background: #c7d2fe; }
-@media (hover: hover) { .sugg:hover { background: #e0e7ff; } }
+.sugg:active { background: #E8D9C2; }
+@media (hover: hover) { .sugg:hover { background: #F3E8D6; } }
 .sugg .sugg-hanzi { font-size: 1.3rem !important; line-height: 1.1; letter-spacing: 0; white-space: nowrap; }
-.sugg .sugg-alt { font-size: 0.55em; color: #9ca3af; font-weight: 500; vertical-align: super; margin-left: 1px; }
+.sugg .sugg-alt { font-size: 0.55em; color: #B5AA9B; font-weight: 500; vertical-align: super; margin-left: 1px; }
 .sugg .sugg-py {
-    margin-top: 0.15rem; font-size: 0.625rem; color: #6b7280;
+    margin-top: 0.15rem; font-size: 0.625rem; color: #8C8478;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.sugg .sugg-key { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #9ca3af; }
+.sugg .sugg-key { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #B5AA9B; }
 /* Source stripe along the bottom edge, one coloured segment per source
    (colours: ReadingSourceSwitch.injectColors); never covers the character. */
 .sugg .sugg-src { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; display: flex; gap: 1px;
                   border-radius: 9999px; overflow: hidden; }
-.sugg .src-bar { flex: 1 1 0; background: #9ca3af; }
+.sugg .src-bar { flex: 1 1 0; background: #B5AA9B; }
 .sugg:has(.sugg-src) { padding-bottom: 0.5rem; }
-.src-pill { display: inline-block; min-width: 0.8rem; padding: 0 0.2rem; border-radius: 9999px; background: #6b7280;
+.src-pill { display: inline-block; min-width: 0.8rem; padding: 0 0.2rem; border-radius: 9999px; background: #8C8478;
             color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.8rem; text-align: center; }
 @media (hover: none) and (pointer: coarse) { .sugg .sugg-key { display: none; } }
 `;

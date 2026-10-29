@@ -1,73 +1,140 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  /* Chart tokens -- one brand hue for single-series bars. Light only,
+     like the rest of the site. */
+  .car-root {
+    --car-surface: #ffffff;
+    --car-ink: #3A3430;
+    --car-ink-muted: #8C8478;
+    --car-grid: #ECE2D3;
+    --car-bar: #9B1C1C;
+    --car-bar-hover: #7A1414;
+  }
+  .car-tab[aria-selected="true"] { background: var(--car-bar); color: #fff; }
+  .car-chip[aria-pressed="true"] { background: var(--car-bar); color: #fff; border-color: var(--car-bar); }
 
-{% block content %} 
+  /* Character tiles */
+  /* Grouped rows flow in columns, so short syllables don't each take a
+     full-width line. */
+  .car-groups { columns: 17rem; column-gap: 1.5rem; }
+  .car-row { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.25rem; padding: 0.2rem 0; border-top: 1px solid var(--car-grid); break-inside: avoid; }
+  .car-row-label { font-size: 0.85rem; color: var(--car-ink-muted); padding-top: 0.55rem; overflow-wrap: anywhere; }
+  .car-row-label .hanzi { color: var(--car-ink); }
+  .car-tiles { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  .car-tile {
+    position: relative; display: inline-flex; flex-direction: column; align-items: center;
+    min-width: 3.1rem; padding: 0.15rem 0.3rem 0.2rem; border-radius: 0.4rem;
+    color: var(--car-ink); text-decoration: none; border: 1px solid transparent;
+  }
+  .car-tile:hover, .car-tile:focus-visible { border-color: var(--car-grid); background: #fdf6f5; outline: none; }
+  .car-tile .hanzi { font-size: 1.9rem !important; line-height: 1.15; }
+  .car-tile .car-py { font-size: 0.75rem; color: var(--car-ink-muted); }
+  .car-tile .car-n {
+    position: absolute; top: 0; right: 0; font-size: 0.6rem; line-height: 1;
+    padding: 1px 3px; border-radius: 999px; background: #F6EFE4; color: var(--car-ink-muted);
+  }
 
-<h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-    <button type="button" class="toggle-section focus:outline-none">
-        Caractères rangés par prononciation ({{ all_prons|length }})  
-    </button>
-</h1>
+  /* Charts */
+  .car-card { background: var(--car-surface); border: 1px solid var(--car-grid); border-radius: 0.75rem; padding: 1rem; }
+  .car-card h3 { font-weight: 700; color: var(--car-ink); }
+  .car-card .car-sub { font-size: 0.8rem; color: var(--car-ink-muted); margin-bottom: 0.75rem; }
+  .car-cols { display: flex; align-items: flex-end; gap: 6px; height: 11rem; border-bottom: 1px solid var(--car-grid); }
+  .car-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; cursor: pointer; background: none; border: 0; padding: 0; }
+  .car-col .car-mark { width: 100%; max-width: 2.6rem; background: var(--car-bar); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .car-col:hover .car-mark, .car-col:focus-visible .car-mark { background: var(--car-bar-hover); }
+  .car-col .car-val { font-size: 0.75rem; color: var(--car-ink); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+  .car-col-labels { display: flex; gap: 6px; margin-top: 4px; }
+  .car-col-labels span { flex: 1; text-align: center; font-size: 0.75rem; color: var(--car-ink-muted); }
+  .car-hbar { display: grid; grid-template-columns: 5rem 1fr 2.5rem; align-items: center; gap: 0.5rem; width: 100%; padding: 3px 0; background: none; border: 0; text-align: left; cursor: pointer; color: var(--car-ink); text-decoration: none; }
+  .car-hbar .car-track { height: 0.8rem; }
+  .car-hbar .car-mark { height: 100%; background: var(--car-bar); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .car-hbar:hover .car-mark, .car-hbar:focus-visible .car-mark { background: var(--car-bar-hover); }
+  .car-hbar .car-val { font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .car-hbar .car-lab { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #car-tooltip {
+    position: fixed; z-index: 50; pointer-events: none; max-width: 16rem;
+    background: #261F1C; color: #FDFAF5; font-size: 0.8rem; line-height: 1.35;
+    padding: 0.45rem 0.6rem; border-radius: 0.4rem; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  #car-tooltip .hanzi { font-size: 1.1em !important; }
+  @media print {
+    .car-tile .car-n { display: none; }
+  }
+</style>
 
-<div class="no-print-overflow bg-white p-6 text-gray-800 foldable-section max-h-96 overflow-y-auto transition-all duration-300">
-    <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
-        {% for p in all_prons %}
-            <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-                    <span class="hanzi-block">
-                        <span class="simp">{{ p.simp }}</span>
-                        <span class="trad hidden">{{ p.trad }}</span>
-                    </span>
-                </a>
-                <span class="text-gray-600">
-                    {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number%}</span>
-            </div>
-        {% endfor %}
+<div class="car-root w-full max-w-screen-lg mx-auto space-y-4">
+
+  <!-- Key figures -->
+  <section id="car-kpis" class="grid grid-cols-2 sm:grid-cols-5 gap-2" aria-label="Chiffres clés"></section>
+
+  <!-- Tabs -->
+  <div class="no-print flex gap-2" role="tablist">
+    <button type="button" role="tab" class="car-tab min-h-10 px-4 rounded-full bg-white border border-gray-300 font-semibold" data-tab="list" aria-selected="true" aria-controls="car-panel-list">Caractères</button>
+    <button type="button" role="tab" class="car-tab min-h-10 px-4 rounded-full bg-white border border-gray-300 font-semibold" data-tab="stats" aria-selected="false" aria-controls="car-panel-stats">Statistiques</button>
+  </div>
+
+  <!-- List -->
+  <section id="car-panel-list" role="tabpanel" class="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4">
+    <div class="no-print flex flex-col gap-2 mb-3">
+      <div class="flex flex-wrap gap-2 items-center">
+        <input id="car-search" type="search" placeholder="Caractère ou pinyin (ex. 家, ka, ka1)"
+               autocapitalize="off" autocorrect="off" spellcheck="false"
+               class="flex-1 min-w-[12rem] min-h-10 px-3 py-1.5 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+        <label class="text-sm text-gray-700 flex items-center gap-1">
+          Trier
+          <select id="car-sort" class="min-h-10 border border-gray-300 rounded-md px-2 text-sm bg-white">
+            <option value="syllable">par syllabe</option>
+            <option value="usage">les plus utilisés</option>
+          </select>
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-1.5 items-center text-sm" role="group" aria-label="Filtres">
+        <span class="text-gray-500 mr-1">Ton</span>
+        <span id="car-tones" class="contents"></span>
+        <button type="button" id="car-poly" class="car-chip min-h-9 px-3 rounded-full border border-gray-300 ml-2" aria-pressed="false">多音字 plusieurs lectures</button>
+        <span id="car-active-filter"></span>
+      </div>
     </div>
+    <p id="car-count" class="text-sm text-gray-500 mb-1" role="status"></p>
+    <div id="car-list"></div>
+  </section>
+
+  <!-- Statistics -->
+  <section id="car-panel-stats" role="tabpanel" hidden class="space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="car-card">
+        <h3>Lectures par ton</h3>
+        <p class="car-sub">Nombre de lectures (caractère + prononciation) pour chaque ton.</p>
+        <div id="car-chart-tones"></div>
+      </div>
+      <div class="car-card">
+        <h3>Usage dans le lexique</h3>
+        <p class="car-sub">Combien de lectures apparaissent dans 1, 2, 3… mots du lexique.</p>
+        <div id="car-chart-usage"></div>
+      </div>
+      <div class="car-card">
+        <h3>Les 20 caractères les plus utilisés</h3>
+        <p class="car-sub">Nombre de mots du lexique qui contiennent cette lecture.</p>
+        <div id="car-chart-top"></div>
+      </div>
+      <div class="car-card">
+        <h3>Syllabes les plus homophones</h3>
+        <p class="car-sub">Syllabes (sans le ton) partagées par le plus de caractères.</p>
+        <div id="car-chart-homophones"></div>
+      </div>
+    </div>
+    <a href="{% url 'phonemes' %}" class="car-card block hover:border-brand">
+      <h3>Caractères par syllabe →</h3>
+      <p class="car-sub" style="margin:0">Le tableau des initiales × finales, coloré selon le nombre de caractères, est sur la page Phonèmes.</p>
+    </a>
+  </section>
 </div>
 
-<h1 class="text-3xl font-extrabold text-gray-900 mb-6">
-    <button type="button" class="toggle-section focus:outline-none">
-        多音字 Caractères à plusieurs lectures  ({{ all_prons_by_car|length }})
-    </button>
-</h1>
+<div id="car-tooltip" hidden></div>
 
-<div class="no-print-overflow bg-white p-6 text-gray-800 foldable-section max-h-96 overflow-y-auto transition-all duration-300">
-    <div class="compact-grid columns-2 sm:columns-3 md:columns-6 lg:columns-7 print:columns-6 gap-4">
-        {% for p in all_prons_by_car %}
-            <div class="break-inside-avoid">
-                <a href="{% url 'hanzi' p.simp %}" class="hanzi text-3xl font-bold">
-                    <span class="hanzi-block">
-                        <span class="simp">{{ p.simp }}</span>
-                        <span class="trad hidden">{{ p.trad }}</span>
-                    </span>
-                </a>
-                <span class="text-gray-600"> 
-                    {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
-                </span>
-            </div>
-        {% endfor %}
-    </div>
-</div>
-
-<script>
-document.querySelectorAll('.toggle-section').forEach((btn, idx) => {
-    btn.addEventListener('click', function() {
-        const section = document.querySelectorAll('.foldable-section')[idx];
-        if (section.style.maxHeight && section.style.maxHeight !== '0px') {
-            section.style.maxHeight = '0px';
-            section.style.overflowY = 'hidden';
-        } else {
-            section.style.maxHeight = '24rem';
-            section.style.overflowY = 'auto';
-        }
-    });
-});
-// Initialize folded state
-document.querySelectorAll('.foldable-section').forEach(section => {
-    section.style.maxHeight = '24rem';
-    section.style.overflowY = 'auto';
-});
-</script>
-
-
+{{ caracters_data|json_script:"caracters-data" }}
+<script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/caracters.js' %}"></script>
 {% endblock %}

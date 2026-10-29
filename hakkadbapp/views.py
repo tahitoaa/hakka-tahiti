@@ -5,6 +5,7 @@ from django.db.models import Prefetch, Count, Q
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.core.cache import cache
 from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
 from django.db.models import F, Value, CharField
@@ -844,26 +845,67 @@ def transcripter(request):
     context["page"] = "transcripter"
     return render(request, "hakkadbapp/transcripter.html", context)
 
-def caracters(request):
-    context = {"page": "caracters", "title": "Caractères"}
-    all_prons = Pronunciation.objects.order_by('initial__initial', 'final__final', 'tone__tone_number').select_related('initial', 'final', 'tone')
-    context["all_prons"] = all_prons
+# The lexicon only changes on imports; a short cache spares the two
+# (remote, slow) queries on every visit.
+CARACTERS_CACHE_KEY = "caracters-data"
+CARACTERS_CACHE_SECONDS = 600
 
-    multi_pron_hanzi = (
+
+def _caracters_data():
+    readings = list(
         Pronunciation.objects
-        .values('hanzi')
-        .annotate(count=Count('id'))
-        .filter(count__gt=1)
-        .values_list('hanzi', flat=True)
-    )
-    all_prons_by_car = (
-        Pronunciation.objects
-        .filter(hanzi__in=multi_pron_hanzi)
-        .order_by('hanzi', 'initial__initial', 'final__final', 'tone__tone_number')
         .select_related('initial', 'final', 'tone')
+        .order_by('initial__initial', 'final__final', 'tone__tone_number')
     )
-    context["all_prons_by_car"] = all_prons_by_car
-    return render(request, "hakkadbapp/caracters.html", context)
+
+    # Words per reading, and up to 3 example words (shortest first) for
+    # tooltips -- all from the one WordPronunciation query.
+    word_hanzi = defaultdict(str)
+    french_by_word = {}
+    word_ids_by_pron = defaultdict(set)
+    for word_id, pron_id, hanzi_char, french in (
+        WordPronunciation.objects.order_by('word_id', 'position')
+        .values_list('word_id', 'pronunciation_id', 'pronunciation__hanzi', 'word__french')
+    ):
+        word_hanzi[word_id] += hanzi_char
+        french_by_word[word_id] = french or ''
+        word_ids_by_pron[pron_id].add(word_id)
+    examples = {}
+    for pron_id, word_ids in word_ids_by_pron.items():
+        shortest = sorted(word_ids, key=lambda w: (len(word_hanzi[w]), w))[:3]
+        examples[pron_id] = [[word_hanzi[w], french_by_word[w]] for w in shortest]
+
+    return {
+        # [id, simp, trad, initial, final, tone, number of words]
+        "readings": [
+            [p.id, p.simp(), p.trad(), p.initial.initial or '', p.final.final or '',
+             p.tone.tone_number if p.tone else None, len(word_ids_by_pron.get(p.id, ()))]
+            for p in readings
+        ],
+        "examples": examples,
+        "hanzi_url": reverse('hanzi', args=['__HANZI__']),
+    }
+
+
+def caracters_data():
+    """The cached reading payload shared by the Caractères and Phonèmes pages."""
+    data = cache.get(CARACTERS_CACHE_KEY)
+    if data is None:
+        data = _caracters_data()
+        cache.set(CARACTERS_CACHE_KEY, data, CARACTERS_CACHE_SECONDS)
+    return data
+
+
+def caracters(request):
+    """Every lexicon reading as one compact JSON payload, rendered (list,
+    filters, statistics) by caracters.js -- server-rendering each of the
+    ~1000 readings in every transcription system made this page ~840 KB of
+    HTML and several seconds to build."""
+    return render(request, "hakkadbapp/caracters.html", {
+        "page": "caracters",
+        "title": "Caractères",
+        "caracters_data": caracters_data(),
+    })
 
 
 def api_words_data(request):
@@ -995,83 +1037,18 @@ def hanzi(request, hanzi_char):
     return render(request, "hakkadbapp/hanzi.html", context)
 
 def phonemes(request):
-    custom_order = ['b', 'p', 'm', 'f',
-                'd', 't', 'n', 'l',
-                'g', 'k', 'h',
-                'j', 'q', 'x',
-                'zh', 'ch', 'sh', 'r',
-                'z', 'c', 's',
-                '']  # for null initial
-
-    # hakka_finals = sorted([
-    #     'a', 'e', 'i', 'o', 'u', 'ai', 'oi', 'ui', 'iu', 'eu', 'am', 'em', 'im', 'an', 'in', 'un',
-    #     'ang', 'ing', 'ung', 'ong', 'ap', 'ip', 'at', 'it', 'ut', 'ak', 'uk', 'ok', 'et', 'on',
-    #     'iap', 'iung', 'ot', 'iong', 'au', 'ao', 'io', 'uo', 'iuk', 'en', 'iok', 'iun', 'ia',
-    #     'iang', 'ep', 'ian', 'iam', 'iao', 'iak'
-    # ])
-
-    # Build a Case/When expression for ordering
-    order_cases = Case(
-        *[When(initial=val, then=Value(idx)) for idx, val in enumerate(custom_order)],
-        default=Value(len(custom_order)),  # Items not in list go last
-        output_field=IntegerField()
-    )
-
-    # Apply the custom order in the query
-    initials = (
-        Initial.objects
-        .filter(pronunciations__isnull=False)
-        .distinct()
-        .annotate(ordering=order_cases)
-        .order_by('ordering')
-    )
-
-    # # Build the ordering Case
-    # ordering_case = Case(
-    #     *[When(final=val, then=Value(idx)) for idx, val in enumerate(hakka_finals)],
-    #     default=Value(len(hakka_finals)),  # Place unknown finals last
-    #     output_field=IntegerField()
-    # )
-
-    # Query with custom ordering
-    finals = (
-        Final.objects
-        .filter(pronunciations__isnull=False)
-        .distinct()
-        .order_by('final')
-    )
-    # All unique initials and finals in use
-    # initials = Initial.objects.filter(pronunciations__isnull=False).distinct().order_by('initial')
-    # finals = Final.objects.filter(pronunciations__isnull=False).distinct().order_by('final')
-
-    # Get all unique (initial, final) pairs
-    combos = Pronunciation.objects.values_list('initial_id', 'final_id').distinct()
-
-    # Convert to set of tuples for fast lookup
-    combo_set = set(combos)
-
-    # Distinct hanzi per (initial, final) combo, ignoring tone -- lets the
-    # "show matching characters" toggle reveal them inline instead of just
-    # linking out to the hanzi_by_pinyin page.
-    combo_hanzi = defaultdict(list)
-    seen = defaultdict(set)
-    for initial_id, final_id, hanzi_char in Pronunciation.objects.values_list(
-        'initial_id', 'final_id', 'hanzi'
-    ).order_by('hanzi'):
-        key = (initial_id, final_id)
-        if hanzi_char not in seen[key]:
-            seen[key].add(hanzi_char)
-            combo_hanzi[key].append(hanzi_char)
-
-    context = {
-        'initials': initials,
-        'finals': finals,
-        'combo_set': combo_set,
-        'combo_hanzi': dict(combo_hanzi),
+    """Initial x final table, statistics and per-syllable details, all
+    rendered by phonemes.js from the same cached payload as the Caractères
+    page (the server-rendered table used to include every transcription
+    system in each of its ~1300 cells)."""
+    data = dict(caracters_data())
+    data.pop("examples", None)
+    data["syllable_url"] = reverse('hanzi_by_pinyin', args=['__SYLLABLE__'])
+    return render(request, 'hakkadbapp/phonemes.html', {
         'title': "Tableau des phonèmes",
         'page': "phonemes",
-    }
-    return render(request, 'hakkadbapp/phonemes.html', context)
+        'phonemes_data': data,
+    })
 
 
 def hanzi_by_pinyin(request, syllable):

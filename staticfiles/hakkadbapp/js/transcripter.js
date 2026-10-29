@@ -350,10 +350,10 @@ class Overview {
         const x = (ms) => (ms / duration) * width;
 
         // Lanes and minute ticks.
-        ctx.fillStyle = '#f3f4f6';
+        ctx.fillStyle = '#F6EFE4';
         for (let i = 0; i < lanes; i++) ctx.fillRect(0, top + i * (laneH + 2), width, laneH);
         const step = duration > 30 * 60000 ? 300000 : 60000;
-        ctx.fillStyle = '#d1d5db';
+        ctx.fillStyle = '#DDD0BD';
         for (let t = step; t < duration; t += step) ctx.fillRect(Math.round(x(t)), 0, 1, height);
 
         // Segments: faint when empty, half when in progress, full when done.
@@ -372,7 +372,7 @@ class Overview {
             const w = Math.max(3, x(this.view.end) - x0);
             ctx.fillStyle = 'rgba(67, 56, 202, 0.12)';
             ctx.fillRect(x0, 0, w, height);
-            ctx.strokeStyle = '#4338ca';
+            ctx.strokeStyle = '#9B1C1C';
             ctx.lineWidth = 1.5;
             ctx.strokeRect(x0 + 0.75, 0.75, w - 1.5, height - 1.5);
         }
@@ -380,7 +380,7 @@ class Overview {
         // Segment being edited.
         const active = this.app.editor?.segment;
         if (active) {
-            ctx.strokeStyle = '#111827';
+            ctx.strokeStyle = '#261F1C';
             ctx.lineWidth = 2;
             ctx.strokeRect(x(active.start) - 1, top + active.speaker.index * (laneH + 2) - 1,
                 Math.max(3, x(active.end) - x(active.start)) + 2, laneH + 2);

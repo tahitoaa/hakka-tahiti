@@ -1,27 +1,30 @@
 <style>
     .rosace-poster, .rosace-cards {
-        --rosace-red: var(--color-brand, #8B1A1A);
-        --rosace-gold: var(--color-brand-gold, #F2A93D);
+        --rosace-red: var(--color-brand, #9B1C1C);
+        --rosace-gold: var(--color-brand-gold, #FFBE3B);
         --rosace-block-bg: #ffffff;
-        --rosace-block-border: #e5d9c8;
-        --rosace-block-text: #1e293b;
-        --rosace-block-text-muted: #6b7280;
+        --rosace-block-border: #E8D9C2;
+        --rosace-hanzi: var(--color-brand-hanzi, #D2190F);
+        --rosace-block-text: #3A3430;
+        --rosace-block-text-muted: #8C8478;
     }
     @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) .rosace-poster,
         :root:not([data-theme="light"]) .rosace-cards {
             --rosace-block-bg: #201c14;
-            --rosace-block-border: rgba(242,169,61,0.25);
+            --rosace-block-border: rgba(255,190,59,0.25);
+            --rosace-hanzi: #f5e3c6;
             --rosace-block-text: #f5e3c6;
-            --rosace-block-text-muted: #9ca3af;
+            --rosace-block-text-muted: #B5AA9B;
         }
     }
     :root[data-theme="dark"] .rosace-poster,
     :root[data-theme="dark"] .rosace-cards {
         --rosace-block-bg: #201c14;
-        --rosace-block-border: rgba(242,169,61,0.25);
+        --rosace-block-border: rgba(255,190,59,0.25);
+        --rosace-hanzi: #f5e3c6;
         --rosace-block-text: #f5e3c6;
-        --rosace-block-text-muted: #9ca3af;
+        --rosace-block-text-muted: #B5AA9B;
     }
 
     .rosace-empty {
@@ -61,7 +64,7 @@
     .rosace-block-emoji { width: 3rem; height: 3rem; }
     .rosace-block-hanzi .hanzi {
         font-size: clamp(2.25rem, 4vw, 3rem) !important;
-        color: var(--rosace-block-text);
+        color: var(--rosace-hanzi);
     }
     .rosace-block-pinyin {
         font-size: clamp(1.25rem, 2.2vw, 1.6rem);
@@ -75,7 +78,7 @@
     .rosace-block-french {
         font-size: clamp(1.15rem, 2vw, 1.4rem);
         font-weight: 600;
-        color: var(--rosace-block-text);
+        color: var(--rosace-block-text-muted);
     }
     .rosace-block-category {
         font-size: 0.85rem;
