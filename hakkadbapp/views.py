@@ -816,7 +816,9 @@ def get_all_data():
     )
 
     context = {
-        'caracters_data': caracters_data(),
+        # The lexicon's readings (components/data.html #pron-list): the
+        # character suggestions of Écrire, Transcrire, Saisie, Expressions.
+        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
         'tones': Tone.objects.all(),
         'initials': Initial.objects.all(),
         'finals': Final.objects.all(),
