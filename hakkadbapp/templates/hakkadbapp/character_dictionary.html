@@ -1,0 +1,103 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  /* Sources page: one table of every source, the inferred rules, the automaton.
+     Tokens: the site's cream/red, an indigo for Mandarin (as on the
+     character page), a neutral grey ramp for weak correspondences. */
+  .sx-root { --sx-ink: #261F1C; --sx-muted: #8C8478; --sx-line: #E8DFD2; --sx-soft: #FDFAF5; --sx-red: #9B1C1C;
+             --sx-man: #3730a3; --sx-man-bg: #eef2ff; --sx-guess: #8a6d1f; --sx-guess-bg: #fdf6e3; }
+  .sx-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid var(--sx-line); }
+  .sx-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .sx-tabs a[aria-selected="true"] { color: var(--sx-red); border-bottom-color: var(--sx-red); }
+  .sx-tabs a.sx-tab-main { font-size: 1.05rem; }
+  .sx-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .sx-tools input[type=search] { flex: 1 1 18rem; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+  .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
+  .sx-chip[aria-pressed="true"] { background: var(--sx-red); border-color: var(--sx-red); color: #fff; }
+  .sx-count { font-size: 0.85rem; color: var(--sx-muted); }
+  .sx-wrap { overflow-x: auto; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
+  .sx-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .sx-table th { position: sticky; top: 0; background: #F6EFE4; color: #544D45; font-size: 0.7rem; text-transform: uppercase;
+                 letter-spacing: 0.03em; text-align: center; padding: 0.4rem 0.5rem; white-space: nowrap; }
+  .sx-table td { padding: 0.3rem 0.5rem; border-top: 1px solid #F0E8DC; text-align: center; vertical-align: middle; }
+  .sx-table td.sx-char a { font-size: 1.5rem; color: var(--sx-ink); text-decoration: none; }
+  .sx-table td.sx-char small { display: block; color: var(--sx-muted); font-size: 0.75rem; }
+  .sx-table td.sx-en { text-align: left; color: #544D45; font-style: italic; font-size: 0.8rem; max-width: 18rem; }
+  .sx-r { display: inline-block; margin: 1px 2px; padding: 0 0.35rem; border-radius: 0.3rem; background: var(--sx-soft); border: 1px solid var(--sx-line); white-space: nowrap; }
+  .sx-r-wenfa { background: #FBF0E6; border-color: #e8c9b5; color: var(--sx-red); font-weight: 600; }
+  .sx-r-man { background: var(--sx-man-bg); border-color: #c7d2fe; color: var(--sx-man); }
+  .sx-guess { color: var(--sx-guess); background: var(--sx-guess-bg); border: 1px dashed #d9c27a; border-radius: 0.3rem; padding: 0 0.35rem; font-style: italic; white-space: nowrap; }
+  .sx-none { color: #C8BFB2; }
+  .sx-more { display: block; margin: 0.75rem auto; }
+  /* Rules */
+  .sx-acc { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .sx-acc div { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.6rem; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: #544D45; }
+  .sx-acc b { display: block; font-size: 1.25rem; color: var(--sx-ink); font-variant-numeric: tabular-nums; }
+  .sx-rules { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+  .sx-rule-card { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.75rem; min-width: 0; }
+  .sx-rule-card h3 { font-weight: 700; margin-bottom: 0.4rem; }
+  .sx-rule { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.4rem; padding: 0.25rem 0; border-top: 1px solid #F3ECE1; font-size: 0.85rem; }
+  .sx-rule:first-of-type { border-top: 0; }
+  .sx-rule .sx-src { font-weight: 700; text-align: right; font-family: ui-monospace, monospace; }
+  .sx-out { display: inline-flex; align-items: baseline; gap: 0.2rem; margin: 0 0.4rem 0.15rem 0; }
+  .sx-out code { font-weight: 700; color: var(--sx-red); }
+  .sx-out .sx-pct { font-size: 0.72rem; color: var(--sx-muted); font-variant-numeric: tabular-nums; }
+  .sx-bar { display: inline-block; height: 0.4rem; background: var(--sx-red); border-radius: 2px; vertical-align: middle; opacity: 0.75; }
+  /* Automaton */
+  .sx-chain { width: 100%; max-width: 40rem; height: auto; display: block; margin: 0 auto; }
+  .sx-chain .st { fill: #fff; stroke: #544D45; stroke-width: 1.5; }
+  .sx-chain .st-end { stroke-width: 3; }
+  .sx-chain text { font: 600 13px system-ui, sans-serif; fill: var(--sx-ink); text-anchor: middle; }
+  .sx-chain .tr { cursor: pointer; }
+  .sx-chain .tr path { stroke: #B5AA9B; stroke-width: 2; fill: none; marker-end: url(#sx-arrow); }
+  .sx-chain .tr text { fill: #6E655C; font-weight: 700; }
+  .sx-chain .tr.is-on path { stroke: var(--sx-red); stroke-width: 3; }
+  .sx-chain .tr.is-on text { fill: var(--sx-red); }
+  .sx-graph-wrap { overflow: auto; max-height: 75vh; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
+  .sx-graph text { font: 12px ui-monospace, monospace; fill: var(--sx-ink); dominant-baseline: middle; }
+  .sx-graph .node rect { fill: var(--sx-soft); stroke: var(--sx-line); }
+  .sx-graph .node.is-wenfa rect { fill: #FBF0E6; stroke: #e8c9b5; }
+  .sx-graph .node.is-hot rect { stroke: var(--sx-red); stroke-width: 2; }
+  .sx-graph .edge { fill: none; stroke-linecap: round; }
+  .sx-graph.has-hot .edge { opacity: 0.08; }
+  .sx-graph.has-hot .edge.is-hot { opacity: 0.9; }
+  .sx-graph .col-title { font: 700 11px system-ui, sans-serif; fill: #6E655C; text-transform: uppercase; letter-spacing: 0.05em; }
+  .sx-detail { min-height: 1.5rem; font-size: 0.85rem; color: #544D45; }
+  .sx-legend { font-size: 0.75rem; color: var(--sx-muted); }
+</style>
+
+<div class="sx-root w-full max-w-screen-xl mx-auto mt-2 space-y-3">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="font-display text-2xl font-bold text-gray-800">Dictionnaire des caractères</h2>
+    <p class="sx-count" id="sx-summary">Chargement…</p>
+  </div>
+  <p class="text-sm text-gray-700">Chaque caractère du lexique et des dictionnaires Bao'an et McIver, avec ses lectures hakka, cantonaises et
+    mandarin et son sens anglais. Hors lexique, une lecture Wenfa est déduite des
+    <a class="underline font-semibold" href="{% url 'pronunciation_comparison' %}">correspondances entre les sources</a>.</p>
+  <!-- 3. Every character of every source -->
+  <section data-sxpanel="lectures" class="space-y-2">
+    <div class="sx-tools">
+      <label class="sr-only" for="sx-search">Rechercher</label>
+      <input id="sx-search" type="search" placeholder="Caractère, lecture (ga1, ka¹, jia, jiā) ou sens anglais (house)…" autocapitalize="off" spellcheck="false">
+      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer">
+        <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
+        <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
+        <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
+      </div>
+    </div>
+    <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
+      Cantonais, mandarin et sens anglais : Unicode Unihan.</p>
+    <p class="sx-count" id="sx-count" role="status"></p>
+    <div class="sx-wrap">
+      <table class="sx-table no-auto-csv">
+        <thead><tr><th>Caractère</th><th>Lexique <small>Wenfa</small></th><th>Bao'an</th><th>McIver</th><th>Cantonais <small>jyutping</small></th><th>Mandarin <small>pinyin</small></th><th>Anglais <small>Unihan</small></th></tr></thead>
+        <tbody id="sx-rows"><tr><td colspan="7" class="sx-none py-6">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+    <button type="button" id="sx-more" class="sx-chip sx-more" hidden>Afficher plus</button>
+  </section>
+
+</div>
+<script src="{% static 'hakkadbapp/js/sources_page.js' %}" data-url="{% url 'api_sources_table' %}" data-hanzi-url="{% url 'hanzi' '__H__' %}"></script>
+{% endblock %}

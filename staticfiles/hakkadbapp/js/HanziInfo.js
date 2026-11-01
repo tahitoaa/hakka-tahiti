@@ -23,7 +23,8 @@ const HanziInfo = (() => {
     /** {mandarin: "jiā jià", meaning: "house, home"} or null (not loaded, unknown). */
     function get(char) {
         const entry = chars?.[char];
-        return entry ? { mandarin: entry[0].split(' ').filter(Boolean).join(', '), meaning: entry[1] } : null;
+        return entry ? { mandarin: entry[0].split(' ').filter(Boolean).join(', '), meaning: entry[1],
+            cantonese: (entry[2] || '').split(' ').filter(Boolean).join(', ') } : null;
     }
 
     /** One line for a tooltip: "Mandarin : jiā, jià — house, home". */

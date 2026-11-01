@@ -75,13 +75,13 @@
   <nav class="sx-tabs" role="tablist" aria-label="Vues">
     <a href="#correspondances" role="tab" data-sxtab="correspondances" class="sx-tab-main">🔀 Correspondances</a>
     <a href="#regles" role="tab" data-sxtab="regles">Règles détaillées</a>
-    <a href="#lectures" role="tab" data-sxtab="lectures">Toutes les lectures</a>
   </nav>
 
   <!-- 1. The rules as an automaton (correspondences) -->
   <section data-sxpanel="correspondances" class="space-y-3">
-    <p class="text-sm text-gray-700">Comment une lecture <b>Bao'an</b>, <b>McIver</b> ou <b>mandarin</b> devient une lecture <b>Wenfa</b> :
-      les correspondances observées entre les sources et le lexique, étape par étape (initiale, finale, ton).</p>
+    <p class="text-sm text-gray-700">Comment une lecture <b>Bao'an</b>, <b>McIver</b>, <b>cantonaise</b> ou <b>mandarin</b> devient une lecture <b>Wenfa</b> :
+      les correspondances observées entre les sources et le lexique, étape par étape (initiale, finale, ton).
+      Pour chercher un caractère dans toutes les sources : <a class="underline font-semibold" href="{% url 'character_dictionary' %}">Dictionnaire des caractères</a>.</p>
     <div class="flex flex-wrap gap-1.5 items-center" role="group" aria-label="Source" data-sxsource-group></div>
     <svg class="sx-chain" id="sx-chain" viewBox="0 0 640 90" role="img" aria-label="Automate : initiale, finale, ton"></svg>
     <p class="sx-legend">Un transducteur à trois étapes : chaque syllabe source passe par l'initiale, la finale puis le ton, et chaque étape
@@ -90,29 +90,6 @@
     <label class="text-sm text-gray-700 inline-flex items-center gap-2"><input type="checkbox" id="sx-rare"> afficher les correspondances rares (moins de 5 %)</label>
     <p class="sx-detail" id="sx-detail" aria-live="polite"></p>
     <div class="sx-graph-wrap"><svg class="sx-graph" id="sx-graph" role="img" aria-label="Transitions de l'étape choisie"></svg></div>
-  </section>
-
-  <!-- 3. Every character of every source -->
-  <section data-sxpanel="lectures" class="space-y-2" hidden>
-    <div class="sx-tools">
-      <label class="sr-only" for="sx-search">Rechercher</label>
-      <input id="sx-search" type="search" placeholder="Caractère, lecture (ga1, ka¹, jia, jiā) ou sens anglais (house)…" autocapitalize="off" spellcheck="false">
-      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer">
-        <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
-        <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
-        <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
-      </div>
-    </div>
-    <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
-      Mandarin et sens anglais : Unicode Unihan.</p>
-    <p class="sx-count" id="sx-count" role="status"></p>
-    <div class="sx-wrap">
-      <table class="sx-table no-auto-csv">
-        <thead><tr><th>Caractère</th><th>Lexique <small>Wenfa</small></th><th>Bao'an</th><th>McIver</th><th>Mandarin <small>pinyin</small></th><th>Anglais <small>Unihan</small></th></tr></thead>
-        <tbody id="sx-rows"><tr><td colspan="6" class="sx-none py-6">Chargement…</td></tr></tbody>
-      </table>
-    </div>
-    <button type="button" id="sx-more" class="sx-chip sx-more" hidden>Afficher plus</button>
   </section>
 
   <!-- 2. The rules, per source -->

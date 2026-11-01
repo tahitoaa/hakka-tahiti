@@ -26,11 +26,13 @@
     const state = { filter: 'all', query: '', limit: PAGE, source: null, part: 'initial', hot: null };
 
     // ---- tabs ---------------------------------------------------------------------------------
-    const TABS = ['correspondances', 'regles', 'lectures'];
-    const OLD = { automate: 'correspondances', tableau: 'lectures' }; // earlier links keep working
+    // The panels this page has (Lectures comparées: correspondances, règles;
+    // Dictionnaire des caractères: the table only).
+    const TABS = [...document.querySelectorAll('[data-sxpanel]')].map((p) => p.dataset.sxpanel);
+    const OLD = { automate: 'correspondances' }; // earlier links keep working
     function showTab() {
         const hash = OLD[location.hash.slice(1)] || location.hash.slice(1);
-        const name = TABS.includes(hash) ? hash : 'correspondances';
+        const name = TABS.includes(hash) ? hash : TABS[0];
         document.querySelectorAll('[data-sxtab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.sxtab === name)));
         document.querySelectorAll('[data-sxpanel]').forEach((p) => { p.hidden = p.dataset.sxpanel !== name; });
         if (data && name === 'correspondances') drawAutomaton();
@@ -48,7 +50,7 @@
     }
 
     function rowHtml(r) {
-        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess] = r;
+        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese] = r;
         let lex = readings(wenfa, 'sx-r-wenfa');
         if (!wenfa && guess) {
             const [reading, source, confidence] = guess.split('|');
@@ -58,7 +60,7 @@
         return `<tr><td class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
             + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</td>`
             + `<td>${lex}</td><td>${readings(baoan, '')}</td><td>${readings(mciver, '')}</td>`
-            + `<td>${readings(mandarin, 'sx-r-man')}</td>`
+            + `<td>${readings(cantonese, 'sx-r-man')}</td><td>${readings(mandarin, 'sx-r-man')}</td>`
             + `<td class="sx-en" lang="en">${esc(english)}</td></tr>`;
     }
 
@@ -73,16 +75,17 @@
     }
 
     function renderTable() {
+        if (!$('sx-rows')) return;
         const found = matches();
         $('sx-count').textContent = `${found.length.toLocaleString('fr-FR')} caractère${found.length > 1 ? 's' : ''}`
             + (found.length > state.limit ? ` · ${state.limit.toLocaleString('fr-FR')} affichés` : '');
         $('sx-rows').innerHTML = found.length ? found.slice(0, state.limit).map(rowHtml).join('')
-            : '<tr><td colspan="6" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>';
+            : '<tr><td colspan="7" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>';
         $('sx-more').hidden = found.length <= state.limit;
     }
 
-    $('sx-search').addEventListener('input', (e) => { state.query = e.target.value; state.limit = PAGE; renderTable(); });
-    $('sx-more').addEventListener('click', () => { state.limit += PAGE; renderTable(); });
+    $('sx-search')?.addEventListener('input', (e) => { state.query = e.target.value; state.limit = PAGE; renderTable(); });
+    $('sx-more')?.addEventListener('click', () => { state.limit += PAGE; renderTable(); });
     document.querySelectorAll('[data-sxfilter]').forEach((b) => b.addEventListener('click', () => {
         state.filter = b.dataset.sxfilter;
         state.limit = PAGE;
@@ -117,6 +120,7 @@
     }
 
     function renderRules() {
+        if (!$('sx-rules')) return;
         const r = data.rules[state.source];
         const a = r.accuracy;
         $('sx-acc').innerHTML = [[r.pairs, 'caractères appris'], [`${a.initial} %`, 'initiale juste'],
@@ -147,20 +151,20 @@
         $('sx-chain').innerHTML = `<defs><marker id="sx-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="#6E655C"/></marker></defs>${parts}${states}`;
     }
-    $('sx-chain').addEventListener('click', (e) => {
+    $('sx-chain')?.addEventListener('click', (e) => {
         const g = e.target.closest('[data-part]');
         if (!g) return;
         state.part = g.dataset.part;
         state.hot = null;
         drawAutomaton();
     });
-    $('sx-chain').addEventListener('keydown', (e) => {
+    $('sx-chain')?.addEventListener('keydown', (e) => {
         if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.part) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
     });
-    $('sx-rare').addEventListener('change', () => drawAutomaton());
+    $('sx-rare')?.addEventListener('change', () => drawAutomaton());
 
     function drawAutomaton() {
-        if (!data || !state.source) return;
+        if (!data || !state.source || !$('sx-graph')) return;
         drawChain();
         const rare = $('sx-rare').checked;
         const rows = ruleRows(state.source, state.part);
@@ -225,11 +229,11 @@
         });
         $('sx-detail').textContent = lines.join(' · ');
     }
-    $('sx-graph').addEventListener('click', (e) => {
+    $('sx-graph')?.addEventListener('click', (e) => {
         const node = e.target.closest('.node');
         highlight(node && !node.classList.contains('is-hot') ? node : null);
     });
-    $('sx-graph').addEventListener('keydown', (e) => {
+    $('sx-graph')?.addEventListener('keydown', (e) => {
         if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.node')) { e.preventDefault(); highlight(e.target.closest('.node')); }
     });
 
@@ -245,7 +249,7 @@
         renderRules();
         showTab();
     }).catch(() => {
-        $('sx-rows').innerHTML = '<tr><td colspan="6" class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
+        $('sx-rows').innerHTML = '<tr><td colspan="7" class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
     });
     showTab();
 })();

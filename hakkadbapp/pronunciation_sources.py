@@ -52,7 +52,9 @@ def unihan(char):
         _cache["unihan"] = (mtime, json.loads(path.read_text(encoding="utf-8")).get("chars", {}))
     chars = _cache["unihan"][1]
     entry = chars.get(char) or chars.get(_s2t.convert(char)) or chars.get(_t2s.convert(char))
-    return {"mandarin": entry[0].split(), "meaning": entry[1]} if entry else None
+    if not entry:
+        return None
+    return {"mandarin": entry[0].split(), "meaning": entry[1], "cantonese": (entry[2] if len(entry) > 2 else "").split()}
 
 
 def _readings_by_char(source):

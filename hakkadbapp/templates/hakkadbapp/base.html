@@ -340,6 +340,7 @@
         <ul class="no-print sm:flex sm:flex-wrap sm:gap-x-5 text-sm sm:text-base font-medium">
           <li><a href="{% url 'flashcards' %}" class="nav-link{% if page == 'flashcards' %} is-active{% endif %}">Accueil</a></li>
           <li><a href="{% url 'search' %}" class="nav-link{% if page == 'search' %} is-active{% endif %}">Recherche</a></li>
+          <li><a href="{% url 'character_dictionary' %}" class="nav-link{% if page == 'character_dictionary' %} is-active{% endif %}">Dictionnaire des caractères</a></li>
           <li><a href="{% url 'pinyin_converter' %}" class="nav-link{% if page == 'converter' %} is-active{% endif %}">Écrire</a></li>
           <li><a href="{% url 'pronunciation' %}" class="nav-link{% if page == 'pronunciation' %} is-active{% endif %}">Prononciation</a></li>
           <li><a href="{% url 'expressions' %}" class="nav-link{% if page == 'expressions' %} is-active{% endif %}">Expressions</a></li>

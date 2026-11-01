@@ -32,6 +32,13 @@
       </tr>
       {% endfor %}
       <tr class="src-unihan">
+        <th scope="row" title="Unicode Unihan (kCantonese, Jyutping)">Cantonais <span class="src-sub">Unihan</span></th>
+        <td>
+          {% for c in comparison.unihan.cantonese %}<span class="src-chip src-chip-mandarin">{{ c }}</span>{% empty %}<span class="src-none">—</span>{% endfor %}
+        </td>
+        <td class="src-sub">Jyutping</td>
+      </tr>
+      <tr>
         <th scope="row" title="Unicode Unihan (kMandarin, kHanyuPinyin, kDefinition)">Mandarin <span class="src-sub">Unihan</span></th>
         <td>
           {% for m in comparison.unihan.mandarin %}<span class="src-chip src-chip-mandarin">{{ m }}</span>{% empty %}<span class="src-none">—</span>{% endfor %}

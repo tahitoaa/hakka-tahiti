@@ -33,6 +33,7 @@ TONE_MARKS = {"̄": "1", "́": "2", "̌": "3", "̀": "4"}
 SOURCES = [
     {"id": "baoan", "label": "Bao'an", "system": "baoan"},
     {"id": "mciver", "label": "McIver", "system": "mciver"},
+    {"id": "cantonese", "label": "Cantonais", "system": None},
     {"id": "mandarin", "label": "Mandarin", "system": None},
 ]
 _cache = {}
@@ -57,6 +58,19 @@ def split_source(syllable, tone, system_id, initials):
         if s.startswith(i) and len(s) > len(i):
             return i, s[len(i):], str(tone or "")
     return "", s, str(tone or "")
+
+
+JYUTPING_INITIALS = ["gw", "kw", "ng", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "w", "z", "c", "s", "j"]
+
+
+def split_cantonese(reading):
+    """"gaa1" -> ("g", "aa", "1") in Jyutping; "m4", "ng5": no initial."""
+    tone = reading[-1] if reading[-1:].isdigit() else ""
+    base = reading[:-1] if tone else reading
+    for i in JYUTPING_INITIALS:
+        if base.startswith(i) and len(base) > len(i):
+            return i, base[len(i):], tone
+    return "", base, tone
 
 
 def split_mandarin(reading):
@@ -123,7 +137,9 @@ def load_sources():
 def unihan_entry(char):
     chars = _cache["maps"]["unihan"]
     entry = chars.get(char) or chars.get(convert_all(ps._s2t, [char])[char])
-    return {"mandarin": entry[0].split(), "meaning": entry[1]} if entry else {}
+    if not entry:
+        return {}
+    return {"mandarin": entry[0].split(), "meaning": entry[1], "cantonese": (entry[2] if len(entry) > 2 else "").split()}
 
 
 def source_readings(source, char):
@@ -131,6 +147,8 @@ def source_readings(source, char):
     maps = _cache.get("maps") or load_sources()
     if source["id"] == "mandarin":
         return [split_mandarin(r) for r in unihan_entry(char).get("mandarin", [])]
+    if source["id"] == "cantonese":
+        return [split_cantonese(r) for r in unihan_entry(char).get("cantonese", [])]
     readings = maps[source["id"]].get(char) or maps[source["id"]].get(convert_all(ps._s2t, [char])[char], [])
     return [split_source(syl, tone, source["system"], maps["initials"][source["system"]]) for syl, tone in readings]
 
@@ -213,7 +231,7 @@ def predict(rules, source_id, reading):
 # ---- the page's data -------------------------------------------------------------------------------
 
 def table_payload():
-    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess]], "rules": ...}.
+    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese]], "rules": ...}.
     `wenfa`: the lexicon's readings; `guess`: for a character the lexicon
     doesn't have, the Wenfa reading deduced from the best source available
     ("ga¹|Bao'an|72")."""
@@ -242,6 +260,7 @@ def table_payload():
             " ".join(source_text(SOURCES[0], r) for r in readings["baoan"]),
             " ".join(source_text(SOURCES[1], r) for r in readings["mciver"]),
             " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess,
+            " ".join(source_text(SOURCES[2], r) for r in readings["cantonese"]),
         ])
     # The lexicon's characters first (by Wenfa reading), then the others.
     rows.sort(key=lambda r: (not r[2], r[2], r[0]))

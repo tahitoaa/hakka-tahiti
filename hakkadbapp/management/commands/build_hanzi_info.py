@@ -1,6 +1,6 @@
 """Builds static/hakkadbapp/data/hanzi_info.json: for every character of the
 lexicon and of the dictionary indexes (Bao'an, McIver), its Mandarin
-reading(s) and a short English meaning, from the Unicode Unihan database
+reading(s), a short English meaning and its Cantonese reading(s) (Jyutping), from the Unicode Unihan database
 (free, textual, unicode.org). Shown by HanziInfo.js on a character's page,
 in the Caractères tab and on the character suggestions.
 
@@ -27,7 +27,7 @@ def read_unihan(data):
     """{char: (Mandarin readings, definition)} from Unihan_Readings.txt."""
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         text = z.read("Unihan_Readings.txt").decode("utf-8")
-    mandarin, hanyu, definition = {}, {}, {}
+    mandarin, hanyu, definition, cantonese = {}, {}, {}, {}
     for line in text.splitlines():
         if not line or line.startswith("#"):
             continue
@@ -40,13 +40,15 @@ def read_unihan(data):
             hanyu[char] = [r for part in value.split() for r in part.split(":", 1)[-1].split(",")]
         elif field == "kDefinition":
             definition[char] = value
+        elif field == "kCantonese":
+            cantonese[char] = value
     out = {}
-    for char in set(mandarin) | set(definition):
+    for char in set(mandarin) | set(definition) | set(cantonese):
         readings = []
         for r in mandarin.get(char, []) + hanyu.get(char, []):
             if r and r not in readings:
                 readings.append(r)
-        out[char] = (readings, definition.get(char, ""))
+        out[char] = (readings, definition.get(char, ""), cantonese.get(char, ""))
     return out
 
 
@@ -80,12 +82,12 @@ class Command(BaseCommand):
 
         entries = {}
         for char in sorted(chars):
-            readings, definition = unihan.get(char, ([], ""))
-            if readings or definition:
-                entries[char] = [" ".join(readings), definition]
+            readings, definition, canto = unihan.get(char, ([], "", ""))
+            if readings or definition or canto:
+                entries[char] = [" ".join(readings), definition, canto]
         out = {
             "meta": {
-                "source": "Unicode Unihan (kMandarin, kHanyuPinyin, kDefinition)",
+                "source": "Unicode Unihan (kMandarin, kHanyuPinyin, kDefinition, kCantonese)",
                 "url": "https://www.unicode.org/charts/unihan.html",
                 "license": "Unicode License v3",
                 "count": len(entries),

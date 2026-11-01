@@ -1102,6 +1102,15 @@ def pronunciation_comparison(request):
     })
 
 
+def character_dictionary(request):
+    """Every character of every source, searchable (sources_page.js, same
+    data as Lectures comparées)."""
+    return render(request, "hakkadbapp/character_dictionary.html", {
+        "page": "character_dictionary",
+        "title": "Dictionnaire des caractères",
+    })
+
+
 @gzip_page
 def api_sources_table(request):
     """The Sources page's data (source_rules.table_payload), cached."""
