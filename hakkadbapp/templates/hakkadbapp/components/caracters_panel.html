@@ -1,6 +1,5 @@
-{% extends "hakkadbapp/base.html" %}
 {% load static %}
-{% block content %}
+{# The characters list and statistics (caracters.js), shown in the « Caractères » tab of the Recherche page. Needs caracters_data. #}
 <style>
   /* Chart tokens -- one brand hue for single-series bars. Light only,
      like the rest of the site. */
@@ -137,4 +136,3 @@
 {{ caracters_data|json_script:"caracters-data" }}
 <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/caracters.js' %}"></script>
-{% endblock %}

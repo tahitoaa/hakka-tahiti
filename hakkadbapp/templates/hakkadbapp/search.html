@@ -3,10 +3,22 @@
 
 {% block content %}
 {% include "hakkadbapp/components/rosace_card_styles.html" %}
+<style>
+  .sr-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
+  .sr-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .sr-tabs a[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+</style>
+<div class="max-w-5xl mx-auto px-4 pt-4">
+  <nav class="sr-tabs" role="tablist" aria-label="Rechercher">
+    <a href="#mots" role="tab" data-srtab="mots">Mots</a>
+    <a href="#expressions" role="tab" data-srtab="expressions">Expressions</a>
+    <a href="#caracteres" role="tab" data-srtab="caracteres">Caractères</a>
+  </nav>
+</div>
 <div class="rosace-cards max-w-5xl mx-auto px-4 py-6 space-y-12">
 
   <!-- 🟩 Vocabulaire Section -->
-  <section>
+  <section data-srpanel="mots">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
       <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
         Vocabulaire
@@ -41,7 +53,7 @@
   </section>
 
   <!-- 🟨 Expressions Section -->
-  <section>
+  <section data-srpanel="expressions" hidden>
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
       <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
         Expressions
@@ -67,48 +79,7 @@
     </div>
   </section>
 
-  <!-- 🟦 Caractères Section -->
-  <section>
-    <!-- Title and Search -->
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
-        Caractères
-        <span class="text-gray-500 text-base font-normal">(<span id="pron-count">{{ pronunciations|length }}</span> caractères)</span>
-      </h1>
-      <input
-        type="text"
-        id="char-search"
-        placeholder="Ex. 家 ou ka ou ka1 ou siong"
-        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
-      />
-    </div>
 
-    <!-- Pronunciation list -->
-    <ul id="pron-list" class="flex flex-wrap gap-3">
-      {% for p in pronunciations %}
-        <li
-          class="w-28 cursor-pointer"
-          data-search="{{ p.hanzi }} {{ p.initial.initial }}{{ p.final.final }}{{ p.tone.tone_number|default:'' }}"
-        >
-          <div class="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 text-center rounded-lg px-3 py-2">
-            <div class="hanzi font-semibold text-lg">
-              <a href="{% url 'hanzi' p.simp %}">
-                    <span class="hanzi-block">
-                    <span class="simp">{{ p.simp }}</span>
-                    <span class="trad hidden">{{ p.trad }}</span>
-                    </span>
-
-              </a></div>
-            <div class="text-sm">
-              {% include "hakkadbapp/components/pinyin_switch.html" with i=p.initial.initial f=p.final.final t=p.tone.tone_number %}
-            </div>
-          </div>
-        </li>
-      {% empty %}
-        <li class="text-gray-500 italic">No pronunciations found.</li>
-      {% endfor %}
-    </ul>
-  </section>
 
 </div>
 
@@ -151,12 +122,6 @@ setupSearch({
   countId: 'expr-count'
 });
 
-setupSearch({
-  inputId: 'char-search',
-  itemSelector: 'li',
-  containerId: '#pron-list',
-  countId: 'pron-count',
-});
 
 document.getElementById('category-select').addEventListener('change', function() {
   const selectedCategory = this.value.toLowerCase();
@@ -171,6 +136,23 @@ document.getElementById('category-select').addEventListener('change', function()
   const visibleCount = Array.from(items).filter(item => item.style.display !== 'none').length;
   document.getElementById('word-count').textContent = visibleCount;
 });</script>
+<div data-srpanel="caracteres" hidden class="px-4 pb-8">
+  {% include "hakkadbapp/components/caracters_panel.html" %}
+</div>
+<script>
+  /* Tabs by #hash: /caracters redirects to #caracteres. */
+  (function () {
+    const tabs = [...document.querySelectorAll('[data-srtab]')];
+    const show = () => {
+      const name = ['mots', 'expressions', 'caracteres'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'mots';
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.srtab === name)));
+      document.querySelectorAll('[data-srpanel]').forEach((p) => { p.hidden = p.dataset.srpanel !== name; });
+    };
+    tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', t.getAttribute('href')); show(); }));
+    window.addEventListener('hashchange', show);
+    show();
+  })();
+</script>
 <script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/WordNotes.js' %}"></script>
 

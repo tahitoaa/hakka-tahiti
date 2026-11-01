@@ -326,7 +326,7 @@ def index(request):
     )
 
     context = {
-        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'caracters_data': caracters_data(),
         'tones': Tone.objects.all(),
         'initials': Initial.objects.all(),
         'finals': Final.objects.all(),
@@ -776,13 +776,13 @@ def search(request):
     expressions = _with_platform_target(_with_segments(expressions_qs), components_by_hanzi)
 
     context = {
-        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'caracters_data': caracters_data(),
         'tones': Tone.objects.all(),
         'initials': Initial.objects.all(),
         'finals': Final.objects.all(),
         'words': words,
         'expressions': expressions,
-        'title': "Recherche de mots",
+        'title': "Recherche",
         'page': "search",
         "categories": Word.objects.values_list('category', flat=True).distinct(),
     }
@@ -816,7 +816,7 @@ def get_all_data():
     )
 
     context = {
-        'pronunciations': Pronunciation.objects.select_related('initial', 'final', 'tone').all(),
+        'caracters_data': caracters_data(),
         'tones': Tone.objects.all(),
         'initials': Initial.objects.all(),
         'finals': Final.objects.all(),
@@ -897,15 +897,10 @@ def caracters_data():
 
 
 def caracters(request):
-    """Every lexicon reading as one compact JSON payload, rendered (list,
-    filters, statistics) by caracters.js -- server-rendering each of the
-    ~1000 readings in every transcription system made this page ~840 KB of
-    HTML and several seconds to build."""
-    return render(request, "hakkadbapp/caracters.html", {
-        "page": "caracters",
-        "title": "Caractères",
-        "caracters_data": caracters_data(),
-    })
+    """The characters list is now the « Caractères » tab of the Recherche
+    page: every lexicon reading as one compact JSON payload (caracters_data),
+    rendered by caracters.js."""
+    return redirect(reverse("search") + "#caracteres")
 
 
 def api_words_data(request):
