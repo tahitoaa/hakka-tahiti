@@ -39,6 +39,25 @@ _t2s = OpenCC("t2s")
 _cache = {}
 
 
+def unihan(char):
+    """{"mandarin": ["jiā", ...], "meaning": "house, home"} for `char` from
+    Unicode Unihan (data/hanzi_info.json, `manage.py build_hanzi_info`),
+    trying its traditional and simplified forms too; None when unknown.
+    Shown last, after the lexicon and the dictionaries."""
+    path = DATA_DIR / "hanzi_info.json"
+    if not path.exists():
+        return None
+    mtime = path.stat().st_mtime
+    if _cache.get("unihan", (None,))[0] != mtime:
+        _cache["unihan"] = (mtime, json.loads(path.read_text(encoding="utf-8")).get("chars", {}))
+    chars = _cache["unihan"][1]
+    for form in (char, _s2t.convert(char), _t2s.convert(char)):
+        entry = chars.get(form)
+        if entry:
+            return {"mandarin": entry[0].split(), "meaning": entry[1]}
+    return None
+
+
 def _readings_by_char(source):
     """{hanzi: [(syllable, tone)]} for one dictionary, keyed by both its
     traditional and simplified forms; reloaded when the file changes."""
@@ -116,6 +135,7 @@ def compare_char(char, wenfa_readings):
     for entry in result["sources"]:
         entry.setdefault("status_label", STATUS_LABELS[entry["status"]])
         entry["per_wenfa_labels"] = [STATUS_LABELS[s] for s in entry["per_wenfa"]]
+    result["unihan"] = unihan(char)
     return result
 
 

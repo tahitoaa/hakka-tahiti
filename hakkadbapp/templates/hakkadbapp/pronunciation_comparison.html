@@ -61,11 +61,12 @@
           <th>Caractère</th>
           <th>Lexique <span class="src-sub">Wenfa</span></th>
           {% for s in sources %}<th title="{{ s.title }}">{{ s.label }}</th>{% endfor %}
+          <th title="Unicode Unihan (kMandarin, kHanyuPinyin, kDefinition)">Mandarin <span class="src-sub">Unihan</span></th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr data-search="{{ r.char }} {% for w in r.wenfa %}{{ w.stored }} {{ w.text }} {% endfor %}{% for s in r.sources %}{% for x in s.readings %}{{ x.text }} {% endfor %}{% endfor %}"
+        <tr data-search="{{ r.char }} {% for w in r.wenfa %}{{ w.stored }} {{ w.text }} {% endfor %}{% for s in r.sources %}{% for x in s.readings %}{{ x.text }} {% endfor %}{% endfor %}{% for m in r.unihan.mandarin %}{{ m }} {% endfor %}{{ r.unihan.meaning }}"
             {% for s in r.sources %} data-status-{{ s.id }}="{{ s.status }}"{% endfor %}>
           <td class="cmp-char"><a class="hanzi" href="{% url 'hanzi' r.char %}">{{ r.char }}</a></td>
           <td>{% for w in r.wenfa %}<span class="src-chip src-chip-ref">{{ w.text }}</span>{% endfor %}</td>
@@ -77,6 +78,8 @@
             {% endif %}
           </td>
           {% endfor %}
+          <td class="cmp-unihan">{% for m in r.unihan.mandarin %}<span class="src-chip src-chip-mandarin">{{ m }}</span>{% empty %}<span class="src-none">—</span>{% endfor %}
+            {% if r.unihan.meaning %}<div class="src-meaning" lang="en">{{ r.unihan.meaning }}</div>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
