@@ -75,6 +75,7 @@
       <input id="saisie-pinyin" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
              placeholder="ex. wuk5ka1"
              class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
       <p id="saisie-pinyin-help" class="mt-1 text-xs text-gray-500">
         Tapez les syllabes avec leur ton (<code>wuk5ka1</code>, <code>_</code> sans ton : <code>ngai_</code>), dans le système « Je tape en » (réglages ci-dessus).
         Pour une expression, mettez un espace entre les mots (<code>ngai_ oi4 wuk5ka1</code>). Chaque caractère choisi remplace sa syllabe dans le texte,
@@ -87,7 +88,6 @@
       <div class="text-sm font-semibold text-gray-700 mb-1">Caractères</div>
       <div id="saisie-slots" class="flex flex-wrap gap-2 min-h-12 items-end"></div>
       <p class="mt-1 text-xs text-gray-500">Touchez une case vide puis un caractère proposé ci-dessous (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.</p>
-      <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
     </div>
 
     <!-- Each word against the lexicon (same matching as the Écrire page) -->

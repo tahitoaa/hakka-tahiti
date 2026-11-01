@@ -163,6 +163,11 @@ const SUGGESTION_BAR_CSS = `
 .src-pill { display: inline-block; min-width: 0.8rem; padding: 0 0.2rem; border-radius: 9999px; background: #8C8478;
             color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.8rem; text-align: center; }
 @media (hover: none) and (pointer: coarse) { .sugg .sugg-key { display: none; } }
+/* Unihan under the character: Mandarin reading, then a short English meaning. */
+.sugg-bar.sugg-bar.has-uh { grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr)); max-height: min(45vh, 18rem); }
+.sugg .sugg-uh { margin-top: 0.15rem; width: 100%; font-size: 0.6rem; line-height: 1.15; color: #6E655C; text-align: center;
+                 display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sugg .sugg-uh b { color: #3730a3; font-weight: 600; }
 `;
 
 function injectSuggestionBarCss() {
@@ -184,6 +189,9 @@ class SuggestionBar {
         this.suggestions = [];
 
         this.container.addEventListener('click', (event) => this.handleClick(event));
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('hanzi-info-ready', () => { if (this.suggestions.length) this.render(this.suggestions); });
+        }
 
         if (this.anchorTo) {
             // Tapping/clicking a suggestion would otherwise move focus to the
@@ -231,6 +239,7 @@ class SuggestionBar {
         // As soon as a dictionary is in use, every tile shows where it comes
         // from -- lexicon-only ones included, or they'd look unmarked.
         const showSources = this.suggestions.some((s) => s.sources?.some((src) => src !== 'L'));
+        let withUnihan = false;
         this.container.innerHTML = this.suggestions.map((s, i) => {
             const keyHint = suggestionKeyHint(i);
             // Main form follows the sitewide Trad./Simp. toggle (char()); the
@@ -249,15 +258,25 @@ class SuggestionBar {
             // Mandarin + meaning (Unihan), when loaded (HanziInfo.js).
             const info = typeof HanziInfo !== 'undefined' ? HanziInfo.text(simp) || HanziInfo.text(trad) : '';
             const infoTitle = info ? `\n${info.replace(/"/g, '&quot;')}` : '';
+            const uh = typeof HanziInfo !== 'undefined' ? HanziInfo.get(simp) || HanziInfo.get(trad) : null;
+            const uhLine = uh ? `<span class="sugg-uh" lang="en"><b>${escapeSugg(uh.mandarin.split(', ')[0])}</b>`
+                + `${uh.meaning ? ` ${escapeSugg(uh.meaning.split(/[;,]/)[0].trim())}` : ''}</span>` : '';
+            if (uhLine) withUnihan = true;
             return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${infoTitle}">`
                 + `<span class="sugg-key">${keyHint}</span>${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
                 + `<span class="sugg-py">${pinyin}</span>`
+                + uhLine
                 + `</button>`;
         }).join('');
 
+        this.container.classList.toggle?.('has-uh', withUnihan);
         this.updateVisibility();
     }
+}
+
+function escapeSugg(text) {
+    return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 // The suggestions' tooltips show each character's Mandarin and meaning: loaded early.
