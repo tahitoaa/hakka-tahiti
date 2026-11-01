@@ -423,3 +423,47 @@ class ImportedDocument(models.Model):
 
     def __str__(self):
         return self.filename
+
+
+class SourceSite(models.Model):
+    """A source the 🔎 lookup (sources.py) may consult, edited in /admin/.
+    "designated" sites come first; a lookup address ("{q}" = the word)
+    lets the page be read directly, with no search. The domain "*" opens
+    the search to the whole web."""
+    KIND_DESIGNATED = "designated"
+    KIND_BROAD = "broad"
+    KIND_CHOICES = [(KIND_DESIGNATED, "Désignée"), (KIND_BROAD, "Web large")]
+
+    name = models.CharField(max_length=100)
+    domain = models.CharField(max_length=100, help_text="ex. hakkadictionary.com ; « * » = tout le web")
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=KIND_DESIGNATED)
+    lookup_url = models.CharField(max_length=300, blank=True, default="",
+                                  help_text="Adresse d'une entrée, avec {q} pour le mot (facultatif)")
+    priority = models.PositiveIntegerField(default=10, help_text="Plus petit = consulté en premier")
+    active = models.BooleanField(default=True)
+    notes = models.CharField(max_length=300, blank=True, default="")
+
+    class Meta:
+        ordering = ["priority", "name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.domain})"
+
+
+class SourceLookup(models.Model):
+    """One 🔎 lookup for a word or character, kept so it is shown the same
+    every time (and paid once) until someone refreshes it. `result`:
+    {"documents": [...], "web": [{text, citations: [{url, title, cited_text}]}],
+     "ai": [text], "sites": [...]}."""
+    query = models.CharField(max_length=100, db_index=True)
+    reading = models.CharField(max_length=100, blank=True, default="")
+    result = models.JSONField(default=dict)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.query} ({self.created_at:%d/%m/%Y})"

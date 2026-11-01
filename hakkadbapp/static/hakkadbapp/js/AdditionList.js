@@ -407,6 +407,7 @@ class ValidationTable extends AdditionList {
                 <input id="vt-comment-${a.id}" type="text" placeholder="Ajouter un commentaire…" maxlength="1000">
                 <button type="submit" class="saisie-btn saisie-btn-neutral">Commenter</button>
               </form>
+              <button type="button" class="src-open-btn" data-sources="${esc(a.hanzi.replace(/\s+/g, ''))}" data-reading="${esc(a.pinyin)}">🔎 Sources</button>
               <button type="button" class="saisie-btn saisie-btn-neutral" data-remark="mute" data-muted="${muted}">
                 ${muted ? '🔔 Réactiver l’IA sur cet ajout' : '🔕 Couper l’IA sur cet ajout'}</button>
             </div></td></tr>`;

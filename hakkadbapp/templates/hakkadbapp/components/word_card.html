@@ -18,6 +18,9 @@
     </div>
     <div class="rosace-block-french">{{ word.french }}</div>
     {% if word.category %}<div class="rosace-block-category">{{ word.category }}</div>{% endif %}
+    {% if can_edit %}<button type="button" class="rosace-copy-btn" title="Sources sur ce mot"
+            data-sources="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.simp }}{% endfor %}"
+            data-reading="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial|default:'' }}{{ wp.pronunciation.final.final|default:'' }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %}">🔎</button>{% endif %}
     <button type="button" class="rosace-copy-btn" title="Éditer le commentaire"
             data-note-toggle="{{ word.id }}">💬</button>
     <div class="rosace-note-panel" data-note-panel="{{ word.id }}"

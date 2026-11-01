@@ -446,6 +446,14 @@ class SaisieEntry {
             this.renderPreview();
             // A proposal made for other characters no longer applies.
             if (this.aiSuggestion && this.aiFor !== this.aiEntryKey()) this.clearSuggestion();
+            // 🔎 Sources (Sources.js) follows the characters typed.
+            const sources = document.getElementById('saisie-sources');
+            if (sources) {
+                const v = this.entry.values();
+                sources.dataset.sources = this.entry.syllables.length ? '' : v.hanzi.replace(/\s+/g, '');
+                sources.dataset.reading = v.pinyin;
+                sources.hidden = !sources.dataset.sources;
+            }
         }
 
         // ---- AI suggestions (ai.py) ------------------------------------------

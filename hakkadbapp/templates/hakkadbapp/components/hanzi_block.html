@@ -7,6 +7,7 @@
             <span class="hanzi simp">{{ simp }}</span>
             <span class="hanzi trad hidden">{{ trad }}</span>
         </div>
+        {% if can_edit %}<button type="button" class="src-open-btn" data-sources="{{ simp }}">🔎 Sources sur {{ simp }}</button>{% endif %}
         {% if pronunciations %}
         <div class="rosace-pinyin">
             {% for p in pronunciations %}

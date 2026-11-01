@@ -511,5 +511,39 @@ document.addEventListener("DOMContentLoaded", attachExportButtons);
 </style>
 
 
+{% if can_edit %}
+<!-- 🔎 Sources (Sources.js, sources.py): any [data-sources] button opens the panel. -->
+<style>
+  .src-dialog { width: min(46rem, calc(100vw - 2rem)); max-height: 85vh; padding: 0; border: 0; border-radius: 0.9rem;
+                box-shadow: 0 12px 40px rgb(0 0 0 / .3); background: #fff; color: #261F1C; }
+  .src-dialog::backdrop { background: rgb(38 31 28 / .45); }
+  .src-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+              padding: 0.75rem 1rem; background: var(--color-brand, #9B1C1C); color: #fff; }
+  .src-head h2 { font-weight: 700; font-size: 1.05rem; }
+  .src-head .hanzi { color: var(--color-brand-gold, #FFBE3B); }
+  .src-close { min-width: 2.25rem; min-height: 2.25rem; border-radius: 9999px; color: #fff; font-size: 1rem; }
+  .src-close:hover { background: rgb(255 255 255 / .15); }
+  .src-body { padding: 0.75rem 1rem 1rem; display: grid; gap: 0.9rem; font-size: 0.9rem; }
+  .src-body h3 { font-weight: 700; color: #544D45; margin-bottom: 0.35rem; }
+  .src-body h3 small { font-weight: 400; color: #8C8478; }
+  .src-list { display: grid; gap: 0.5rem; }
+  .src-list > li { border-left: 3px solid #E8DFD2; padding-left: 0.6rem; }
+  .src-cites { display: grid; gap: 0.2rem; margin-top: 0.25rem; font-size: 0.8rem; color: #544D45; }
+  .src-cites a { color: var(--color-brand, #9B1C1C); text-decoration: underline; margin-left: 0.3rem; }
+  .src-ai .src-list > li { border-left-color: #c4b5fd; }
+  .src-meta, .src-empty { color: #8C8478; font-size: 0.8rem; }
+  .src-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #6E655C;
+              border-top: 1px solid #F0E8DC; padding-top: 0.6rem; }
+  .src-btn { min-height: 2rem; padding: 0.2rem 0.7rem; border-radius: 0.375rem; border: 1px solid #DDD0BD; background: #fff; font-weight: 600; }
+  .src-btn-main { background: #5b21b6; border-color: #5b21b6; color: #fff; }
+  .src-btn:disabled { opacity: 0.6; cursor: progress; }
+  .src-state { color: #544D45; }
+  .src-error { color: #b91c1c; }
+  .src-open-btn { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.85rem; padding: 0.1rem 0.55rem; border-radius: 9999px;
+                  border: 1px solid #DDD0BD; background: #fff; color: #544D45; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+  .src-open-btn:hover { border-color: var(--color-brand, #9B1C1C); color: var(--color-brand, #9B1C1C); }
+</style>
+<script src="{% static 'hakkadbapp/js/Sources.js' %}"></script>
+{% endif %}
 </body>
 </html>
