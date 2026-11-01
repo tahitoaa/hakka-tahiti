@@ -5,6 +5,7 @@ from django.db.models import Prefetch, Count, Q
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.views.decorators.gzip import gzip_page
 from django.core.cache import cache
 from django.views.decorators.http import require_POST
 from .forms import PronunciationForm, WordForm
@@ -1092,43 +1093,23 @@ def hanzi_by_pinyin(request, syllable):
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
 
 def pronunciation_comparison(request):
-    """Every character of the lexicon: its Wenfa readings against the
-    readings of the external dictionaries (pronunciation_sources), with
-    per-source agreement statistics."""
-    by_char = defaultdict(list)
-    for p in Pronunciation.objects.select_related('initial', 'final', 'tone'):
-        if p.hanzi:
-            by_char[p.hanzi].append(p)
-
-    rows = [pronunciation_sources.compare_pronunciations(char, prons) for char, prons in by_char.items()]
-    rows.sort(key=lambda r: ([w["stored"] for w in r["wenfa"]], r["char"]))
-
-    stats = []
-    for k, source in enumerate(pronunciation_sources.SOURCES):
-        chars = Counter(r["sources"][k]["status"] for r in rows)
-        readings = Counter(s for r in rows for s in r["sources"][k]["per_wenfa"] if s != "absent")
-        present = sum(readings.values()) or 1
-        stats.append({
-            **source,
-            "chars": [
-                {"status": s, "label": pronunciation_sources.STATUS_LABELS[s], "count": chars.get(s, 0)}
-                for s in ("ok", "tone", "diff", "absent")
-            ],
-            "present_chars": len(rows) - chars.get("absent", 0),
-            "readings_ok": round(100 * readings.get("ok", 0) / present),
-            "readings_tone": round(100 * readings.get("tone", 0) / present),
-            "readings_diff": round(100 * readings.get("diff", 0) / present),
-        })
-
-    context = {
+    """Every character of every source (lexicon, Bao'an, McIver, Mandarin),
+    the correspondence rules from each source to Wenfa, and those rules as
+    an automaton -- all drawn by sources_page.js from api_sources_table."""
+    return render(request, "hakkadbapp/pronunciation_comparison.html", {
         "page": "pronunciation_comparison",
-        "title": "Comparaison des prononciations",
-        "rows": rows,
-        "stats": stats,
-        "sources": pronunciation_sources.SOURCES,
-        "total_chars": len(rows),
-    }
-    return render(request, "hakkadbapp/pronunciation_comparison.html", context)
+        "title": "Sources",
+    })
+
+
+@gzip_page
+def api_sources_table(request):
+    """The Sources page's data (source_rules.table_payload), cached."""
+    from . import source_rules
+
+    response = JsonResponse(source_rules.cached_payload(), json_dumps_params={"ensure_ascii": False})
+    response["Cache-Control"] = "public, max-age=600"
+    return response
 
 
 def hanzi_by_tone(request, tone):

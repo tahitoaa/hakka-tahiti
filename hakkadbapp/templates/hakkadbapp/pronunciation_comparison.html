@@ -1,159 +1,125 @@
 {% extends "hakkadbapp/base.html" %}
-
+{% load static %}
 {% block content %}
-{% include "hakkadbapp/components/source_comparison_styles.html" %}
-<div class="cmp-page max-w-6xl mx-auto px-4 py-6">
-  <h1 class="text-xl font-bold text-gray-800">Comparaison des prononciations</h1>
-  <p class="mt-1 text-sm text-gray-600 max-w-3xl">
-    Chaque caractère du lexique ({{ total_chars }}) : ses lectures Wenfa comparées à celles des dictionnaires.
-    Une lecture de dictionnaire « concorde » quand sa transcription correspond, par le mapping de
-    <code>romanization.json</code>, à la syllabe et au ton Wenfa.
-  </p>
-
-  <div class="cmp-stats">
-    {% for s in stats %}
-    <section class="cmp-card" aria-label="{{ s.label }}">
-      <div class="cmp-card-head">
-        <span class="cmp-card-title" title="{{ s.title }}">{{ s.label }}</span>
-        <span class="src-sub">{{ s.present_chars }} / {{ total_chars }} caractères présents</span>
-      </div>
-      <div class="cmp-bar" title="Lectures Wenfa des caractères présents">
-        <span class="cmp-bar-ok" style="width: {{ s.readings_ok }}%"></span><span class="cmp-bar-tone" style="width: {{ s.readings_tone }}%"></span><span class="cmp-bar-diff" style="width: {{ s.readings_diff }}%"></span>
-      </div>
-      <p class="src-sub">Lectures : {{ s.readings_ok }} % concordent · {{ s.readings_tone }} % ton différent · {{ s.readings_diff }} % différentes</p>
-      <div class="cmp-chips">
-        {% for c in s.chars %}
-        <button type="button" class="src-status src-status-{{ c.status }} cmp-filter-chip"
-                data-source="{{ s.id }}" data-status="{{ c.status }}">{{ c.label }} : {{ c.count }}</button>
-        {% endfor %}
-      </div>
-    </section>
-    {% endfor %}
-  </div>
-
-  <div class="cmp-filters" role="search">
-    <label>Source
-      <select id="cmp-source">
-        <option value="">toutes</option>
-        {% for s in sources %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Statut
-      <select id="cmp-status">
-        <option value="">tous</option>
-        <option value="disagree">désaccord (ton ou syllabe)</option>
-        <option value="ok">concorde</option>
-        <option value="tone">ton différent</option>
-        <option value="diff">différent</option>
-        <option value="absent">absent</option>
-      </select>
-    </label>
-    <label class="cmp-search">Recherche
-      <input id="cmp-search" type="search" placeholder="caractère ou lecture (ex. 家, ngai)">
-    </label>
-    <span id="cmp-count" class="src-sub" aria-live="polite"></span>
-  </div>
-
-  <div class="cmp-table-wrap">
-    <table class="cmp-table no-auto-csv">
-      <thead>
-        <tr>
-          <th>Caractère</th>
-          <th>Lexique <span class="src-sub">Wenfa</span></th>
-          {% for s in sources %}<th title="{{ s.title }}">{{ s.label }}</th>{% endfor %}
-          <th title="Unicode Unihan (kMandarin, kHanyuPinyin, kDefinition)">Mandarin <span class="src-sub">Unihan</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-        <tr data-search="{{ r.char }} {% for w in r.wenfa %}{{ w.stored }} {{ w.text }} {% endfor %}{% for s in r.sources %}{% for x in s.readings %}{{ x.text }} {% endfor %}{% endfor %}{% for m in r.unihan.mandarin %}{{ m }} {% endfor %}{{ r.unihan.meaning }}"
-            {% for s in r.sources %} data-status-{{ s.id }}="{{ s.status }}"{% endfor %}>
-          <td class="cmp-char"><a class="hanzi" href="{% url 'hanzi' r.char %}">{{ r.char }}</a></td>
-          <td>{% for w in r.wenfa %}<span class="src-chip src-chip-ref">{{ w.text }}</span>{% endfor %}</td>
-          {% for s in r.sources %}
-          <td>
-            {% for x in s.readings %}<span class="src-chip{% if x.match %} src-chip-{{ x.match }}{% endif %}">{{ x.text }}</span>{% empty %}<span class="src-none">absent</span>{% endfor %}
-            {% if s.status == 'tone' or s.status == 'diff' %}
-            <span class="src-sub"><span class="src-status src-status-{{ s.status }}">{{ s.status_label }}</span> attendu : {{ s.expected|join:", " }}</span>
-            {% endif %}
-          </td>
-          {% endfor %}
-          <td class="cmp-unihan">{% for m in r.unihan.mandarin %}<span class="src-chip src-chip-mandarin">{{ m }}</span>{% empty %}<span class="src-none">—</span>{% endfor %}
-            {% if r.unihan.meaning %}<div class="src-meaning" lang="en">{{ r.unihan.meaning }}</div>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p id="cmp-empty" class="text-sm text-gray-500 mt-3" hidden>Aucun caractère ne correspond à ces filtres.</p>
-</div>
-
 <style>
-  .cmp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0.75rem; margin-top: 1rem; }
-  .cmp-card { background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.75rem 1rem; }
-  .cmp-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
-  .cmp-card-title { font-weight: 600; color: #3A3430; }
-  .cmp-bar { display: flex; height: 0.6rem; margin: 0.5rem 0 0.25rem; border-radius: 9999px; overflow: hidden; background: #F6EFE4; }
-  .cmp-bar-ok { background: #22c55e; } .cmp-bar-tone { background: #f59e0b; } .cmp-bar-diff { background: #ef4444; }
-  .cmp-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
-  .cmp-filter-chip { cursor: pointer; border: 0; }
-  .cmp-filter-chip:hover { filter: brightness(0.95); text-decoration: underline; }
-  .cmp-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 0.75rem; margin: 1.25rem 0 0.75rem;
-                 font-size: 0.8rem; color: #6E665C; }
-  .cmp-filters label { display: flex; flex-direction: column; gap: 0.2rem; }
-  .cmp-filters select, .cmp-filters input { min-height: 2.25rem; padding: 0.25rem 0.5rem; font-size: 0.875rem;
-                 background: #fff; border: 1px solid #DDD0BD; border-radius: 0.375rem; }
-  .cmp-search { flex: 1 1 14rem; } .cmp-search input { width: 100%; }
-  .cmp-table-wrap { overflow-x: auto; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
-  .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-  .cmp-table th { position: sticky; top: 0; background: #FDFAF5; text-align: left; font-weight: 600; color: #544D45;
-                  padding: 0.5rem; border-bottom: 1px solid #ECE2D3; z-index: 1; }
-  .cmp-table td { padding: 0.35rem 0.5rem; border-top: 1px solid #F6EFE4; vertical-align: top; }
-  .cmp-char a { font-size: 1.25rem; color: #9B1C1C; text-decoration: none; }
-  .cmp-char a:hover { text-decoration: underline; }
+  /* Sources page: one table of every source, the inferred rules, the automaton.
+     Tokens: the site's cream/red, an indigo for Mandarin (as on the
+     character page), a neutral grey ramp for weak correspondences. */
+  .sx-root { --sx-ink: #261F1C; --sx-muted: #8C8478; --sx-line: #E8DFD2; --sx-soft: #FDFAF5; --sx-red: #9B1C1C;
+             --sx-man: #3730a3; --sx-man-bg: #eef2ff; --sx-guess: #8a6d1f; --sx-guess-bg: #fdf6e3; }
+  .sx-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid var(--sx-line); }
+  .sx-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .sx-tabs a[aria-selected="true"] { color: var(--sx-red); border-bottom-color: var(--sx-red); }
+  .sx-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .sx-tools input[type=search] { flex: 1 1 18rem; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+  .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
+  .sx-chip[aria-pressed="true"] { background: var(--sx-red); border-color: var(--sx-red); color: #fff; }
+  .sx-count { font-size: 0.85rem; color: var(--sx-muted); }
+  .sx-wrap { overflow-x: auto; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
+  .sx-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .sx-table th { position: sticky; top: 0; background: #F6EFE4; color: #544D45; font-size: 0.7rem; text-transform: uppercase;
+                 letter-spacing: 0.03em; text-align: center; padding: 0.4rem 0.5rem; white-space: nowrap; }
+  .sx-table td { padding: 0.3rem 0.5rem; border-top: 1px solid #F0E8DC; text-align: center; vertical-align: middle; }
+  .sx-table td.sx-char a { font-size: 1.5rem; color: var(--sx-ink); text-decoration: none; }
+  .sx-table td.sx-char small { display: block; color: var(--sx-muted); font-size: 0.75rem; }
+  .sx-table td.sx-en { text-align: left; color: #544D45; font-style: italic; font-size: 0.8rem; max-width: 18rem; }
+  .sx-r { display: inline-block; margin: 1px 2px; padding: 0 0.35rem; border-radius: 0.3rem; background: var(--sx-soft); border: 1px solid var(--sx-line); white-space: nowrap; }
+  .sx-r-wenfa { background: #FBF0E6; border-color: #e8c9b5; color: var(--sx-red); font-weight: 600; }
+  .sx-r-man { background: var(--sx-man-bg); border-color: #c7d2fe; color: var(--sx-man); }
+  .sx-guess { color: var(--sx-guess); background: var(--sx-guess-bg); border: 1px dashed #d9c27a; border-radius: 0.3rem; padding: 0 0.35rem; font-style: italic; white-space: nowrap; }
+  .sx-none { color: #C8BFB2; }
+  .sx-more { display: block; margin: 0.75rem auto; }
+  /* Rules */
+  .sx-acc { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .sx-acc div { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.6rem; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: #544D45; }
+  .sx-acc b { display: block; font-size: 1.25rem; color: var(--sx-ink); font-variant-numeric: tabular-nums; }
+  .sx-rules { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+  .sx-rule-card { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.75rem; min-width: 0; }
+  .sx-rule-card h3 { font-weight: 700; margin-bottom: 0.4rem; }
+  .sx-rule { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.4rem; padding: 0.25rem 0; border-top: 1px solid #F3ECE1; font-size: 0.85rem; }
+  .sx-rule:first-of-type { border-top: 0; }
+  .sx-rule .sx-src { font-weight: 700; text-align: right; font-family: ui-monospace, monospace; }
+  .sx-out { display: inline-flex; align-items: baseline; gap: 0.2rem; margin: 0 0.4rem 0.15rem 0; }
+  .sx-out code { font-weight: 700; color: var(--sx-red); }
+  .sx-out .sx-pct { font-size: 0.72rem; color: var(--sx-muted); font-variant-numeric: tabular-nums; }
+  .sx-bar { display: inline-block; height: 0.4rem; background: var(--sx-red); border-radius: 2px; vertical-align: middle; opacity: 0.75; }
+  /* Automaton */
+  .sx-chain { width: 100%; max-width: 40rem; height: auto; display: block; margin: 0 auto; }
+  .sx-chain .st { fill: #fff; stroke: #544D45; stroke-width: 1.5; }
+  .sx-chain .st-end { stroke-width: 3; }
+  .sx-chain text { font: 600 13px system-ui, sans-serif; fill: var(--sx-ink); text-anchor: middle; }
+  .sx-chain .tr { cursor: pointer; }
+  .sx-chain .tr path { stroke: #B5AA9B; stroke-width: 2; fill: none; marker-end: url(#sx-arrow); }
+  .sx-chain .tr text { fill: #6E655C; font-weight: 700; }
+  .sx-chain .tr.is-on path { stroke: var(--sx-red); stroke-width: 3; }
+  .sx-chain .tr.is-on text { fill: var(--sx-red); }
+  .sx-graph-wrap { overflow: auto; max-height: 75vh; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
+  .sx-graph text { font: 12px ui-monospace, monospace; fill: var(--sx-ink); dominant-baseline: middle; }
+  .sx-graph .node rect { fill: var(--sx-soft); stroke: var(--sx-line); }
+  .sx-graph .node.is-wenfa rect { fill: #FBF0E6; stroke: #e8c9b5; }
+  .sx-graph .node.is-hot rect { stroke: var(--sx-red); stroke-width: 2; }
+  .sx-graph .edge { fill: none; stroke-linecap: round; }
+  .sx-graph.has-hot .edge { opacity: 0.08; }
+  .sx-graph.has-hot .edge.is-hot { opacity: 0.9; }
+  .sx-graph .col-title { font: 700 11px system-ui, sans-serif; fill: #6E655C; text-transform: uppercase; letter-spacing: 0.05em; }
+  .sx-detail { min-height: 1.5rem; font-size: 0.85rem; color: #544D45; }
+  .sx-legend { font-size: 0.75rem; color: var(--sx-muted); }
 </style>
 
-<script>
-  (function () {
-    var source = document.getElementById('cmp-source');
-    var status = document.getElementById('cmp-status');
-    var search = document.getElementById('cmp-search');
-    var count = document.getElementById('cmp-count');
-    var empty = document.getElementById('cmp-empty');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.cmp-table tbody tr'));
-    var sourceIds = Array.prototype.slice.call(source.options).map(function (o) { return o.value; }).filter(Boolean);
+<div class="sx-root w-full max-w-screen-xl mx-auto mt-2 space-y-3">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="font-display text-2xl font-bold text-gray-800">Sources</h2>
+    <p class="sx-count" id="sx-summary">Chargement des sources…</p>
+  </div>
+  <nav class="sx-tabs" role="tablist" aria-label="Vues">
+    <a href="#tableau" role="tab" data-sxtab="tableau">Tableau</a>
+    <a href="#regles" role="tab" data-sxtab="regles">Règles vers le Wenfa</a>
+    <a href="#automate" role="tab" data-sxtab="automate">Automate</a>
+  </nav>
 
-    function statusMatches(value, wanted) {
-      if (!wanted) return true;
-      if (wanted === 'disagree') return value === 'tone' || value === 'diff';
-      return value === wanted;
-    }
+  <!-- 1. Every character of every source -->
+  <section data-sxpanel="tableau" class="space-y-2">
+    <div class="sx-tools">
+      <label class="sr-only" for="sx-search">Rechercher</label>
+      <input id="sx-search" type="search" placeholder="Caractère, lecture (ga1, ka¹, jia, jiā) ou sens anglais (house)…" autocapitalize="off" spellcheck="false">
+      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer">
+        <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
+        <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
+        <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
+      </div>
+    </div>
+    <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
+      Mandarin et sens anglais : Unicode Unihan.</p>
+    <p class="sx-count" id="sx-count" role="status"></p>
+    <div class="sx-wrap">
+      <table class="sx-table no-auto-csv">
+        <thead><tr><th>Caractère</th><th>Lexique <small>Wenfa</small></th><th>Bao'an</th><th>McIver</th><th>Mandarin <small>pinyin</small></th><th>Anglais <small>Unihan</small></th></tr></thead>
+        <tbody id="sx-rows"><tr><td colspan="6" class="sx-none py-6">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+    <button type="button" id="sx-more" class="sx-chip sx-more" hidden>Afficher plus</button>
+  </section>
 
-    function apply() {
-      var ids = source.value ? [source.value] : sourceIds;
-      var q = search.value.trim().toLowerCase();
-      var shown = 0;
-      rows.forEach(function (row) {
-        var ok = ids.some(function (id) { return statusMatches(row.getAttribute('data-status-' + id), status.value); })
-          && (!q || row.getAttribute('data-search').toLowerCase().indexOf(q) !== -1);
-        row.hidden = !ok;
-        if (ok) shown++;
-      });
-      count.textContent = shown + ' / ' + rows.length + ' caractères';
-      empty.hidden = shown !== 0;
-    }
+  <!-- 2. The rules, per source -->
+  <section data-sxpanel="regles" class="space-y-3" hidden>
+    <div class="flex flex-wrap gap-1.5" role="group" aria-label="Source" data-sxsource-group></div>
+    <p class="sx-legend">Appris sur les caractères du lexique qui ont une seule lecture dans le lexique et une seule dans la source.
+      Chaque règle donne la valeur Wenfa la plus fréquente, et la part des cas où elle s'applique.</p>
+    <div class="sx-acc" id="sx-acc"></div>
+    <div class="sx-rules" id="sx-rules"></div>
+  </section>
 
-    [source, status].forEach(function (el) { el.addEventListener('change', apply); });
-    search.addEventListener('input', apply);
-    document.querySelectorAll('.cmp-filter-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        source.value = chip.getAttribute('data-source');
-        status.value = chip.getAttribute('data-status');
-        apply();
-        document.querySelector('.cmp-filters').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-    apply();
-  })();
-</script>
+  <!-- 3. The rules as an automaton -->
+  <section data-sxpanel="automate" class="space-y-3" hidden>
+    <div class="flex flex-wrap gap-1.5 items-center" role="group" aria-label="Source" data-sxsource-group></div>
+    <svg class="sx-chain" id="sx-chain" viewBox="0 0 640 90" role="img" aria-label="Automate : initiale, finale, ton"></svg>
+    <p class="sx-legend">Un transducteur à trois étapes : chaque syllabe source passe par l'initiale, la finale puis le ton, et chaque étape
+      transforme la valeur source (à gauche) en valeur Wenfa (à droite). Épaisseur : nombre de caractères ; rouge : la correspondance la
+      plus fréquente pour cette valeur. Touchez une étape ci-dessus, puis une valeur pour voir ses transitions.</p>
+    <label class="text-sm text-gray-700 inline-flex items-center gap-2"><input type="checkbox" id="sx-rare"> afficher les correspondances rares (moins de 5 %)</label>
+    <p class="sx-detail" id="sx-detail" aria-live="polite"></p>
+    <div class="sx-graph-wrap"><svg class="sx-graph" id="sx-graph" role="img" aria-label="Transitions de l'étape choisie"></svg></div>
+  </section>
+</div>
+<script src="{% static 'hakkadbapp/js/sources_page.js' %}" data-url="{% url 'api_sources_table' %}" data-hanzi-url="{% url 'hanzi' '__H__' %}"></script>
 {% endblock %}

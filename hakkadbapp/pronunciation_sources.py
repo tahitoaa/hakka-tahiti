@@ -51,11 +51,8 @@ def unihan(char):
     if _cache.get("unihan", (None,))[0] != mtime:
         _cache["unihan"] = (mtime, json.loads(path.read_text(encoding="utf-8")).get("chars", {}))
     chars = _cache["unihan"][1]
-    for form in (char, _s2t.convert(char), _t2s.convert(char)):
-        entry = chars.get(form)
-        if entry:
-            return {"mandarin": entry[0].split(), "meaning": entry[1]}
-    return None
+    entry = chars.get(char) or chars.get(_s2t.convert(char)) or chars.get(_t2s.convert(char))
+    return {"mandarin": entry[0].split(), "meaning": entry[1]} if entry else None
 
 
 def _readings_by_char(source):
