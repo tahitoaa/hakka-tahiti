@@ -1,0 +1,73 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% comment %}
+  A shared transcription, to read and listen to on a phone (members logged
+  in only, views.transcription_listen). Rendering: TranscriptDocument.js;
+  behavior: listen.js. Printing gives the PDF (texte segment par segment).
+{% endcomment %}
+<div id="tr-app" class="tr-page" data-id="{{ shared.id }}">
+
+  <p class="no-print tr-back"><a href="{% url 'transcriptions' %}">← Toutes les transcriptions</a></p>
+  <div id="tr-head"></div>
+
+  {% if audio_url %}
+  <div id="tr-bar" class="tr-bar no-print">
+    <audio id="tr-audio" controls preload="metadata" src="{{ audio_url }}"></audio>
+    <div class="tr-options">
+      <label><input id="tr-follow" type="checkbox" checked> suivre</label>
+      <label title="Toucher une phrase ne lit que cette phrase"><input id="tr-one" type="checkbox"> phrase par phrase</label>
+      <span id="tr-resume" class="tr-resume"></span>
+    </div>
+  </div>
+  {% elif audio_error %}
+  <p class="tr-note no-print">L'audio est momentanément indisponible ({{ audio_error }}).</p>
+  {% else %}
+  <p class="tr-note no-print">Pas d'audio pour cette transcription.</p>
+  {% endif %}
+
+  <div class="tr-toolbar no-print">
+    <span>Afficher :</span>
+    <label><input type="checkbox" data-show="hanzi" checked> hanzi</label>
+    <label><input type="checkbox" data-show="pinyin" checked> pinyin</label>
+    <label><input type="checkbox" data-show="fr" checked> français</label>
+    <span class="tr-grow"></span>
+    <button id="tr-print" type="button" class="tr-btn">PDF</button>
+  </div>
+
+  <div id="tr-segments"></div>
+  <p class="tr-note no-print">Touchez une phrase pour l'écouter. « PDF » ouvre l'impression : choisissez « Enregistrer au format PDF » (sur iPhone : Partager → Imprimer, puis écarter l'aperçu avec deux doigts).</p>
+</div>
+
+{{ transcript|json_script:"transcript-data" }}
+
+<style>
+  .tr-page { max-width: 46rem; margin: 0 auto; }
+  .tr-back { font-size: 0.85rem; margin-bottom: 0.5rem; } .tr-back a { color: #9B1C1C; }
+  .tr-bar { position: sticky; top: 0; z-index: 20; margin: 0.75rem -0.5rem 0.5rem; padding: 0.4rem 0.5rem;
+            background: rgb(229 231 235 / 0.96); backdrop-filter: blur(4px); border-radius: 0.6rem; }
+  .tr-bar audio { display: block; width: 100%; height: 2.5rem; }
+  .tr-options { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.3rem; font-size: 0.85rem; color: #544D45; }
+  .tr-options label, .tr-toolbar label { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2rem; cursor: pointer; }
+  .tr-resume { color: #8C8478; margin-left: auto; align-self: center; }
+  .tr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.9rem; margin: 0.5rem 0; font-size: 0.85rem; color: #544D45; }
+  .tr-grow { flex: 1; }
+  .tr-btn { min-height: 2.25rem; padding: 0.3rem 0.9rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; font-weight: 600; }
+  .tr-note { font-size: 0.8rem; color: #8C8478; margin: 0.75rem 0; }
+  #tr-segments { background: #fff; border-radius: 0.6rem; overflow: hidden; }
+  #tr-segments .tr-seg { cursor: pointer; -webkit-tap-highlight-color: transparent; scroll-margin-top: 7rem; }
+  #tr-segments .tr-seg:active { background: #F6EFE4; }
+  #tr-segments .tr-seg.is-playing { background: #fef3c7; }
+  body.tr-hide-hanzi .tr-hanzi, body.tr-hide-pinyin .tr-pinyin, body.tr-hide-fr .tr-fr { display: none; }
+  @media print {
+    .tr-page { max-width: none; }
+    #tr-segments .tr-seg.is-playing { background: none; }
+  }
+</style>
+<script src="{% static 'hakkadbapp/js/TranscriptDocument.js' %}"></script>
+<script>
+  // Shared styles of the segment list (screen and print).
+  document.head.insertAdjacentHTML('beforeend', `<style>${TranscriptDocument.CSS}</style>`);
+</script>
+<script src="{% static 'hakkadbapp/js/listen.js' %}"></script>
+{% endblock %}

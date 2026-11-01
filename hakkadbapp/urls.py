@@ -72,6 +72,7 @@ urlpatterns = [
     path("expression-mesh/sync", views.expression_mesh_sync, name="expression_mesh_sync"),
     path("word-notes/<int:word_id>", views.word_note_entry, name="word_note_entry"),
     path("saisie/", additions.saisie, name="saisie"),
+    path("validation/", additions.validation, name="validation"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/<int:addition_id>", additions.addition_update, name="addition_update"),
     path("api/ajouts/<int:addition_id>/supprimer", additions.addition_delete, name="addition_delete"),

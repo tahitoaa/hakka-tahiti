@@ -1,0 +1,246 @@
+{
+  "_readme": [
+    "Systèmes de transcription (romanisation) du hakka -- SOURCE UNIQUE, éditée à la main.",
+    "Les mots sont stockés en base dans la notation Wenfa (initiale + finale + ton).",
+    "Ce fichier dit comment afficher chaque syllabe stockée dans chaque autre système.",
+    "Il est lu à la fois par Django (hakkadbapp/romanization.py) et par le navigateur",
+    "(static/hakkadbapp/js/Romanization.js) : même fichier, même algorithme, même résultat.",
+    "",
+    "Pour une syllabe stockée (initiale I, finale F, ton T), dans l'ordre :",
+    "  1. 'syllables' : si la clé 'I+F' existe (ex. 'z+i', ou '+an' pour l'initiale vide),",
+    "     sa valeur remplace toute la syllabe (sans le ton). Prioritaire sur tout le reste.",
+    "  2. sinon : initials[I] + finals[F]  (une entrée absente = recopiée telle quelle,",
+    "     et signalée par `python manage.py check_romanization`)",
+    "  3. puis chaque règle de 'rules' dont 'when' correspond remplace l'initiale et/ou la",
+    "     finale déjà convertie. Les conditions portent toujours sur la notation STOCKÉE.",
+    "     Conditions possibles (toutes doivent être vraies) : initial, final (liste ou",
+    "     valeur), final_startswith (préfixe ou liste), final_not (liste).",
+    "  4. enfin le ton : tones[T] (le 'tones' du système, sinon celui du haut du fichier).",
+    "",
+    "Saisie dans un autre système (menu « Saisie en… » d'Écrire / Transcrire) : la conversion",
+    "est inversée automatiquement à partir des tables ci-dessus. 'input_tones' (facultatif)",
+    "dit quels tons stockés un chiffre tapé peut désigner, ex. \"3\": [\"3\", \"4\"] ;",
+    "sans lui, c'est l'inverse exact de 'tones'. 'input_syllables' (facultatif) ajoute des",
+    "orthographes tapées possibles : \"ch\": [\"z+i\"] = taper ch(i) trouve aussi le Wenfa zi.",
+    "",
+    "Toute clé commençant par '_' est un commentaire et est ignorée.",
+    "Après modification : `python manage.py check_romanization` puis `npm test`."
+  ],
+
+  "default_system": "wenfa",
+
+  "tones": {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "": ""},
+
+  "systems": [
+    {
+      "id": "wenfa",
+      "label": "Wenfa",
+      "source": "Guide de prononciation de l'association Wenfa",
+      "_comment": "Notation de stockage : tout est recopié à l'identique.",
+      "initials": {
+        "": "", "b": "b", "p": "p", "m": "m", "f": "f", "d": "d", "t": "t", "n": "n", "l": "l", "g": "g",
+        "k": "k", "ng": "ng", "h": "h", "j": "j", "q": "q", "x": "x", "z": "z", "c": "c", "s": "s",
+        "zh": "zh", "ch": "ch", "sh": "sh", "y": "y", "w": "w"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "ang", "ao": "ao",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ei", "em": "em", "en": "en", "ep": "ep", "et": "et",
+        "eu": "eu", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iang", "iao": "iao",
+        "iap": "iap", "ien": "ien", "iet": "iet", "im": "im", "in": "in", "ing": "ing", "io": "io",
+        "iok": "iok", "iong": "iong", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "iun",
+        "iung": "iung", "o": "o", "oi": "oi", "ok": "ok", "on": "on", "ong": "ong", "ot": "ot", "u": "u",
+        "ui": "ui", "uk": "uk", "un": "un", "ung": "ung", "uo": "uo", "uong": "uong", "ut": "ut", "ü": "ü"
+      },
+      "rules": [],
+      "syllables": {}
+    },
+
+    {
+      "id": "hakka_dict",
+      "label": "Hakkadictionary.com",
+      "source": "Hakkadictionary.com 客家話大辭典",
+      "initials": {
+        "": "", "b": "p", "p": "p'", "m": "m", "f": "f", "d": "t", "t": "t'", "n": "n", "l": "l", "g": "k",
+        "k": "k'", "ng": "ng", "h": "h", "j": "ts", "q": "ts'", "x": "s", "z": "ts", "c": "ts'", "s": "s",
+        "zh": "ts", "ch": "ts'", "sh": "s", "y": "j", "w": "w"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "ang", "ao": "au",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ei", "em": "em", "en": "en", "ep": "ep", "et": "et",
+        "eu": "iu", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iang", "iao": "iau",
+        "iap": "iap", "ien": "ien", "iet": "iet", "im": "im", "in": "in", "ing": "ing", "io": "io",
+        "iok": "iok", "iong": "iong", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "iun",
+        "iung": "iung", "o": "o", "oi": "oi", "ok": "ok", "on": "on", "ong": "ong", "ot": "ot", "u": "u",
+        "ui": "ui", "uk": "uk", "un": "un", "ung": "ung", "uo": "uo", "uong": "uong", "ut": "ut", "ü": "ü"
+      },
+      "rules": [],
+      "syllables": {}
+    },
+
+    {
+      "id": "chappell",
+      "label": "Chappell & Lamarre",
+      "source": "A Grammar and Lexicon of Hakka, Hilary Chappell, Christine Lamarre",
+      "initials": {
+        "": "", "b": "p", "p": "ph", "m": "m", "f": "f", "d": "t", "t": "th", "n": "n", "l": "l", "g": "k",
+        "k": "kh", "ng": "ng", "h": "h", "j": "ts", "q": "tsh", "x": "š", "z": "ts", "c": "tšh", "s": "s",
+        "zh": "ts", "ch": "tsh", "sh": "sh", "y": "j", "w": "w"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "ang", "ao": "au",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ei", "em": "em", "en": "en", "ep": "ep", "et": "et",
+        "eu": "eu", "i": "i", "ia": "ia", "iak": "iak", "iam": "yam", "iang": "iang", "iao": "yau",
+        "iap": "iap", "ien": "ien", "iet": "iet", "im": "im", "in": "in", "ing": "ing", "io": "io",
+        "iok": "iok", "iong": "iong", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "iun",
+        "iung": "iung", "o": "o", "oi": "oi", "ok": "ok", "on": "on", "ong": "ong", "ot": "ot", "u": "u",
+        "ui": "ui", "uk": "uk", "un": "un", "ung": "ung", "uo": "uo", "uong": "uong", "ut": "ut", "ü": "ü"
+      },
+      "rules": [
+        {"_comment": "Sifflantes rétroflexes devant -i. À VÉRIFIER : l'ancien code ne gardait que l'initiale (ni voyelle ni ton) ; ici la finale 'i' et le ton sont conservés.", "when": {"initial": ["z", "zh", "ch", "sh"], "final": "i"}, "then": {"initial": "tṣ"}},
+        {"when": {"initial": "c", "final": "i"}, "then": {"initial": "tṣh"}},
+        {"when": {"initial": "s", "final": "i"}, "then": {"initial": "ṣ"}},
+        {"_comment": "Labialisation : g + et/ut -> kwet/kwut", "when": {"initial": "g", "final": "et"}, "then": {"final": "wet"}},
+        {"when": {"initial": "g", "final": "ut"}, "then": {"final": "wut"}},
+        {"_comment": "Palatalisation : ng devant i -> ny", "when": {"initial": "ng", "final_startswith": "i"}, "then": {"initial": "ny"}}
+      ],
+      "syllables": {}
+    },
+
+    {
+      "id": "sagart",
+      "label": "Sagart",
+      "source": "Phonologie du dialecte Hakka de Sung Him Tong, Laurent Sagart",
+      "initials": {
+        "": "", "b": "p", "p": "p'", "m": "m", "f": "f", "d": "t", "t": "t'", "n": "n", "l": "l", "g": "k",
+        "k": "k'", "ng": "ŋ", "h": "h", "j": "ts", "q": "ts'", "x": "s", "z": "ts", "c": "ts'", "s": "s",
+        "zh": "ts", "ch": "ts'", "sh": "s", "y": "j", "w": "v"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "aŋ", "ao": "au",
+        "ap": "ap", "at": "at", "e": "ε", "ei": "εi", "em": "εm", "en": "εn", "ep": "εp", "et": "εt",
+        "eu": "eu", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iaŋ", "iao": "iau",
+        "iap": "iap", "ien": "iεn", "iet": "iεt", "im": "im", "in": "in", "ing": "iŋ", "io": "iɔ",
+        "iok": "iɔk", "iong": "iɔŋ", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "iun",
+        "iung": "iuŋ", "o": "ɔ", "oi": "ɔi", "ok": "ɔk", "on": "ɔn", "ong": "ɔŋ", "ot": "ɔt", "u": "u",
+        "ui": "ui", "uk": "uk", "un": "un", "ung": "uŋ", "uo": "uɔ", "uong": "uɔŋ", "ut": "ut", "ü": "ü"
+      },
+      "rules": [
+        {"_comment": "Voyelle apicale après sifflante : zi, ci, si... -> tsu, ts'u, su", "when": {"initial": ["z", "c", "s", "zh", "ch", "sh"], "final": "i"}, "then": {"final": "u"}},
+        {"_comment": "Palatalisation devant une finale en i- (sauf -i seul)", "when": {"initial": "g", "final_startswith": "i", "final_not": ["i"]}, "then": {"initial": "kj"}},
+        {"when": {"initial": "k", "final_startswith": "i", "final_not": ["i"]}, "then": {"initial": "kj'"}},
+        {"when": {"initial": "q", "final_startswith": "i", "final_not": ["i"]}, "then": {"initial": "tsj'"}},
+        {"when": {"initial": "ng", "final_startswith": "i", "final_not": ["i"]}, "then": {"initial": "ŋj"}},
+        {"when": {"initial": "y", "final": "u"}, "then": {"final": "iu"}}
+      ],
+      "syllables": {}
+    },
+
+    {
+      "id": "mciver",
+      "label": "McIver",
+      "source": "McIver, A Chinese-English Dictionary, Hakka-Dialect (Hakka Index) -- mapping déduit automatiquement",
+      "_comment": "GÉNÉRÉ par `manage.py derive_source_mapping mciver` à partir de 876 paires de lectures (lexique Wenfa x index McIver). Les tons sont lexicaux : le ton 4 Wenfa correspond à ⁵ ou ³ selon le caractère, d'où des erreurs inévitables (voir le rapport).",
+      "initials": {
+        "": "", "b": "p", "c": "tsh", "ch": "chh", "d": "t", "f": "f", "g": "k", "h": "h", "j": "ts",
+        "k": "kh", "l": "l", "m": "m", "n": "n", "ng": "ng", "p": "ph", "q": "tsh", "s": "s", "sh": "sh",
+        "t": "th", "w": "v", "x": "s", "y": "y", "z": "ts", "zh": "ch"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "ang", "ao": "au",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ai", "em": "em", "en": "en", "ep": "ap", "et": "et",
+        "eu": "eu", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iang", "iao": "iau",
+        "iap": "ap", "ien": "ien", "iet": "iet", "im": "im", "in": "in", "ing": "in", "io": "ṳ", "iok": "ok",
+        "iong": "iong", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "un", "iung": "iung",
+        "o": "o", "oi": "oi", "ok": "ok", "on": "on", "ong": "ong", "ot": "ot", "u": "u", "ui": "ui",
+        "uk": "uk", "un": "un", "ung": "ung", "uo": "uo", "uong": "ong", "ut": "ut", "ü": "ṳ"
+      },
+      "tones": {
+        "1": "¹", "2": "²", "3": "³", "4": "⁵", "5": "⁷", "6": "⁸", "": ""
+      },
+      "rules": [
+        {"_comment": "déduit : 20/22 caractères", "when": {"initial": "ng", "final_startswith": "i"}, "then": {"initial": "ny"}}
+      ],
+      "syllables": {
+        "ch+ao": "tshau", "g+on": "kwon", "g+ui": "kwui", "j+i": "chi", "j+in": "chin", "k+ui": "khwui",
+        "l+en": "lien", "l+uk": "liuk", "ng+ien": "nyen", "q+it": "chhit"
+      },
+      "input_tones": {
+        "1": ["1"], "2": ["2"], "3": ["3"], "5": ["4"], "7": ["5", "6"], "8": ["5", "6"]
+      },
+      "input_syllables": {
+        "cha": ["z+a"], "chau": ["z+ao"], "chen": ["h+en"], "chhak": ["l+ak"], "chhim": ["q+im"],
+        "chhin": ["q+in"], "chhiu": ["ch+u", "sh+u"], "chhok": ["z+ok"], "chim": ["j+im"], "chin": ["j+ing"],
+        "chip": ["j+ip"], "chiu": ["ch+eu", "z+u", "zh+u"], "chok": ["sh+ok"], "chu": ["z+u"],
+        "chung": ["z+ung"], "fun": ["w+on"], "hi": ["s+ung"], "hiet": ["h+et"], "hong": ["g+iang"],
+        "ka": ["k+eu"], "kai": ["+ai"], "kang": ["g+ong"], "ken": ["g+ien"], "kham": ["k+an"],
+        "khen": ["k+ien"], "khet": ["k+em"], "khi": ["h+i", "k+ia"], "khiam": ["k+iang"],
+        "khiun": ["k+in", "k+iun"], "khiung": ["k+ong"], "khoi": ["h+oi"], "khu": ["f+u"], "khwai": ["k+ai"],
+        "ki": ["g+it"], "kia": ["g+iu"], "kien": ["g+an"], "kim": ["g+in"], "kiok": ["g+iok"],
+        "kok": ["g+ao"], "kon": ["g+on"], "kwa": ["g+a"], "kwai": ["g+ai"], "kwan": ["g+an"],
+        "kwat": ["g+at"], "kwet": ["g+et"], "kwo": ["g+o"], "kwong": ["g+ong"], "kwut": ["g+ut"],
+        "leu": ["l+iu"], "liung": ["l+ung"], "lo": ["l+u"], "mi": ["m+ai", "m+en", "m+ui"], "mien": ["m+en"],
+        "mit": ["m+i"], "mong": ["b+ong", "l+ong"], "mung": ["w+ung"], "nai": ["l+ai"], "nam": ["l+em"],
+        "nap": ["l+ep"], "nau": ["l+ao"], "ng": ["ng+a"], "nga": ["l+a"], "ngo": ["+o", "ng+ai"],
+        "ni": ["n+e", "ng+i", "y+i"], "no": ["l+o"], "non": ["l+on"], "nong": ["l+ong"], "nun": ["l+un"],
+        "nung": ["l+ung"], "nyang": ["ng+iang"], "nyau": ["d+iao", "ng+iao"], "nyen": ["k+en"],
+        "nyet": ["ng+iet"], "nyu": ["ng+iu"], "nyuk": ["ng+iuk"], "nyung": ["l+iu"], "o": ["+a"],
+        "pan": ["b+ang", "m+en"], "phai": ["b+ei"], "phien": ["p+en"], "phiet": ["p+et"], "phok": ["p+ak"],
+        "phong": ["b+ong"], "phu": ["b+u"], "pi": ["b+in"], "piang": ["p+en"], "pien": ["b+en", "g+en"],
+        "poi": ["p+oi"], "pu": ["m+u"], "pun": ["b+in"], "sa": ["s+o"], "seu": ["x+iu"], "sham": ["s+ap"],
+        "shau": ["s+ao"], "shet": ["s+et"], "shi": ["q+i", "sh+it", "x+i"], "shin": ["sh+ang"],
+        "shiu": ["q+i", "sh+u"], "shong": ["s+ong"], "shu": ["s+u"], "shun": ["s+un"], "siau": ["s+o"],
+        "siet": ["s+et"], "sin": ["x+im"], "sit": ["s+ak"], "sot": ["ch+at"], "ten": ["t+en"],
+        "thap": ["d+ap"], "thau": ["d+ao"], "thi": ["d+i", "q+i", "t+ai"], "thiap": ["t+iap"],
+        "thien": ["t+en"], "thok": ["d+ok"], "thot": ["b+ok"], "thui": ["d+ui"], "tsap": ["z+ak"],
+        "tsau": ["y+a"], "tsen": ["z+ang"], "tsha": ["ch+a"], "tshan": ["ch+an"], "tshap": ["z+a", "z+ap"],
+        "tshat": ["ch+at"], "tshiam": ["j+iam"], "tshioi": ["c+oi"], "tshit": ["q+it"], "tshoi": ["ch+oi"],
+        "tshon": ["ch+on"], "tshong": ["ch+ong"], "tshung": ["ch+ung"], "tsi": ["j+i"], "tsin": ["j+in"],
+        "tsui": ["z+oi"], "tsun": ["zh+un"], "tsṳ": ["k+io", "z+u"], "yok": ["ng+ia"], "yong": ["n+iong"],
+        "yu": ["l+uk"]
+      }
+    },
+
+    {
+      "id": "baoan",
+      "label": "Bao'an (陳志明)",
+      "source": "客家話大辭典（寶安腔）, 陳志明 -- mapping déduit automatiquement",
+      "_comment": "GÉNÉRÉ par `manage.py derive_source_mapping baoan` à partir de 923 paires de lectures (lexique Wenfa x dictionnaire Bao'an). Les tons sont lexicaux : le ton 4 Wenfa correspond à ⁵ ou ³ selon le caractère, d'où des erreurs inévitables (voir le rapport).",
+      "initials": {
+        "": "", "b": "p", "c": "ts'", "ch": "ts'", "d": "t", "f": "f", "g": "k", "h": "h", "j": "ts",
+        "k": "k'", "l": "l", "m": "m", "n": "ng", "ng": "ng", "p": "p'", "q": "ts'", "s": "s", "sh": "s",
+        "t": "t'", "w": "w", "x": "s", "y": "j", "z": "ts", "zh": "ts"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ak", "am": "am", "an": "an", "ang": "ang", "ao": "au",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ei", "em": "em", "en": "en", "ep": "ep", "et": "et",
+        "eu": "iu", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iang", "iao": "iau",
+        "iap": "iap", "ien": "en", "iet": "et", "im": "im", "in": "in", "ing": "in", "io": "io",
+        "iok": "iok", "iong": "iong", "ip": "ip", "it": "it", "iu": "iu", "iuk": "iuk", "iun": "iun",
+        "iung": "iung", "o": "o", "oi": "oi", "ok": "ok", "on": "on", "ong": "ong", "ot": "ot", "u": "u",
+        "ui": "ui", "uk": "uk", "un": "un", "ung": "ung", "uo": "o", "uong": "ong", "ut": "ut", "ü": "u"
+      },
+      "tones": {
+        "1": "¹", "2": "²", "3": "³", "4": "⁵", "5": "⁷", "6": "⁸", "": ""
+      },
+      "rules": [],
+      "syllables": {
+        "ng+ien": "ngien"
+      },
+      "input_tones": {
+        "1": ["1"], "2": ["2"], "3": ["3", "4"], "5": ["4"], "7": ["5"], "8": ["5", "6"]
+      },
+      "input_syllables": {
+        "fung": ["k+ong"], "hi": ["s+ung"], "hong": ["g+iang"], "jen": ["y+in"], "k'ai": ["g+ai"],
+        "k'am": ["k+an"], "k'iun": ["k+in"], "k'ung": ["k+ong"], "ka": ["k+eu"], "kai": ["+ai"],
+        "kang": ["g+ong"], "kiak": ["h+iak"], "kok": ["g+iok"], "kon": ["g+ok"], "kut": ["m+i"],
+        "la": ["l+ai"], "lam": ["l+em"], "li": ["ng+i"], "moi": ["m+ui"], "mong": ["b+ong", "l+ong"],
+        "mung": ["w+ung"], "nga": ["l+a"], "ngi": ["y+i"], "ngiet": ["ng+iet"], "ngiung": ["l+iu"],
+        "p'at": ["p+ak"], "p'en": ["g+en"], "p'et": ["p+u"], "p'u": ["b+u"], "pan": ["b+ang"],
+        "pun": ["b+in"], "si": ["sh+it"], "siau": ["s+o"], "sin": ["x+im"], "sit": ["s+et"], "siu": ["j+iu"],
+        "t'ap": ["d+ap"], "t'au": ["d+ao"], "t'i": ["d+i"], "t'ok": ["d+ok"], "t'ot": ["b+ok"],
+        "t'ui": ["d+ui"], "tang": ["t+in"], "ts'ak": ["l+ak"], "ts'ap": ["z+ap"], "ts'i": ["j+i"],
+        "ts'iam": ["j+iam"], "tsat": ["z+ak"], "tset": ["z+ap"], "tsi": ["sh+it"], "tsiu": ["ch+eu"]
+      }
+    }
+  ]
+}

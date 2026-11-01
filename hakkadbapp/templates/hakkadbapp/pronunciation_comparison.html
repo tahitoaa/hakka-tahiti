@@ -1,0 +1,156 @@
+{% extends "hakkadbapp/base.html" %}
+
+{% block content %}
+{% include "hakkadbapp/components/source_comparison_styles.html" %}
+<div class="cmp-page max-w-6xl mx-auto px-4 py-6">
+  <h1 class="text-xl font-bold text-gray-800">Comparaison des prononciations</h1>
+  <p class="mt-1 text-sm text-gray-600 max-w-3xl">
+    Chaque caractère du lexique ({{ total_chars }}) : ses lectures Wenfa comparées à celles des dictionnaires.
+    Une lecture de dictionnaire « concorde » quand sa transcription correspond, par le mapping de
+    <code>romanization.json</code>, à la syllabe et au ton Wenfa.
+  </p>
+
+  <div class="cmp-stats">
+    {% for s in stats %}
+    <section class="cmp-card" aria-label="{{ s.label }}">
+      <div class="cmp-card-head">
+        <span class="cmp-card-title" title="{{ s.title }}">{{ s.label }}</span>
+        <span class="src-sub">{{ s.present_chars }} / {{ total_chars }} caractères présents</span>
+      </div>
+      <div class="cmp-bar" title="Lectures Wenfa des caractères présents">
+        <span class="cmp-bar-ok" style="width: {{ s.readings_ok }}%"></span><span class="cmp-bar-tone" style="width: {{ s.readings_tone }}%"></span><span class="cmp-bar-diff" style="width: {{ s.readings_diff }}%"></span>
+      </div>
+      <p class="src-sub">Lectures : {{ s.readings_ok }} % concordent · {{ s.readings_tone }} % ton différent · {{ s.readings_diff }} % différentes</p>
+      <div class="cmp-chips">
+        {% for c in s.chars %}
+        <button type="button" class="src-status src-status-{{ c.status }} cmp-filter-chip"
+                data-source="{{ s.id }}" data-status="{{ c.status }}">{{ c.label }} : {{ c.count }}</button>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  <div class="cmp-filters" role="search">
+    <label>Source
+      <select id="cmp-source">
+        <option value="">toutes</option>
+        {% for s in sources %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Statut
+      <select id="cmp-status">
+        <option value="">tous</option>
+        <option value="disagree">désaccord (ton ou syllabe)</option>
+        <option value="ok">concorde</option>
+        <option value="tone">ton différent</option>
+        <option value="diff">différent</option>
+        <option value="absent">absent</option>
+      </select>
+    </label>
+    <label class="cmp-search">Recherche
+      <input id="cmp-search" type="search" placeholder="caractère ou lecture (ex. 家, ngai)">
+    </label>
+    <span id="cmp-count" class="src-sub" aria-live="polite"></span>
+  </div>
+
+  <div class="cmp-table-wrap">
+    <table class="cmp-table no-auto-csv">
+      <thead>
+        <tr>
+          <th>Caractère</th>
+          <th>Lexique <span class="src-sub">Wenfa</span></th>
+          {% for s in sources %}<th title="{{ s.title }}">{{ s.label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-search="{{ r.char }} {% for w in r.wenfa %}{{ w.stored }} {{ w.text }} {% endfor %}{% for s in r.sources %}{% for x in s.readings %}{{ x.text }} {% endfor %}{% endfor %}"
+            {% for s in r.sources %} data-status-{{ s.id }}="{{ s.status }}"{% endfor %}>
+          <td class="cmp-char"><a class="hanzi" href="{% url 'hanzi' r.char %}">{{ r.char }}</a></td>
+          <td>{% for w in r.wenfa %}<span class="src-chip src-chip-ref">{{ w.text }}</span>{% endfor %}</td>
+          {% for s in r.sources %}
+          <td>
+            {% for x in s.readings %}<span class="src-chip{% if x.match %} src-chip-{{ x.match }}{% endif %}">{{ x.text }}</span>{% empty %}<span class="src-none">absent</span>{% endfor %}
+            {% if s.status == 'tone' or s.status == 'diff' %}
+            <span class="src-sub"><span class="src-status src-status-{{ s.status }}">{{ s.status_label }}</span> attendu : {{ s.expected|join:", " }}</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p id="cmp-empty" class="text-sm text-gray-500 mt-3" hidden>Aucun caractère ne correspond à ces filtres.</p>
+</div>
+
+<style>
+  .cmp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .cmp-card { background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.75rem 1rem; }
+  .cmp-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+  .cmp-card-title { font-weight: 600; color: #3A3430; }
+  .cmp-bar { display: flex; height: 0.6rem; margin: 0.5rem 0 0.25rem; border-radius: 9999px; overflow: hidden; background: #F6EFE4; }
+  .cmp-bar-ok { background: #22c55e; } .cmp-bar-tone { background: #f59e0b; } .cmp-bar-diff { background: #ef4444; }
+  .cmp-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+  .cmp-filter-chip { cursor: pointer; border: 0; }
+  .cmp-filter-chip:hover { filter: brightness(0.95); text-decoration: underline; }
+  .cmp-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 0.75rem; margin: 1.25rem 0 0.75rem;
+                 font-size: 0.8rem; color: #6E665C; }
+  .cmp-filters label { display: flex; flex-direction: column; gap: 0.2rem; }
+  .cmp-filters select, .cmp-filters input { min-height: 2.25rem; padding: 0.25rem 0.5rem; font-size: 0.875rem;
+                 background: #fff; border: 1px solid #DDD0BD; border-radius: 0.375rem; }
+  .cmp-search { flex: 1 1 14rem; } .cmp-search input { width: 100%; }
+  .cmp-table-wrap { overflow-x: auto; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .cmp-table th { position: sticky; top: 0; background: #FDFAF5; text-align: left; font-weight: 600; color: #544D45;
+                  padding: 0.5rem; border-bottom: 1px solid #ECE2D3; z-index: 1; }
+  .cmp-table td { padding: 0.35rem 0.5rem; border-top: 1px solid #F6EFE4; vertical-align: top; }
+  .cmp-char a { font-size: 1.25rem; color: #9B1C1C; text-decoration: none; }
+  .cmp-char a:hover { text-decoration: underline; }
+</style>
+
+<script>
+  (function () {
+    var source = document.getElementById('cmp-source');
+    var status = document.getElementById('cmp-status');
+    var search = document.getElementById('cmp-search');
+    var count = document.getElementById('cmp-count');
+    var empty = document.getElementById('cmp-empty');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.cmp-table tbody tr'));
+    var sourceIds = Array.prototype.slice.call(source.options).map(function (o) { return o.value; }).filter(Boolean);
+
+    function statusMatches(value, wanted) {
+      if (!wanted) return true;
+      if (wanted === 'disagree') return value === 'tone' || value === 'diff';
+      return value === wanted;
+    }
+
+    function apply() {
+      var ids = source.value ? [source.value] : sourceIds;
+      var q = search.value.trim().toLowerCase();
+      var shown = 0;
+      rows.forEach(function (row) {
+        var ok = ids.some(function (id) { return statusMatches(row.getAttribute('data-status-' + id), status.value); })
+          && (!q || row.getAttribute('data-search').toLowerCase().indexOf(q) !== -1);
+        row.hidden = !ok;
+        if (ok) shown++;
+      });
+      count.textContent = shown + ' / ' + rows.length + ' caractères';
+      empty.hidden = shown !== 0;
+    }
+
+    [source, status].forEach(function (el) { el.addEventListener('change', apply); });
+    search.addEventListener('input', apply);
+    document.querySelectorAll('.cmp-filter-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        source.value = chip.getAttribute('data-source');
+        status.value = chip.getAttribute('data-status');
+        apply();
+        document.querySelector('.cmp-filters').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    apply();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% comment %}
+  Readings of one character in every source, compared with the lexicon
+  (pronunciation_sources.compare_char). Expects `comparison`.
+{% endcomment %}
+<section class="src-compare" aria-label="Prononciations par source">
+  <h3 class="src-compare-title">Prononciations par source</h3>
+  <table class="src-compare-table no-auto-csv">
+    <thead>
+      <tr><th>Source</th><th>Lectures</th><th>Par rapport au lexique</th></tr>
+    </thead>
+    <tbody>
+      <tr class="src-wenfa">
+        <th scope="row">Lexique <span class="src-sub">Wenfa</span></th>
+        <td>
+          {% for w in comparison.wenfa %}<span class="src-chip src-chip-ref">{{ w.text }}</span>{% empty %}<span class="src-none">—</span>{% endfor %}
+        </td>
+        <td class="src-sub">référence</td>
+      </tr>
+      {% for s in comparison.sources %}
+      <tr>
+        <th scope="row" title="{{ s.title }}">{{ s.label }}</th>
+        <td>
+          {% for r in s.readings %}<span class="src-chip{% if r.match %} src-chip-{{ r.match }}{% endif %}"
+            title="{% if r.match == 'ok' %}correspond à une lecture du lexique{% elif r.match == 'tone' %}même syllabe qu'une lecture du lexique, autre ton{% else %}sans équivalent dans le lexique{% endif %}">{{ r.text }}</span>{% empty %}<span class="src-none">caractère absent</span>{% endfor %}
+        </td>
+        <td>
+          <span class="src-status src-status-{{ s.status }}">{{ s.status_label }}</span>
+          {% if s.status != 'absent' and s.status != 'ok' %}
+          <span class="src-sub">attendu : {{ s.expected|join:", " }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="src-legend">
+    <span class="src-chip src-chip-ok">vert</span> même lecture que le lexique ·
+    <span class="src-chip src-chip-tone">orange</span> même syllabe, autre ton ·
+    <span class="src-chip">gris</span> autre lecture.
+    « Attendu » : la lecture du lexique transcrite dans le système de la source.
+    <a href="{% url 'pronunciation_comparison' %}">Vue d'ensemble</a>
+  </p>
+</section>
+{% include "hakkadbapp/components/source_comparison_styles.html" %}

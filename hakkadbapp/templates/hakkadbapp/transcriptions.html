@@ -1,0 +1,56 @@
+{% extends "hakkadbapp/base.html" %}
+{% block content %}
+{% comment %}
+  The transcriptions shared with the working group (views.transcriptions),
+  members logged in only. Published from the "Transcrire" page.
+{% endcomment %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold font-display mb-1">Écouter</h1>
+  <p class="text-sm text-gray-600 mb-4">Les transcriptions partagées par le groupe : touchez-en une pour la lire et l'écouter.</p>
+
+  {% if items %}
+  <ul class="grid gap-3">
+    {% for item in items %}
+    <li class="tr-card" data-id="{{ item.id }}">
+      <a href="{% url 'transcription_listen' item.id %}" class="tr-card-link">
+        <span class="tr-card-title">{{ item.title }}</span>
+        <span class="tr-card-sub">{{ item.participants|join:", " }}</span>
+        <span class="tr-card-sub">{{ item.segments }} segments{% if not item.has_audio %} · sans audio{% endif %} · mis à jour le {{ item.updated_at|date:"j F Y à H:i" }}</span>
+      </a>
+      {% if can_edit %}
+      <button type="button" class="tr-card-delete" data-delete="{% url 'api_transcription_delete' item.id %}" title="Retirer le partage (texte et audio)">Retirer</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-gray-600">Aucune transcription partagée pour l'instant.{% if can_edit %} Publiez-en une depuis <a class="underline" href="{% url 'transcripter' %}">Transcrire</a> (bouton « Partager »).{% endif %}</p>
+  {% endif %}
+</div>
+
+<style>
+  .tr-card { display: flex; align-items: stretch; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; overflow: hidden; }
+  .tr-card-link { flex: 1; display: grid; gap: 0.15rem; padding: 0.8rem 1rem; min-width: 0; }
+  .tr-card-link:hover { background: #FDFAF5; }
+  .tr-card-title { font-weight: 700; color: #261F1C; }
+  .tr-card-sub { font-size: 0.8rem; color: #8C8478; overflow-wrap: anywhere; }
+  .tr-card-delete { padding: 0 0.9rem; font-size: 0.8rem; color: #b91c1c; border-left: 1px solid #F6EFE4; }
+  .tr-card-delete:hover { background: #fef2f2; }
+</style>
+{% if can_edit %}
+<script>
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-delete]');
+    if (!button) return;
+    const card = button.closest('.tr-card');
+    const title = card.querySelector('.tr-card-title').textContent;
+    if (!confirm(`Retirer le partage de « ${title} » ? La page et sa copie de l'audio seront supprimées (votre fichier .eaf n'est pas touché).`)) return;
+    const token = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+    const response = await fetch(button.dataset.delete, { method: 'POST', headers: { 'X-CSRFToken': decodeURIComponent(token) } });
+    const answer = await response.json().catch(() => ({}));
+    if (response.ok) card.remove();
+    else alert(answer.error || `Erreur ${response.status}`);
+  });
+</script>
+{% endif %}
+{% endblock %}

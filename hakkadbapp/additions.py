@@ -1,0 +1,200 @@
+"""The "Saisie" and "Validation" pages: editors type new words/expressions
+(LexiconAddition) with the converter's hanzi suggestions on "Saisie" (where
+the drafts stay), then move what was proposed through review ->
+validated/rejected on "Validation". Kept out of views.py on purpose:
+it's a self-contained feature with its own small JSON API."""
+import json
+
+from django.contrib.auth.views import redirect_to_login
+from django.db import transaction
+from django.http import HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_POST
+
+from .models import Expression, LexiconAddition, Word
+from .permissions import editor_required, is_editor
+
+EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations")
+KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
+STATUSES = {s for s, _ in LexiconAddition.STATUS_CHOICES}
+
+
+def _deny(request):
+    if not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path())
+    return HttpResponseForbidden("Votre compte ne permet pas la saisie.")
+
+
+def _addition_json(a):
+    return {
+        "id": a.id,
+        "kind": a.kind,
+        "status": a.status,
+        "hanzi": a.hanzi,
+        "pinyin": a.pinyin,
+        "french": a.french,
+        "english": a.english,
+        "themes": a.themes,
+        "observations": a.observations,
+        "platform_id": a.platform_id,
+        "created_by": a.created_by.username if a.created_by else "",
+        "updated_by": a.updated_by.username if a.updated_by else "",
+        "created_at": a.created_at.isoformat(),
+        "updated_at": a.updated_at.isoformat(),
+    }
+
+
+def _known_themes():
+    """Theme names already used in the lexicon, for the form's suggestions."""
+    names = set()
+    for model in (Word, Expression):
+        for category in model.objects.exclude(category=None).values_list("category", flat=True).distinct():
+            names.update(n.strip() for n in category.split(",") if n.strip())
+    return sorted(names, key=str.lower)
+
+
+def _apply_payload(addition, payload):
+    """Copies the known fields from a JSON payload onto `addition`; returns
+    an error message, or None when everything is valid."""
+    if "kind" in payload:
+        if payload["kind"] not in KINDS:
+            return "Type invalide."
+        addition.kind = payload["kind"]
+    if "status" in payload:
+        if payload["status"] not in STATUSES:
+            return "Statut invalide."
+        addition.status = payload["status"]
+    for field in EDITABLE_FIELDS:
+        if field in payload:
+            value = payload[field]
+            if not isinstance(value, str):
+                return f"'{field}' doit être une chaîne."
+            setattr(addition, field, " ".join(value.split()) if field in ("hanzi", "pinyin") else value.strip())
+    if not addition.hanzi:
+        return "Les caractères sont obligatoires."
+    return None
+
+
+MAX_NEW_WORDS = 30
+
+
+def _save_with_new_words(request, addition, payload):
+    """Saves `addition` and, for an expression, the unknown words typed
+    along with it (payload["new_words"]: [{hanzi, pinyin, french}]), as
+    word additions with the same status and themes -- all or nothing.
+    A word already proposed (same hanzi and pinyin, not rejected) is
+    reused rather than added twice. Returns (words, error message)."""
+    new_words = payload.get("new_words") or []
+    if not isinstance(new_words, list) or len(new_words) > MAX_NEW_WORDS:
+        return None, "Liste de mots à ajouter invalide."
+    if new_words and addition.kind != LexiconAddition.KIND_EXPRESSION:
+        return None, "Seule une expression peut ajouter des mots."
+    prepared = []
+    for item in new_words:
+        if not isinstance(item, dict) or not all(isinstance(item.get(k, ""), str) for k in ("hanzi", "pinyin", "french")):
+            return None, "Mot à ajouter mal formé."
+        hanzi, pinyin = "".join(item.get("hanzi", "").split()), "".join(item.get("pinyin", "").split())
+        if not hanzi:
+            return None, "Un mot à ajouter n'a pas de caractères."
+        prepared.append((hanzi, pinyin, item.get("french", "").strip()))
+
+    words = []
+    with transaction.atomic():
+        addition.save()
+        for hanzi, pinyin, french in prepared:
+            existing = (LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin)
+                        .exclude(status=LexiconAddition.STATUS_REJECTED).first())
+            if existing:
+                words.append(existing)
+                continue
+            words.append(LexiconAddition.objects.create(
+                kind=LexiconAddition.KIND_WORD, status=addition.status, hanzi=hanzi, pinyin=pinyin, french=french,
+                themes=addition.themes, observations=f"Ajouté avec l'expression « {addition.hanzi} ».",
+                created_by=request.user, updated_by=request.user,
+            ))
+    return words, None
+
+
+def _read_json(request):
+    try:
+        return json.loads(request.body.decode("utf-8")), None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, JsonResponse({"error": "JSON invalide."}, status=400)
+
+
+def saisie(request):
+    if not is_editor(request.user):
+        return _deny(request)
+    from .views import get_all_data  # same lexicon data as the converter page
+
+    context = get_all_data()
+    context.update({
+        "title": "Saisie",
+        "page": "saisie",
+        "known_themes": _known_themes(),
+        "status_labels": dict(LexiconAddition.STATUS_CHOICES),
+    })
+    return render(request, "hakkadbapp/saisie.html", context)
+
+
+def validation(request):
+    """What was proposed, to validate or reject (no lexicon data needed:
+    editing goes back to the Saisie form)."""
+    if not is_editor(request.user):
+        return _deny(request)
+    return render(request, "hakkadbapp/validation.html", {
+        "title": "Validation",
+        "page": "validation",
+        # Drafts live on the Saisie page.
+        "status_choices": [c for c in LexiconAddition.STATUS_CHOICES if c[0] != LexiconAddition.STATUS_DRAFT],
+        "status_labels": dict(LexiconAddition.STATUS_CHOICES),
+    })
+
+
+@editor_required
+def additions_api(request):
+    """GET: every addition. POST: create one from a JSON payload."""
+    if not is_editor(request.user):
+        return JsonResponse({"error": "Connexion requise."}, status=403)
+
+    if request.method == "POST":
+        payload, error = _read_json(request)
+        if error:
+            return error
+        addition = LexiconAddition(created_by=request.user, updated_by=request.user)
+        message = _apply_payload(addition, payload)
+        if message:
+            return JsonResponse({"error": message}, status=400)
+        words, message = _save_with_new_words(request, addition, payload)
+        if message:
+            return JsonResponse({"error": message}, status=400)
+        return JsonResponse({"ok": True, "addition": _addition_json(addition),
+                             "words": [_addition_json(w) for w in words]}, status=201)
+
+    additions = LexiconAddition.objects.select_related("created_by", "updated_by")
+    return JsonResponse({"additions": [_addition_json(a) for a in additions]})
+
+
+@require_POST
+@editor_required
+def addition_update(request, addition_id):
+    addition = get_object_or_404(LexiconAddition, id=addition_id)
+    payload, error = _read_json(request)
+    if error:
+        return error
+    message = _apply_payload(addition, payload)
+    if message:
+        return JsonResponse({"error": message}, status=400)
+    addition.updated_by = request.user
+    words, message = _save_with_new_words(request, addition, payload)
+    if message:
+        return JsonResponse({"error": message}, status=400)
+    return JsonResponse({"ok": True, "addition": _addition_json(addition),
+                         "words": [_addition_json(w) for w in words]})
+
+
+@require_POST
+@editor_required
+def addition_delete(request, addition_id):
+    get_object_or_404(LexiconAddition, id=addition_id).delete()
+    return JsonResponse({"ok": True})

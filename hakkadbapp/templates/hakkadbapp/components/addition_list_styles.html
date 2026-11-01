@@ -1,0 +1,34 @@
+{# Styles of the addition list (AdditionList.js), shared by the Saisie and Validation pages. #}
+<style>
+  .saisie-chip[aria-pressed="true"] { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
+  /* Action buttons: one colour per action, a spinner while the server answers. */
+  .saisie-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 2.25rem;
+                padding: 0.3rem 0.8rem; border-radius: 0.375rem; border: 1px solid transparent; font-size: 0.875rem;
+                font-weight: 600; line-height: 1.2; transition: background-color .15s, box-shadow .15s, opacity .15s;
+                touch-action: manipulation; }
+  .saisie-btn[hidden] { display: none; }
+  .saisie-btn:focus-visible { outline: 2px solid var(--color-brand-gold); outline-offset: 2px; }
+  .saisie-btn-lg { min-height: 2.75rem; padding: 0.5rem 1rem; font-size: 0.95rem; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+  .saisie-btn-save     { background: var(--color-brand, #9B1C1C); color: #fff; }
+  .saisie-btn-save:hover:not(:disabled) { filter: brightness(1.12); }
+  .saisie-btn-review   { background: #9B1C1C; color: #fff; }
+  .saisie-btn-review:hover:not(:disabled) { background: #9B1C1C; }
+  .saisie-btn-validate { background: #047857; color: #fff; }
+  .saisie-btn-validate:hover:not(:disabled) { background: #065f46; }
+  .saisie-btn-reject   { background: #fff; color: #b91c1c; border-color: #fca5a5; }
+  .saisie-btn-reject:hover:not(:disabled) { background: #fef2f2; }
+  .saisie-btn-delete   { background: #fff; color: #b91c1c; border-color: #fecaca; font-weight: 500; }
+  .saisie-btn-delete:hover:not(:disabled) { background: #fef2f2; }
+  .saisie-btn-neutral  { background: #fff; color: #544D45; border-color: #DDD0BD; font-weight: 500; }
+  .saisie-btn-neutral:hover:not(:disabled) { background: #F6EFE4; }
+  .saisie-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .saisie-btn[aria-busy="true"] { opacity: 0.9; cursor: progress; }
+  .saisie-spinner { width: 1em; height: 1em; border-radius: 9999px; border: 2px solid currentColor; border-right-color: transparent;
+                    animation: saisie-spin 0.7s linear infinite; flex: none; }
+  @keyframes saisie-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .saisie-spinner { animation-duration: 2s; } }
+  /* The row just changed: a short highlight. */
+  .saisie-flash { animation: saisie-flash 1.6s ease-out; }
+  @keyframes saisie-flash { from { background: #fef08a; } to { background: transparent; } }
+  li.is-busy > :not(.saisie-actions) { opacity: 0.6; }
+</style>

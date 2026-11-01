@@ -369,9 +369,14 @@
           </a>
         </li>
         {% if can_edit %}
-        <li class="border-t border-white/10 sm:border-0">
+        <li class="border-y border-white/10 sm:border-0">
           <a href="{% url 'saisie' %}" class="block py-2.5 sm:py-2 {% if page == 'saisie' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Saisie
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'validation' %}" class="block py-2.5 sm:py-2 {% if page == 'validation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            Validation
           </a>
         </li>
         {% endif %}

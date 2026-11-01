@@ -1,0 +1,142 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+<style>
+  .saisie-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+  .saisie-slot input {
+    width: 2.6rem; height: 2.6rem; text-align: center; font-size: 1.4rem;
+    border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #fff;
+  }
+  .saisie-slot input:focus { outline: none; }
+  .saisie-slot.is-active input { border-color: var(--color-brand-gold); box-shadow: 0 0 0 2px var(--color-brand-gold); }
+  .saisie-slot.is-empty input { background: #fff7ed; border-style: dashed; }
+  .saisie-slot small { font-size: 0.7rem; color: #8C8478; }
+  .saisie-word { display: inline-flex; gap: 2px; padding: 2px; border-radius: 0.5rem; background: #F6EFE4; }
+  /* A converted character: same box as an input, filled in. */
+  .saisie-slot.is-char .saisie-char {
+    display: flex; align-items: center; justify-content: center; width: 2.6rem; height: 2.6rem; font-size: 1.4rem;
+    border: 1px solid #a5b4fc; border-radius: 0.375rem; background: #FBF0E6; color: #261F1C;
+  }
+  .saisie-check-list { display: grid; gap: 0.25rem; font-size: 0.875rem; }
+  .saisie-check-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; padding: 0.25rem 0.5rem;
+                          border-radius: 0.375rem; border-left: 4px solid #DDD0BD; background: #FDFAF5; }
+  .saisie-check-list .hanzi { font-size: 1.1rem; }
+  #saisie-check > p { font-size: 0.875rem; padding: 0.4rem 0.6rem; border-radius: 0.375rem; }
+  .saisie-check-known { border-left-color: #059669 !important; } p.saisie-check-known { background: #fef3c7; color: #92400e; }
+  .saisie-check-reading { border-left-color: #d97706 !important; } p.saisie-check-reading { background: #fef3c7; color: #92400e; }
+  .saisie-check-proposed { border-left-color: #6366f1 !important; } p.saisie-check-proposed { background: #FBF0E6; color: #9B1C1C; }
+  .saisie-check-unknown { border-left-color: #dc2626 !important; } p.saisie-check-unknown { background: #ecfdf5; color: #065f46; }
+  .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+  @media (max-width: 480px) { .saisie-new-word { grid-template-columns: 1fr; } }
+</style>
+
+<div class="mt-4 sm:mt-8 w-full max-w-screen-md mx-auto space-y-6">
+
+  <!-- 0. Reading settings: same as the "Écrire" page. -->
+  <details class="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4">
+    <summary class="cursor-pointer select-none text-sm font-semibold text-gray-700">Réglages de saisie : lectures, « Je tape en », « J'affiche en »</summary>
+    <div class="pt-3">
+      {% include "hakkadbapp/components/reading_settings.html" %}
+    </div>
+  </details>
+
+  <!-- 1. Form -->
+  <form id="saisie-form" data-validation-url="{% url 'validation' %}" class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5 space-y-4" autocomplete="off">
+    <div class="flex items-center justify-between gap-2">
+      <h2 id="saisie-form-title" class="font-display text-xl font-bold text-gray-800">Nouvel ajout</h2>
+      <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm" role="group" aria-label="Type">
+        <button type="button" class="saisie-chip px-3 min-h-10 border-r border-gray-300" data-kind="word" aria-pressed="true">Mot</button>
+        <button type="button" class="saisie-chip px-3 min-h-10" data-kind="expression" aria-pressed="false">Expression</button>
+      </div>
+    </div>
+
+    <div>
+      <label for="saisie-pinyin" class="block text-sm font-semibold text-gray-700 mb-1">Texte (comme sur la page Écrire)</label>
+      <input id="saisie-pinyin" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
+             placeholder="ex. wuk5ka1"
+             class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      <p id="saisie-pinyin-help" class="mt-1 text-xs text-gray-500">
+        Tapez les syllabes avec leur ton (<code>wuk5ka1</code>, <code>_</code> sans ton : <code>ngai_</code>), dans le système « Je tape en » (réglages ci-dessus).
+        Pour une expression, mettez un espace entre les mots (<code>ngai_ oi4 wuk5ka1</code>). Chaque caractère choisi remplace sa syllabe dans le texte,
+        comme sur la page Écrire ; la lecture d'un caractère à plusieurs lectures s'écrit entre parenthèses (<code>生(sen1)</code>).
+        Le pinyin est enregistré en Wenfa.
+      </p>
+    </div>
+
+    <div>
+      <div class="text-sm font-semibold text-gray-700 mb-1">Caractères</div>
+      <div id="saisie-slots" class="flex flex-wrap gap-2 min-h-12 items-end"></div>
+      <p class="mt-1 text-xs text-gray-500">Touchez une case vide puis un caractère proposé ci-dessous (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.</p>
+      <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
+    </div>
+
+    <!-- Each word against the lexicon (same matching as the Écrire page) -->
+    <div id="saisie-check" aria-live="polite"></div>
+    <div id="saisie-new-words"></div>
+
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div>
+        <label for="saisie-french" class="block text-sm font-semibold text-gray-700 mb-1">Français</label>
+        <input id="saisie-french" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      </div>
+      <div>
+        <label for="saisie-english" class="block text-sm font-semibold text-gray-700 mb-1">Anglais <span class="font-normal text-gray-500">(facultatif)</span></label>
+        <input id="saisie-english" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      </div>
+      <div>
+        <label for="saisie-themes" class="block text-sm font-semibold text-gray-700 mb-1">Thème <span class="font-normal text-gray-500">(facultatif)</span></label>
+        <input id="saisie-themes" type="text" list="saisie-theme-list" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+        <datalist id="saisie-theme-list">
+          {% for theme in known_themes %}<option value="{{ theme }}">{% endfor %}
+        </datalist>
+      </div>
+      <div>
+        <label for="saisie-observations" class="block text-sm font-semibold text-gray-700 mb-1">Observations <span class="font-normal text-gray-500">(facultatif)</span></label>
+        <input id="saisie-observations" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      </div>
+    </div>
+
+    <div>
+      <div class="text-sm font-semibold text-gray-700 mb-1">Rendu mixte <span class="font-normal text-gray-500">(pinyin + caractères)</span></div>
+      <div id="saisie-preview" class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md p-2 min-h-10"></div>
+    </div>
+    <div id="saisie-status" class="text-sm" role="status"></div>
+
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" data-status="draft" class="saisie-btn saisie-btn-lg saisie-btn-save">
+        ✓ Enregistrer
+      </button>
+      <button type="submit" data-status="review" class="saisie-btn saisie-btn-lg saisie-btn-review">
+        ↑ Enregistrer et proposer à la validation
+      </button>
+      <button type="button" id="saisie-cancel" hidden class="saisie-btn saisie-btn-lg saisie-btn-neutral">
+        Annuler
+      </button>
+    </div>
+  </form>
+
+  <!-- 2. Drafts (what is proposed is on the Validation tab) -->
+  <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="font-display text-xl font-bold text-gray-800">Brouillons</h2>
+      <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les brouillons"
+             class="min-h-10 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold">
+    </div>
+    <p class="text-xs text-gray-500 mb-2">
+      Les ajouts proposés se valident ou se rejettent dans l'onglet <a href="{% url 'validation' %}" class="underline font-semibold">Validation</a>.
+    </p>
+    <ul id="saisie-list" class="divide-y divide-gray-100"></ul>
+  </section>
+</div>
+
+{% include "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words %}
+{{ status_labels|json_script:"saisie-status-labels" }}
+<script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Saisie.js' %}"></script>
+{% endblock %}

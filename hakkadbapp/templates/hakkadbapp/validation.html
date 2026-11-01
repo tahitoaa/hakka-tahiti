@@ -1,0 +1,29 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+
+<div id="validation-page" data-saisie-url="{% url 'saisie' %}" class="mt-4 sm:mt-8 w-full max-w-screen-md mx-auto space-y-6">
+  <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="font-display text-xl font-bold text-gray-800">Validation des ajouts</h2>
+      <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les ajouts"
+             class="min-h-10 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold">
+    </div>
+    <p class="text-xs text-gray-500 mb-3">
+      Les ajouts proposés depuis l'onglet <a href="{% url 'saisie' %}" class="underline font-semibold">Saisie</a> :
+      validez-les, rejetez-les, ou renvoyez-les en brouillon. « Modifier » les ouvre dans le formulaire de saisie.
+    </p>
+    <div id="saisie-filters" class="flex flex-wrap gap-2 mb-3 text-sm" role="group" aria-label="Filtrer par statut">
+      {% for value, label in status_choices %}
+      <button type="button" class="saisie-chip px-3 min-h-9 rounded-full border border-gray-300" data-filter="{{ value }}" aria-pressed="{% if value == 'review' %}true{% else %}false{% endif %}">{{ label }}</button>
+      {% endfor %}
+      <button type="button" class="saisie-chip px-3 min-h-9 rounded-full border border-gray-300" data-filter="all" aria-pressed="false">Tous</button>
+    </div>
+    <ul id="saisie-list" class="divide-y divide-gray-100"></ul>
+  </section>
+</div>
+
+{{ status_labels|json_script:"saisie-status-labels" }}
+<script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+{% endblock %}

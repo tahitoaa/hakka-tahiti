@@ -1,0 +1,67 @@
+{% load static %}
+{% comment %}
+  The three reading settings, shared by the converter and the transcriber
+  (driven by static/hakkadbapp/js/ReadingSources.js):
+  - Lectures: where pronunciations come from -- the lexicon, one dictionary
+    index, or all of them. A dictionary is one button: data-dict-url = its
+    compact file (manage.py build_dict_index), data-dict-system = the
+    romanization.json system it is spelled in, data-dict-short = its mark
+    on suggestions (L for the lexicon), data-dict-color = its colour on
+    suggestions and in the legend ("Toutes" mode).
+  - Je tape en / J'affiche en: components/romanization_settings.html.
+{% endcomment %}
+<div class="reading-settings">
+  <div class="settings-row">
+    <span class="rom-setting-label" id="source-label">Lectures</span>
+    <div id="source-switch" role="group" aria-labelledby="source-label" class="segmented">
+      <button type="button" data-source="db" aria-pressed="true" class="source-btn"
+              data-dict-short="L" data-dict-color="#9B1C1C"
+              title="Lexique de l'association (Wenfa) : prononciations, mots et traductions">Lexique</button>
+      <button type="button" data-source="baoan" aria-pressed="false" class="source-btn"
+              data-dict-url="{% static 'hakkadbapp/data/hakka_dict_prons.json' %}"
+              data-dict-system="baoan" data-dict-short="B" data-dict-color="#059669" data-dict-label="dictionnaire Bao'an"
+              title="客家話大辭典（寶安腔）, 陳志明 : prononciations seules">Bao'an</button>
+      <button type="button" data-source="mciver" aria-pressed="false" class="source-btn"
+              data-dict-url="{% static 'hakkadbapp/data/mciver_prons.json' %}"
+              data-dict-system="mciver" data-dict-short="M" data-dict-color="#d97706" data-dict-label="index McIver"
+              title="McIver, A Chinese-English Dictionary, Hakka-Dialect (Hakka Index) : prononciations seules">McIver</button>
+      <button type="button" data-source="all" aria-pressed="false" class="source-btn"
+              title="Lexique et tous les dictionnaires : les mots et traductions du lexique, les prononciations de toutes les sources">Toutes</button>
+    </div>
+  </div>
+  <div class="settings-rows">
+    {% include "hakkadbapp/components/romanization_settings.html" %}
+  </div>
+  <p id="settings-summary" class="settings-summary" aria-live="polite"></p>
+  <p id="source-legend" class="settings-legend" hidden></p>
+  <p id="source-status" class="settings-status" aria-live="polite"></p>
+</div>
+<style>
+  .reading-settings .settings-row,
+  .reading-settings .rom-setting {
+    display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); align-items: center; gap: 0.5rem;
+  }
+  .reading-settings .settings-rows { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+  .reading-settings .rom-setting-select { width: 100%; }
+  .reading-settings .segmented {
+    display: flex; gap: 2px; padding: 2px; border-radius: 9999px; background: #F6EFE4; border: 1px solid #ECE2D3;
+  }
+  .reading-settings .source-btn {
+    flex: 1 1 0; min-width: 0; min-height: 2.25rem; padding: 0.25rem 0.5rem; border-radius: 9999px;
+    font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: #544D45; touch-action: manipulation;
+  }
+  .reading-settings .source-btn[aria-pressed="true"] { background: var(--color-brand, #9B1C1C); color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .15); }
+  .reading-settings .source-btn[aria-pressed="false"]:hover { background: #ECE2D3; }
+  .reading-settings .settings-summary { margin-top: 0.6rem; font-size: 0.875rem; color: #3A3430; }
+  .reading-settings .settings-summary:empty { display: none; }
+  .reading-settings .settings-status { margin-top: 0.15rem; font-size: 0.75rem; color: #8C8478; }
+  .reading-settings .settings-legend { margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem;
+                                       font-size: 0.75rem; color: #544D45; align-items: center; }
+  .reading-settings .settings-legend[hidden] { display: none; }
+  .reading-settings .settings-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+  @media (max-width: 380px) {
+    .reading-settings .settings-row, .reading-settings .rom-setting { grid-template-columns: 1fr; gap: 0.25rem; }
+  }
+</style>
+<script src="{% static 'hakkadbapp/js/ReadingSources.js' %}"></script>
