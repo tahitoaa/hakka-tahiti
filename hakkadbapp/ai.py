@@ -43,6 +43,7 @@ Rules:
 - Hakka meanings can differ from Mandarin; prefer what the lexicon entries show over the Mandarin meaning of the characters, and lower the confidence when you only have the Mandarin meaning.
 - If the editor already typed a French or English translation, keep its meaning unless it is clearly wrong; you may polish its wording.
 - Never invent lexicon entries in based_on.
+- "characters" gives each character's Mandarin readings and English meaning from Unicode Unihan (the "Anglais" column of the Sources page). Use it to infer the meaning of words the lexicon doesn't have, word by word, together with the expression's context; Hakka can differ from Mandarin (characters used for their sound, dialect words), so lower the confidence when Unihan is your only basis, and say so in the explanation.
 - For an expression, "unknown_words" lists its words the lexicon doesn't have yet: give each one (in "words", same hanzi) its own french, english and themes, as for a word entry, in the meaning it has in this expression. When the editor already typed some of them (french_typed_by_editor, english_typed_by_editor, themes_typed_by_editor), rely on them to translate the expression and return them unchanged; fill in only what is missing, the English included."""
 
 
@@ -159,8 +160,16 @@ def suggestion(request):
 
     themes = _known_themes()
     words, expressions = related_entries(fields["hanzi"])
+    from .pronunciation_sources import unihan
+
+    characters = []
+    for char in dict.fromkeys(HAN_RE.findall(fields["hanzi"])):
+        info = unihan(char)
+        if info:
+            characters.append({"char": char, "mandarin": " ".join(info["mandarin"][:4]), "english": info["meaning"]})
     entry = {
         "kind": "expression" if fields["kind"] == "expression" else "word",
+        "characters": characters,
         "hanzi": fields["hanzi"], "reading": fields["pinyin"],
         "french_typed_by_editor": fields["french"], "english_typed_by_editor": fields["english"],
         "unknown_words": unknown,

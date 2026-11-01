@@ -28,6 +28,7 @@
   .sx-r-man { background: var(--sx-man-bg); border-color: #c7d2fe; color: var(--sx-man); }
   .sx-guess { color: var(--sx-guess); background: var(--sx-guess-bg); border: 1px dashed #d9c27a; border-radius: 0.3rem; padding: 0 0.35rem; font-style: italic; white-space: nowrap; }
   .sx-none { color: #C8BFB2; }
+  .sx-warn { display: inline-block; color: #b45309; font-weight: 700; cursor: help; }
   .sx-more { display: block; margin: 0.75rem auto; }
   /* Rules */
   .sx-acc { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -86,10 +87,12 @@
         <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
         <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
         <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
+        <button type="button" class="sx-chip" data-sxfilter="warn" aria-pressed="false" title="Lecture mandarin peu cohérente avec les lectures hakka">⚠ Mandarin éloigné</button>
       </div>
     </div>
     <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
-      Mandarin et sens anglais : Unicode Unihan.</p>
+      Mandarin et sens anglais : Unicode Unihan. <span class="sx-warn">⚠</span> : lecture mandarin éloignée des lectures hakka
+      (moins de 10 % de cohérence selon les règles apprises) — souvent un caractère emprunté pour son sens, ou une lecture dialectale.</p>
     <p class="sx-count" id="sx-count" role="status"></p>
     <div class="sx-wrap">
       <table class="sx-table no-auto-csv">

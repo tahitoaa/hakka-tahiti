@@ -150,7 +150,7 @@ const SUGGESTION_BAR_CSS = `
 .sugg .sugg-hanzi { font-size: 1.3rem !important; line-height: 1.1; letter-spacing: 0; white-space: nowrap; }
 .sugg .sugg-alt { font-size: 0.6em; color: #8C8478; font-weight: 500; margin-left: 1px; }
 .sugg .sugg-py {
-    margin-top: 0.15rem; font-size: 0.68rem; color: #8C8478;
+    margin-top: 0.15rem; font-size: 0.82rem; color: #8C8478;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sugg .sugg-key { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #B5AA9B; }
@@ -164,11 +164,11 @@ const SUGGESTION_BAR_CSS = `
             color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.8rem; text-align: center; }
 @media (hover: none) and (pointer: coarse) { .sugg .sugg-key { display: none; } }
 /* Unihan under the character: Mandarin reading, then a short English meaning. */
-.sugg-bar.sugg-bar.has-uh { grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr)); max-height: min(45vh, 17rem); }
+.sugg-bar.sugg-bar.has-uh { grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); max-height: min(45vh, 18rem); }
 /* Line 2: Hakka in bold, Mandarin lighter; line 3: English. */
 .sugg .sugg-py .sugg-hk { font-weight: 700; color: #3A3430; }
-.sugg .sugg-py .sugg-man { font-weight: 400; color: #3730a3; margin-left: 0.2rem; }
-.sugg .sugg-en { margin-top: 0.05rem; width: 100%; font-size: 0.58rem; line-height: 1.15; color: #8C8478; text-align: center;
+.sugg .sugg-py .sugg-man { font-weight: 400; font-size: 0.85em; color: #3730a3; margin-left: 0.2rem; }
+.sugg .sugg-en { margin-top: 0.05rem; width: 100%; font-size: 0.72rem; line-height: 1.15; color: #6E655C; text-align: center;
                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sugg .sugg-uh { margin-top: 0.15rem; width: 100%; font-size: 0.6rem; line-height: 1.15; color: #6E655C; text-align: center;
                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
