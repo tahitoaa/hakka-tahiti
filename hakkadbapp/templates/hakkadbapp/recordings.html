@@ -11,17 +11,19 @@
   .rec-origin-lexique { background: #F0EBE3; color: #544D45; }
   .rec-origin-ajout { background: #d1fae5; color: #065f46; }
   .rec-wrap { overflow-x: auto; border: 1px solid #E8DFD2; border-radius: 0.75rem; }
+  .rec-example { font-size: 0.8rem; color: #544D45; }
+  .rec-example small { display: block; color: #8C8478; }
+  .rec-table h3 { font-weight: 700; }
 </style>
 
 <div class="mt-2 w-full max-w-screen-lg mx-auto space-y-3">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 class="font-display text-xl font-bold text-gray-800">Mots à enregistrer</h2>
-    <p class="text-sm text-gray-600">{{ rows|length }} mot{{ rows|length|pluralize }} sans audio :
-      {{ from_lexicon }} du lexique, {{ from_additions }} ajout{{ from_additions|pluralize }} validé{{ from_additions|pluralize }}.</p>
+    <p class="text-sm text-gray-600">{{ words|length }} mot{{ words|length|pluralize }} et {{ expressions|length }} expression{{ expressions|length|pluralize }} sans audio{% if added %}, dont {{ added }} ajout{{ added|pluralize }} validé{{ added|pluralize }}{% endif %}.</p>
   </div>
   <p class="text-xs text-gray-500">
     {% if snapshot_date %}Audio du lexique d'après la plateforme au {{ snapshot_date|date:"d/m/Y" }}.{% else %}Aucun instantané de la plateforme : seuls les ajouts validés sont listés.{% endif %}
-    Nom de fichier attendu : le pinyin avec les tons en chiffres.
+    Nom de fichier attendu : le pinyin avec les tons en chiffres pour un mot, les caractères pour une expression.
   </p>
   <div class="flex flex-wrap gap-2">
     <label class="sr-only" for="rec-search">Rechercher</label>
@@ -32,11 +34,34 @@
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
   </div>
+  <h3 class="font-display text-lg font-bold text-gray-800">Mots <span class="text-sm font-normal text-gray-500">({{ words|length }})</span></h3>
   <div class="rec-wrap">
     <table class="rec-table">
-      <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
-      <tbody id="rec-rows">
-        {% for r in rows %}
+      <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th>Exemple d'expression</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
+      <tbody>
+        {% for r in words %}
+        <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
+          <td class="hanzi">{{ r.hanzi }}</td>
+          <td>{{ r.pinyin }}</td>
+          <td>{{ r.french }}</td>
+          <td class="rec-example">{% if r.example %}{{ r.example.target }}<small>{{ r.example.french }}</small>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+          <td class="text-gray-600">{{ r.theme }}</td>
+          <td class="rec-file">{{ r.filename }}</td>
+          <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{{ r.origin }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-gray-500 py-6">Tous les mots ont leur audio.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="font-display text-lg font-bold text-gray-800 pt-2">Expressions <span class="text-sm font-normal text-gray-500">({{ expressions|length }})</span></h3>
+  <div class="rec-wrap">
+    <table class="rec-table">
+      <thead><tr><th>Expression</th><th>Pinyin</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
+      <tbody>
+        {% for r in expressions %}
         <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
           <td class="hanzi">{{ r.hanzi }}</td>
           <td>{{ r.pinyin }}</td>
@@ -46,7 +71,7 @@
           <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{{ r.origin }}</span></td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-gray-500 py-6">Tous les mots ont leur audio.</td></tr>
+        <tr><td colspan="6" class="text-center text-gray-500 py-6">Toutes les expressions ont leur audio.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -57,7 +82,7 @@
     const search = document.getElementById('rec-search'), theme = document.getElementById('rec-theme');
     const filter = () => {
       const q = search.value.trim().toLowerCase(), t = theme.value;
-      document.querySelectorAll('#rec-rows tr[data-search]').forEach((tr) => {
+      document.querySelectorAll('.rec-table tr[data-search]').forEach((tr) => {
         tr.hidden = (t && tr.dataset.theme !== t) || (q && !tr.dataset.search.includes(q));
       });
     };
