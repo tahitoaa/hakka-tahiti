@@ -1,6 +1,5 @@
-{% extends "hakkadbapp/base.html" %}
 {% load static %}
-{% block content %}
+{# The interactive table of sounds (phonemes.js), shown in the « Tableau des sons » tab of the Prononciation page. Needs phonemes_data. #}
 <style>
   /* Tokens: a one-hue light->dark ramp for "characters per syllable"
      (validated as an ordinal ramp on white), one brand hue for
@@ -140,4 +139,3 @@
 {{ phonemes_data|json_script:"phonemes-data" }}
 <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/phonemes.js' %}"></script>
-{% endblock %}

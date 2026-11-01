@@ -354,11 +354,6 @@
           </a>
         </li>
         <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'phonemes' %}" class="block py-2.5 sm:py-2 {% if page == 'phonemes' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Phonèmes
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
           <a href="{% url 'pronunciation' %}" class="block py-2.5 sm:py-2 {% if page == 'pronunciation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Prononciation
           </a>
@@ -377,6 +372,13 @@
         <li>
           <a href="{% url 'validation' %}" class="block py-2.5 sm:py-2 {% if page == 'validation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
             Validation
+          </a>
+        </li>
+        {% endif %}
+        {% if user.is_authenticated %}
+        <li class="border-t border-white/10 sm:border-0">
+          <a href="{% url 'recordings' %}" class="block py-2.5 sm:py-2 {% if page == 'recordings' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
+            À enregistrer
           </a>
         </li>
         {% endif %}

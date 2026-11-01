@@ -1037,18 +1037,17 @@ def hanzi(request, hanzi_char):
     return render(request, "hakkadbapp/hanzi.html", context)
 
 def phonemes(request):
-    """Initial x final table, statistics and per-syllable details, all
-    rendered by phonemes.js from the same cached payload as the Caractères
-    page (the server-rendered table used to include every transcription
-    system in each of its ~1300 cells)."""
+    """The table of sounds is now the « Tableau des sons » tab of the
+    Prononciation page (rendered by phonemes.js from the same cached
+    payload as the Caractères page)."""
+    return redirect(reverse('pronunciation') + '#sons')
+
+
+def _phonemes_data():
     data = dict(caracters_data())
     data.pop("examples", None)
     data["syllable_url"] = reverse('hanzi_by_pinyin', args=['__SYLLABLE__'])
-    return render(request, 'hakkadbapp/phonemes.html', {
-        'title': "Tableau des phonèmes",
-        'page': "phonemes",
-        'phonemes_data': data,
-    })
+    return data
 
 
 def hanzi_by_pinyin(request, syllable):
@@ -1213,6 +1212,7 @@ def pronunciation(request):
         'tones': tones,
         'title': "Prononciation",
         'page': "pronunciation",
+        'phonemes_data': _phonemes_data(),
     }
     return render(request, "hakkadbapp/pronunciation.html", context)
 

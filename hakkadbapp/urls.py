@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
-from . import additions, ai, assistant, importer
+from . import additions, ai, assistant, importer, recordings
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -73,6 +73,7 @@ urlpatterns = [
     path("word-notes/<int:word_id>", views.word_note_entry, name="word_note_entry"),
     path("saisie/", additions.saisie, name="saisie"),
     path("validation/", additions.validation, name="validation"),
+    path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),

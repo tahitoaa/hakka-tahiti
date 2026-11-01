@@ -1,6 +1,19 @@
  {% extends 'hakkadbapp/base.html' %}
 
  {% block content %}
+<style>
+  .pr-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; margin-bottom: 1rem; }
+  .pr-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .pr-tabs a[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+</style>
+<div class="w-full max-w-screen-xl mx-auto mt-2">
+  <h2 class="font-display text-2xl font-bold text-gray-800 mb-2">Prononciation</h2>
+  <nav class="pr-tabs" role="tablist" aria-label="Parties">
+    <a href="#consonnes" role="tab" data-prtab="consonnes">Consonnes</a>
+    <a href="#voyelles" role="tab" data-prtab="voyelles">Voyelles et finales</a>
+    <a href="#sons" role="tab" data-prtab="sons">Tableau des sons</a>
+  </nav>
+  <section id="pr-consonnes" role="tabpanel" data-prpanel="consonnes">
  
 
     <div>
@@ -206,12 +219,12 @@
 
 
 
-    <h2>Possible Initials and Finals</h2>
+    <h2 class="font-display text-xl font-bold text-gray-800 mt-6">Initiales, finales et tons</h2>
     <div class="flex flex-col gap-8 my-6">
         <div class="w-full bg-white rounded-lg shadow p-6">
             <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="inline-block w-2 h-2 bg-brand-cream0 rounded-full"></span>
-                Initials
+                Initiales
             </h3>
 
             <table class="table-auto mb-4 w-full text-center border border-red-200 shadow-lg rounded-lg overflow-hidden">
@@ -286,7 +299,7 @@
         <div class="w-full bg-white rounded-lg shadow p-6"></div>
             <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-                Finals
+                Finales
             </h3>
             <ul class="grid grid-cols-3 gap-3">
                 {% for final in finals %}
@@ -299,7 +312,7 @@
     <div class="w-full bg-white rounded-lg shadow p-6">
         <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
             <span class="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
-            Tones
+            Tons
         </h3>
 
         <p>
@@ -317,12 +330,13 @@
                 {% endfor %}
         </ul>
     </div>
-</div>
-</div>
 
 
 
-<div class="space-y-10 p-6 bg-gray-50 min-h-screen">
+
+
+  </section>
+  <section id="pr-voyelles" role="tabpanel" data-prpanel="voyelles" hidden><div class="space-y-10 p-6 bg-gray-50 min-h-screen">
 <section class="mb-10"><h2 class="text-2xl font-extrabold text-brand-dark mb-6 border-b-2 border-brand-line pb-2">Cas default</h2>
 <div class="mb-8"><h3 class="text-lg font-semibold text-brand mb-2">﻿Nature ?</h3><div class="overflow-x-auto rounded-lg shadow"><table class="min-w-full text-sm text-gray-800 bg-white border border-gray-200 rounded-lg"><thead><tr class="bg-brand text-brand-gold uppercase tracking-wider"><th class="px-6 py-3 text-left font-bold">Phonème</th><th class="px-6 py-3 text-left font-bold">Français</th><th class="px-6 py-3 text-left font-bold">Hanzi</th><th class="px-6 py-3 text-left font-bold">Hakka</th><th class="px-6 py-3 text-left font-bold">Mandarin</th></tr></thead><tbody>
 </tbody></table></div></div>
@@ -854,4 +868,23 @@
 </tbody></table></div></div>
 </section>
 </div>
- {% endblock %}
+   </section>
+  <section id="pr-sons" role="tabpanel" data-prpanel="sons" hidden>
+    {% include "hakkadbapp/components/phonemes_panel.html" %}
+  </section>
+</div>
+<script>
+  /* Tabs by #hash: /phonemes/ redirects to #sons. */
+  (function () {
+    const tabs = [...document.querySelectorAll('[data-prtab]')];
+    const show = () => {
+      const name = ['consonnes', 'voyelles', 'sons'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'consonnes';
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.prtab === name)));
+      document.querySelectorAll('[data-prpanel]').forEach((p) => { p.hidden = p.dataset.prpanel !== name; });
+    };
+    tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', t.getAttribute('href')); show(); }));
+    window.addEventListener('hashchange', show);
+    show();
+  })();
+</script>
+{% endblock %}
