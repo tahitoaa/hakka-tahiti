@@ -170,12 +170,14 @@ def _norm(hanzi):
     return t2s.convert(hanzi)
 
 
-def known_words():
+def known_words(include_additions=True):
     """Every word the assistant must not suggest again, simplified: the
-    lexicon's words and every word addition (rejected ones included)."""
+    lexicon's words and (unless told otherwise) every word addition,
+    rejected ones included."""
     words = {_norm(h) for _w, h, _p in _word_rows()}
-    words |= {_norm("".join(h.split())) for h in
-              LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD).values_list("hanzi", flat=True)}
+    if include_additions:
+        words |= {_norm("".join(h.split())) for h in
+                  LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD).values_list("hanzi", flat=True)}
     return words
 
 

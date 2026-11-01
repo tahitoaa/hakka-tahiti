@@ -373,11 +373,10 @@ class ValidationTable extends AdditionList {
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
             <td class="hanzi vt-hanzi">${esc(a.hanzi)}</td>
             <td class="vt-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</td>
-            <td class="vt-french">${esc(a.french)}
-                ${a.english ? `<div class="vt-sub italic">${esc(a.english)}</div>` : ''}
-                ${a.observations ? `<div class="vt-sub">${esc(a.observations)}</div>` : ''}</td>
-            <td class="vt-meta">${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? `<div class="vt-sub">${esc(a.themes)}</div>` : ''}</td>
-            <td class="vt-meta vt-who">${who}<div class="vt-sub">${date}</div></td>
+            <td class="vt-french">${esc(a.french)}${a.english ? `<span class="vt-sub italic"> · ${esc(a.english)}</span>` : ''}
+                ${a.observations ? `<div class="vt-sub vt-obs" title="${esc(a.observations)}">${esc(a.observations)}</div>` : ''}</td>
+            <td class="vt-meta">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
+            <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span></td>
             <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
@@ -638,6 +637,163 @@ class LexiconRemarks {
     }
 }
 
+/* Import of a text document (importer.py), on the Validation page: the
+   server reads the file, the AI reads a free text chunk by chunk, every
+   entry is checked, and the editor ticks what to propose "À valider". */
+class DocumentImport {
+    static STATES = {
+        new: 'nouveau', known: 'déjà au lexique', proposed: 'déjà proposé',
+        rejected: 'déjà rejeté', duplicate: 'en double dans le fichier',
+    };
+
+    constructor(table) {
+        this.table = table;
+        const $ = (id) => document.getElementById(id);
+        this.form = $('import-form');
+        this.file = $('import-file');
+        this.status = $('import-status');
+        this.result = $('import-result');
+        this.reset();
+        this.form.addEventListener('submit', (event) => { event.preventDefault(); this.analyse(); });
+        this.result.addEventListener('change', (event) => {
+            const box = event.target.closest('[data-pick]');
+            if (box) { this.entries[Number(box.dataset.pick)].picked = box.checked; this.renderSummary(); }
+        });
+        this.result.addEventListener('click', (event) => {
+            if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
+        });
+    }
+
+    reset() {
+        this.doc = null;
+        this.entries = [];
+        this.result.innerHTML = '';
+    }
+
+    setStatus(message, isError = false) {
+        this.status.textContent = message;
+        this.status.className = `text-sm ${isError ? 'text-red-700' : 'text-gray-700'}`;
+    }
+
+    async post(url, body) {
+        const isForm = body instanceof FormData;
+        const response = await fetch(url, {
+            method: 'POST', body: isForm ? body : JSON.stringify(body),
+            headers: { 'X-CSRFToken': AdditionList.getCsrfToken(), ...(isForm ? {} : { 'Content-Type': 'application/json' }) },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Erreur ${response.status}`);
+        return data;
+    }
+
+    add(candidates) {
+        const seen = new Set(this.entries.map((e) => e.hanzi.replace(/\s+/g, '')));
+        candidates.forEach((c) => {
+            const key = c.hanzi.replace(/\s+/g, '');
+            if (c.state === 'new' && seen.has(key)) c.state = 'duplicate';
+            seen.add(key);
+            this.entries.push({ ...c, picked: c.state === 'new' });
+        });
+    }
+
+    async analyse() {
+        const file = this.file.files[0];
+        if (!file) return;
+        this.reset();
+        const button = this.form.querySelector('button');
+        await AdditionList.whileBusy(button, 'Lecture…', async () => {
+            try {
+                const body = new FormData();
+                body.append('file', file);
+                const data = await this.post('/api/import/analyse', body);
+                this.doc = data;
+                if (data.kind === 'table') {
+                    this.add(data.candidates);
+                    this.setStatus(`Tableau lu${data.used_ai ? ' (colonnes reconnues par l’IA)' : ' sans IA'} : ${data.candidates.length} entrée(s).`);
+                    this.render();
+                    return;
+                }
+                if (!data.chunks) {
+                    this.setStatus('Aucun mot nouveau à lire dans ce texte (pas de caractères chinois inconnus du lexique).');
+                    return;
+                }
+                if (!data.ai_enabled) {
+                    this.setStatus('Ce texte doit être lu par l’IA, qui n’est pas configurée sur ce serveur.', true);
+                    return;
+                }
+                for (let n = 0; n < data.chunks; n += 1) {
+                    this.setStatus(`L’IA lit le texte : partie ${n + 1} sur ${data.chunks}…`);
+                    const part = await this.post(`/api/import/${data.document}/extraire`, { chunk: n });
+                    this.add(part.candidates);
+                    this.render();
+                }
+                this.setStatus(`Texte lu par l’IA (${data.chunks} partie${data.chunks > 1 ? 's' : ''}${data.truncated ? ', début du texte seulement' : ''}) : ${this.entries.length} entrée(s).`);
+                this.render();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    renderSummary() {
+        const summary = this.result.querySelector('[data-summary]');
+        const button = this.result.querySelector('[data-propose]');
+        if (!summary || !button) return;
+        const counts = {};
+        this.entries.forEach((e) => { counts[e.state] = (counts[e.state] || 0) + 1; });
+        summary.innerHTML = Object.entries(counts).map(([state, n]) =>
+            `<span class="vt-state vt-state-${state}">${n} ${DocumentImport.STATES[state] || state}</span>`).join(' ');
+        const picked = this.entries.filter((e) => e.picked).length;
+        button.textContent = `↑ Proposer ${picked} mot${picked > 1 ? 's' : ''} à la validation`;
+        button.disabled = !picked;
+    }
+
+    render() {
+        const esc = AdditionList.escapeHtml;
+        if (!this.entries.length) { this.result.innerHTML = ''; return; }
+        this.result.innerHTML = `
+            <div class="vt-import-summary"><span data-summary></span>
+              <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
+            <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
+              <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th>Caractères</th><th>Lecture</th>
+                <th>Français</th><th class="vt-who">Origine</th><th>État</th></tr></thead>
+              <tbody>${this.entries.map((e, i) => `<tr class="${e.state === 'new' ? '' : 'is-off'}">
+                <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}
+                    aria-label="Proposer ${esc(e.hanzi)}"></td>
+                <td class="hanzi vt-hanzi">${esc(e.hanzi)}</td>
+                <td class="vt-pinyin">${e.reading ? esc(AdditionList.displayPinyin(e.reading)) : `<i>${esc(e.pinyin) || '—'}</i>`}
+                    ${e.reading_note ? `<div class="vt-warn">⚠ ${esc(e.reading_note)}</div>` : ''}</td>
+                <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated ? ' <span class="vt-ai-badge">traduit IA</span>' : ''}
+                    ${e.english ? `<div class="vt-sub italic">${esc(e.english)}</div>` : ''}</td>
+                <td class="vt-meta vt-who">${esc(e.location)}</td>
+                <td><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
+              </tr>`).join('')}</tbody></table></div>`;
+        this.renderSummary();
+    }
+
+    async propose(button) {
+        const entries = this.entries.filter((e) => e.picked).map((e) => ({
+            hanzi: e.hanzi, pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
+            themes: e.themes || '', location: e.location || '', translated: !!e.translated,
+        }));
+        if (!entries.length || !this.doc) return;
+        await AdditionList.whileBusy(button, 'Envoi…', async () => {
+            try {
+                const data = await this.post(`/api/import/${this.doc.document}/proposer`, { entries });
+                data.additions.forEach((a) => this.table.additions.unshift(a));
+                this.table.render();
+                this.table.flash(data.additions.map((a) => a.id));
+                const n = data.additions.length;
+                this.setStatus(`✓ ${n} mot${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} à la validation${data.skipped ? ` (${data.skipped} ignoré${data.skipped > 1 ? 's' : ''} : déjà connus)` : ''}.`);
+                this.reset();
+                this.form.reset();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('validation-page');
     if (!root) return;
@@ -650,6 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.validationTable = table;
     table.load();
+    if (document.getElementById('import-form')) window.documentImport = new DocumentImport(table);
     document.querySelectorAll('[data-new-words]').forEach((btn) =>
         btn.addEventListener('click', () => table.aiNewWords(btn.dataset.newWords, btn)));
 

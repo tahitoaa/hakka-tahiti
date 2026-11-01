@@ -210,6 +210,7 @@ class WordNote(models.Model):
     every `platform_to_vercel --yes` reset+rebuild. Keyed by the e_reo
     platform's own id (Word.platform_id), not by the Word's own pk, since
     that pk is destroyed and reassigned on every reset."""
+    id = models.AutoField(primary_key=True)  # as created in 0017 (the site default is now BigAutoField)
     platform_id = models.CharField(max_length=64, unique=True)
     commentaire = models.TextField(blank=True, default="")
     # Opt-in, off by default: export_corpus() only includes this word in
@@ -228,6 +229,7 @@ class ExpressionNote(models.Model):
     plus a free-text comment. Same reasoning as WordNote: its own table,
     outside reset=True's reach, keyed by Expression.platform_id rather
     than the Expression's own reset-and-reassigned pk."""
+    id = models.AutoField(primary_key=True)  # as created in 0017 (the site default is now BigAutoField)
     platform_id = models.CharField(max_length=64, unique=True)
     excel_format = models.TextField(blank=True, default="")
     commentaire = models.TextField(blank=True, default="")
@@ -397,3 +399,27 @@ class AITarget(models.Model):
 
     def __str__(self):
         return f"{self.target_type} {self.target_id}{' (muet)' if self.muted else ''}"
+
+
+class ImportedDocument(models.Model):
+    """A text document (spreadsheet, CSV, text, Word, PDF with text) an
+    editor imported to find new words (importer.py). Only its extracted
+    text is kept, never the file: the words found are proposed "À valider",
+    and the text stays as a source the lookups search first."""
+    KIND_TABLE = "table"
+    KIND_TEXT = "text"
+    KIND_CHOICES = [(KIND_TABLE, "Tableau"), (KIND_TEXT, "Texte")]
+
+    filename = models.CharField(max_length=255)
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    # Tables: one line per row, cells separated by tabs. Texts: the text.
+    text = models.TextField()
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.filename
