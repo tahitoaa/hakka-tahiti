@@ -307,91 +307,67 @@
     });
   </script>
 
-  <!-- Navigation Menu -->
-  <nav id="menu" class="no-print hidden sm:block border-t border-white/10 sm:border-0">
-    <div class="container mx-auto px-4">
-      <ul class="no-print flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1 text-sm sm:text-base font-medium font-display">
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'flashcards' %}" class="block py-2.5 sm:py-2 {% if page == 'flashcards' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Home
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'transcripter' %}" class="block py-2.5 sm:py-2 {% if page == 'transcripter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Transcrire
-          </a>
-        </li>
+  <!-- Navigation Menu: the public pages, then the members' space (login
+       required), set apart. On a phone: one centred column, a title per group. -->
+  <style>
+    .nav-link { display: block; padding: 0.6rem 0.75rem; color: rgb(255 255 255 / .9); border-radius: 0.5rem; }
+    .nav-link:hover { color: var(--color-brand-gold); }
+    .nav-link.is-active { color: var(--color-brand-gold); }
+    .nav-group-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / .55); }
+    @media (max-width: 639px) {
+      #menu ul { display: flex; flex-direction: column; align-items: center; text-align: center; }
+      #menu li { width: 100%; }
+      #menu .nav-link { padding: 0.7rem 1rem; font-size: 1rem; }
+      #menu .nav-link.is-active { background: rgb(0 0 0 / .18); }
+      .nav-members { border-top: 1px solid rgb(255 255 255 / .15); margin-top: 0.25rem; padding-top: 0.5rem; }
+    }
+    @media (min-width: 640px) {
+      .nav-link { padding: 0.45rem 0.1rem; }
+      .nav-members { background: rgb(0 0 0 / .16); border-radius: 9999px; padding: 0 0.9rem; }
+      .nav-members .nav-link { padding: 0.35rem 0.1rem; }
+    }
+  </style>
+  <nav id="menu" class="no-print hidden sm:block border-t border-white/10 sm:border-0" aria-label="Menu principal">
+    <div class="container mx-auto px-4 py-2 sm:py-1 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 font-display">
+      <div>
+        <p class="nav-group-title text-center sm:hidden pt-1">Lexique</p>
+        <ul class="no-print sm:flex sm:flex-wrap sm:gap-x-5 text-sm sm:text-base font-medium">
+          <li><a href="{% url 'flashcards' %}" class="nav-link{% if page == 'flashcards' %} is-active{% endif %}">Accueil</a></li>
+          <li><a href="{% url 'search' %}" class="nav-link{% if page == 'search' %} is-active{% endif %}">Recherche</a></li>
+          <li><a href="{% url 'pinyin_converter' %}" class="nav-link{% if page == 'converter' %} is-active{% endif %}">Écrire</a></li>
+          <li><a href="{% url 'pronunciation' %}" class="nav-link{% if page == 'pronunciation' %} is-active{% endif %}">Prononciation</a></li>
+          <li><a href="{% url 'expressions' %}" class="nav-link{% if page == 'expressions' %} is-active{% endif %}">Expressions</a></li>
+          <li><a href="{% url 'transcripter' %}" class="nav-link{% if page == 'transcripter' %} is-active{% endif %}">Transcrire</a></li>
+          <li><a href="{% url 'reports' %}" class="nav-link{% if page == 'reports' %} is-active{% endif %}">Analyse du lexique</a></li>
+          <li><a href="{% url 'pronunciation_comparison' %}" class="nav-link{% if page == 'pronunciation_comparison' %} is-active{% endif %}">Sources</a></li>
+        </ul>
+      </div>
+      <div class="nav-members sm:flex sm:items-center sm:gap-x-4">
+        <p class="nav-group-title text-center sm:text-left">🔒 Espace membres</p>
         {% if user.is_authenticated %}
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'transcriptions' %}" class="block py-2.5 sm:py-2 {% if page == 'transcriptions' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Écouter
-          </a>
-        </li>
+        <ul class="no-print sm:flex sm:flex-wrap sm:gap-x-4 text-sm sm:text-base font-medium">
+            <li><a href="{% url 'transcriptions' %}" class="nav-link{% if page == 'transcriptions' %} is-active{% endif %}">Écouter</a></li>
+            {% if can_edit %}
+            <li><a href="{% url 'saisie' %}" class="nav-link{% if page == 'saisie' %} is-active{% endif %}">Saisie</a></li>
+            <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Validation</a></li>
+            {% endif %}
+            <li><a href="{% url 'recordings' %}" class="nav-link{% if page == 'recordings' %} is-active{% endif %}">À enregistrer</a></li>
+            <!-- Logout must be a POST since Django 5 (LogoutView). -->
+            <li>
+              <form method="post" action="{% url 'logout' %}" class="flex items-center justify-center gap-2 py-2 sm:py-1">
+                {% csrf_token %}
+                <span class="text-brand-gold">{{ user.get_short_name|default:user.username }}</span>
+                <button type="submit" class="text-white/80 hover:text-brand-gold underline-offset-2 hover:underline text-sm">Déconnexion</button>
+              </form>
+            </li>
+        </ul>
+        {% else %}
+        <ul class="no-print text-sm sm:text-base font-medium">
+          <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="nav-link{% if page == 'login' %} is-active{% endif %}"
+                 title="Écouter, Saisie, Validation, À enregistrer">Connexion</a></li>
+        </ul>
         {% endif %}
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'pinyin_converter' %}" class="block py-2.5 sm:py-2 {% if page == 'converter' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Écrire
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'search' %}" class="block py-2.5 sm:py-2 {% if page == 'search' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Recherche
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'reports' %}" class="block py-2.5 sm:py-2 {% if page == 'reports' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Analyse du lexique
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'pronunciation_comparison' %}" class="block py-2.5 sm:py-2 {% if page == 'pronunciation_comparison' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Sources
-          </a>
-        </li>
-        <li class="border-b border-white/10 sm:border-0">
-          <a href="{% url 'pronunciation' %}" class="block py-2.5 sm:py-2 {% if page == 'pronunciation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Prononciation
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'expressions' %}" class="block py-2.5 sm:py-2 {% if page == 'expressions' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Expressions
-          </a>
-        </li>
-        {% if can_edit %}
-        <li class="border-y border-white/10 sm:border-0">
-          <a href="{% url 'saisie' %}" class="block py-2.5 sm:py-2 {% if page == 'saisie' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Saisie
-          </a>
-        </li>
-        <li>
-          <a href="{% url 'validation' %}" class="block py-2.5 sm:py-2 {% if page == 'validation' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Validation
-          </a>
-        </li>
-        {% endif %}
-        {% if user.is_authenticated %}
-        <li class="border-t border-white/10 sm:border-0">
-          <a href="{% url 'recordings' %}" class="block py-2.5 sm:py-2 {% if page == 'recordings' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            À enregistrer
-          </a>
-        </li>
-        {% endif %}
-        <!-- Logout must be a POST since Django 5 (LogoutView). -->
-        <li class="border-t border-white/10 sm:border-0 sm:ml-auto">
-          {% if user.is_authenticated %}
-          <form method="post" action="{% url 'logout' %}" class="flex items-center gap-2 py-2.5 sm:py-2">
-            {% csrf_token %}
-            <span class="text-brand-gold">{{ user.get_short_name|default:user.username }}</span>
-            <button type="submit" class="text-white/90 hover:text-brand-gold underline-offset-2 hover:underline">Déconnexion</button>
-          </form>
-          {% else %}
-          <a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="block py-2.5 sm:py-2 {% if page == 'login' %}text-brand-gold{% else %}text-white/90 hover:text-brand-gold{% endif %}">
-            Connexion
-          </a>
-          {% endif %}
-        </li>
-      </ul>
+      </div>
     </div>
   </nav>
 </header>
