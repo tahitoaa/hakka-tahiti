@@ -43,7 +43,7 @@ Rules:
 - Hakka meanings can differ from Mandarin; prefer what the lexicon entries show over the Mandarin meaning of the characters, and lower the confidence when you only have the Mandarin meaning.
 - If the editor already typed a French or English translation, keep its meaning unless it is clearly wrong; you may polish its wording.
 - Never invent lexicon entries in based_on.
-- For an expression, "unknown_words" lists its words the lexicon doesn't have yet: give each one (in "words", same hanzi) its own french, english and themes, as for a word entry, in the meaning it has in this expression."""
+- For an expression, "unknown_words" lists its words the lexicon doesn't have yet: give each one (in "words", same hanzi) its own french, english and themes, as for a word entry, in the meaning it has in this expression. When the editor already typed some of them (french_typed_by_editor, english_typed_by_editor, themes_typed_by_editor), rely on them to translate the expression and return them unchanged; fill in only what is missing, the English included."""
 
 
 def ai_enabled():
@@ -147,7 +147,12 @@ def suggestion(request):
     if not isinstance(unknown, list) or len(unknown) > 30 or not all(
             isinstance(w, dict) and isinstance(w.get("hanzi"), str) and isinstance(w.get("pinyin", ""), str) for w in unknown):
         return JsonResponse({"error": "Mots inconnus invalides."}, status=400)
-    unknown = [{"hanzi": "".join(w["hanzi"].split())[:20], "reading": "".join(w.get("pinyin", "").split())[:60]}
+    def typed(w, name):
+        value = w.get(name, "")
+        return " ".join(value.split())[:200] if isinstance(value, str) else ""
+
+    unknown = [{"hanzi": "".join(w["hanzi"].split())[:20], "reading": "".join(w.get("pinyin", "").split())[:60],
+                **{f"{name}_typed_by_editor": typed(w, name) for name in ("french", "english", "themes") if typed(w, name)}}
                for w in unknown if fields["kind"] == "expression" and HAN_RE.search(w["hanzi"])]
     if _over_limit(request.user):
         return JsonResponse({"error": f"Limite de {DAILY_LIMIT} suggestions par jour atteinte."}, status=429)

@@ -481,8 +481,14 @@ class SaisieEntry {
                     const data = await request(AI_API, {
                         kind: values.kind, hanzi: values.hanzi, pinyin: values.pinyin,
                         french: values.french, english: values.english,
+                        // With what the editor already typed for them, if anything.
                         new_words: this.kind === 'expression'
-                            ? this.newWordCandidates().map((c) => ({ hanzi: c.hanzi, pinyin: c.pinyin })) : [],
+                            ? this.newWordCandidates().map((c) => {
+                                const state = this.newWords.get(this.newWordKey(c)) || {};
+                                const typed = (name) => (state.ai?.[name] ? '' : (state[name] || '').trim());
+                                return { hanzi: c.hanzi, pinyin: c.pinyin, french: typed('french'),
+                                    english: typed('english'), themes: typed('themes') };
+                            }) : [],
                     });
                     this.aiSuggestion = data.suggestion;
                     this.aiFor = key;
@@ -531,8 +537,11 @@ class SaisieEntry {
             const state = c && this.newWords.get(this.newWordKey(c));
             if (!state) return;
             state.checked = true;
+            // Never over what the editor typed: only empty fields (or ones
+            // the AI filled before) take the proposal.
             ['french', 'english', 'themes'].forEach((name) => {
-                if (w[name]) { state[name] = w[name]; state.ai[name] = true; }
+                const typedByEditor = (state[name] || '').trim() && !state.ai[name];
+                if (w[name] && !typedByEditor) { state[name] = w[name]; state.ai[name] = true; }
             });
             this.renderNewWords();
         }
