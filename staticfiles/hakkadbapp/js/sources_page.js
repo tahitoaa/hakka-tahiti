@@ -48,7 +48,7 @@
     }
 
     function rowHtml(r) {
-        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, warning] = r;
+        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess] = r;
         let lex = readings(wenfa, 'sx-r-wenfa');
         if (!wenfa && guess) {
             const [reading, source, confidence] = guess.split('|');
@@ -58,8 +58,7 @@
         return `<tr><td class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
             + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</td>`
             + `<td>${lex}</td><td>${readings(baoan, '')}</td><td>${readings(mciver, '')}</td>`
-            + `<td>${readings(mandarin, 'sx-r-man')}${warning !== '' ? ` <span class="sx-warn" title="Lecture mandarin éloignée des lectures hakka `
-                + `(cohérence ${warning} %) : caractère peut-être emprunté pour son sens, lecture dialectale, ou erreur à vérifier.">⚠</span>` : ''}</td>`
+            + `<td>${readings(mandarin, 'sx-r-man')}</td>`
             + `<td class="sx-en" lang="en">${esc(english)}</td></tr>`;
     }
 
@@ -69,7 +68,6 @@
         return data.rows.filter((r, i) => {
             if (state.filter === 'lexicon' && !r[2]) return false;
             if (state.filter === 'guess' && r[2]) return false;
-            if (state.filter === 'warn' && r[8] === '') return false;
             return words.every((w) => data.hay[i].includes(w));
         });
     }

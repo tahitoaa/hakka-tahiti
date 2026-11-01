@@ -210,32 +210,10 @@ def predict(rules, source_id, reading):
     return tuple(out), round(100 * confidence)
 
 
-COHERENCE_WARNING = 10  # % below which the Mandarin reading is flagged
-
-
-def coherence(rules, mandarin, hakka):
-    """How well a character's Mandarin readings fit its Hakka (Wenfa)
-    readings, 0-100: for the best pair, the mean of how often the Mandarin
-    initial gives that Wenfa initial and the Mandarin final that Wenfa
-    final, in the learnt rules. The tone is left out (it maps loosely).
-    Low: a character used for its meaning rather than its sound, a
-    dialectal reading, or an error. None when either side is missing."""
-    if not mandarin or not hakka:
-        return None
-    parts = rules["mandarin"]["parts"]
-
-    def share(part, src, w):
-        counts = parts[part].get(src)
-        return counts.get(w, 0) / sum(counts.values()) if counts else 0
-
-    return round(100 * max((share("initial", m[0], h[0]) + share("final", m[1], h[1])) / 2
-                           for m in mandarin for h in hakka))
-
-
 # ---- the page's data -------------------------------------------------------------------------------
 
 def table_payload():
-    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, coherence]], "rules": ...}.
+    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess]], "rules": ...}.
     `wenfa`: the lexicon's readings; `guess`: for a character the lexicon
     doesn't have, the Wenfa reading deduced from the best source available
     ("ga¹|Bao'an|72")."""
@@ -250,7 +228,6 @@ def table_payload():
         info = unihan_entry(char)
         readings = {s["id"]: source_readings(s, char) for s in SOURCES}
         guess = ""
-        hakka = lexicon.get(char, [])
         if char not in lexicon:
             for s in order:
                 if readings[s["id"]]:
@@ -258,24 +235,19 @@ def table_payload():
                     if reading:
                         guess = f"{wenfa_text(reading)}|{s['label']}|{confidence}"
                         break
-            # Outside the lexicon, the Hakka side is what Bao'an and McIver give, in Wenfa.
-            hakka = [r for s in ("baoan", "mciver") for src in readings[s]
-                     for r in [predict(rules, s, src)[0]] if r]
-        score = coherence(rules, readings["mandarin"], hakka)
-        warning = score if score is not None and score < COHERENCE_WARNING else ""
         trad = traditional[char]
         rows.append([
             char, trad if trad != char else "",
             " ".join(wenfa_text(r) for r in lexicon.get(char, [])),
             " ".join(source_text(SOURCES[0], r) for r in readings["baoan"]),
             " ".join(source_text(SOURCES[1], r) for r in readings["mciver"]),
-            " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess, warning,
+            " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess,
         ])
     # The lexicon's characters first (by Wenfa reading), then the others.
     rows.sort(key=lambda r: (not r[2], r[2], r[0]))
     for r in rules.values():
         r.pop("best", None)
-    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order], "coherence_warning": COHERENCE_WARNING}
+    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order]}
 
 
 def cached_payload():
