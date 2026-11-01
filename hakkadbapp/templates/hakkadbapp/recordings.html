@@ -22,7 +22,9 @@
   .rec-tabs small { font-weight: 400; color: #8C8478; }
   .rec-furigana { font-size: 1.6rem; line-height: 2.5; text-align: center; }
   .rec-furigana ruby { margin-right: 0.08em; }
-  .rec-furigana rt { font-family: inherit; font-size: 0.55em; color: #9B1C1C; font-weight: 600; letter-spacing: 0; }
+  /* The pinyin in the site's plain font, not the hanzi's calligraphic one. */
+  .rec-furigana rt { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 0.5em;
+                    color: #9B1C1C; font-weight: 600; letter-spacing: 0.01em; font-style: normal; }
 </style>
 
 <div class="mt-2 w-full max-w-screen-lg mx-auto space-y-3">
