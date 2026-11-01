@@ -4,7 +4,35 @@
   .rec-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: #fff; }
   .rec-table th { background: #F6EFE4; color: #544D45; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
                   text-align: left; padding: 0.4rem 0.5rem; }
-  .rec-table td { padding: 0.3rem 0.5rem; border-top: 1px solid #F0E8DC; vertical-align: middle; }
+  .rec-table td { padding: 0.75rem 0.5rem; border-top: 1px solid #F0E8DC; vertical-align: middle; }
+  .rec-table tbody tr[data-i] { cursor: pointer; }
+  .rec-table tbody tr[data-i]:hover { background: #FDFAF5; }
+  /* Slideshow: one item at a time, large. */
+  .rec-show { width: min(40rem, calc(100vw - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 0; border: 0; border-radius: 1rem;
+              background: #fff; color: #261F1C; box-shadow: 0 16px 48px rgb(0 0 0 / .35); }
+  .rec-show::backdrop { background: rgb(38 31 28 / .6); }
+  .rec-show-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem;
+                   background: var(--color-brand, #9B1C1C); color: #fff; }
+  .rec-show-head b { font-variant-numeric: tabular-nums; }
+  .rec-show-close { min-width: 2.5rem; min-height: 2.5rem; border-radius: 9999px; color: #fff; font-size: 1.1rem; }
+  .rec-show-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center;
+                   min-height: 22rem; padding: 1.25rem 1rem; transition: opacity .12s ease; }
+  .rec-show-card.is-changing { opacity: 0.25; }
+  .rec-show-hanzi { font-size: clamp(3.5rem, 14vw, 6rem) !important; line-height: 1.1; color: #9B1C1C; }
+  .rec-show-card .rec-furigana { font-size: clamp(2rem, 8vw, 3.2rem); }
+  .rec-show-pinyin { font-size: clamp(1.5rem, 6vw, 2.2rem); font-weight: 700; color: #3A3430; }
+  .rec-show-french { font-size: 1.3rem; color: #261F1C; }
+  .rec-show-example { font-size: 0.95rem; color: #544D45; }
+  .rec-show-example small { display: block; color: #8C8478; }
+  .rec-show-meta { font-size: 0.8rem; color: #8C8478; }
+  .rec-show-meta .rec-file { font-size: 0.9rem; }
+  .rec-show-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid #F0E8DC; }
+  .rec-show-nav button { min-height: 3.25rem; border-radius: 0.6rem; font-size: 1.05rem; font-weight: 700; border: 1px solid #DDD0BD;
+                         background: #fff; color: #544D45; touch-action: manipulation; user-select: none; }
+  .rec-show-nav button.is-next { background: var(--color-brand, #9B1C1C); border-color: var(--color-brand, #9B1C1C); color: #fff; }
+  .rec-show-nav button:disabled { opacity: 0.4; }
+  .rec-show-btn { min-height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; background: var(--color-brand, #9B1C1C); color: #fff;
+                  font-weight: 700; font-size: 0.9rem; }
   /* Hakka columns: larger and centred. */
   .rec-table td.hanzi, .rec-table td.rec-hk, .rec-table th.rec-hk { text-align: center; }
   .rec-table td.hanzi { font-size: 1.55rem !important; line-height: 1.2; }
@@ -44,6 +72,7 @@
       <option value="">Tous les thèmes</option>
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
+    <button type="button" id="rec-show-open" class="rec-show-btn">▶ Diaporama</button>
   </div>
   <nav class="rec-tabs" role="tablist" aria-label="Que voir">
     <a href="#mots" role="tab" data-rectab="mots">Mots <small>({{ words|length }})</small></a>
@@ -54,7 +83,7 @@
       <thead><tr><th class="rec-hk">Caractères</th><th class="rec-hk">Pinyin</th><th>Français</th><th>Exemple d'expression</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
         {% for r in words %}
-        <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
+        <tr data-i="{{ forloop.counter0 }}" data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
           <td class="hanzi">{{ r.hanzi }}</td>
           <td class="rec-hk">{{ r.pinyin }}</td>
           <td>{{ r.french }}</td>
@@ -75,7 +104,7 @@
       <thead><tr><th class="rec-hk">Expression</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
         {% for r in expressions %}
-        <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
+        <tr data-i="{{ forloop.counter0 }}" data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
           <td class="rec-furigana">{% for char, syl in r.furigana %}<ruby class="hanzi">{{ char }}<rt>{{ syl }}</rt></ruby>{% endfor %}</td>
           <td>{{ r.french }}</td>
           <td class="text-gray-600">{{ r.theme }}</td>
@@ -89,7 +118,97 @@
     </table>
   </div>
 </div>
+<dialog class="rec-show" id="rec-show" aria-labelledby="rec-show-count">
+  <div class="rec-show-head">
+    <span id="rec-show-count" aria-live="polite"></span>
+    <button type="button" class="rec-show-close" data-show="close" aria-label="Fermer le diaporama">✕</button>
+  </div>
+  <div class="rec-show-card" id="rec-show-card"></div>
+  <div class="rec-show-nav">
+    <button type="button" data-show="-1">← Précédent</button>
+    <button type="button" data-show="1" class="is-next">Suivant →</button>
+  </div>
+</dialog>
+{{ words|json_script:"rec-words-data" }}
+{{ expressions|json_script:"rec-expressions-data" }}
+
 <script>
+  /* Slideshow: the items of the open tab, as filtered, one at a time.
+     A double click (or a double tap) on « Suivant » moves one item only:
+     a second click is ignored while the previous move settles (450 ms),
+     as are repeated clicks of one gesture and held-down keys. */
+  (function () {
+    const DATA = { mots: JSON.parse(document.getElementById('rec-words-data').textContent),
+                   expressions: JSON.parse(document.getElementById('rec-expressions-data').textContent) };
+    const dialog = document.getElementById('rec-show'), card = document.getElementById('rec-show-card');
+    const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    let list = [], pos = 0, tab = 'mots', lockedUntil = 0;
+
+    const currentTab = () => (location.hash.slice(1) === 'expressions' ? 'expressions' : 'mots');
+    /** The indexes of the rows the filters leave visible, in order. */
+    const visibleIndexes = (name) => [...document.querySelectorAll(`[data-recpanel="${name}"] tr[data-i]`)]
+      .filter((tr) => !tr.hidden).map((tr) => Number(tr.dataset.i));
+
+    function render() {
+      const r = DATA[tab][list[pos]];
+      document.getElementById('rec-show-count').innerHTML = `${tab === 'mots' ? 'Mots' : 'Expressions'} · <b>${pos + 1} / ${list.length}</b>`;
+      const main = tab === 'mots'
+        ? `<div class="hanzi rec-show-hanzi">${esc(r.hanzi)}</div><div class="rec-show-pinyin">${esc(r.pinyin)}</div>`
+        : `<div class="rec-furigana">${r.furigana.map(([c, s]) => `<ruby class="hanzi">${esc(c)}<rt>${esc(s)}</rt></ruby>`).join('')}</div>`;
+      const example = tab === 'mots' && r.example
+        ? `<div class="rec-show-example">${esc(r.example.target)}<small>${esc(r.example.french)}</small></div>` : '';
+      card.innerHTML = `${main}<div class="rec-show-french">${esc(r.french)}</div>${example}
+        <div class="rec-show-meta">${r.theme ? `${esc(r.theme)} · ` : ''}<span class="rec-file">${esc(r.filename)}</span> · ${esc(r.origin)}</div>`;
+      dialog.querySelector('[data-show="-1"]').disabled = pos === 0;
+      dialog.querySelector('[data-show="1"]').disabled = pos === list.length - 1;
+    }
+
+    function open(startAt) {
+      tab = currentTab();
+      list = visibleIndexes(tab);
+      if (!list.length) return;
+      pos = Math.max(0, list.indexOf(startAt));
+      render();
+      if (!dialog.open) dialog.showModal();
+    }
+
+    function move(step) {
+      const now = Date.now();
+      if (now < lockedUntil) return;          // a second click of a double click
+      const next = Math.min(list.length - 1, Math.max(0, pos + step));
+      if (next === pos) return;
+      lockedUntil = now + 450;
+      pos = next;
+      card.classList.add('is-changing');      // a visible change, so a move is never missed
+      setTimeout(() => { render(); card.classList.remove('is-changing'); }, 120);
+    }
+
+    document.getElementById('rec-show-open').addEventListener('click', () => open(-1));
+    document.querySelectorAll('.rec-table tbody').forEach((tbody) => tbody.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-i]');
+      if (tr) open(Number(tr.dataset.i));
+    }));
+    dialog.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-show]');
+      if (e.target === dialog || b?.dataset.show === 'close') { dialog.close(); return; }
+      if (b && e.detail <= 1) move(Number(b.dataset.show));   // detail 2+: the same double click
+    });
+    dialog.addEventListener('keydown', (e) => {
+      if (e.repeat) return;                    // a held-down key moves once
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); move(1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
+    });
+    // Swipe on a phone or a tablet.
+    let x0 = null;
+    card.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    card.addEventListener('touchend', (e) => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0;
+      x0 = null;
+      if (Math.abs(dx) > 60) move(dx < 0 ? 1 : -1);
+    });
+  })();
+
   (function () {
     const search = document.getElementById('rec-search'), theme = document.getElementById('rec-theme');
     const filter = () => {
