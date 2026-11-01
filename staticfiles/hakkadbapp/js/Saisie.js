@@ -423,9 +423,9 @@ class SaisieEntry {
             // The syllable converted disappears: the next one takes its index.
             this.active = Math.max(0, Math.min(this.active, this.entry.syllables.length - 1));
             this.renderAll();
-            const next = this.el.slots.querySelector(`[data-slot="${this.active}"]`);
+            // Keep typing where you were; never move the focus to a box
+            // (on a tablet that would also open the keyboard).
             if (focusText) this.el.text.focus();
-            else next?.focus();
         }
 
         setActive(index) {
