@@ -1098,7 +1098,7 @@ def pronunciation_comparison(request):
     an automaton -- all drawn by sources_page.js from api_sources_table."""
     return render(request, "hakkadbapp/pronunciation_comparison.html", {
         "page": "pronunciation_comparison",
-        "title": "Sources",
+        "title": "Lectures comparées",
     })
 
 

@@ -26,12 +26,14 @@
     const state = { filter: 'all', query: '', limit: PAGE, source: null, part: 'initial', hot: null };
 
     // ---- tabs ---------------------------------------------------------------------------------
-    const TABS = ['tableau', 'regles', 'automate'];
+    const TABS = ['correspondances', 'regles', 'lectures'];
+    const OLD = { automate: 'correspondances', tableau: 'lectures' }; // earlier links keep working
     function showTab() {
-        const name = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tableau';
+        const hash = OLD[location.hash.slice(1)] || location.hash.slice(1);
+        const name = TABS.includes(hash) ? hash : 'correspondances';
         document.querySelectorAll('[data-sxtab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.sxtab === name)));
         document.querySelectorAll('[data-sxpanel]').forEach((p) => { p.hidden = p.dataset.sxpanel !== name; });
-        if (data && name === 'automate') drawAutomaton();
+        if (data && name === 'correspondances') drawAutomaton();
     }
     document.querySelectorAll('[data-sxtab]').forEach((t) => t.addEventListener('click', (e) => {
         e.preventDefault();
