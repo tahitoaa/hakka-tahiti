@@ -19,5 +19,8 @@
     "api/index.py": {
       "maxDuration": 60
     }
+  },
+  "git": {
+    "deploymentEnabled": false
   }
 }
