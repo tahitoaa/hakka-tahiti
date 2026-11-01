@@ -74,6 +74,7 @@ urlpatterns = [
     path("saisie/", additions.saisie, name="saisie"),
     path("validation/", additions.validation, name="validation"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
+    path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ajouts/<int:addition_id>", additions.addition_update, name="addition_update"),
     path("api/ajouts/<int:addition_id>/supprimer", additions.addition_delete, name="addition_delete"),
 ]

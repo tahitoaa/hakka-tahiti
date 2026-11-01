@@ -198,3 +198,39 @@ def addition_update(request, addition_id):
 def addition_delete(request, addition_id):
     get_object_or_404(LexiconAddition, id=addition_id).delete()
     return JsonResponse({"ok": True})
+
+
+MAX_BULK = 500
+
+
+@require_POST
+@editor_required
+def additions_bulk(request):
+    """The rows ticked on the Validation page, all or nothing:
+    {"ids": [...], "status": "validated"} changes their status,
+    {"ids": [...], "action": "delete"} deletes them."""
+    payload, error = _read_json(request)
+    if error:
+        return error
+    ids = payload.get("ids") if isinstance(payload, dict) else None
+    if (not isinstance(ids, list) or not ids or len(ids) > MAX_BULK
+            or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids)):
+        return JsonResponse({"error": "Sélection invalide."}, status=400)
+    additions = list(LexiconAddition.objects.filter(id__in=ids).select_related("created_by", "updated_by"))
+    if len(additions) != len(set(ids)):
+        return JsonResponse({"error": "Certains ajouts n'existent plus : rechargez la page."}, status=404)
+
+    if payload.get("action") == "delete":
+        with transaction.atomic():
+            LexiconAddition.objects.filter(id__in=ids).delete()
+        return JsonResponse({"ok": True, "deleted": sorted(set(ids))})
+
+    status = payload.get("status")
+    if status not in STATUSES:
+        return JsonResponse({"error": "Statut invalide."}, status=400)
+    with transaction.atomic():
+        for addition in additions:
+            addition.status = status
+            addition.updated_by = request.user
+            addition.save(update_fields=["status", "updated_by", "updated_at"])
+    return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})

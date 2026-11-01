@@ -209,7 +209,7 @@ class AdditionList {
         if (!addition) return;
         if (action === 'edit') return this.onEdit(addition);
         if (action === 'delete' && !confirm(`Supprimer « ${addition.hanzi} » (${addition.french}) ?`)) return;
-        const row = button?.closest('li');
+        const row = button?.closest('[data-id]');
         row?.classList.add('is-busy');
         const group = row ? [...row.querySelectorAll('button')] : [];
         await AdditionList.whileBusy(button, AdditionList.BUSY_LABELS[action === 'delete' ? 'delete' : status] || '…', async () => {
@@ -231,16 +231,158 @@ class AdditionList {
     }
 }
 
-/* The "Validation" page: just the list, opened on what awaits validation;
-   "Modifier" goes back to the Saisie form with that addition loaded. */
+/* =========================================================================
+   The "Validation" page: the additions as a table (made for an iPad in
+   landscape), rows ticked then validated / rejected / sent back together
+   (one request: /api/ajouts/lot). "Modifier" goes back to the Saisie form
+   with that addition loaded.
+   ========================================================================= */
+class ValidationTable extends AdditionList {
+    static BULK = {
+        validated: { busy: 'Validation…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} validé${n > 1 ? 's' : ''}.` },
+        rejected: { busy: 'Rejet…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} rejeté${n > 1 ? 's' : ''}.` },
+        review: { busy: 'Proposition…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} remis à valider.` },
+        draft: { busy: 'Retour en brouillon…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} renvoyé${n > 1 ? 's' : ''} en brouillon.` },
+        delete: { busy: 'Suppression…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}.` },
+    };
+
+    /** options: AdditionList's, plus `all` (the header checkbox), `bar`
+     *  (the bulk buttons, [data-bulk]), `count` and `status` elements. */
+    constructor(options) {
+        super(options);
+        Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status });
+        this.selected = new Set();
+
+        this.el.list.addEventListener('change', (event) => {
+            const box = event.target.closest('[data-select]');
+            if (box) this.toggle(Number(box.dataset.select), box.checked);
+        });
+        // A tap anywhere on the row ticks it (not on its buttons).
+        this.el.list.addEventListener('click', (event) => {
+            if (event.target.closest('button, a, input, label')) return;
+            const row = event.target.closest('tr[data-id]');
+            if (row) this.toggle(Number(row.dataset.id), !this.selected.has(Number(row.dataset.id)));
+        });
+        this.el.all.addEventListener('change', () => {
+            const ids = this.visible().map((a) => a.id);
+            if (this.el.all.checked) ids.forEach((id) => this.selected.add(id));
+            else ids.forEach((id) => this.selected.delete(id));
+            this.render();
+        });
+        this.el.bar.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-bulk]');
+            if (btn) this.bulk(btn.dataset.bulk, btn);
+        });
+    }
+
+    toggle(id, on) {
+        if (on) this.selected.add(id);
+        else this.selected.delete(id);
+        const row = this.el.list.querySelector(`tr[data-id="${id}"]`);
+        row?.classList.toggle('is-selected', on);
+        const box = row?.querySelector('[data-select]');
+        if (box) box.checked = on;
+        this.renderBar();
+    }
+
+    render() {
+        // Only what is shown can stay ticked.
+        const visible = this.visible();
+        const shown = new Set(visible.map((a) => a.id));
+        [...this.selected].forEach((id) => { if (!shown.has(id)) this.selected.delete(id); });
+        super.render();
+        if (!visible.length) {
+            this.el.list.innerHTML = `<tr><td colspan="8" class="vt-empty">${AdditionList.escapeHtml(this.empty)}</td></tr>`;
+        }
+        if (this.el.bar) this.renderBar();
+    }
+
+    renderBar() {
+        const visible = this.visible();
+        const n = this.selected.size;
+        this.el.all.checked = n > 0 && n === visible.length;
+        this.el.all.indeterminate = n > 0 && n < visible.length;
+        this.el.all.disabled = !visible.length;
+        this.el.count.textContent = n ? `${n} sélectionné${n > 1 ? 's' : ''}` : 'Cochez des lignes';
+        const chosen = this.additions.filter((a) => this.selected.has(a.id));
+        this.el.bar.querySelectorAll('[data-bulk]').forEach((b) => {
+            if (b.getAttribute('aria-busy') === 'true') return;
+            const action = b.dataset.bulk;
+            // Nothing to do when every ticked row already has that status;
+            // only drafts and rejected additions can be deleted.
+            b.disabled = !n || (action === 'delete'
+                ? chosen.some((a) => !['draft', 'rejected'].includes(a.status))
+                : chosen.every((a) => a.status === action));
+        });
+    }
+
+    renderItem(a) {
+        const esc = AdditionList.escapeHtml;
+        const on = this.selected.has(a.id);
+        const date = new Date(a.updated_at).toLocaleDateString('fr-FR');
+        const who = a.updated_by && a.updated_by !== a.created_by ? `${a.created_by} → ${a.updated_by}` : a.created_by;
+        return `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
+            <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
+                aria-label="Sélectionner ${esc(a.hanzi)}"></td>
+            <td class="hanzi vt-hanzi">${esc(a.hanzi)}</td>
+            <td class="vt-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</td>
+            <td class="vt-french">${esc(a.french)}
+                ${a.english ? `<div class="vt-sub italic">${esc(a.english)}</div>` : ''}
+                ${a.observations ? `<div class="vt-sub">${esc(a.observations)}</div>` : ''}</td>
+            <td class="vt-meta">${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? `<div class="vt-sub">${esc(a.themes)}</div>` : ''}</td>
+            <td class="vt-meta vt-who">${esc(who)}<div class="vt-sub">${date}</div></td>
+            <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
+            <td class="vt-actions"><button type="button" data-action="edit" class="saisie-btn saisie-btn-neutral"
+                aria-label="Modifier ${esc(a.hanzi)}" title="Modifier">✎</button></td>
+        </tr>`;
+    }
+
+    setStatus(message, isError = false) {
+        this.el.status.textContent = message;
+        this.el.status.className = `text-sm ${isError ? 'text-red-700' : 'text-green-700'}`;
+    }
+
+    async bulk(action, button) {
+        const ids = [...this.selected];
+        if (!ids.length) return;
+        if (action === 'delete' && !confirm(`Supprimer ${ids.length} ajout${ids.length > 1 ? 's' : ''} ? C'est définitif.`)) return;
+        const labels = ValidationTable.BULK[action];
+        const rows = ids.map((id) => this.el.list.querySelector(`tr[data-id="${id}"]`)).filter(Boolean);
+        rows.forEach((r) => r.classList.add('is-busy'));
+        this.setStatus('');
+        await AdditionList.whileBusy(button, labels.busy, async () => {
+            try {
+                const payload = action === 'delete' ? { ids, action } : { ids, status: action };
+                const data = await AdditionList.request(`${AdditionList.API}lot`, payload);
+                if (action === 'delete') {
+                    const gone = new Set(data.deleted);
+                    this.additions = this.additions.filter((a) => !gone.has(a.id));
+                } else {
+                    const byId = new Map(data.additions.map((a) => [a.id, a]));
+                    this.additions = this.additions.map((a) => byId.get(a.id) || a);
+                }
+                this.selected.clear();
+                this.render();
+                if (action !== 'delete') this.flash(ids);
+                this.setStatus(`✓ ${labels.done(ids.length)}`);
+            } catch (err) {
+                rows.forEach((r) => r.classList.remove('is-busy'));
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
+        this.renderBar();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('validation-page');
     if (!root) return;
     const $ = (id) => document.getElementById(id);
-    window.validationList = new AdditionList({
-        list: $('saisie-list'), search: $('saisie-search'), filters: $('saisie-filters'),
+    window.validationTable = new ValidationTable({
+        list: $('validation-rows'), search: $('saisie-search'), filters: $('saisie-filters'),
+        all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
         filter: 'review', empty: 'Rien à afficher ici.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
-    window.validationList.load();
+    window.validationTable.load();
 });
