@@ -246,7 +246,10 @@ class SuggestionBar {
                 ? `<span class="sugg-src">${s.sources.map((src) => `<i class="src-bar" data-src="${src}"></i>`).join('')}</span>`
                 : '';
             const sourceTitle = showSources && s.sources?.length ? ` · sources : ${s.sources.join(', ')}` : '';
-            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}">`
+            // Mandarin + meaning (Unihan), when loaded (HanziInfo.js).
+            const info = typeof HanziInfo !== 'undefined' ? HanziInfo.text(simp) || HanziInfo.text(trad) : '';
+            const infoTitle = info ? `\n${info.replace(/"/g, '&quot;')}` : '';
+            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${infoTitle}">`
                 + `<span class="sugg-key">${keyHint}</span>${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
                 + `<span class="sugg-py">${pinyin}</span>`
@@ -256,3 +259,6 @@ class SuggestionBar {
         this.updateVisibility();
     }
 }
+
+// The suggestions' tooltips show each character's Mandarin and meaning: loaded early.
+if (typeof HanziInfo !== 'undefined') HanziInfo.load();

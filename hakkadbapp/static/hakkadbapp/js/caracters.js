@@ -275,7 +275,8 @@
         return `<span class="hanzi">${escapeHtml(r.simp)}</span> <b>${escapeHtml(pinyinText(r.key))}</b>`
             + ` · ${r.words} mot${r.words > 1 ? 's' : ''}`
             + (polyHanzi.has(r.simp) ? `<br><i>autres lectures : ${byHanzi.get(r.simp).filter((o) => o !== r).map((o) => escapeHtml(pinyinText(o.key))).join(', ')}</i>` : '')
-            + (examples ? `<br>${examples}` : '');
+            + (examples ? `<br>${examples}` : '')
+            + (typeof HanziInfo !== 'undefined' && HanziInfo.html(r.simp) ? `<br>${HanziInfo.html(r.simp)}` : '');
     }
 
     function tipFor(el) {
@@ -285,6 +286,7 @@
     }
 
     function setupTooltip() {
+        if (typeof HanziInfo !== 'undefined') HanziInfo.load();
         const tip = $('car-tooltip');
         const show = (el) => {
             const html = tipFor(el);

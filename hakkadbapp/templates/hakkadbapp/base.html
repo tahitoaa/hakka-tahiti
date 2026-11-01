@@ -20,6 +20,12 @@
     {{ romanization_config|json_script:"romanization-config" }}
     <script src="{% static 'hakkadbapp/js/Romanization.js' %}"></script>
     <script>Romanization.init();</script>
+    <!-- Mandarin + short meaning of a character (Unicode Unihan), loaded on demand. -->
+    <script src="{% static 'hakkadbapp/js/HanziInfo.js' %}" data-url="{% static 'hakkadbapp/data/hanzi_info.json' %}"></script>
+    <style>
+      .hzi-src { font-size: 0.7em; color: #8C8478; border: 1px solid #E8DFD2; border-radius: 9999px; padding: 0 0.35em; margin-left: 0.25em; }
+      .rosace-mandarin { margin-top: 0.4rem; font-size: 0.95rem; color: #544D45; text-align: center; }
+    </style>
 
     <!-- Tailwind CSS -->
      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
