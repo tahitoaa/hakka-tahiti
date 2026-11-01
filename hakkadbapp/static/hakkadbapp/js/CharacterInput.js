@@ -148,9 +148,9 @@ const SUGGESTION_BAR_CSS = `
 .sugg:active { background: #E8D9C2; }
 @media (hover: hover) { .sugg:hover { background: #F3E8D6; } }
 .sugg .sugg-hanzi { font-size: 1.3rem !important; line-height: 1.1; letter-spacing: 0; white-space: nowrap; }
-.sugg .sugg-alt { font-size: 0.55em; color: #B5AA9B; font-weight: 500; vertical-align: super; margin-left: 1px; }
+.sugg .sugg-alt { font-size: 0.6em; color: #8C8478; font-weight: 500; margin-left: 1px; }
 .sugg .sugg-py {
-    margin-top: 0.15rem; font-size: 0.625rem; color: #8C8478;
+    margin-top: 0.15rem; font-size: 0.68rem; color: #8C8478;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sugg .sugg-key { position: absolute; top: 2px; left: 4px; font-size: 0.5rem; color: #B5AA9B; }
@@ -164,7 +164,12 @@ const SUGGESTION_BAR_CSS = `
             color: #fff; font-size: 0.5rem; font-weight: 700; line-height: 0.8rem; text-align: center; }
 @media (hover: none) and (pointer: coarse) { .sugg .sugg-key { display: none; } }
 /* Unihan under the character: Mandarin reading, then a short English meaning. */
-.sugg-bar.sugg-bar.has-uh { grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr)); max-height: min(45vh, 18rem); }
+.sugg-bar.sugg-bar.has-uh { grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr)); max-height: min(45vh, 17rem); }
+/* Line 2: Hakka in bold, Mandarin lighter; line 3: English. */
+.sugg .sugg-py .sugg-hk { font-weight: 700; color: #3A3430; }
+.sugg .sugg-py .sugg-man { font-weight: 400; color: #3730a3; margin-left: 0.2rem; }
+.sugg .sugg-en { margin-top: 0.05rem; width: 100%; font-size: 0.58rem; line-height: 1.15; color: #8C8478; text-align: center;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sugg .sugg-uh { margin-top: 0.15rem; width: 100%; font-size: 0.6rem; line-height: 1.15; color: #6E655C; text-align: center;
                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sugg .sugg-uh b { color: #3730a3; font-weight: 600; }
@@ -248,7 +253,7 @@ class SuggestionBar {
             const trad = s.pron.trad || simp;
             const main = s.pron.char ? (s.pron.char() || simp) : simp;
             const alt = main === simp ? trad : simp;
-            const hanzi = alt && alt !== main ? `${main}<span class="sugg-alt">${alt}</span>` : main;
+            const hanzi = alt && alt !== main ? `${main}<span class="sugg-alt">(${alt})</span>` : main;
             const pinyin = s.pron.pinyinSpan ? s.pron.pinyinSpan() : (s.pron.abstractPinyin ? s.pron.abstractPinyin() : '?');
             // Where it comes from, when more than the lexicon is in use (L·B·M).
             const marks = showSources && s.sources?.length
@@ -259,14 +264,14 @@ class SuggestionBar {
             const info = typeof HanziInfo !== 'undefined' ? HanziInfo.text(simp) || HanziInfo.text(trad) : '';
             const infoTitle = info ? `\n${info.replace(/"/g, '&quot;')}` : '';
             const uh = typeof HanziInfo !== 'undefined' ? HanziInfo.get(simp) || HanziInfo.get(trad) : null;
-            const uhLine = uh ? `<span class="sugg-uh" lang="en"><b>${escapeSugg(uh.mandarin.split(', ')[0])}</b>`
-                + `${uh.meaning ? ` ${escapeSugg(uh.meaning.split(/[;,]/)[0].trim())}` : ''}</span>` : '';
-            if (uhLine) withUnihan = true;
+            const mandarin = uh?.mandarin ? `<span class="sugg-man">${escapeSugg(uh.mandarin.split(', ')[0])}</span>` : '';
+            const english = uh?.meaning ? `<span class="sugg-en" lang="en">${escapeSugg(uh.meaning.split(/[;,]/)[0].trim())}</span>` : '';
+            if (uh) withUnihan = true;
             return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${infoTitle}">`
                 + `<span class="sugg-key">${keyHint}</span>${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
-                + `<span class="sugg-py">${pinyin}</span>`
-                + uhLine
+                + `<span class="sugg-py"><span class="sugg-hk">${pinyin}</span>${mandarin}</span>`
+                + english
                 + `</button>`;
         }).join('');
 
