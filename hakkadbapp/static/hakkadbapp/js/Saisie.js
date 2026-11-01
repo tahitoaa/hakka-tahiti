@@ -254,6 +254,8 @@ class SaisieEntry {
     const { API, escapeHtml, superscriptTones, displayPinyin, request, whileBusy } = typeof AdditionList !== 'undefined'
         ? AdditionList : {};
 
+    const AI_API = '/api/ia/suggestion';
+
     const CHECK_LABELS = {
         known: 'dans le lexique',
         reading: 'dans le lexique, autre lecture',
@@ -286,7 +288,10 @@ class SaisieEntry {
                 observations: $('saisie-observations'), preview: $('saisie-preview'),
                 check: $('saisie-check'), newWords: $('saisie-new-words'),
                 status: $('saisie-status'), cancel: $('saisie-cancel'),
+                ai: $('saisie-ai'), aiBtn: $('saisie-ai-btn'), aiResult: $('saisie-ai-result'),
             };
+            this.aiSuggestion = null;   // last AI proposal, and the entry it was for
+            this.aiFor = '';
             this.validationUrl = this.el.form.dataset.validationUrl || '';
             // Every addition is loaded (for "déjà proposé"); only the drafts are listed.
             this.list = new AdditionList({
@@ -359,6 +364,14 @@ class SaisieEntry {
                 this.save(button?.dataset.status || 'draft', button);
             });
             this.el.cancel.addEventListener('click', () => this.resetForm());
+            this.el.aiBtn?.addEventListener('click', () => this.suggest());
+            this.el.aiResult?.addEventListener('click', (event) => {
+                const btn = event.target.closest('[data-ai-use]');
+                if (btn) this.useSuggestion(btn.dataset.aiUse);
+            });
+            // A field the AI filled stays tinted until the editor changes it.
+            [this.el.french, this.el.english, this.el.themes].forEach((input) =>
+                input.addEventListener('input', () => input.classList.remove('is-ai')));
             // Shift+1..9 picks a suggestion, as on the "Écrire" page.
             this.el.form.addEventListener('keydown', (event) => {
                 if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;
@@ -431,6 +444,80 @@ class SaisieEntry {
         renderAll() {
             this.renderSlots();
             this.renderPreview();
+            // A proposal made for other characters no longer applies.
+            if (this.aiSuggestion && this.aiFor !== this.aiEntryKey()) this.clearSuggestion();
+        }
+
+        // ---- AI suggestions (ai.py) ------------------------------------------
+
+        aiEntryKey() {
+            const v = this.entry.values();
+            return `${v.kind}|${v.hanzi}|${v.pinyin}`;
+        }
+
+        clearSuggestion() {
+            this.aiSuggestion = null;
+            this.aiFor = '';
+            if (this.el.aiResult) this.el.aiResult.innerHTML = '';
+        }
+
+        /** Asks the server for French, English and theme; shows them to accept. */
+        async suggest() {
+            const problem = this.entry.problem();
+            if (problem) return this.setStatus(problem, true);
+            const values = this.values();
+            const key = this.aiEntryKey();
+            this.setStatus('');
+            await whileBusy(this.el.aiBtn, 'L’IA réfléchit…', async () => {
+                try {
+                    const data = await request(AI_API, {
+                        kind: values.kind, hanzi: values.hanzi, pinyin: values.pinyin,
+                        french: values.french, english: values.english,
+                    });
+                    this.aiSuggestion = data.suggestion;
+                    this.aiFor = key;
+                    this.renderSuggestion();
+                } catch (err) {
+                    this.clearSuggestion();
+                    this.el.aiResult.innerHTML = `<p class="text-sm text-red-700">${escapeHtml(err.message)}</p>`;
+                }
+            });
+        }
+
+        renderSuggestion() {
+            const s = this.aiSuggestion;
+            if (!s) return this.clearSuggestion();
+            const rows = [['french', 'Français'], ['english', 'Anglais'], ['themes', 'Thème']]
+                .filter(([field]) => s[field])
+                .map(([field, label]) => `<div class="saisie-ai-row">
+                    <b>${label}</b><span>${escapeHtml(s[field])}</span>
+                    <button type="button" class="saisie-btn saisie-btn-neutral" data-ai-use="${field}">Utiliser</button>
+                  </div>`);
+            if (!rows.length) {
+                this.el.aiResult.innerHTML = '<p class="text-sm">L’IA n’a rien proposé pour cette entrée.</p>';
+                return;
+            }
+            const based = s.based_on.length ? ` D’après : <span class="hanzi">${s.based_on.map(escapeHtml).join('、')}</span>.` : '';
+            this.el.aiResult.innerHTML = `${rows.join('')}
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" class="saisie-btn saisie-btn-ai" data-ai-use="all">Tout utiliser</button>
+                  <span class="saisie-ai-meta"><span class="saisie-ai-conf saisie-ai-conf-${escapeHtml(s.confidence)}">Confiance ${escapeHtml(s.confidence)}</span>
+                    ${escapeHtml(s.explanation)}${based}</span>
+                </div>`;
+        }
+
+        /** Copies one proposed field (or all of them) into the form. */
+        useSuggestion(field) {
+            const s = this.aiSuggestion;
+            if (!s) return;
+            const inputs = { french: this.el.french, english: this.el.english, themes: this.el.themes };
+            const fields = field === 'all' ? Object.keys(inputs) : [field];
+            fields.filter((f) => s[f] && inputs[f]).forEach((f) => {
+                inputs[f].value = s[f];
+                inputs[f].classList.add('is-ai');
+            });
+            this.setStatus('Suggestion reprise : vérifiez-la avant d’enregistrer.');
+            inputs[fields[0]]?.focus();
         }
 
         renderSlots() {
@@ -624,6 +711,7 @@ class SaisieEntry {
             this.el.text.value = SaisieEntry.textFromStored(addition.hanzi, addition.pinyin, addition.kind);
             this.newWords.clear();
             this.setKind(addition.kind);
+            [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
             this.el.french.value = addition.french;
             this.el.english.value = addition.english;
             this.el.themes.value = addition.themes;
@@ -650,6 +738,8 @@ class SaisieEntry {
             this.el.cancel.hidden = true;
             this.setSaveButtons('draft');
             this.el.form.reset();
+            [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
+            this.clearSuggestion();
             this.newWords.clear();
             this.active = 0;
             this.updateText();

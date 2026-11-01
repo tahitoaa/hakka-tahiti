@@ -35,13 +35,57 @@
   .vt-status-rejected { background: #fee2e2; color: #991b1b; }
   /* Narrower than a landscape iPad: the author column goes. */
   @media (max-width: 899px) { .vt-who { display: none; } }
+  /* AI assistant: remarks under a row, its badge, the two tabs. */
+  .vt-tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
+  .vt-tabs button { min-height: 2.75rem; padding: 0.4rem 1rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .vt-tabs button[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+  .vt-ai-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.6rem 0.75rem; border: 1px dashed #c4b5fd;
+                 background: #faf7ff; border-radius: 0.75rem; font-size: 0.85rem; color: #4c1d95; }
+  .vt-ai-tools[hidden] { display: none; }
+  .vt-ai-tools b { margin-right: auto; }
+  .saisie-btn-ai { background: #5b21b6; color: #fff; }
+  .saisie-btn-ai:hover:not(:disabled) { background: #4c1d95; }
+  .vt-ai-badge { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; background: #ede9fe; color: #5b21b6; font-weight: 700; font-size: 0.75rem; }
+  .vt-ia { width: 5.5rem; text-align: center; }
+  .vt-ia-btn { min-height: 2.75rem; min-width: 2.75rem; padding: 0 0.5rem; border-radius: 0.5rem; border: 1px solid #E8DFD2; background: #fff; color: #8C8478; font-size: 0.85rem; white-space: nowrap; }
+  .vt-ia-btn.has-remarks { border-color: #a78bfa; background: #f5f0ff; color: #5b21b6; font-weight: 700; }
+  .vt-table tr.vt-detail { cursor: default; background: #FDFAF5; }
+  .vt-table tr.vt-detail:hover { background: #FDFAF5; }
+  .vt-detail-box { display: grid; gap: 0.6rem; padding: 0.25rem 0 0.5rem 3.25rem; }
+  .vt-remarks { display: grid; gap: 0.5rem; }
+  .vt-remark { background: #fff; border: 1px solid #E8DFD2; border-left: 4px solid #a78bfa; border-radius: 0.5rem; padding: 0.5rem 0.75rem; display: grid; gap: 0.3rem; font-size: 0.9rem; }
+  .vt-remark-correction { border-left-color: #047857; }
+  .vt-remark-head { font-size: 0.75rem; color: #8C8478; font-weight: 600; }
+  .vt-diff del { color: #991b1b; background: #fee2e2; text-decoration: line-through; padding: 0 0.2rem; }
+  .vt-diff ins { color: #065f46; background: #d1fae5; text-decoration: none; padding: 0 0.2rem; }
+  .vt-remark-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .vt-detail-box > [data-remark="mute"] { justify-self: start; }
+  .vt-remark-head .hanzi { color: #261F1C; }
+  .vt-comment-form { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .vt-comment-form input { flex: 1 1 14rem; min-height: 2.5rem; padding: 0.3rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #fff; }
+  .vt-lexicon { display: grid; gap: 0.75rem; }
+  .vt-lexicon ul { display: grid; gap: 0.5rem; }
+  @media (max-width: 640px) { .vt-detail-box { padding-left: 0; } }
 </style>
 
 <div id="validation-page" data-saisie-url="{% url 'saisie' %}" class="mt-2 sm:mt-4 w-full max-w-screen-xl mx-auto space-y-3">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h2 class="font-display text-xl font-bold text-gray-800">Validation des ajouts</h2>
+    <h2 class="font-display text-xl font-bold text-gray-800">Validation</h2>
     <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les ajouts"
            class="min-h-11 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
+  </div>
+
+  <div class="vt-tabs" role="tablist" aria-label="Que relire">
+    <button type="button" role="tab" data-vtab="additions" aria-selected="true" aria-controls="additions-panel">Ajouts</button>
+    <button type="button" role="tab" data-vtab="lexicon" aria-selected="false" aria-controls="lexicon-panel">Remarques sur le lexique<span id="lexicon-count"></span></button>
+  </div>
+
+  <div id="additions-panel" role="tabpanel" class="space-y-3">
+  <div class="vt-ai-tools" data-needs-ai hidden>
+    <b>🤖 Assistant IA</b>
+    <span>Suggérer des mots :</span>
+    <button type="button" class="saisie-btn saisie-btn-ai" data-new-words="missing" title="Mots des expressions et transcriptions absents du lexique">Mots manquants</button>
+    <button type="button" class="saisie-btn saisie-btn-ai" data-new-words="compounds" title="Mots composés de caractères du lexique">Mots composés</button>
   </div>
 
   <div id="saisie-filters" class="flex flex-wrap gap-2 text-sm" role="group" aria-label="Filtrer par statut">
@@ -58,11 +102,12 @@
     <button type="button" data-bulk="review" class="saisie-btn saisie-btn-lg saisie-btn-neutral" disabled>↑ À valider</button>
     <button type="button" data-bulk="draft" class="saisie-btn saisie-btn-lg saisie-btn-neutral" disabled>↺ Brouillon</button>
     <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-lg saisie-btn-delete" disabled>Supprimer</button>
+    <button type="button" data-bulk="ai-review" data-needs-ai hidden class="saisie-btn saisie-btn-lg saisie-btn-ai" disabled>🤖 Relire avec l’IA</button>
   </div>
   <div id="validation-status" class="text-sm min-h-5" role="status"></div>
 
   <div class="vt-wrap">
-    <table class="vt-table">
+    <table class="vt-table no-auto-csv">
       <thead>
         <tr>
           <th class="vt-check"><input type="checkbox" id="validation-all" aria-label="Tout sélectionner"></th>
@@ -72,19 +117,33 @@
           <th>Type · thème</th>
           <th class="vt-who">Par</th>
           <th>Statut</th>
+          <th class="vt-ia">Remarques</th>
           <th><span class="sr-only">Modifier</span></th>
         </tr>
       </thead>
       <tbody id="validation-rows">
-        <tr><td colspan="8" class="vt-empty">Chargement…</td></tr>
+        <tr><td colspan="9" class="vt-empty">Chargement…</td></tr>
       </tbody>
     </table>
   </div>
 
   <p class="text-xs text-gray-500">
     Touchez une ligne pour la cocher, puis choisissez l'action. « ✎ » ouvre l'ajout dans l'onglet
-    <a href="{% url 'saisie' %}" class="underline font-semibold">Saisie</a>.
+    <a href="{% url 'saisie' %}" class="underline font-semibold">Saisie</a>. « 💬 » montre les remarques : l'IA
+    commente et propose des corrections, elle ne modifie, ne valide et ne supprime jamais rien.
   </p>
+  </div>
+
+  <section id="lexicon-panel" role="tabpanel" class="vt-lexicon" hidden>
+    <div class="vt-ai-tools" data-needs-ai hidden>
+      <b>🤖 Faire relire par l'IA</b>
+      <button type="button" class="saisie-btn saisie-btn-ai" data-lex="review" data-type="word">10 mots du lexique</button>
+      <button type="button" class="saisie-btn saisie-btn-ai" data-lex="review" data-type="expression">10 expressions</button>
+    </div>
+    <p class="text-xs text-gray-500">Le lexique se corrige sur la plateforme : corrigez-y l'entrée, puis marquez la remarque « Corrigé ».</p>
+    <div id="lexicon-status" class="text-sm min-h-5" role="status"></div>
+    <ul data-lex-list><li class="vt-sub">Chargement…</li></ul>
+  </section>
 </div>
 
 {{ status_labels|json_script:"saisie-status-labels" }}

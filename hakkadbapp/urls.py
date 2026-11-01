@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
-from . import additions
+from . import additions, ai, assistant
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -75,6 +75,13 @@ urlpatterns = [
     path("validation/", additions.validation, name="validation"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
+    path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),
+    path("api/ia/relire", assistant.api_review, name="assistant_review"),
+    path("api/ia/mots", assistant.api_new_words, name="assistant_new_words"),
+    path("api/ia/muet", assistant.api_mute, name="assistant_mute"),
+    path("api/ia/nuit", assistant.api_nightly, name="assistant_nightly"),
+    path("api/commentaires", assistant.api_comments, name="comments"),
+    path("api/commentaires/<int:comment_id>", assistant.api_comment_action, name="comment_action"),
     path("api/ajouts/<int:addition_id>", additions.addition_update, name="addition_update"),
     path("api/ajouts/<int:addition_id>/supprimer", additions.addition_delete, name="addition_delete"),
 ]

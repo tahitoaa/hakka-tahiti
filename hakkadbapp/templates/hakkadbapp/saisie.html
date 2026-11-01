@@ -29,6 +29,25 @@
   .saisie-check-unknown { border-left-color: #dc2626 !important; } p.saisie-check-unknown { background: #ecfdf5; color: #065f46; }
   .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
   @media (max-width: 480px) { .saisie-new-word { grid-template-columns: 1fr; } }
+  /* AI suggestions: a proposal to accept, never saved on its own. */
+  .saisie-ai { border: 1px dashed #c4b5fd; background: #faf7ff; border-radius: 0.75rem; padding: 0.75rem; display: grid; gap: 0.6rem; }
+  .saisie-ai[hidden] { display: none; }
+  .saisie-ai-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .saisie-ai-head p { flex: 1 1 14rem; margin: 0; font-size: 0.8rem; color: #6b6478; }
+  .saisie-btn-ai { background: #5b21b6; color: #fff; }
+  .saisie-btn-ai:hover:not(:disabled) { background: #4c1d95; }
+  .saisie-ai-result { display: grid; gap: 0.4rem; }
+  .saisie-ai-row { display: grid; grid-template-columns: 6rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: center;
+                   background: #fff; border: 1px solid #e9e3f5; border-radius: 0.5rem; padding: 0.35rem 0.5rem; }
+  .saisie-ai-row b { font-size: 0.8rem; color: #544D45; }
+  .saisie-ai-row span { overflow-wrap: anywhere; }
+  .saisie-ai-meta { font-size: 0.8rem; color: #6b6478; }
+  .saisie-ai-conf { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; font-weight: 600; font-size: 0.75rem; }
+  .saisie-ai-conf-haute { background: #d1fae5; color: #065f46; }
+  .saisie-ai-conf-moyenne { background: #fef3c7; color: #92400e; }
+  .saisie-ai-conf-basse { background: #fee2e2; color: #991b1b; }
+  input.is-ai { background: #f5f0ff; border-color: #a78bfa; }
+  @media (max-width: 480px) { .saisie-ai-row { grid-template-columns: minmax(0, 1fr) auto; } .saisie-ai-row b { grid-column: 1 / -1; } }
 </style>
 
 <div class="mt-4 sm:mt-8 w-full max-w-screen-md mx-auto space-y-6">
@@ -74,6 +93,15 @@
     <!-- Each word against the lexicon (same matching as the Écrire page) -->
     <div id="saisie-check" aria-live="polite"></div>
     <div id="saisie-new-words"></div>
+
+    <!-- AI suggestions (ai.py): French, English, theme. Only shown when configured. -->
+    <section id="saisie-ai" class="saisie-ai" {% if not ai_enabled %}hidden{% endif %} aria-labelledby="saisie-ai-btn">
+      <div class="saisie-ai-head">
+        <button type="button" id="saisie-ai-btn" class="saisie-btn saisie-btn-lg saisie-btn-ai">✨ Suggérer français, anglais, thème</button>
+        <p>Proposé par l'IA d'après les mots du lexique qui partagent ces caractères. À vérifier : rien n'est enregistré sans vous.</p>
+      </div>
+      <div id="saisie-ai-result" class="saisie-ai-result" aria-live="polite"></div>
+    </section>
 
     <div class="grid sm:grid-cols-2 gap-3">
       <div>

@@ -27,6 +27,9 @@ if DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
     ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", "").split(",")
+    # Each Vercel deployment's own address (set by Vercel itself), so a
+    # preview deployment answers on its URL instead of a 400.
+    ALLOWED_HOSTS += [h for h in (config("VERCEL_URL", default=""), config("VERCEL_BRANCH_URL", default="")) if h]
 
 # Application definition
 

@@ -331,3 +331,69 @@ class SharedTranscript(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ReviewComment(models.Model):
+    """A remark on an item -- an addition (LexiconAddition) or a lexicon
+    word / expression: a plain comment, or a correction proposing a new
+    value for one field. Written by the AI assistant (assistant.py) or an
+    editor. A correction never changes the item by itself: an editor
+    applies it (additions only; the lexicon is edited on the platform) or
+    dismisses it."""
+    TARGET_ADDITION = "addition"
+    TARGET_WORD = "word"
+    TARGET_EXPRESSION = "expression"
+    TARGET_CHOICES = [(TARGET_ADDITION, "Ajout"), (TARGET_WORD, "Mot du lexique"),
+                      (TARGET_EXPRESSION, "Expression du lexique")]
+    KIND_COMMENT = "comment"
+    KIND_CORRECTION = "correction"
+    KIND_CHOICES = [(KIND_COMMENT, "Commentaire"), (KIND_CORRECTION, "Correction")]
+    STATUS_OPEN = "open"
+    STATUS_APPLIED = "applied"
+    STATUS_DISMISSED = "dismissed"
+    STATUS_CHOICES = [(STATUS_OPEN, "À traiter"), (STATUS_APPLIED, "Appliquée"), (STATUS_DISMISSED, "Écartée")]
+
+    target_type = models.CharField(max_length=12, choices=TARGET_CHOICES)
+    target_id = models.IntegerField()
+    # The item as it was when commented ("屋家 · la maison"): stays readable
+    # even if a lexicon reimport changes or drops it.
+    target_label = models.CharField(max_length=300, blank=True, default="")
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=KIND_COMMENT)
+    text = models.TextField()
+    # Corrections: which field, its value then, the proposed value.
+    field = models.CharField(max_length=20, blank=True, default="")
+    current_value = models.TextField(blank=True, default="")
+    proposed_value = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_OPEN)
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["target_type", "target_id"])]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} sur {self.target_label or self.target_id}"
+
+
+class AITarget(models.Model):
+    """What the AI assistant knows of one item: muted by an editor (the AI
+    never comments on it again), and when it last reviewed it (the nightly
+    run skips what it already read, unless the item changed since)."""
+    target_type = models.CharField(max_length=12, choices=ReviewComment.TARGET_CHOICES)
+    target_id = models.IntegerField()
+    muted = models.BooleanField(default=False)
+    muted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["target_type", "target_id"], name="unique_ai_target")]
+
+    def __str__(self):
+        return f"{self.target_type} {self.target_id}{' (muet)' if self.muted else ''}"

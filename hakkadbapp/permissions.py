@@ -9,10 +9,22 @@ SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 # Users are put in this group by hand in the admin.
 READERS_GROUP = "Lecteurs"
 
+# The AI assistant's account (assistant.py): it suggests new words and
+# writes comments, through assistant.py's own functions only. It is not an
+# editor: every editor endpoint refuses it, so it can't change, validate
+# or delete anything, whatever it asks for.
+ASSISTANTS_GROUP = "Assistants IA"
+AI_USERNAME = "ia"
+
+
+def is_assistant(user):
+    return user.is_authenticated and user.groups.filter(name=ASSISTANTS_GROUP).exists()
+
 
 def is_editor(user):
-    """Logged in and not a reader."""
-    return user.is_authenticated and not user.groups.filter(name=READERS_GROUP).exists()
+    """Logged in, and neither a reader nor the AI assistant."""
+    return (user.is_authenticated
+            and not user.groups.filter(name__in=[READERS_GROUP, ASSISTANTS_GROUP]).exists())
 
 
 def editor_required(view):

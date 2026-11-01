@@ -11,8 +11,9 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 
+from .ai import ai_enabled
 from .models import Expression, LexiconAddition, Word
-from .permissions import editor_required, is_editor
+from .permissions import AI_USERNAME, editor_required, is_editor
 
 EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations")
 KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
@@ -38,6 +39,7 @@ def _addition_json(a):
         "observations": a.observations,
         "platform_id": a.platform_id,
         "created_by": a.created_by.username if a.created_by else "",
+        "by_ai": bool(a.created_by and a.created_by.username == AI_USERNAME),
         "updated_by": a.updated_by.username if a.updated_by else "",
         "created_at": a.created_at.isoformat(),
         "updated_at": a.updated_at.isoformat(),
@@ -133,6 +135,7 @@ def saisie(request):
         "page": "saisie",
         "known_themes": _known_themes(),
         "status_labels": dict(LexiconAddition.STATUS_CHOICES),
+        "ai_enabled": ai_enabled(),
     })
     return render(request, "hakkadbapp/saisie.html", context)
 

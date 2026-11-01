@@ -29,8 +29,7 @@ class AdditionList {
     }
 
     static superscriptTones(pinyin) {
-        const SUPERSCRIPT = { 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶' };
-        return String(pinyin || '').replace(/[1-6]/g, (d) => SUPERSCRIPT[d]);
+        return String(pinyin || '').replace(/[1-8]/g, (d) => '¹²³⁴⁵⁶⁷⁸'[d - 1]);
     }
 
     /** A stored (Wenfa) pinyin as shown, in the "J'affiche en" system. */
@@ -236,8 +235,11 @@ class AdditionList {
    landscape), rows ticked then validated / rejected / sent back together
    (one request: /api/ajouts/lot). "Modifier" goes back to the Saisie form
    with that addition loaded.
+   The AI assistant's remarks (assistant.py) show under each row: an editor
+   applies a correction, dismisses a remark, or mutes the AI on an item.
    ========================================================================= */
 class ValidationTable extends AdditionList {
+    static COMMENTS_API = '/api/commentaires';
     static BULK = {
         validated: { busy: 'Validation…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} validé${n > 1 ? 's' : ''}.` },
         rejected: { busy: 'Rejet…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} rejeté${n > 1 ? 's' : ''}.` },
@@ -245,6 +247,7 @@ class ValidationTable extends AdditionList {
         draft: { busy: 'Retour en brouillon…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} renvoyé${n > 1 ? 's' : ''} en brouillon.` },
         delete: { busy: 'Suppression…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}.` },
     };
+    static MAX_AI_REVIEW = 12;
 
     /** options: AdditionList's, plus `all` (the header checkbox), `bar`
      *  (the bulk buttons, [data-bulk]), `count` and `status` elements. */
@@ -252,6 +255,9 @@ class ValidationTable extends AdditionList {
         super(options);
         Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status });
         this.selected = new Set();
+        this.comments = [];          // remarks on additions (open + recently resolved)
+        this.muted = new Set();      // addition ids the AI must leave alone
+        this.expanded = new Set();   // rows showing their remarks
 
         this.el.list.addEventListener('change', (event) => {
             const box = event.target.closest('[data-select]');
@@ -259,9 +265,17 @@ class ValidationTable extends AdditionList {
         });
         // A tap anywhere on the row ticks it (not on its buttons).
         this.el.list.addEventListener('click', (event) => {
-            if (event.target.closest('button, a, input, label')) return;
+            const remark = event.target.closest('[data-remark]');
+            if (remark) return this.onRemarkAction(remark);
+            if (event.target.closest('button, a, input, label, textarea, .vt-detail')) return;
             const row = event.target.closest('tr[data-id]');
             if (row) this.toggle(Number(row.dataset.id), !this.selected.has(Number(row.dataset.id)));
+        });
+        this.el.list.addEventListener('submit', (event) => {
+            const form = event.target.closest('[data-comment-form]');
+            if (!form) return;
+            event.preventDefault();
+            this.addHumanComment(Number(form.dataset.commentForm), form);
         });
         this.el.all.addEventListener('change', () => {
             const ids = this.visible().map((a) => a.id);
@@ -273,6 +287,28 @@ class ValidationTable extends AdditionList {
             const btn = event.target.closest('[data-bulk]');
             if (btn) this.bulk(btn.dataset.bulk, btn);
         });
+    }
+
+    async load() {
+        await super.load();
+        await this.loadComments();
+    }
+
+    async loadComments() {
+        try {
+            const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}?scope=additions`);
+            this.comments = data.comments;
+            this.muted = new Set(data.muted.map((m) => m.target_id));
+            this.aiEnabled = data.ai_enabled;
+            document.querySelectorAll('[data-needs-ai]').forEach((el) => { el.hidden = !data.ai_enabled; });
+        } catch (err) {
+            this.setStatus(`Remarques de l'IA indisponibles : ${err.message}`, true);
+        }
+        this.render();
+    }
+
+    openRemarks(id) {
+        return this.comments.filter((c) => c.target_id === id && c.status === 'open');
     }
 
     toggle(id, on) {
@@ -292,7 +328,7 @@ class ValidationTable extends AdditionList {
         [...this.selected].forEach((id) => { if (!shown.has(id)) this.selected.delete(id); });
         super.render();
         if (!visible.length) {
-            this.el.list.innerHTML = `<tr><td colspan="8" class="vt-empty">${AdditionList.escapeHtml(this.empty)}</td></tr>`;
+            this.el.list.innerHTML = `<tr><td colspan="9" class="vt-empty">${AdditionList.escapeHtml(this.empty)}</td></tr>`;
         }
         if (this.el.bar) this.renderBar();
     }
@@ -310,6 +346,11 @@ class ValidationTable extends AdditionList {
             const action = b.dataset.bulk;
             // Nothing to do when every ticked row already has that status;
             // only drafts and rejected additions can be deleted.
+            if (action === 'ai-review') {
+                b.disabled = !n || n > ValidationTable.MAX_AI_REVIEW || chosen.every((a) => this.muted.has(a.id));
+                b.title = n > ValidationTable.MAX_AI_REVIEW ? `Au plus ${ValidationTable.MAX_AI_REVIEW} lignes à la fois` : '';
+                return;
+            }
             b.disabled = !n || (action === 'delete'
                 ? chosen.some((a) => !['draft', 'rejected'].includes(a.status))
                 : chosen.every((a) => a.status === action));
@@ -320,8 +361,14 @@ class ValidationTable extends AdditionList {
         const esc = AdditionList.escapeHtml;
         const on = this.selected.has(a.id);
         const date = new Date(a.updated_at).toLocaleDateString('fr-FR');
-        const who = a.updated_by && a.updated_by !== a.created_by ? `${a.created_by} → ${a.updated_by}` : a.created_by;
-        return `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
+        const who = a.by_ai ? '<span class="vt-ai-badge">🤖 IA</span>'
+            : esc(a.updated_by && a.updated_by !== a.created_by ? `${a.created_by} → ${a.updated_by}` : a.created_by);
+        const remarks = this.openRemarks(a.id);
+        const corrections = remarks.filter((c) => c.kind === 'correction').length;
+        const muted = this.muted.has(a.id);
+        const open = this.expanded.has(a.id);
+        const iaLabel = remarks.length ? `💬 ${remarks.length}${corrections ? ` · ✎ ${corrections}` : ''}` : '💬';
+        const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
             <td class="hanzi vt-hanzi">${esc(a.hanzi)}</td>
@@ -330,11 +377,86 @@ class ValidationTable extends AdditionList {
                 ${a.english ? `<div class="vt-sub italic">${esc(a.english)}</div>` : ''}
                 ${a.observations ? `<div class="vt-sub">${esc(a.observations)}</div>` : ''}</td>
             <td class="vt-meta">${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? `<div class="vt-sub">${esc(a.themes)}</div>` : ''}</td>
-            <td class="vt-meta vt-who">${esc(who)}<div class="vt-sub">${date}</div></td>
+            <td class="vt-meta vt-who">${who}<div class="vt-sub">${date}</div></td>
             <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
+            <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
+                aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
             <td class="vt-actions"><button type="button" data-action="edit" class="saisie-btn saisie-btn-neutral"
                 aria-label="Modifier ${esc(a.hanzi)}" title="Modifier">✎</button></td>
         </tr>`;
+        return open ? row + this.renderDetail(a, remarks, muted) : row;
+    }
+
+    /** The remarks under a row: corrections to apply, comments, mute, a comment of one's own. */
+    renderDetail(a, remarks, muted) {
+        const esc = AdditionList.escapeHtml;
+        const list = remarks.map((c) => `<li class="vt-remark vt-remark-${c.kind}">
+              <div class="vt-remark-head">${c.by_ai ? '🤖 IA' : esc(c.author)} ·
+                ${c.kind === 'correction' ? `correction du ${esc(c.field_label)}` : 'commentaire'}</div>
+              ${c.kind === 'correction' ? `<div class="vt-diff"><del>${esc(c.current_value) || '<i>vide</i>'}</del>
+                  <span aria-hidden="true">→</span> <ins>${esc(c.proposed_value)}</ins></div>` : ''}
+              <div>${esc(c.text)}</div>
+              <div class="vt-remark-actions">
+                ${c.applicable ? `<button type="button" class="saisie-btn saisie-btn-validate" data-remark="apply" data-cid="${c.id}">Appliquer</button>` : ''}
+                <button type="button" class="saisie-btn saisie-btn-neutral" data-remark="dismiss" data-cid="${c.id}">Écarter</button>
+              </div></li>`).join('');
+        return `<tr class="vt-detail" data-detail="${a.id}"><td colspan="9">
+            <div class="vt-detail-box">
+              ${list ? `<ul class="vt-remarks">${list}</ul>` : '<p class="vt-sub">Aucune remarque en cours.</p>'}
+              <form class="vt-comment-form" data-comment-form="${a.id}">
+                <label class="sr-only" for="vt-comment-${a.id}">Votre commentaire</label>
+                <input id="vt-comment-${a.id}" type="text" placeholder="Ajouter un commentaire…" maxlength="1000">
+                <button type="submit" class="saisie-btn saisie-btn-neutral">Commenter</button>
+              </form>
+              <button type="button" class="saisie-btn saisie-btn-neutral" data-remark="mute" data-muted="${muted}">
+                ${muted ? '🔔 Réactiver l’IA sur cet ajout' : '🔕 Couper l’IA sur cet ajout'}</button>
+            </div></td></tr>`;
+    }
+
+    async onRemarkAction(button) {
+        const row = button.closest('[data-id], [data-detail]');
+        const id = Number(row.dataset.id || row.dataset.detail);
+        const action = button.dataset.remark;
+        if (action === 'expand') {
+            if (this.expanded.has(id)) this.expanded.delete(id);
+            else this.expanded.add(id);
+            return this.render();
+        }
+        const labels = { apply: 'Application…', dismiss: '…', mute: '…' };
+        await AdditionList.whileBusy(button, labels[action], async () => {
+            try {
+                if (action === 'mute') {
+                    const muted = button.dataset.muted !== 'true';
+                    await AdditionList.request('/api/ia/muet', { target_type: 'addition', target_id: id, muted });
+                    if (muted) this.muted.add(id); else this.muted.delete(id);
+                    this.setStatus(muted ? 'L’IA ne commentera plus cet ajout.' : 'L’IA peut de nouveau commenter cet ajout.');
+                } else {
+                    const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}/${button.dataset.cid}`, { action });
+                    this.comments = this.comments.map((c) => (c.id === data.comment.id ? data.comment : c));
+                    if (data.addition) this.additions = this.additions.map((a) => (a.id === data.addition.id ? data.addition : a));
+                    this.setStatus(action === 'apply' ? '✓ Correction appliquée.' : 'Remarque écartée.');
+                }
+                this.render();
+                this.flash([id]);
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    async addHumanComment(id, form) {
+        const input = form.querySelector('input');
+        const text = input.value.trim();
+        if (!text) return;
+        await AdditionList.whileBusy(form.querySelector('button'), '…', async () => {
+            try {
+                const data = await AdditionList.request(ValidationTable.COMMENTS_API, { target_type: 'addition', target_id: id, text });
+                this.comments.unshift(data.comment);
+                this.render();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
     }
 
     setStatus(message, isError = false) {
@@ -343,6 +465,7 @@ class ValidationTable extends AdditionList {
     }
 
     async bulk(action, button) {
+        if (action === 'ai-review') return this.aiReview(button);
         const ids = [...this.selected];
         if (!ids.length) return;
         if (action === 'delete' && !confirm(`Supprimer ${ids.length} ajout${ids.length > 1 ? 's' : ''} ? C'est définitif.`)) return;
@@ -372,17 +495,172 @@ class ValidationTable extends AdditionList {
         }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
         this.renderBar();
     }
+
+    /** The AI reads the ticked rows (muted ones left out) and leaves remarks. */
+    async aiReview(button) {
+        const ids = [...this.selected].filter((id) => !this.muted.has(id));
+        if (!ids.length) return;
+        this.setStatus('');
+        await AdditionList.whileBusy(button, 'L’IA relit…', async () => {
+            try {
+                const data = await AdditionList.request('/api/ia/relire', { target_type: 'addition', ids });
+                this.comments = [...data.comments, ...this.comments];
+                data.comments.forEach((c) => this.expanded.add(c.target_id));
+                this.render();
+                const n = data.comments.length;
+                this.setStatus(n ? `🤖 ${n} remarque${n > 1 ? 's' : ''} de l’IA (sous les lignes concernées).`
+                    : '🤖 L’IA n’a rien à redire sur ces lignes.');
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
+        this.renderBar();
+    }
+
+    /** The AI suggests a few new words; they arrive "À valider". */
+    async aiNewWords(mode, button) {
+        this.setStatus('');
+        await AdditionList.whileBusy(button, 'L’IA cherche…', async () => {
+            try {
+                const data = await AdditionList.request('/api/ia/mots', { mode });
+                data.additions.forEach((a) => this.additions.unshift(a));
+                this.render();
+                this.flash(data.additions.map((a) => a.id));
+                const n = data.additions.length;
+                this.setStatus(n ? `🤖 ${n} mot${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} par l’IA, en tête de liste « À valider ».`
+                    : '🤖 L’IA n’a pas trouvé de nouveau mot à proposer.');
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+}
+
+/* The "Lexique" tab of the Validation page: the AI's remarks on lexicon
+   words and expressions. The lexicon is edited on the platform: an editor
+   fixes it there, then marks the remark done -- or dismisses it, or mutes
+   the AI on that item. */
+class LexiconRemarks {
+    constructor(root, status) {
+        this.root = root;
+        this.status = status;
+        this.list = root.querySelector('[data-lex-list]');
+        this.comments = [];
+        this.muted = new Set();
+        root.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-lex]');
+            if (btn) this.action(btn);
+        });
+    }
+
+    key(type, id) { return `${type}:${id}`; }
+
+    async load() {
+        try {
+            const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}?scope=lexicon`);
+            this.comments = data.comments.filter((c) => c.status === 'open');
+            this.muted = new Set(data.muted.map((m) => this.key(m.target_type, m.target_id)));
+        } catch (err) {
+            this.list.innerHTML = `<li class="vt-sub">Échec du chargement : ${AdditionList.escapeHtml(err.message)}</li>`;
+            return;
+        }
+        this.render();
+    }
+
+    render() {
+        const esc = AdditionList.escapeHtml;
+        const count = document.getElementById('lexicon-count');
+        if (count) count.textContent = this.comments.length ? ` (${this.comments.length})` : '';
+        if (!this.comments.length) {
+            this.list.innerHTML = '<li class="vt-sub">Aucune remarque en cours sur le lexique.</li>';
+            return;
+        }
+        this.list.innerHTML = this.comments.map((c) => {
+            const muted = this.muted.has(this.key(c.target_type, c.target_id));
+            const [hanzi, ...rest] = c.target_label.split(' · ');
+            return `<li class="vt-remark vt-remark-${c.kind}" data-cid="${c.id}">
+              <div class="vt-remark-head"><span class="hanzi">${esc(hanzi)}</span> ${esc(rest.join(' · '))} ·
+                ${c.target_type === 'word' ? 'mot' : 'expression'} · ${c.by_ai ? '🤖 IA' : esc(c.author)}</div>
+              ${c.kind === 'correction' ? `<div class="vt-diff"><b>${esc(c.field_label)}</b> : <del>${esc(c.current_value) || '<i>vide</i>'}</del>
+                  <span aria-hidden="true">→</span> <ins>${esc(c.proposed_value)}</ins></div>` : ''}
+              <div>${esc(c.text)}</div>
+              <div class="vt-remark-actions">
+                <button type="button" class="saisie-btn saisie-btn-validate" data-lex="done" data-cid="${c.id}">✓ Corrigé sur la plateforme</button>
+                <button type="button" class="saisie-btn saisie-btn-neutral" data-lex="dismiss" data-cid="${c.id}">Écarter</button>
+                <button type="button" class="saisie-btn saisie-btn-neutral" data-lex="mute" data-cid="${c.id}" data-muted="${muted}">
+                  ${muted ? '🔔 Réactiver l’IA' : `🔕 Couper l’IA sur ${c.target_type === 'word' ? 'ce mot' : 'cette expression'}`}</button>
+              </div></li>`;
+        }).join('');
+    }
+
+    setStatus(message, isError = false) {
+        this.status.textContent = message;
+        this.status.className = `text-sm ${isError ? 'text-red-700' : 'text-green-700'}`;
+    }
+
+    async action(button) {
+        const action = button.dataset.lex;
+        if (action === 'review') return this.review(button);
+        const comment = this.comments.find((c) => c.id === Number(button.dataset.cid));
+        if (!comment) return;
+        await AdditionList.whileBusy(button, '…', async () => {
+            try {
+                if (action === 'mute') {
+                    const muted = button.dataset.muted !== 'true';
+                    await AdditionList.request('/api/ia/muet', { target_type: comment.target_type, target_id: comment.target_id, muted });
+                    const key = this.key(comment.target_type, comment.target_id);
+                    if (muted) this.muted.add(key); else this.muted.delete(key);
+                } else {
+                    await AdditionList.request(`${ValidationTable.COMMENTS_API}/${comment.id}`, { action });
+                    this.comments = this.comments.filter((c) => c.id !== comment.id);
+                }
+                this.render();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    /** The AI reads the next lexicon words (or expressions) it hasn't read yet. */
+    async review(button) {
+        await AdditionList.whileBusy(button, 'L’IA relit…', async () => {
+            try {
+                const data = await AdditionList.request('/api/ia/relire', { target_type: button.dataset.type, next: true });
+                this.comments = [...data.comments, ...this.comments];
+                this.render();
+                const n = data.comments.length;
+                this.setStatus(data.message || (n ? `🤖 ${n} nouvelle${n > 1 ? 's' : ''} remarque${n > 1 ? 's' : ''}.`
+                    : '🤖 L’IA n’a rien à redire sur ces éléments.'));
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('validation-page');
     if (!root) return;
     const $ = (id) => document.getElementById(id);
-    window.validationTable = new ValidationTable({
+    const table = new ValidationTable({
         list: $('validation-rows'), search: $('saisie-search'), filters: $('saisie-filters'),
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
         filter: 'review', empty: 'Rien à afficher ici.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
-    window.validationTable.load();
+    window.validationTable = table;
+    table.load();
+    document.querySelectorAll('[data-new-words]').forEach((btn) =>
+        btn.addEventListener('click', () => table.aiNewWords(btn.dataset.newWords, btn)));
+
+    const lexicon = new LexiconRemarks($('lexicon-panel'), $('lexicon-status'));
+    lexicon.load();
+    // Two tabs: the additions table, the remarks on the lexicon.
+    const tabs = [...document.querySelectorAll('[data-vtab]')];
+    const show = (name) => {
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.vtab === name)));
+        $('additions-panel').hidden = name !== 'additions';
+        $('lexicon-panel').hidden = name !== 'lexicon';
+    };
+    tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.vtab)));
 });
