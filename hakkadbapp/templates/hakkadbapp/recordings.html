@@ -5,7 +5,10 @@
   .rec-table th { background: #F6EFE4; color: #544D45; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
                   text-align: left; padding: 0.4rem 0.5rem; }
   .rec-table td { padding: 0.3rem 0.5rem; border-top: 1px solid #F0E8DC; vertical-align: middle; }
-  .rec-table .hanzi { font-size: 1.2rem !important; line-height: 1.2; }
+  /* Hakka columns: larger and centred. */
+  .rec-table td.hanzi, .rec-table td.rec-hk, .rec-table th.rec-hk { text-align: center; }
+  .rec-table td.hanzi { font-size: 1.55rem !important; line-height: 1.2; }
+  .rec-table td.rec-hk { font-size: 1.05rem; font-weight: 600; color: #3A3430; }
   .rec-file { font-family: ui-monospace, monospace; font-size: 0.8rem; color: #544D45; }
   .rec-origin { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600; }
   .rec-origin-lexique { background: #F0EBE3; color: #544D45; }
@@ -17,7 +20,7 @@
   .rec-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
   .rec-tabs a[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
   .rec-tabs small { font-weight: 400; color: #8C8478; }
-  .rec-furigana { font-size: 1.25rem; line-height: 2.4; }
+  .rec-furigana { font-size: 1.6rem; line-height: 2.5; text-align: center; }
   .rec-furigana ruby { margin-right: 0.08em; }
   .rec-furigana rt { font-family: inherit; font-size: 0.55em; color: #9B1C1C; font-weight: 600; letter-spacing: 0; }
 </style>
@@ -46,12 +49,12 @@
   </nav>
   <div class="rec-wrap" data-recpanel="mots">
     <table class="rec-table">
-      <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th>Exemple d'expression</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
+      <thead><tr><th class="rec-hk">Caractères</th><th class="rec-hk">Pinyin</th><th>Français</th><th>Exemple d'expression</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
         {% for r in words %}
         <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
           <td class="hanzi">{{ r.hanzi }}</td>
-          <td>{{ r.pinyin }}</td>
+          <td class="rec-hk">{{ r.pinyin }}</td>
           <td>{{ r.french }}</td>
           <td class="rec-example">{% if r.example %}{{ r.example.target }}<small>{{ r.example.french }}</small>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
           <td class="text-gray-600">{{ r.theme }}</td>
@@ -67,7 +70,7 @@
 
   <div class="rec-wrap" data-recpanel="expressions" hidden>
     <table class="rec-table">
-      <thead><tr><th>Expression</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
+      <thead><tr><th class="rec-hk">Expression</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
         {% for r in expressions %}
         <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">

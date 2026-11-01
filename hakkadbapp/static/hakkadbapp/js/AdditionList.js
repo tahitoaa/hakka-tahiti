@@ -758,7 +758,7 @@ class DocumentImport {
             <div class="vt-import-summary"><span data-summary></span>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
-              <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th>Caractères</th><th>Lecture</th>
+              <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Lecture</th>
                 <th>Français</th><th class="vt-who">Origine</th><th>État</th></tr></thead>
               <tbody>${this.entries.map((e, i) => `<tr class="${e.state === 'new' ? '' : 'is-off'}">
                 <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}

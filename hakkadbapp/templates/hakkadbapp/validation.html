@@ -105,6 +105,10 @@
   .vt-import > summary { padding: 0.45rem 0.75rem; min-height: 2.25rem; font-size: 0.9rem; }
   #saisie-filters .saisie-chip { min-height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; }
   #validation-status { min-height: 0; }
+  /* Hakka columns: larger and centred. */
+  .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
+  .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.15; }
+  .vt-table td.vt-pinyin { font-size: 1rem; font-weight: 600; color: #3A3430; }
   .vt-obs { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 
@@ -166,8 +170,8 @@
       <thead>
         <tr>
           <th class="vt-check"><input type="checkbox" id="validation-all" aria-label="Tout sélectionner"></th>
-          <th>Caractères</th>
-          <th>Pinyin</th>
+          <th class="vt-hk">Caractères</th>
+          <th class="vt-hk">Pinyin</th>
           <th>Français</th>
           <th>Type · thème</th>
           <th class="vt-who">Par</th>
