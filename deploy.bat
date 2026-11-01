@@ -18,9 +18,22 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM The project's own Python when there is one (venv), else the system one.
+set PY=python
+if exist venv\Scripts\python.exe set PY=venv\Scripts\python.exe
+
 echo === collectstatic ===
-python manage.py collectstatic --noinput
+%PY% manage.py collectstatic --noinput
 if errorlevel 1 exit /b 1
+
+REM Before the new code goes live: the database it needs. .env points at
+REM the production database, so this migrates production.
+echo === migrate ===
+%PY% manage.py migrate --noinput
+if errorlevel 1 (
+    echo Migration failed, aborting deploy.
+    exit /b 1
+)
 
 echo === git commit -a ===
 git commit -a -m "%~1"

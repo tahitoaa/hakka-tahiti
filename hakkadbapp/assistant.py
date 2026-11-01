@@ -1,7 +1,7 @@
 """The AI assistant: an account ("ia", group "Assistants IA") that
 - suggests new words from the existing data: words used in the lexicon's
   expressions and in the shared transcriptions but missing from the lexicon,
-  and new compounds of lexicon characters -- as additions "À valider";
+  and new expressions made of lexicon words -- as additions "À valider";
 - comments on additions and lexicon words / expressions, and proposes
   corrections (spelling, punctuation...) that an editor applies or dismisses.
 
@@ -416,37 +416,95 @@ def suggest_missing(limit=MAX_NEW_WORDS):
     return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus")[:limit]
 
 
-COMPOUNDS_SYSTEM = NEW_WORDS_SYSTEM + """
+EXPRESSIONS_SYSTEM = CONTEXT + """
 
-Here there are no candidates: propose new compound words of everyday Hakka, in the theme given, made only of characters that appear in the lexicon words given, reading each character as one of its readings given. Only propose words you are confident Hakka speakers use; set keep to true for those you propose. Never propose a word already in the list."""
+You propose new Hakka expressions for the lexicon. An expression is a group of words of the lexicon: a full sentence, a phrase, or only two words. Build each one only from the lexicon words given, referring to them by their "ref" in order; never use a word that is not in the list. Prefer what Hakka speakers really say, in the theme given, and don't repeat the existing expressions shown.
+For each: words (the refs, in order, at least two), french and english (natural translations, in the style of the existing expressions), themes (zero to two from the list), note (one sentence in French on what it shows: a construction, a common use)."""
 
 
-def suggest_compounds(limit=MAX_NEW_WORDS, theme=None):
+def _expressions_schema(themes):
+    return {
+        "type": "object",
+        "properties": {"expressions": {"type": "array", "items": {
+            "type": "object",
+            "properties": {
+                "words": {"type": "array", "items": {"type": "string"}},
+                "french": {"type": "string"}, "english": {"type": "string"},
+                "themes": {"type": "array", "items": {"type": "string", "enum": themes} if themes else {"type": "string"}},
+                "note": {"type": "string"},
+            },
+            "required": ["words", "french", "english", "themes", "note"],
+            "additionalProperties": False,
+        }}},
+        "required": ["expressions"],
+        "additionalProperties": False,
+    }
+
+
+SUPERSCRIPT_DIGITS = str.maketrans("¹²³⁴⁵⁶⁷⁸", "12345678")
+
+
+def known_expressions():
+    """Every expression already there (lexicon and additions), without spaces."""
+    texts = {_norm("".join((t or "").split())) for t in Expression.objects.values_list("text", flat=True)}
+    texts |= {_norm("".join(h.split())) for h in LexiconAddition.objects.filter(
+        kind=LexiconAddition.KIND_EXPRESSION).values_list("hanzi", flat=True)}
+    return texts
+
+
+def suggest_expressions(limit=MAX_NEW_WORDS, theme=None):
+    """New expressions made of lexicon words: the AI picks the words (by
+    ref) and translates; the characters and the reading come from those
+    lexicon words, never from the AI."""
     themes = _themes()
-    words = [(w, h, p) for w, h, p in _word_rows()]
+    rows = [(w, h, p.translate(SUPERSCRIPT_DIGITS)) for w, h, p in _word_rows() if h and p]
     by_theme = defaultdict(list)
-    for w, h, p in words:
-        for name in (w.category or "").split(","):
+    for row in rows:
+        for name in (row[0].category or "").split(","):
             if name.strip():
-                by_theme[name.strip()].append((h, p, w.french))
+                by_theme[name.strip()].append(row)
     if not by_theme:
         return []
     theme = theme if theme in by_theme else random.choice(sorted(by_theme))
-    sample = by_theme[theme][:60]
-    readings = char_readings()
-    chars = sorted({_norm(c) for h, _p, _f in sample for c in h if HAN_RE.fullmatch(c)})
+    # The theme's words, and the words the lexicon's expressions use most
+    # (pronouns, verbs, particles: what holds a sentence together).
+    usage = Counter(Expression.words.through.objects.values_list("word_id", flat=True))
+    common = sorted(rows, key=lambda r: -usage.get(r[0].id, 0))[:40]
+    sample, seen = [], set()
+    for row in by_theme[theme][:50] + common:
+        if row[0].id not in seen:
+            seen.add(row[0].id)
+            sample.append(row)
+    refs = {f"w{w.id}": (h, p) for w, h, p in sample}
+    examples = [{"expression": e.text, "french": e.french} for e in Expression.objects.exclude(text="").order_by("?")[:12]]
     message = json.dumps({
         "theme": theme,
-        "lexicon_words": [{"hanzi": h, "reading": p, "french": f} for h, p, f in sample],
-        "readings_per_character": {c: sorted(readings.get(c, ())) for c in chars},
+        "lexicon_words": [{"ref": f"w{w.id}", "hanzi": h, "reading": p, "french": w.french} for w, h, p in sample],
+        "existing_expressions": examples,
         "propose_at_most": limit,
     }, ensure_ascii=False)
-    data = _call(COMPOUNDS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False), message,
-                 _new_words_schema(themes))
-    # Only characters of the words given.
-    allowed = set(chars)
-    proposals = [w for w in data.get("words", []) if set(_norm(str(w.get("hanzi", "")))) <= allowed]
-    return _create_from(proposals, [], themes, f"mot composé, thème {theme}")[:limit]
+    data = _call(EXPRESSIONS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False), message,
+                 _expressions_schema(themes))
+    known, created, ai = known_expressions(), [], ai_user()
+    for e in data.get("expressions", []):
+        parts = [refs.get(r) for r in e.get("words", [])]
+        if len(parts) < 2 or None in parts or not str(e.get("french", "")).strip():
+            continue  # a word that isn't in the lexicon, or too short: dropped
+        hanzi = " ".join(h for h, _p in parts)
+        key = _norm("".join(hanzi.split()))
+        if key in known:
+            continue
+        known.add(key)
+        created.append(LexiconAddition.objects.create(
+            kind=LexiconAddition.KIND_EXPRESSION, status=LexiconAddition.STATUS_REVIEW, hanzi=hanzi,
+            pinyin=" ".join(p for _h, p in parts), french=e["french"].strip()[:300],
+            english=str(e.get("english", "")).strip()[:300],
+            themes=", ".join(t for t in e.get("themes", []) if t in themes)[:200],
+            observations=f"Suggestion de l'IA (expression, thème {theme}). {e.get('note', '')}".strip()[:1000],
+            created_by=ai, updated_by=ai))
+        if len(created) >= limit:
+            break
+    return created
 
 
 # ---- nightly run ---------------------------------------------------------------------------------
@@ -454,7 +512,8 @@ def suggest_compounds(limit=MAX_NEW_WORDS, theme=None):
 def nightly():
     """The scheduled run: reviews additions changed since it last read
     them, a slice of the lexicon it hasn't read yet, and suggests a few
-    words (missing words and compounds on alternate nights)."""
+    words or expressions (missing words and new expressions on alternate
+    nights)."""
     ai = ai_user()
     report = {}
     reviewed = {(t.target_type, t.target_id): t.reviewed_at for t in AITarget.objects.exclude(reviewed_at=None)}
@@ -467,7 +526,7 @@ def nightly():
     if timezone.now().toordinal() % 2:
         report["new_words"] = len(suggest_missing(3))
     else:
-        report["new_words"] = len(suggest_compounds(3))
+        report["new_words"] = len(suggest_expressions(3))
     logger.info("assistant nightly: %s", report)
     return report
 
@@ -527,12 +586,12 @@ def api_review(request):
 @require_POST
 @editor_required
 def api_new_words(request):
-    """POST {mode: "missing" | "compounds"}: the AI suggests a few words."""
+    """POST {mode: "missing" | "expressions"}: the AI suggests a few words or expressions."""
     from .additions import _addition_json
 
     payload = _json(request) or {}
     try:
-        created = suggest_compounds() if payload.get("mode") == "compounds" else suggest_missing()
+        created = suggest_expressions() if payload.get("mode") in ("expressions", "compounds") else suggest_missing()
     except AssistantError as err:
         return _error(err)
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created]})

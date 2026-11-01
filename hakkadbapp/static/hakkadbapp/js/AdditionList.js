@@ -527,8 +527,10 @@ class ValidationTable extends AdditionList {
                 this.render();
                 this.flash(data.additions.map((a) => a.id));
                 const n = data.additions.length;
-                this.setStatus(n ? `🤖 ${n} mot${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} par l’IA, en tête de liste « À valider ».`
-                    : '🤖 L’IA n’a pas trouvé de nouveau mot à proposer.');
+                const what = mode === 'expressions' ? ['expression', 'expressions', 'proposée', 'proposées', 'nouvelle expression']
+                    : ['mot', 'mots', 'proposé', 'proposés', 'nouveau mot'];
+                this.setStatus(n ? `🤖 ${n} ${n > 1 ? what[1] : what[0]} ${n > 1 ? what[3] : what[2]} par l’IA, en tête de liste « À valider ».`
+                    : `🤖 L’IA n’a pas trouvé de ${what[4]} à proposer.`);
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
