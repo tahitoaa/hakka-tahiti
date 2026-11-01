@@ -83,7 +83,8 @@ MAX_NEW_WORDS = 30
 def _save_with_new_words(request, addition, payload):
     """Saves `addition` and, for an expression, the unknown words typed
     along with it (payload["new_words"]: [{hanzi, pinyin, french}]), as
-    word additions with the same status and themes -- all or nothing.
+    word additions with the same status -- all or nothing. Each word may
+    carry its own english and themes (else the expression's themes).
     A word already proposed (same hanzi and pinyin, not rejected) is
     reused rather than added twice. Returns (words, error message)."""
     new_words = payload.get("new_words") or []
@@ -93,17 +94,19 @@ def _save_with_new_words(request, addition, payload):
         return None, "Seule une expression peut ajouter des mots."
     prepared = []
     for item in new_words:
-        if not isinstance(item, dict) or not all(isinstance(item.get(k, ""), str) for k in ("hanzi", "pinyin", "french")):
+        if not isinstance(item, dict) or not all(isinstance(item.get(k, ""), str)
+                                                 for k in ("hanzi", "pinyin", "french", "english", "themes")):
             return None, "Mot à ajouter mal formé."
         hanzi, pinyin = "".join(item.get("hanzi", "").split()), "".join(item.get("pinyin", "").split())
         if not hanzi:
             return None, "Un mot à ajouter n'a pas de caractères."
-        prepared.append((hanzi, pinyin, item.get("french", "").strip()))
+        prepared.append((hanzi, pinyin, item.get("french", "").strip(), item.get("english", "").strip(),
+                         item.get("themes", "").strip()))
 
     words = []
     with transaction.atomic():
         addition.save()
-        for hanzi, pinyin, french in prepared:
+        for hanzi, pinyin, french, english, themes in prepared:
             existing = (LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin)
                         .exclude(status=LexiconAddition.STATUS_REJECTED).first())
             if existing:
@@ -111,7 +114,8 @@ def _save_with_new_words(request, addition, payload):
                 continue
             words.append(LexiconAddition.objects.create(
                 kind=LexiconAddition.KIND_WORD, status=addition.status, hanzi=hanzi, pinyin=pinyin, french=french,
-                themes=addition.themes, observations=f"Ajouté avec l'expression « {addition.hanzi} ».",
+                english=english[:300], themes=(themes or addition.themes)[:200],
+                observations=f"Ajouté avec l'expression « {addition.hanzi} ».",
                 created_by=request.user, updated_by=request.user,
             ))
     return words, None

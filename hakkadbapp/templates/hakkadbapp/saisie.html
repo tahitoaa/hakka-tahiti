@@ -27,8 +27,8 @@
   .saisie-check-reading { border-left-color: #d97706 !important; } p.saisie-check-reading { background: #fef3c7; color: #92400e; }
   .saisie-check-proposed { border-left-color: #6366f1 !important; } p.saisie-check-proposed { background: #FBF0E6; color: #9B1C1C; }
   .saisie-check-unknown { border-left-color: #dc2626 !important; } p.saisie-check-unknown { background: #ecfdf5; color: #065f46; }
-  .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
-  @media (max-width: 480px) { .saisie-new-word { grid-template-columns: 1fr; } }
+  .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1.1fr)); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+  @media (max-width: 640px) { .saisie-new-word { grid-template-columns: 1fr 1fr; } .saisie-new-word > label { grid-column: 1 / -1; } }
   /* AI suggestions: a proposal to accept, never saved on its own. */
   .saisie-ai { border: 1px dashed #c4b5fd; background: #faf7ff; border-radius: 0.75rem; padding: 0.75rem; display: grid; gap: 0.6rem; }
   .saisie-ai[hidden] { display: none; }

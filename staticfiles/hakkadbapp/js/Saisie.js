@@ -481,6 +481,8 @@ class SaisieEntry {
                     const data = await request(AI_API, {
                         kind: values.kind, hanzi: values.hanzi, pinyin: values.pinyin,
                         french: values.french, english: values.english,
+                        new_words: this.kind === 'expression'
+                            ? this.newWordCandidates().map((c) => ({ hanzi: c.hanzi, pinyin: c.pinyin })) : [],
                     });
                     this.aiSuggestion = data.suggestion;
                     this.aiFor = key;
@@ -501,6 +503,15 @@ class SaisieEntry {
                     <b>${label}</b><span>${escapeHtml(s[field])}</span>
                     <button type="button" class="saisie-btn saisie-btn-neutral" data-ai-use="${field}">Utiliser</button>
                   </div>`);
+            (s.words || []).forEach((w, i) => {
+                const parts = [w.french && escapeHtml(w.french), w.english && `<i>${escapeHtml(w.english)}</i>`,
+                    w.themes && escapeHtml(w.themes)].filter(Boolean);
+                rows.push(`<div class="saisie-ai-row">
+                    <b>Mot <span class="hanzi">${escapeHtml(w.hanzi)}</span></b>
+                    <span>${parts.join(' · ')}</span>
+                    <button type="button" class="saisie-btn saisie-btn-neutral" data-ai-use="word:${i}">Utiliser</button>
+                  </div>`);
+            });
             if (!rows.length) {
                 this.el.aiResult.innerHTML = '<p class="text-sm">L’IA n’a rien proposé pour cette entrée.</p>';
                 return;
@@ -514,11 +525,31 @@ class SaisieEntry {
                 </div>`;
         }
 
+        /** An unknown word's proposal into its row (ticked, fields tinted). */
+        useWordSuggestion(w) {
+            const c = this.newWordCandidates().find((x) => x.hanzi === w.hanzi);
+            const state = c && this.newWords.get(this.newWordKey(c));
+            if (!state) return;
+            state.checked = true;
+            ['french', 'english', 'themes'].forEach((name) => {
+                if (w[name]) { state[name] = w[name]; state.ai[name] = true; }
+            });
+            this.renderNewWords();
+        }
+
         /** Copies one proposed field (or all of them) into the form. */
         useSuggestion(field) {
             const s = this.aiSuggestion;
             if (!s) return;
             const inputs = { french: this.el.french, english: this.el.english, themes: this.el.themes };
+            if (field === 'all' || field.startsWith('word:')) {
+                const words = field === 'all' ? (s.words || []) : [s.words?.[Number(field.slice(5))]];
+                words.filter(Boolean).forEach((w) => this.useWordSuggestion(w));
+                if (field !== 'all') {
+                    this.setStatus('Suggestion reprise : vérifiez-la avant d’enregistrer.');
+                    return;
+                }
+            }
             const fields = field === 'all' ? Object.keys(inputs) : [field];
             fields.filter((f) => s[f] && inputs[f]).forEach((f) => {
                 inputs[f].value = s[f];
@@ -622,16 +653,20 @@ class SaisieEntry {
                 <p class="text-xs text-gray-500 mb-2">Ils sont enregistrés comme nouveaux mots, avec le même statut que l'expression.</p>
                 ${candidates.map((c) => {
                     const key = this.newWordKey(c);
-                    if (!this.newWords.has(key)) this.newWords.set(key, { checked: c.status === 'unknown', french: '' });
+                    if (!this.newWords.has(key)) {
+                        this.newWords.set(key, { checked: c.status === 'unknown', french: '', english: '', themes: '', ai: {} });
+                    }
                     const state = this.newWords.get(key);
+                    const field = (name, placeholder, extra = '') => `<input type="text" data-nw="${name}" value="${escapeHtml(state[name])}"
+                        placeholder="${placeholder}" ${extra} aria-label="${placeholder} de ${escapeHtml(c.hanzi)}"
+                        class="min-h-10 px-2 py-1 border border-gray-300 rounded-md text-sm${state.ai[name] ? ' is-ai' : ''}" ${state.checked ? '' : 'disabled'}>`;
                     return `<div class="saisie-new-word" data-key="${escapeHtml(key)}">
                         <label class="inline-flex items-center gap-2 min-w-0">
                           <input type="checkbox" data-nw="checked" ${state.checked ? 'checked' : ''}>
                           <span class="hanzi text-lg">${escapeHtml(c.hanzi)}</span>
                           <span class="text-sm text-gray-600">${escapeHtml(displayPinyin(c.pinyin))}</span>
                         </label>
-                        <input type="text" data-nw="french" value="${escapeHtml(state.french)}" placeholder="Français"
-                               class="min-h-10 px-2 py-1 border border-gray-300 rounded-md text-sm" ${state.checked ? '' : 'disabled'}>
+                        ${field('french', 'Français')}${field('english', 'Anglais')}${field('themes', 'Thème', 'list="saisie-theme-list"')}
                       </div>`;
                 }).join('')}`;
         }
@@ -640,11 +675,15 @@ class SaisieEntry {
             const row = event.target.closest('[data-key]');
             const state = row && this.newWords.get(row.dataset.key);
             if (!state) return;
-            if (event.target.dataset.nw === 'checked') {
+            const name = event.target.dataset.nw;
+            if (name === 'checked') {
                 state.checked = event.target.checked;
-                row.querySelector('[data-nw="french"]').disabled = !state.checked;
+                row.querySelectorAll('input[type="text"]').forEach((input) => { input.disabled = !state.checked; });
+            } else if (['french', 'english', 'themes'].includes(name)) {
+                state[name] = event.target.value;
+                state.ai[name] = false;
+                event.target.classList.remove('is-ai');
             }
-            if (event.target.dataset.nw === 'french') state.french = event.target.value;
         }
 
         /** Words checked to be added: [{hanzi, pinyin, french}]. */
@@ -653,7 +692,8 @@ class SaisieEntry {
             return this.newWordCandidates()
                 .map((c) => ({ c, state: this.newWords.get(this.newWordKey(c)) }))
                 .filter(({ state }) => state?.checked)
-                .map(({ c, state }) => ({ hanzi: c.hanzi, pinyin: c.pinyin, french: state.french.trim() }));
+                .map(({ c, state }) => ({ hanzi: c.hanzi, pinyin: c.pinyin, french: state.french.trim(),
+                    english: state.english.trim(), themes: state.themes.trim() }));
         }
 
         /** `link`: optional {href, label} shown after the message. */

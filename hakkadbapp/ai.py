@@ -42,7 +42,8 @@ Rules:
 - The reading given is authoritative: never correct or change the hanzi or the reading.
 - Hakka meanings can differ from Mandarin; prefer what the lexicon entries show over the Mandarin meaning of the characters, and lower the confidence when you only have the Mandarin meaning.
 - If the editor already typed a French or English translation, keep its meaning unless it is clearly wrong; you may polish its wording.
-- Never invent lexicon entries in based_on."""
+- Never invent lexicon entries in based_on.
+- For an expression, "unknown_words" lists its words the lexicon doesn't have yet: give each one (in "words", same hanzi) its own french, english and themes, as for a word entry, in the meaning it has in this expression."""
 
 
 def ai_enabled():
@@ -66,8 +67,15 @@ def _schema(themes):
             "explanation": {"type": "string"},
             "based_on": {"type": "array", "items": {"type": "string"}},
             "confidence": {"type": "string", "enum": ["haute", "moyenne", "basse"]},
+            "words": {"type": "array", "items": {
+                "type": "object",
+                "properties": {"hanzi": {"type": "string"}, "french": {"type": "string"}, "english": {"type": "string"},
+                               "themes": {"type": "array", "items": theme_items}},
+                "required": ["hanzi", "french", "english", "themes"],
+                "additionalProperties": False,
+            }},
         },
-        "required": ["french", "english", "themes", "explanation", "based_on", "confidence"],
+        "required": ["french", "english", "themes", "explanation", "based_on", "confidence", "words"],
         "additionalProperties": False,
     }
 
@@ -117,7 +125,8 @@ def _over_limit(user):
 @require_POST
 @editor_required
 def suggestion(request):
-    """POST {kind, hanzi, pinyin, french?, english?} -> the proposal."""
+    """POST {kind, hanzi, pinyin, french?, english?, new_words?: [{hanzi, pinyin}]}
+    -> the proposal (with one for each unknown word of an expression)."""
     from .additions import _known_themes  # same theme list as the form
 
     if not is_editor(request.user):
@@ -134,6 +143,12 @@ def suggestion(request):
     fields = {k: " ".join(v.split())[:300] for k, v in fields.items()}
     if not HAN_RE.search(fields["hanzi"]) or not fields["pinyin"]:
         return JsonResponse({"error": "Complétez d'abord les caractères et la lecture."}, status=400)
+    unknown = payload.get("new_words") or []
+    if not isinstance(unknown, list) or len(unknown) > 30 or not all(
+            isinstance(w, dict) and isinstance(w.get("hanzi"), str) and isinstance(w.get("pinyin", ""), str) for w in unknown):
+        return JsonResponse({"error": "Mots inconnus invalides."}, status=400)
+    unknown = [{"hanzi": "".join(w["hanzi"].split())[:20], "reading": "".join(w.get("pinyin", "").split())[:60]}
+               for w in unknown if fields["kind"] == "expression" and HAN_RE.search(w["hanzi"])]
     if _over_limit(request.user):
         return JsonResponse({"error": f"Limite de {DAILY_LIMIT} suggestions par jour atteinte."}, status=429)
 
@@ -143,6 +158,7 @@ def suggestion(request):
         "kind": "expression" if fields["kind"] == "expression" else "word",
         "hanzi": fields["hanzi"], "reading": fields["pinyin"],
         "french_typed_by_editor": fields["french"], "english_typed_by_editor": fields["english"],
+        "unknown_words": unknown,
     }
     user_message = (
         "New entry:\n" + json.dumps(entry, ensure_ascii=False)
@@ -197,5 +213,9 @@ def suggestion(request):
         # Only entries really sent: the AI can't cite what doesn't exist.
         "based_on": [h for h in data.get("based_on", []) if h in known][:8],
         "confidence": data.get("confidence") if data.get("confidence") in ("haute", "moyenne", "basse") else "basse",
+        # Only the unknown words asked about.
+        "words": [{"hanzi": w["hanzi"], "french": str(w.get("french", "")).strip(), "english": str(w.get("english", "")).strip(),
+                   "themes": ", ".join(t for t in w.get("themes", []) if not themes or t in themes)}
+                  for w in data.get("words", []) if isinstance(w, dict) and w.get("hanzi") in {u["hanzi"] for u in unknown}],
     }
     return JsonResponse({"ok": True, "suggestion": suggestion})
