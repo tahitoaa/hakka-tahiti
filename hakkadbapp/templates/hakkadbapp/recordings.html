@@ -13,7 +13,13 @@
   .rec-wrap { overflow-x: auto; border: 1px solid #E8DFD2; border-radius: 0.75rem; }
   .rec-example { font-size: 0.8rem; color: #544D45; }
   .rec-example small { display: block; color: #8C8478; }
-  .rec-table h3 { font-weight: 700; }
+  .rec-tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
+  .rec-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .rec-tabs a[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+  .rec-tabs small { font-weight: 400; color: #8C8478; }
+  .rec-furigana { font-size: 1.25rem; line-height: 2.4; }
+  .rec-furigana ruby { margin-right: 0.08em; }
+  .rec-furigana rt { font-family: inherit; font-size: 0.55em; color: #9B1C1C; font-weight: 600; letter-spacing: 0; }
 </style>
 
 <div class="mt-2 w-full max-w-screen-lg mx-auto space-y-3">
@@ -34,8 +40,11 @@
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
   </div>
-  <h3 class="font-display text-lg font-bold text-gray-800">Mots <span class="text-sm font-normal text-gray-500">({{ words|length }})</span></h3>
-  <div class="rec-wrap">
+  <nav class="rec-tabs" role="tablist" aria-label="Que voir">
+    <a href="#mots" role="tab" data-rectab="mots">Mots <small>({{ words|length }})</small></a>
+    <a href="#expressions" role="tab" data-rectab="expressions">Expressions <small>({{ expressions|length }})</small></a>
+  </nav>
+  <div class="rec-wrap" data-recpanel="mots">
     <table class="rec-table">
       <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th>Exemple d'expression</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
@@ -56,22 +65,20 @@
     </table>
   </div>
 
-  <h3 class="font-display text-lg font-bold text-gray-800 pt-2">Expressions <span class="text-sm font-normal text-gray-500">({{ expressions|length }})</span></h3>
-  <div class="rec-wrap">
+  <div class="rec-wrap" data-recpanel="expressions" hidden>
     <table class="rec-table">
-      <thead><tr><th>Expression</th><th>Pinyin</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
+      <thead><tr><th>Expression</th><th>Français</th><th>Thème</th><th>Fichier</th><th>Origine</th></tr></thead>
       <tbody>
         {% for r in expressions %}
         <tr data-theme="{{ r.theme }}" data-search="{{ r.hanzi }} {{ r.pinyin }} {{ r.french|lower }}">
-          <td class="hanzi">{{ r.hanzi }}</td>
-          <td>{{ r.pinyin }}</td>
+          <td class="rec-furigana">{% for char, syl in r.furigana %}<ruby class="hanzi">{{ char }}<rt>{{ syl }}</rt></ruby>{% endfor %}</td>
           <td>{{ r.french }}</td>
           <td class="text-gray-600">{{ r.theme }}</td>
           <td class="rec-file">{{ r.filename }}</td>
           <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{{ r.origin }}</span></td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-gray-500 py-6">Toutes les expressions ont leur audio.</td></tr>
+        <tr><td colspan="5" class="text-center text-gray-500 py-6">Toutes les expressions ont leur audio.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -88,6 +95,16 @@
     };
     search.addEventListener('input', filter);
     theme.addEventListener('change', filter);
+    // Two tabs by #hash: words, expressions.
+    const tabs = [...document.querySelectorAll('[data-rectab]')];
+    const show = () => {
+      const name = location.hash.slice(1) === 'expressions' ? 'expressions' : 'mots';
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.rectab === name)));
+      document.querySelectorAll('[data-recpanel]').forEach((p) => { p.hidden = p.dataset.recpanel !== name; });
+    };
+    tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', t.getAttribute('href')); show(); }));
+    window.addEventListener('hashchange', show);
+    show();
   })();
 </script>
 {% endblock %}

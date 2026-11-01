@@ -6,6 +6,8 @@
 - expressions: the same, for expressions.
 Each with the file name the platform export expects: digit-tone pinyin for
 a word ("on1lok6.wav"), the hanzi for an expression ("我爱屋家.wav")."""
+import re
+
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import render
 
@@ -16,6 +18,22 @@ def _digits(pinyin):
     from .views import SUPERSCRIPT_TO_DIGIT
 
     return "".join(str(pinyin or "").split()).translate(SUPERSCRIPT_TO_DIGIT)
+
+
+SYLLABLE_RE = re.compile(r"[a-zA-Züāáǎàēéěèīíǐìōóǒòūúǔù'’]+[0-8¹²³⁴⁵⁶⁷⁸]?")
+HAN_RE = re.compile(r"[㐀-鿿豈-﫿𠀀-𯿿]")
+TO_SUPERSCRIPT = str.maketrans("12345678", "¹²³⁴⁵⁶⁷⁸")
+
+
+def furigana(hanzi, pinyin):
+    """[(character, its syllable)] to show the reading above each
+    character; one pair for the whole expression when the syllables and
+    the characters don't line up one to one."""
+    chars = HAN_RE.findall(hanzi or "")
+    syllables = [s.translate(TO_SUPERSCRIPT) for s in SYLLABLE_RE.findall(pinyin or "")]
+    if chars and len(chars) == len(syllables):
+        return list(zip(chars, syllables))
+    return [("".join(chars) or hanzi, (pinyin or "").translate(TO_SUPERSCRIPT))]
 
 
 def _example_from_lexicon(hanzi, expressions):
@@ -62,6 +80,7 @@ def to_record():
         tr = payload.get("translations", {}) or {}
         pinyin, hanzi = split_target(tr.get("target", ""))
         expressions.append({"hanzi": hanzi, "pinyin": pinyin, "french": tr.get("primary", ""),
+                            "furigana": furigana(hanzi, pinyin),
                             "theme": expr_themes.get(platform_id) or "",
                             "filename": f"{''.join(hanzi.split())}.wav" if hanzi else "", "origin": "Lexique"})
     # Validated additions the platform doesn't have yet.
@@ -75,6 +94,7 @@ def to_record():
                           "example": _example_from_lexicon(hanzi, lexicon_expressions)})
         else:
             expressions.append({"hanzi": a.hanzi, "pinyin": a.pinyin, "french": a.french, "theme": a.themes,
+                                "furigana": furigana(a.hanzi, a.pinyin),
                                 "filename": f"{hanzi}.wav", "origin": "Ajout validé"})
     words.sort(key=lambda r: (r["theme"].lower(), r["pinyin"]))
     expressions.sort(key=lambda r: (r["theme"].lower(), r["hanzi"]))
