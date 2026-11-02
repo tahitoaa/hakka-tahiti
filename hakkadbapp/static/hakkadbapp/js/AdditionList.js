@@ -938,7 +938,7 @@ class DocumentImport {
                     ${e.reading_note ? `<div class="vt-warn">⚠ ${esc(e.reading_note)}</div>` : ''}</td>
                 <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated ? ' <span class="vt-ai-badge">traduit IA</span>' : ''}
                     ${e.english ? `<div class="vt-sub italic">${esc(e.english)}</div>` : ''}</td>
-                <td class="vt-meta vt-who">${esc(e.location)}</td>
+                <td class="vt-meta vt-who"${e.remark || e.source_sense ? ` title="${esc([e.source_sense, e.remark].filter(Boolean).join(' — '))}"` : ''}>${esc(e.location)}</td>
                 <td><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
               </tr>`).join('')}</tbody></table></div>`;
         this.renderSummary();
@@ -948,6 +948,7 @@ class DocumentImport {
         const entries = this.entries.filter((e) => e.picked).map((e) => ({
             hanzi: e.hanzi, pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
             themes: e.themes || '', location: e.location || '', translated: !!e.translated,
+            source_sense: e.source_sense || '', remark: e.remark || '', type: e.type || '',
         }));
         if (!entries.length || !this.doc) return;
         await AdditionList.whileBusy(button, 'Envoi…', async () => {

@@ -38,7 +38,30 @@ HEADER_WORDS = {
     "french": ("français", "francais", "french", "traduction", "sens", "fr", "signification"),
     "english": ("anglais", "english", "en"),
     "themes": ("thème", "theme", "thèmes", "catégorie", "categorie", "category"),
+    "page": ("page", "pages", "p.", "folio"),
+    "lang": ("langue du sens", "langue"),
+    "remark": ("remarque", "remarques", "note", "notes", "commentaire", "commentaires", "observations"),
+    "type": ("type", "nature"),
 }
+EXTRA_FIELDS = ("page", "source_sense", "remark", "type")
+
+
+def _header_field(name):
+    """Field of a header cell. « Sens (anglais) » is English and « Sens
+    (document) » the document's own wording, not French."""
+    if name.startswith(("sens", "meaning", "gloss")) and "(" in name:
+        inside = name.split("(", 1)[1]
+        if inside.startswith(("angl", "engl")):
+            return "english"
+        if inside.startswith(("doc", "orig", "chin", "中")):
+            return "source_sense"
+        return "french"
+    if name in ("gloss", "meaning"):
+        return "english"
+    for field, words in HEADER_WORDS.items():
+        if name in words or any(name.startswith(w + " ") for w in words if len(w) > 2):
+            return field
+    return None
 SYLLABLE_RE = re.compile(r"([a-zA-Zàâäéèêëïîôöùûüçŋεɔš'’]+)([0-8¹²³⁴⁵⁶⁷⁸]?)")
 SUPERSCRIPTS = str.maketrans("¹²³⁴⁵⁶⁷⁸", "12345678")
 
@@ -80,6 +103,10 @@ def read_rows(kind, data):
                     return rows
         return rows
     text = _decode(data)
+    first = text.lstrip("﻿").split("\n", 1)[0]
+    if first.count("\t") >= 2:
+        # Tab-separated (.tsv): commas and quotes inside the senses are text.
+        return [[_cell(c) for c in line.split("\t")] for line in text.splitlines() if line.strip()][:MAX_ROWS]
     try:
         dialect = csv.Sniffer().sniff(text[:5000], delimiters=",;\t")
     except csv.Error:
@@ -120,10 +147,10 @@ def _header_map(rows):
         found = {}
         for c, cell in enumerate(row):
             name = cell.strip().lower()
-            for field, words in HEADER_WORDS.items():
-                if field not in found and (name in words or any(name.startswith(w + " ") for w in words if len(w) > 2)):
-                    found[field] = c
-        if "hanzi" in found and ("french" in found or "pinyin" in found):
+            field = _header_field(name)
+            if field and field not in found:
+                found[field] = c
+        if "hanzi" in found and ({"french", "english", "pinyin"} & set(found)):
             return r, found
     return None
 
@@ -170,7 +197,9 @@ def _ai_columns(rows):
 
 
 def table_candidates(rows):
-    """[{hanzi, pinyin, french, english, themes, location}] and whether the AI was used."""
+    """[{hanzi, pinyin, french, english, themes, location, page, source_sense,
+    remark, type}] and whether the AI was used. Everything the table says
+    about a word is kept: it ends up in the addition's observations."""
     used_ai = False
     found = _header_map(rows)
     start = found[0] + 1 if found else 0
@@ -190,8 +219,15 @@ def table_candidates(rows):
     for n, row in enumerate(rows[start:], start + 1):
         get = lambda f: row[columns[f]] if f in columns and columns[f] < len(row) else ""
         if HAN_RE.search(get("hanzi")):
-            out.append({"hanzi": get("hanzi"), "pinyin": get("pinyin"), "french": get("french"),
-                        "english": get("english"), "themes": get("themes"), "location": f"ligne {n}"})
+            entry = {f: get(f).strip() for f in ("hanzi", "pinyin", "french", "english", "themes") + EXTRA_FIELDS}
+            lang = get("lang").strip().lower()
+            if entry["french"] and lang.startswith(("angl", "engl", "en")):
+                entry["english"], entry["french"] = entry["english"] or entry["french"], ""
+            elif entry["french"] and lang.startswith(("chin", "zh", "中", "doc")):
+                entry["source_sense"], entry["french"] = entry["source_sense"] or entry["french"], ""
+            page = entry.pop("page")
+            entry["location"] = (f"p. {page}" if page and not page.lower().startswith("p") else page) or f"ligne {n}"
+            out.append(entry)
     return out, used_ai
 
 
@@ -319,12 +355,16 @@ def check_candidates(candidates):
     for c in candidates:
         c["hanzi"] = " ".join(c["hanzi"].split())
         key = _norm("".join(c["hanzi"].split()))
-        c["kind"] = LexiconAddition.KIND_EXPRESSION if " " in c["hanzi"] or len(key) > 6 else LexiconAddition.KIND_WORD
+        kind = c.get("type", "").lower()
+        c["kind"] = (LexiconAddition.KIND_EXPRESSION if kind.startswith(("expr", "locution", "phrase"))
+                     else LexiconAddition.KIND_WORD if kind.startswith("mot")
+                     else LexiconAddition.KIND_EXPRESSION if " " in c["hanzi"] or len(key) > 6 else LexiconAddition.KIND_WORD)
         c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings)
         c["state"] = ("duplicate" if key in seen else "known" if key in known_lexicon
                       else additions.get(key, "new"))
         if not c.get("french") and c["state"] == "new":
-            c["reading_note"] = (c["reading_note"] + " ; " if c["reading_note"] else "") + "sens manquant"
+            missing = "sens français à traduire" if c.get("english") or c.get("source_sense") else "sens manquant"
+            c["reading_note"] = (c["reading_note"] + " ; " if c["reading_note"] else "") + missing
         seen.add(key)
     return candidates
 
@@ -399,7 +439,7 @@ def api_extract(request, document_id):
 @editor_required
 def api_propose(request, document_id):
     """POST {entries: [{hanzi, reading, french, english, themes, location,
-    reading_note, translated}]}: the ticked entries become additions
+    reading_note, translated, source_sense, remark, type}]}: the ticked entries become additions
     "À valider", checked again here (the browser is not trusted)."""
     from .additions import _addition_json
 
@@ -410,9 +450,10 @@ def api_propose(request, document_id):
         return JsonResponse({"error": "Rien à proposer."}, status=400)
     clean = []
     for e in entries:
-        if not isinstance(e, dict) or not all(isinstance(e.get(k, ""), str) for k in ("hanzi", "pinyin", "french", "english", "themes", "location")):
+        fields = ("hanzi", "pinyin", "french", "english", "themes", "location", "source_sense", "remark", "type")
+        if not isinstance(e, dict) or not all(isinstance(e.get(k, ""), str) for k in fields):
             return JsonResponse({"error": "Entrée mal formée."}, status=400)
-        clean.append({k: e.get(k, "")[:300] for k in ("hanzi", "pinyin", "french", "english", "themes", "location")}
+        clean.append({k: e.get(k, "")[:300] for k in fields}
                      | {"translated": bool(e.get("translated"))})
     created, skipped = [], 0
     for c in check_candidates(clean):
@@ -420,6 +461,13 @@ def api_propose(request, document_id):
             skipped += 1
             continue
         notes = [f"Importé de « {doc.filename} » ({c['location']})." if c["location"] else f"Importé de « {doc.filename} »."]
+        doc_reading = " ".join(c["pinyin"].split())
+        if doc_reading and doc_reading.replace(" ", "") != c["reading"].replace(" ", ""):
+            notes.append(f"Lecture du document : {doc_reading}.")
+        if c.get("source_sense"):
+            notes.append(f"Sens dans le document : {c['source_sense'].strip()}.")
+        if c.get("remark"):
+            notes.append(f"Remarque du document : {c['remark'].strip().rstrip('.')}.")
         if c.get("translated"):
             notes.append("Sens traduit en français par l'IA.")
         if c["reading_note"]:
