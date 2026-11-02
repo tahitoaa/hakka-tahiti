@@ -9,6 +9,17 @@
             padding: 0.6rem 0.75rem; background: #fff; border: 1px solid #DDD0BD; border-radius: 0.75rem;
             box-shadow: 0 2px 6px rgb(0 0 0 / .06); }
   .vt-bar .vt-count { font-weight: 600; color: #544D45; margin-right: auto; min-width: 9rem; }
+  .vt-facets { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-size: 0.8rem; }
+  .vt-facets label { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.15rem 0 0.55rem; min-height: 2rem;
+                     border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; color: #6E655C; }
+  .vt-facets label.is-on { border-color: #9B1C1C; background: #FBF0E6; color: #9B1C1C; font-weight: 600; }
+  .vt-facets select { border: 0; background: transparent; font: inherit; color: #261F1C; max-width: 11rem; padding: 0.15rem 0.2rem; }
+  .vt-facets-reset { color: #9B1C1C; font-weight: 600; padding: 0 0.5rem; min-height: 2rem; }
+  .vt-group td { background: #F6EFE4; padding-top: 0.3rem; padding-bottom: 0.3rem; font-size: 0.85rem; color: #3A3430; }
+  .vt-src { font-size: 0.7rem; color: #6E655C; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vt-more { display: block; margin: 0.5rem auto; }
+  .vt-import-source { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; color: #544D45; margin: 0.25rem 0; }
+  .vt-import-source input { flex: 1 1 14rem; max-width: 24rem; min-height: 2.1rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-weight: 400; }
   .vt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #E8DFD2; border-radius: 0.75rem; background: #fff; }
   .vt-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
   .vt-table th { position: sticky; top: 0; background: #F6EFE4; color: #544D45; font-size: 0.75rem; font-weight: 700;
@@ -189,6 +200,7 @@
     <button type="button" class="saisie-chip px-4 min-h-11 rounded-full border border-gray-300 bg-white" data-filter="all" aria-pressed="false">Tous</button>
     <button type="button" id="vs-open" class="vs-open">▶ Diaporama</button>
   </div>
+  <div id="vt-facets" class="vt-facets" role="group" aria-label="Filtrer et grouper"></div>
 
   <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
     <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
@@ -221,6 +233,7 @@
       </tbody>
     </table>
   </div>
+  <button type="button" id="vt-more" class="saisie-btn saisie-btn-neutral vt-more" hidden>Afficher plus</button>
 
   <p class="text-xs text-gray-500">
     Touchez une ligne pour la cocher, puis choisissez l'action. « ✎ » ouvre l'ajout dans l'onglet

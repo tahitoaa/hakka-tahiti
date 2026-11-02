@@ -495,6 +495,8 @@ def api_propose(request, document_id):
     doc = ImportedDocument.objects.filter(id=document_id).first()
     payload = _json(request) or {}
     entries = payload.get("entries")
+    source = payload.get("source") if isinstance(payload.get("source"), str) else ""
+    source = " ".join(source.split())[:200] or doc.filename[:200]
     if not doc or not isinstance(entries, list) or not entries or len(entries) > MAX_ROWS:
         return JsonResponse({"error": "Rien à proposer."}, status=400)
     clean = []
@@ -524,5 +526,5 @@ def api_propose(request, document_id):
         created.append(LexiconAddition.objects.create(
             kind=c["kind"], status=LexiconAddition.STATUS_REVIEW, hanzi=c["hanzi"], pinyin=c["reading"],
             french=c["french"].strip(), english=c["english"].strip(), themes=c["themes"].strip(),
-            observations=" ".join(notes), created_by=request.user, updated_by=request.user))
+            observations=" ".join(notes), source=source, created_by=request.user, updated_by=request.user))
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created], "skipped": skipped})

@@ -281,6 +281,9 @@ class LexiconAddition(models.Model):
     # Comma-separated theme names, like Word.category / Expression.category.
     themes = models.CharField(max_length=200, blank=True, default="")
     observations = models.TextField(blank=True, default="")
+    # Where the word comes from: the imported document's source ("Chappell &
+    # Lamarre"), a book, a person... Empty for a plain entry.
+    source = models.CharField(max_length=200, blank=True, default="")
     platform_id = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
 
     created_by = models.ForeignKey(

@@ -150,7 +150,8 @@ class AdditionList {
         return this.additions.filter((a) => {
             if (!this.matchesFilter(a)) return false;
             if (!needle) return true;
-            return [a.hanzi, a.pinyin, a.french, a.english, a.themes].some((f) => f.toLowerCase().includes(needle));
+            return [a.hanzi, a.pinyin, a.french, a.english, a.themes, a.source || '', a.observations || '']
+                .some((f) => f.toLowerCase().includes(needle));
         });
     }
 
@@ -248,12 +249,54 @@ class ValidationTable extends AdditionList {
         delete: { busy: 'Suppression…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}.` },
     };
     static MAX_AI_REVIEW = 12;
+    static PAGE = 100;
+    // Filters beyond the status, and what rows can be grouped by.
+    static FACETS = [
+        ['origin', 'Origine'], ['author', 'Auteur'], ['kind', 'Type'], ['theme', 'Thème'],
+    ];
+
+    /** The values of `facet` for an addition (several for the themes). */
+    static facetValues(a, facet) {
+        if (facet === 'origin') return [a.by_ai ? '🤖 IA' : a.source ? a.source : 'Saisie'];
+        if (facet === 'author') return [a.created_by || '—'];
+        if (facet === 'kind') return [a.kind === 'word' ? 'Mot' : 'Expression'];
+        const themes = (a.themes || '').split(',').map((t) => t.trim()).filter(Boolean);
+        return themes.length ? themes : ['Sans thème'];
+    }
 
     /** options: AdditionList's, plus `all` (the header checkbox), `bar`
-     *  (the bulk buttons, [data-bulk]), `count` and `status` elements. */
+     *  (the bulk buttons, [data-bulk]), `count` and `status` elements,
+     *  `facets` (the filter / group bar) and `more` (« Afficher plus »). */
     constructor(options) {
         super(options);
-        Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status });
+        Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status,
+            facets: options.facets, more: options.more });
+        this.facets = {};            // facet -> chosen value ('' = all)
+        this.groupBy = '';
+        this.limit = ValidationTable.PAGE;
+        this.el.facets?.addEventListener('change', (event) => {
+            const select = event.target.closest('select');
+            if (!select) return;
+            if (select.dataset.facet) this.facets[select.dataset.facet] = select.value;
+            if (select.dataset.groupBy !== undefined) this.groupBy = select.value;
+            this.limit = ValidationTable.PAGE;
+            this.render();
+        });
+        this.el.facets?.addEventListener('click', (event) => {
+            if (!event.target.closest('[data-facets-reset]')) return;
+            this.facets = {};
+            this.groupBy = '';
+            this.render();
+        });
+        this.el.more?.addEventListener('click', () => { this.limit += ValidationTable.PAGE; this.render(); });
+        this.el.list.addEventListener('change', (event) => {
+            const box = event.target.closest('[data-group]');
+            if (!box) return;
+            const key = box.dataset.group;
+            this.visible().filter((a) => ValidationTable.facetValues(a, this.groupBy).includes(key))
+                .forEach((a) => (box.checked ? this.selected.add(a.id) : this.selected.delete(a.id)));
+            this.render();
+        });
         this.selected = new Set();
         this.comments = [];          // remarks on additions (open + recently resolved)
         this.muted = new Set();      // addition ids the AI must leave alone
@@ -321,14 +364,79 @@ class ValidationTable extends AdditionList {
         this.renderBar();
     }
 
+    /** The status filter and the search (AdditionList), without the facets. */
+    unfaceted() {
+        return super.visible();
+    }
+
+    visible() {
+        const chosen = Object.entries(this.facets || {}).filter(([, v]) => v);
+        return this.unfaceted().filter((a) => chosen.every(([f, v]) => ValidationTable.facetValues(a, f).includes(v)));
+    }
+
+    /** Filter selects with counts (within the status and the search), and « Grouper par ». */
+    renderFacets() {
+        if (!this.el.facets) return;
+        const esc = AdditionList.escapeHtml;
+        const base = this.unfaceted();
+        const selects = ValidationTable.FACETS.map(([facet, label]) => {
+            const counts = new Map();
+            base.forEach((a) => ValidationTable.facetValues(a, facet).forEach((v) => counts.set(v, (counts.get(v) || 0) + 1)));
+            const current = this.facets[facet] || '';
+            if (current && !counts.has(current)) counts.set(current, 0);
+            const options = [...counts].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], 'fr'))
+                .map(([v, n]) => `<option value="${esc(v)}" ${v === current ? 'selected' : ''}>${esc(v)} (${n})</option>`).join('');
+            return `<label class="${current ? 'is-on' : ''}"><span>${label}</span><select data-facet="${facet}">
+                <option value="">Tous</option>${options}</select></label>`;
+        }).join('');
+        const group = `<label class="${this.groupBy ? 'is-on' : ''}"><span>Grouper</span><select data-group-by>
+            <option value="">—</option>${ValidationTable.FACETS.map(([f, l]) => `<option value="${f}" ${f === this.groupBy ? 'selected' : ''}>${l}</option>`).join('')}
+            </select></label>`;
+        const active = Object.values(this.facets).some(Boolean) || this.groupBy;
+        this.el.facets.innerHTML = selects + group
+            + (active ? '<button type="button" class="vt-facets-reset" data-facets-reset>✕ Effacer</button>' : '');
+    }
+
     render() {
         // Only what is shown can stay ticked.
         const visible = this.visible();
         const shown = new Set(visible.map((a) => a.id));
         [...this.selected].forEach((id) => { if (!shown.has(id)) this.selected.delete(id); });
-        super.render();
+        super.render();   // status chips (counts)
+        this.renderFacets();
+        const esc = AdditionList.escapeHtml;
         if (!visible.length) {
-            this.el.list.innerHTML = `<tr><td colspan="9" class="vt-empty">${AdditionList.escapeHtml(this.empty)}</td></tr>`;
+            this.el.list.innerHTML = `<tr><td colspan="9" class="vt-empty">${esc(this.empty)}</td></tr>`;
+        } else if (!this.groupBy) {
+            this.el.list.innerHTML = visible.slice(0, this.limit).map((a) => this.renderItem(a)).join('');
+        } else {
+            // One block per value (an addition with two themes shows in both).
+            const groups = new Map();
+            visible.forEach((a) => ValidationTable.facetValues(a, this.groupBy).forEach((v) => {
+                if (!groups.has(v)) groups.set(v, []);
+                groups.get(v).push(a);
+            }));
+            let budget = this.limit;
+            this.el.list.innerHTML = [...groups].sort((x, y) => y[1].length - x[1].length || x[0].localeCompare(y[0], 'fr'))
+                .map(([key, items]) => {
+                    if (budget <= 0) return '';
+                    const ticked = items.filter((a) => this.selected.has(a.id)).length;
+                    const rows = items.slice(0, budget).map((a) => this.renderItem(a)).join('');
+                    budget -= items.length;
+                    return `<tr class="vt-group"><td class="vt-check"><input type="checkbox" data-group="${esc(key)}"
+                        ${ticked && ticked === items.length ? 'checked' : ''} aria-label="Cocher le groupe ${esc(key)}"></td>
+                        <td colspan="8"><b>${esc(key)}</b> <span class="vt-sub">${items.length} ajout${items.length > 1 ? 's' : ''}${ticked ? ` · ${ticked} coché${ticked > 1 ? 's' : ''}` : ''}</span></td></tr>${rows}`;
+                }).join('');
+            this.el.list.querySelectorAll('[data-group]').forEach((box) => {
+                const items = groups.get(box.dataset.group) || [];
+                const ticked = items.filter((a) => this.selected.has(a.id)).length;
+                box.indeterminate = ticked > 0 && ticked < items.length;
+            });
+        }
+        if (this.el.more) {
+            const rest = visible.length - this.limit;
+            this.el.more.hidden = rest <= 0;
+            this.el.more.textContent = `Afficher plus (${Math.max(rest, 0)} restant${rest > 1 ? 's' : ''})`;
         }
         if (this.el.bar) this.renderBar();
     }
@@ -376,7 +484,7 @@ class ValidationTable extends AdditionList {
             <td class="vt-french">${esc(a.french)}${a.english ? `<span class="vt-sub italic"> · ${esc(a.english)}</span>` : ''}
                 ${a.observations ? `<div class="vt-sub vt-obs" title="${esc(a.observations)}">${esc(a.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
-            <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span></td>
+            <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
@@ -831,6 +939,8 @@ class DocumentImport {
         this.result.addEventListener('change', (event) => {
             const box = event.target.closest('[data-pick]');
             if (box) { this.entries[Number(box.dataset.pick)].picked = box.checked; this.renderSummary(); }
+            const name = event.target.closest('[data-source-name]');
+            if (name) this.sourceName = name.value.trim();
         });
         this.result.addEventListener('click', (event) => {
             if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
@@ -838,7 +948,14 @@ class DocumentImport {
         });
     }
 
+    /** "Chappell_Lamarre_mots.tsv" -> "Chappell Lamarre" (as migration 0026). */
+    static sourceName(filename) {
+        return filename.replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(/[_-]+(mots|words|texte|extraction|ocr)$/i, '')
+            .replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
     reset() {
+        this.sourceName = '';
         this.doc = null;
         this.entries = [];
         this.result.innerHTML = '';
@@ -965,6 +1082,9 @@ class DocumentImport {
         const esc = AdditionList.escapeHtml;
         if (!this.entries.length) { this.result.innerHTML = ''; return; }
         this.result.innerHTML = `
+            <label class="vt-import-source">Source <input type="text" data-source-name maxlength="200"
+                value="${esc(this.sourceName || DocumentImport.sourceName(this.doc?.filename || ''))}"
+                placeholder="Livre, auteur, page web…" title="Nom de la source, enregistré avec chaque mot : filtre « Origine » de la validation"></label>
             <div class="vt-import-summary"><span data-summary></span>
               <button type="button" class="saisie-btn saisie-btn-lg" data-translate hidden></button>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
@@ -994,7 +1114,8 @@ class DocumentImport {
         if (!entries.length || !this.doc) return;
         await AdditionList.whileBusy(button, 'Envoi…', async () => {
             try {
-                const data = await this.post(`/api/import/${this.doc.document}/proposer`, { entries });
+                const source = this.result.querySelector('[data-source-name]')?.value.trim() || '';
+                const data = await this.post(`/api/import/${this.doc.document}/proposer`, { entries, source });
                 data.additions.forEach((a) => this.table.additions.unshift(a));
                 this.table.render();
                 this.table.flash(data.additions.map((a) => a.id));
@@ -1016,6 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const table = new ValidationTable({
         list: $('validation-rows'), search: $('saisie-search'), filters: $('saisie-filters'),
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
+        facets: $('vt-facets'), more: $('vt-more'),
         filter: 'review', empty: 'Rien à afficher ici.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
