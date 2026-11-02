@@ -45,30 +45,107 @@
     window.addEventListener('hashchange', showTab);
 
     // ---- 1. the table -------------------------------------------------------------------------
-    function readings(text, cls, doubtful = []) {
-        if (doubtful.length && text) {
-            return text.split(' ').map((r, k) => (doubtful.includes(k)
-                ? `<span class="sx-r ${cls} sx-r-doubt" title="Lecture transcrite d'un scan qui ne concorde avec aucune autre source hakka : erreur de lecture possible (ou vrai désaccord).">⚠ ${esc(r)}</span>`
-                : `<span class="sx-r ${cls}">${esc(r)}</span>`)).join('');
+    // Rows: [char, trad, wenfa, guess, mandarin, english, cantonese, {source: [[reading, pages, flag]]}].
+    // Columns: the lexicon, every Hakka source (data.hakka), Cantonese, Mandarin, English;
+    // the reader chooses which ones are shown (remembered in this browser).
+    const OPTIONAL = ['cantonese', 'mandarin', 'english'];
+    const STORE = 'sx-columns-v2';
+    let columns = [];          // ids shown, in order
+    let showPages = true;
+
+    function loadPrefs() {
+        const all = ['lexique', ...data.hakka, ...OPTIONAL];
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { saved = null; }
+        columns = all.filter((id) => !saved || !saved.hidden?.includes(id));
+        showPages = saved ? saved.pages !== false : true;
+    }
+    function savePrefs() {
+        const all = ['lexique', ...data.hakka, ...OPTIONAL];
+        try { localStorage.setItem(STORE, JSON.stringify({ hidden: all.filter((id) => !columns.includes(id)), pages: showPages })); } catch (e) { /* private mode */ }
+    }
+
+    const info = (id) => (data.sources || []).find((s) => s.id === id) || { short: id, sub: '' };
+
+    function renderColumnChooser() {
+        const box = $('sx-cols');
+        if (!box) return;
+        const all = ['lexique', ...data.hakka, ...OPTIONAL];
+        box.innerHTML = all.map((id) => `<button type="button" class="sx-chip sx-chip-sm" data-sxcol="${id}" aria-pressed="${columns.includes(id)}"
+                title="${esc(info(id).full || '')}">${esc(info(id).short)}</button>`).join('')
+            + `<button type="button" class="sx-chip sx-chip-sm sx-chip-opt" data-sxpages aria-pressed="${showPages}">Pages</button>`;
+    }
+    document.addEventListener('click', (e) => {
+        const col = e.target.closest('[data-sxcol]');
+        const pages = e.target.closest('[data-sxpages]');
+        if (!col && !pages) return;
+        if (col) {
+            const id = col.dataset.sxcol;
+            const all = ['lexique', ...data.hakka, ...OPTIONAL];
+            columns = columns.includes(id) ? columns.filter((c) => c !== id) : all.filter((c) => c === id || columns.includes(c));
+        } else {
+            showPages = !showPages;
         }
-        return text ? text.split(' ').map((r) => `<span class="sx-r ${cls}">${esc(r)}</span>`).join('') : '<span class="sx-none">—</span>';
+        savePrefs();
+        renderColumnChooser();
+        renderHead();
+        renderTable();
+    });
+
+    function renderHead() {
+        const head = $('sx-head');
+        if (!head) return;
+        head.innerHTML = `<tr><th class="sx-char">Car.</th>${columns.map((id) => `<th><button type="button" class="sx-th-src" data-src-info="${id}"
+            >${esc(info(id).short)}${info(id).sub ? ` <small>${esc(info(id).sub)}</small>` : ''}</button></th>`).join('')}</tr>`;
+    }
+
+    const DOUBT = "Lecture transcrite d'un scan ou d'un manuscrit qui ne concorde avec aucune autre source hakka : erreur de lecture possible (ou vrai désaccord).";
+    const LOW = 'Lecture vue une seule fois dans la source alors que le caractère en a une autre fréquente : à vérifier.';
+
+    function plain(text, cls) {
+        return text ? text.split(' ').map((r) => `<span class="sx-r ${cls}">${esc(r)}</span>`).join('') : '';
+    }
+
+    function hakkaCell(list) {
+        return (list || []).map(([reading, pages, flag]) => {
+            const cls = flag === 'd' ? 'sx-r-doubt' : flag === 'l' ? 'sx-r-low' : '';
+            const title = flag === 'd' ? DOUBT : flag === 'l' ? LOW : '';
+            return `<span class="sx-r ${cls}"${title ? ` title="${esc(title)}"` : ''}>${flag === 'd' ? '⚠ ' : ''}${esc(reading)}`
+                + `${showPages && pages ? `<small class="sx-p">p.${esc(pages)}</small>` : ''}</span>`;
+        }).join('');
+    }
+
+    function lexiconCell(wenfa, guess) {
+        if (wenfa) return plain(wenfa, 'sx-r-wenfa');
+        if (!guess) return '';
+        const [reading, source, confidence] = guess.split('|');
+        return `<span class="sx-guess" title="Déduite des règles ${esc(source)} (confiance ${confidence} %)">≈ ${esc(reading)}`
+            + `<small class="sx-p">${esc(source)} ${confidence} %</small></span>`;
+    }
+
+    function cell(id, r) {
+        const [char, , wenfa, guess, mandarin, english, cantonese, hakka] = r;
+        let html = '';
+        let extra = '';
+        if (id === 'lexique') html = lexiconCell(wenfa, guess);
+        else if (id === 'cantonese') html = plain(cantonese, 'sx-r-man');
+        else if (id === 'mandarin') html = plain(mandarin, 'sx-r-man');
+        else if (id === 'english') { html = english ? esc(english) : ''; extra = ' sx-en" lang="en'; }
+        else {
+            html = hakkaCell(hakka[id]);
+            const ex = data.examples?.[id]?.[char];
+            if (ex) extra = `" title="${esc(ex)}`;
+        }
+        return `<td class="sx-c${html ? '' : ' is-empty'}${extra}" data-label="${esc(info(id).short)}">${html || '<span class="sx-none">—</span>'}</td>`;
     }
 
     function rowHtml(r) {
-        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese, chappell, chappellEx, doubt = {}] = r;
-        let lex = readings(wenfa, 'sx-r-wenfa');
-        if (!wenfa && guess) {
-            const [reading, source, confidence] = guess.split('|');
-            lex = `<span class="sx-guess" title="Déduite des règles ${esc(source)} (confiance ${confidence} %)">≈ ${esc(reading)}</span>`
-                + `<br><small class="sx-none">${esc(source)}, ${confidence} %</small>`;
-        }
-        return `<tr><td class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
-            + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</td>`
-            + `<td>${lex}</td><td>${readings(baoan, '', doubt.baoan)}</td><td>${readings(mciver, '', doubt.mciver)}</td>`
-            + `<td${chappellEx ? ` title="${esc(chappellEx)}"` : ''}>${readings(chappell, 'sx-r-basel')}</td>`
-            + `<td>${readings(cantonese, 'sx-r-man')}</td><td>${readings(mandarin, 'sx-r-man')}</td>`
-            + `<td class="sx-en" lang="en">${esc(english)}</td></tr>`;
+        const [char, trad] = r;
+        return `<tr><th scope="row" class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
+            + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</th>${columns.map((id) => cell(id, r)).join('')}</tr>`;
     }
+
+    const isDoubtful = (r) => Object.values(r[7]).some((list) => list.some((x) => x[2] === 'd'));
 
     function matches() {
         const q = fold(state.query.trim());
@@ -76,7 +153,7 @@
         return data.rows.filter((r, i) => {
             if (state.filter === 'lexicon' && !r[2]) return false;
             if (state.filter === 'guess' && r[2]) return false;
-            if (state.filter === 'doubt' && !(r[11] && Object.keys(r[11]).length)) return false;
+            if (state.filter === 'doubt' && !isDoubtful(r)) return false;
             return words.every((w) => data.hay[i].includes(w));
         });
     }
@@ -87,7 +164,7 @@
         $('sx-count').textContent = `${found.length.toLocaleString('fr-FR')} caractère${found.length > 1 ? 's' : ''}`
             + (found.length > state.limit ? ` · ${state.limit.toLocaleString('fr-FR')} affichés` : '');
         $('sx-rows').innerHTML = found.length ? found.slice(0, state.limit).map(rowHtml).join('')
-            : '<tr><td colspan="8" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>';
+            : `<tr><td colspan="${columns.length + 1}" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>`;
         $('sx-more').hidden = found.length <= state.limit;
     }
 
@@ -268,7 +345,10 @@
     // ---- load -----------------------------------------------------------------------------------
     fetch(URL).then((r) => r.json()).then((payload) => {
         data = payload;
-        data.hay = data.rows.map((r) => fold(r.join(' ')));
+        data.hay = data.rows.map((r) => fold([...r.slice(0, 7), ...Object.values(r[7]).flat(2)].join(' ')));
+        loadPrefs();
+        renderColumnChooser();
+        renderHead();
         state.source = data.order[0];
         const inLexicon = data.rows.filter((r) => r[2]).length;
         $('sx-summary').textContent = `${data.rows.length.toLocaleString('fr-FR')} caractères · ${inLexicon.toLocaleString('fr-FR')} dans le lexique`;
@@ -277,7 +357,7 @@
         renderRules();
         showTab();
     }).catch(() => {
-        $('sx-rows').innerHTML = '<tr><td colspan="8" class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
+        if ($('sx-rows')) $('sx-rows').innerHTML = '<tr><td class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
     });
     showTab();
 })();

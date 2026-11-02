@@ -8,7 +8,13 @@ Sources live in hakkadbapp/data/pronunciation/ (git/vercel-ignored, so the
 page can't load them in production). This writes only what the converter
 needs -- readable (hanzi, syllable, tone) triples -- to static files that do
 get deployed: hakkadbapp/static/hakkadbapp/data/<name>.json, rows of
-[trad, syllable, tone, simp?].
+[trad, syllable, tone, simp?], plus "pages" (the pages of each row, same
+order: dictionary pages for Bao'an and McIver, PDF pages for the books) and
+"low" (indexes of the rows the source marks confidence="low").
+
+Bao'an and McIver feed the converter. The books (Chappell & Lamarre, Hakka
+Made Easy, Sung Him Tong) feed only the Dictionnaire des caractères and the
+correspondences, with their own tone numbers.
 
 Tones are numbered like the Bao'an dictionary (traditional 8-tone order):
 1 yinping, 2 yangping, 3 shangsheng, 5 qusheng, 7 yinru, 8 yangru -- so every
@@ -70,7 +76,29 @@ def mciver_readings(entry):
             yield syllable, tone
 
 
+def book_readings(entry):
+    """The book indexes (Chappell & Lamarre, Hakka Made Easy, Sung Him Tong):
+    syllable and tone as the book writes them."""
+    if entry.get("syllable") and entry.get("tone") is not None:
+        yield entry["syllable"], int(entry["tone"])
+
+
 SOURCES = {
+    "chappell": {
+        "file": "chappellLamarreIndex.json",
+        "target": "chappell_lamarre_prons.json",
+        "readings": book_readings,
+    },
+    "hme": {
+        "file": "hakkaMadeEasyIndex.json",
+        "target": "hakka_made_easy_prons.json",
+        "readings": book_readings,
+    },
+    "sht": {
+        "file": "sungHimTongIndex.json",
+        "target": "sung_him_tong_prons.json",
+        "readings": book_readings,
+    },
     "baoan": {
         "file": "hakkaDictIndex.json",
         "target": "hakka_dict_prons.json",
@@ -104,8 +132,8 @@ class Command(BaseCommand):
             raise CommandError(f"Fichier introuvable : {source}")
         data = json.loads(source.read_text(encoding="utf-8"))
 
-        seen = set()
-        prons = []
+        seen = {}
+        prons, pages, low = [], [], []
         skipped = 0
         for entry in sorted(data["entries"].values(), key=lambda e: e.get("order", 0)):
             hanzi = entry.get("hanzi")
@@ -114,13 +142,19 @@ class Command(BaseCommand):
                 skipped += 1
                 continue
             simp = t2s.convert(hanzi)
+            entry_pages = [p for p in (entry.get("pages") or [entry.get("page")]) if p is not None]
             for syllable, tone in readings:
                 key = (hanzi, syllable, tone)
                 if key in seen:
+                    k = seen[key]
+                    pages[k] += [p for p in entry_pages if p not in pages[k]]
                     continue
-                seen.add(key)
+                seen[key] = len(prons)
+                if entry.get("confidence") == "low":
+                    low.append(len(prons))
                 # [trad, syllable, tone] or [trad, syllable, tone, simp] when they differ.
                 prons.append([hanzi, syllable, tone] + ([simp] if simp != hanzi else []))
+                pages.append(list(entry_pages))
 
         meta = data.get("meta", {})
         payload = {
@@ -129,9 +163,12 @@ class Command(BaseCommand):
                 "title": meta.get("title", ""),
                 "author": meta.get("author", ""),
                 "tones": meta.get("tones", {}),
+                "romanization": meta.get("romanization", ""),
                 "count": len(prons),
             },
             "prons": prons,
+            "pages": pages,
+            "low": low,
         }
         target = TARGET_DIR / spec["target"]
         target.parent.mkdir(parents=True, exist_ok=True)

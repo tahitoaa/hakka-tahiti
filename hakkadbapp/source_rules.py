@@ -2,12 +2,16 @@
 table, and the correspondence rules from each source to Wenfa, inferred from
 the data.
 
-Sources: the lexicon (Wenfa), Bao'an and McIver (dictionary indexes,
-pronunciation_sources), Mandarin (Unicode Unihan: pinyin + English).
+Sources: the lexicon (Wenfa); the Hakka indexes built by `manage.py
+build_dict_index` -- Bao'an and McIver (dictionaries), Chappell & Lamarre,
+Hakka Made Easy and Sung Him Tong (books), each reading with its pages;
+Cantonese and Mandarin (Unicode Unihan: Jyutping, pinyin + English).
 
 Rules. A syllable is split into initial, final and tone in its own system:
 - Bao'an, McIver: longest initial among that system's spellings
   (romanization.json "initials"), the rest is the final; the tone is given;
+- the books: the same, with the initials found in each book (BOOK_INITIALS),
+  spelled as the book writes them (no folding: Basel tš is not ts);
 - Mandarin: the standard pinyin initials; the tone from the diacritic.
 Learning pairs: the lexicon characters with exactly one Wenfa reading and
 exactly one reading in the source (no guessing which reading goes with
@@ -30,12 +34,26 @@ SUPERSCRIPT = str.maketrans("012345678", "⁰¹²³⁴⁵⁶⁷⁸")
 MANDARIN_INITIALS = ["zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h",
                      "j", "q", "x", "r", "z", "c", "s", "y", "w"]
 TONE_MARKS = {"̄": "1", "́": "2", "̌": "3", "̀": "4"}
+# Initials as each book writes them (from its index), longest first when used.
+BOOK_INITIALS = {
+    "chappell": "tšh tšy tš tshy tsh tsy ts thṣ ths thy th tṣ ty t phy ph py p khw khy kh kw ky k ngy ng ny n "
+                "my m ly l hy h sy s š f y w j v",
+    "hme": "ch'y ch' ch k'w k'y kw' k' kw ky k ts'z ts'y ts' tsz tsy ts t'sz t's t'y t' ty t p'y p' py p "
+           "sh sy sz s ny ng n my m ly l hy h y w f",
+    "sht": "tsj' ts' tsj ts kj' kjy kj k' kw k t' t p' p hy h ly l j m w v f s ʔ ŋj ŋ n",
+}
+# The Hakka sources, in column order. "file": data/<file> (build_dict_index);
+# "scan": transcribed from a scan or a manuscript, so misreadings are possible.
 SOURCES = [
-    {"id": "baoan", "label": "Bao'an", "system": "baoan"},
-    {"id": "mciver", "label": "McIver", "system": "mciver"},
+    {"id": "baoan", "label": "Bao'an", "system": "baoan", "file": "hakka_dict_prons.json", "scan": True},
+    {"id": "mciver", "label": "McIver", "system": "mciver", "file": "mciver_prons.json", "scan": True},
+    {"id": "chappell", "label": "Chappell & Lamarre", "system": None, "file": "chappell_lamarre_prons.json", "scan": False},
+    {"id": "hme", "label": "Hakka Made Easy", "system": None, "file": "hakka_made_easy_prons.json", "scan": True},
+    {"id": "sht", "label": "Sung Him Tong", "system": None, "file": "sung_him_tong_prons.json", "scan": True},
     {"id": "cantonese", "label": "Cantonais", "system": None},
     {"id": "mandarin", "label": "Mandarin", "system": None},
 ]
+HAKKA = [s for s in SOURCES if s.get("file")]
 _cache = {}
 
 
@@ -46,6 +64,15 @@ def _initials(system_id):
     system = romanization.get_system(system_id)
     spellings = {romanization.fold_spelling(v) for v in system.get("initials", {}).values() if v}
     return sorted(spellings, key=len, reverse=True)
+
+
+def split_book(syllable, tone, initials):
+    """("tšhin", 2) -> ("tšh", "in", "2"), the book's spelling kept."""
+    s = syllable.lower().replace("’", "'")
+    for i in initials:
+        if s.startswith(i) and len(s) > len(i):
+            return i, s[len(i):], str(tone or "")
+    return "", s, str(tone or "")
 
 
 def split_source(syllable, tone, system_id, initials):
@@ -123,11 +150,35 @@ def lexicon_readings():
     return out
 
 
+def _load_index(source):
+    """{simplified char: [(syllable, tone, pages, low)]} from one Hakka index
+    (data/<file>, rows [trad, syllable, tone, simp?], "pages", "low")."""
+    path = ps.DATA_DIR / source["file"]
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    pages = data.get("pages") or []
+    low = set(data.get("low") or [])
+    simplified = convert_all(ps._t2s, [row[0] for row in data["prons"]])
+    out = defaultdict(list)
+    for k, row in enumerate(data["prons"]):
+        char = row[3] if len(row) > 3 and isinstance(row[3], str) else simplified[row[0]]
+        reading = (row[1], str(row[2]) if row[2] is not None else "")
+        row_pages = pages[k] if k < len(pages) else []
+        known = next((r for r in out[char] if r[:2] == reading), None)
+        if known:
+            known[2].extend(p for p in row_pages if p not in known[2])
+            continue
+        out[char].append((*reading, list(row_pages), k in low))
+    return dict(out)
+
+
 def load_sources():
-    """Everything the computation reads, loaded once: each dictionary's
-    {char: [(syllable, tone)]}, each system's initials, Unihan."""
-    maps = {s["id"]: ps._readings_by_char(s) for s in ps.SOURCES}
-    maps["initials"] = {s["system"]: _initials(s["system"]) for s in SOURCES if s["system"]}
+    """Everything the computation reads, loaded once: each Hakka index's
+    {char: [(syllable, tone, pages, low)]}, each source's initials, Unihan."""
+    maps = {s["id"]: _load_index(s) for s in HAKKA}
+    maps["initials"] = {s["id"]: (_initials(s["system"]) if s["system"]
+                                  else sorted(BOOK_INITIALS[s["id"]].split(), key=len, reverse=True)) for s in HAKKA}
     ps.unihan("一")  # loads data/hanzi_info.json into ps._cache
     maps["unihan"] = ps._cache.get("unihan", (None, {}))[1]
     _cache["maps"] = maps
@@ -149,20 +200,22 @@ def source_readings(source, char):
         return [split_mandarin(r) for r in unihan_entry(char).get("mandarin", [])]
     if source["id"] == "cantonese":
         return [split_cantonese(r) for r in unihan_entry(char).get("cantonese", [])]
-    readings = maps[source["id"]].get(char) or maps[source["id"]].get(convert_all(ps._s2t, [char])[char], [])
-    return [split_source(syl, tone, source["system"], maps["initials"][source["system"]]) for syl, tone in readings]
+    initials = maps["initials"][source["id"]]
+    if source["system"]:
+        return [split_source(syl, tone, source["system"], initials) for syl, tone, *_ in raw_readings(source, char)]
+    return [split_book(syl, tone, initials) for syl, tone, *_ in raw_readings(source, char)]
+
+
+def raw_readings(source, char):
+    """[(syllable, tone, pages, low)] of `char` in a Hakka index, as written."""
+    maps = _cache.get("maps") or load_sources()
+    return maps[source["id"]].get(char, [])
 
 
 def all_chars():
-    """Every character of the lexicon and the dictionaries, simplified, once."""
-    raw = []
-    for s in ps.SOURCES:
-        path = ps.DATA_DIR / s["file"]
-        if path.exists():
-            raw += [row[3] if len(row) > 3 and isinstance(row[3], str) else row[0]
-                    for row in json.loads(path.read_text(encoding="utf-8"))["prons"]]
-    simplified = convert_all(ps._t2s, raw)
-    return {simplified[c] for c in raw}
+    """Every character of the Hakka indexes, simplified, once."""
+    maps = _cache.get("maps") or load_sources()
+    return set().union(*(maps[s["id"]] for s in HAKKA))
 
 
 def wenfa_text(reading):
@@ -239,16 +292,28 @@ SOURCE_INFO = [
      "full": "陳志明, 客家話大辭典（寶安腔）, index des caractères",
      "origin": "Transcrit à partir du PDF scanné de l'index (43 pages) : reconnaissance de texte (OCR) et relecture visuelle. "
                "Des erreurs de lecture restent possibles.",
-     "romanization": "Romanisation du dictionnaire, accent de Bao'an (tons 1, 2, 3, 5, 7, 8)", "scan": True},
+     "romanization": "Romanisation du dictionnaire, accent de Bao'an (tons 1, 2, 3, 5, 7, 8). Pages : pages du dictionnaire.", "scan": True},
     {"id": "mciver", "short": "McIver", "sub": "1926",
      "full": "D. MacIver, A Chinese-English Dictionary, Hakka-Dialect as spoken in Kwang-tung Province (1926), index hakka",
      "origin": "Transcrit visuellement depuis le scan de l'index ; numéros recoupés par reconnaissance de texte (OCR). "
                "Des erreurs de lecture restent possibles.",
-     "romanization": "Romanisation de MacIver (aspiration notée h : kh, th…)", "scan": True},
-    {"id": "chappell", "short": "Chappell & Lamarre", "sub": "Bâle",
-     "full": "H. Chappell et C. Lamarre, A Grammar and Lexicon of Hakka: Historical Materials from the Basel Mission Library",
-     "origin": "Relevé dans le texte du PDF (HAL) : mots cités avec leur lecture et leur sens anglais.",
-     "romanization": "Romanisation de la Mission de Bâle, dialecte de Sin-on (tš, š, ny…)", "scan": False},
+     "romanization": "Romanisation de MacIver (aspiration notée h : kh, th…). Pages : pages du dictionnaire.", "scan": True},
+    {"id": "chappell", "short": "Chappell & Lamarre", "sub": "Bâle 1909",
+     "full": "H. Chappell et C. Lamarre (2021), A Grammar and Lexicon of Hakka: Historical Materials from the Basel Mission Library (1909)",
+     "origin": "Extrait de la couche texte du PDF (lexique et exemples de grammaire), lectures alignées caractère par syllabe. "
+               "Pages : pages du PDF. Lecture en gris : vue une seule fois, à vérifier.",
+     "romanization": "Lepsius (Mission de Bâle, dialecte de Sin-on) ; tons du livre : 1 陰平, 2 陽平, 3 上, 4 去, 5 陽入, 6 陰入",
+     "scan": False},
+    {"id": "hme", "short": "Hakka Made Easy", "sub": "Dyer Ball",
+     "full": "J. Dyer Ball, Hakka Made Easy (Hong Kong), leçons I à XXXI",
+     "origin": "PDF scanné sans texte : transcription visuelle page par page. Pages : pages du PDF. "
+               "Des erreurs de lecture restent possibles.",
+     "romanization": "Romanisation du manuel (á, é… ; ' = aspiration) ; tons numérotés comme Bao'an (1, 2, 3, 5, 7, 8)", "scan": True},
+    {"id": "sht", "short": "Sung Him Tong", "sub": "Sai Kung",
+     "full": "Sung Him Tong, Phonologie du dialecte hakka de Sai Kung (Hong Kong) : lexique et répertoire de syllabes",
+     "origin": "Manuscrit transcrit visuellement page par page. Pages : pages du PDF. Des erreurs de lecture restent possibles.",
+     "romanization": "API du livre (' = aspiration, j = palatalisation, ŋ) ; tons 1 陰平, 2 陽平, 3 上, 4 去, 5 陰入, 6 陽入",
+     "scan": True},
     {"id": "cantonese", "short": "Cantonais", "sub": "Unihan",
      "full": "Unicode Unihan Database, champ kCantonese", "origin": "Base de données du consortium Unicode.",
      "romanization": "Jyutping (tons 1 à 6)", "scan": False},
@@ -262,16 +327,20 @@ SOURCE_INFO = [
 
 
 def doubtful(rules, lexicon, char, readings):
-    """For the sources transcribed from scans (Bao'an, McIver): the indexes
-    of their readings that agree with no other Hakka source -- read in
-    Wenfa through the learnt rules, neither the initial nor the final of
-    any lexicon reading or of the other dictionary's readings. A sign of a
-    possible misreading of the scan (or of a real disagreement). Only
-    flagged when there is something to compare with."""
+    """For the sources transcribed from scans or manuscripts: the indexes of
+    their readings that agree with no other Hakka source -- read in Wenfa
+    through the learnt rules, neither the initial nor the final of any
+    lexicon reading or of any other Hakka source's readings. A sign of a
+    possible misreading (or of a real disagreement). Only flagged when
+    there is something to compare with."""
     out = {}
-    predicted = {sid: [predict(rules, sid, r)[0] for r in readings[sid]] for sid in ("baoan", "mciver")}
-    for sid, other in (("baoan", "mciver"), ("mciver", "baoan")):
-        others = list(lexicon.get(char, [])) + [p for p in predicted[other] if p]
+    predicted = {s["id"]: [predict(rules, s["id"], r)[0] for r in readings[s["id"]]] for s in HAKKA}
+    for source in HAKKA:
+        sid = source["id"]
+        if not source["scan"] or not readings[sid]:
+            continue
+        others = list(lexicon.get(char, [])) + [p for other, guesses in predicted.items() if other != sid
+                                                 for p in guesses if p]
         if not others:
             continue
         bad = [k for k, p in enumerate(predicted[sid])
@@ -281,43 +350,46 @@ def doubtful(rules, lexicon, char, readings):
     return out
 
 
-def chappell():
-    """{simplified char: (["sang¹", ...], "生 sang1 life; ...")} from
-    data/chappell_prons.json (manage.py build_chappell_index): readings and
-    example words from Chappell & Lamarre's grammar. Shown, not learnt from."""
+def chappell_examples():
+    """{simplified char: "船隻 šon2 tšak6 « ships » ; ..."}: example words from
+    Chappell & Lamarre's lexicon (data/chappell_prons.json, manage.py
+    build_chappell_index), shown when hovering that column."""
     path = ps.DATA_DIR / "chappell_prons.json"
     if not path.exists():
         return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    by_char = defaultdict(lambda: ([], ""))
-    raw = [row[0] for row in data["prons"]]
-    simplified = convert_all(ps._t2s, raw)
-    for char, syllable, tone in data["prons"]:
+    examples = json.loads(path.read_text(encoding="utf-8")).get("examples", {})
+    simplified = convert_all(ps._t2s, list(examples))
+    out = {}
+    for char, words in examples.items():
+        text = " ; ".join(f"{w} {r} « {g} »" for w, r, g in words)
         key = simplified[char]
-        texts, _ = by_char[key]
-        text = f"{syllable}{str(tone or '').translate(SUPERSCRIPT)}"
-        if text not in texts:
-            texts.append(text)
-        examples = " ; ".join(f"{w} {r} « {g} »" for w, r, g in data.get("examples", {}).get(char, []))
-        by_char[key] = (texts, examples)
-    return dict(by_char)
+        out[key] = f"{out[key]} ; {text}" if key in out else text
+    return out
+
+
+def pages_text(pages):
+    """[83, 96, 183, 224, 225] -> "83, 96, 183…" (the first three)."""
+    shown = ", ".join(str(p) for p in pages[:3])
+    return shown + ("…" if len(pages) > 3 else "")
 
 
 def table_payload():
-    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese,
-    chappell, chappell_examples, doubtful]], "rules": ..., "sources": SOURCE_INFO + counts}.
-    `doubtful`: {"baoan": [indexes], ...} of readings that may be misread scans.
+    """{"rows": [[char, trad, wenfa, guess, mandarin, english, cantonese, hakka]],
+    "rules": ..., "order": [...], "sources": SOURCE_INFO + counts,
+    "hakka": [Hakka source ids, column order], "examples": {"chappell": {char: text}}}.
     `wenfa`: the lexicon's readings; `guess`: for a character the lexicon
     doesn't have, the Wenfa reading deduced from the best source available
-    ("ga¹|Bao'an|72")."""
+    ("ga¹|Bao'an|72"); `hakka`: {source id: [[reading as written, pages,
+    flag]]}, flag "d" for a doubtful reading (a scan reading that agrees
+    with no other Hakka source), "l" for one the source itself marks
+    low-confidence, "" otherwise."""
     load_sources()
     lexicon = lexicon_readings()
     rules = learn(lexicon)
     order = sorted(SOURCES, key=lambda s: -rules[s["id"]]["accuracy"]["all"])
     rows = []
-    basel = chappell()
     flagged = Counter()
-    chars = sorted(all_chars() | set(lexicon) | set(basel))
+    chars = sorted(all_chars() | set(lexicon))
     traditional = convert_all(ps._s2t, chars)
     for char in chars:
         info = unihan_entry(char)
@@ -332,28 +404,34 @@ def table_payload():
                         break
         trad = traditional[char]
         flags = doubtful(rules, lexicon, char, readings)
-        for sid, ks in flags.items():
-            flagged[sid] += len(ks)
+        hakka = {}
+        for s in HAKKA:
+            raw = raw_readings(s, char)
+            if not raw:
+                continue
+            bad = flags.get(s["id"], [])
+            flagged[s["id"]] += len(bad)
+            hakka[s["id"]] = [[f"{syl}{tone.translate(SUPERSCRIPT)}", pages_text(pages),
+                               "d" if k in bad else "l" if low else ""]
+                              for k, (syl, tone, pages, low) in enumerate(raw)]
         rows.append([
             char, trad if trad != char else "",
-            " ".join(wenfa_text(r) for r in lexicon.get(char, [])),
-            " ".join(source_text(SOURCES[0], r) for r in readings["baoan"]),
-            " ".join(source_text(SOURCES[1], r) for r in readings["mciver"]),
-            " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess,
-            " ".join(source_text(SOURCES[2], r) for r in readings["cantonese"]),
-            " ".join(basel.get(char, ([], ""))[0]), basel.get(char, ([], ""))[1],
-            flags,
+            " ".join(wenfa_text(r) for r in lexicon.get(char, [])), guess,
+            " ".join(info.get("mandarin", [])), info.get("meaning", ""),
+            " ".join(source_text(None, r) for r in readings["cantonese"]),
+            hakka,
         ])
     # The lexicon's characters first (by Wenfa reading), then the others.
     rows.sort(key=lambda r: (not r[2], r[2], r[0]))
     for r in rules.values():
         r.pop("best", None)
-    counts = {"lexique": sum(1 for r in rows if r[2]), "baoan": sum(1 for r in rows if r[3]),
-              "mciver": sum(1 for r in rows if r[4]), "chappell": sum(1 for r in rows if r[9]),
-              "cantonese": sum(1 for r in rows if r[8]), "mandarin": sum(1 for r in rows if r[5]),
-              "english": sum(1 for r in rows if r[6])}
+    counts = Counter({"lexique": sum(1 for r in rows if r[2]), "mandarin": sum(1 for r in rows if r[4]),
+                      "english": sum(1 for r in rows if r[5]), "cantonese": sum(1 for r in rows if r[6])})
+    for r in rows:
+        counts.update(r[7].keys())
     sources = [{**s, "chars": counts.get(s["id"], 0), "doubtful": flagged.get(s["id"], 0)} for s in SOURCE_INFO]
-    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order], "sources": sources}
+    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order], "sources": sources,
+            "hakka": [s["id"] for s in HAKKA], "examples": {"chappell": chappell_examples()}}
 
 
 def cached_payload():

@@ -16,20 +16,48 @@
   .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
   .sx-chip[aria-pressed="true"] { background: var(--sx-red); border-color: var(--sx-red); color: #fff; }
   .sx-count { font-size: 0.85rem; color: var(--sx-muted); }
-  .sx-wrap { overflow-x: auto; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
-  .sx-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  .sx-table th { position: sticky; top: 0; background: #F6EFE4; color: #544D45; font-size: 0.7rem; text-transform: uppercase;
-                 letter-spacing: 0.03em; text-align: center; padding: 0.4rem 0.5rem; white-space: nowrap; }
-  .sx-table td { padding: 0.3rem 0.5rem; border-top: 1px solid #F0E8DC; text-align: center; vertical-align: middle; }
-  .sx-table td.sx-char a { font-size: 1.5rem; color: var(--sx-ink); text-decoration: none; }
-  .sx-table td.sx-char small { display: block; color: var(--sx-muted); font-size: 0.75rem; }
-  .sx-table td.sx-en { text-align: left; color: #544D45; font-style: italic; font-size: 0.8rem; max-width: 18rem; }
-  .sx-r { display: inline-block; margin: 1px 2px; padding: 0 0.35rem; border-radius: 0.3rem; background: var(--sx-soft); border: 1px solid var(--sx-line); white-space: nowrap; }
+  /* The table scrolls inside its frame: header row and character column stay put. */
+  .sx-wrap { overflow: auto; max-height: calc(100vh - 13rem); min-height: 20rem; border: 1px solid var(--sx-line); border-radius: 0.75rem; background: #fff; }
+  .sx-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+  .sx-table thead th { position: sticky; top: 0; z-index: 2; background: #F6EFE4; color: #544D45; font-size: 0.68rem; text-transform: uppercase;
+                 letter-spacing: 0.03em; text-align: center; padding: 0.35rem 0.4rem; white-space: nowrap; border-bottom: 1px solid var(--sx-line); }
+  .sx-table thead th.sx-char { left: 0; z-index: 3; }
+  .sx-table td, .sx-table tbody th { padding: 0.25rem 0.35rem; border-top: 1px solid #F0E8DC; text-align: center; vertical-align: middle; }
+  .sx-table .sx-char { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: 1px 0 0 var(--sx-line); width: 3.2rem; }
+  .sx-table tbody tr:hover > * { background: #FFFCF6; }
+  .sx-table tbody th.sx-char a { font-size: 1.5rem; color: var(--sx-ink); text-decoration: none; font-weight: 400; }
+  .sx-table tbody th.sx-char small { display: block; color: var(--sx-muted); font-size: 0.75rem; font-weight: 400; }
+  .sx-table td.sx-en { text-align: left; color: #544D45; font-style: italic; font-size: 0.78rem; min-width: 10rem; max-width: 16rem; }
+  .sx-c { min-width: 4.5rem; }
+  .sx-r { display: block; width: fit-content; margin: 1px auto; padding: 0 0.35rem; border-radius: 0.3rem; background: var(--sx-soft);
+          border: 1px solid var(--sx-line); white-space: nowrap; line-height: 1.35; }
+  .sx-p { display: block; font-size: 0.62rem; color: var(--sx-muted); line-height: 1.1; font-style: normal; }
+  .sx-r-low { color: #8C8478; border-style: dashed; }
+  .sx-chip-sm { min-height: 1.9rem; padding: 0 0.6rem; font-size: 0.78rem; }
+  .sx-chip-opt[aria-pressed="true"] { background: #544D45; border-color: #544D45; }
+  .sx-cols { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+  .sx-cols > span { font-size: 0.75rem; color: var(--sx-muted); margin-right: 0.15rem; }
+  /* Phones: one card per character, only the sources that have it. */
+  @media (max-width: 640px) {
+    .sx-wrap { max-height: none; overflow: visible; border: 0; background: transparent; }
+    .sx-table thead { display: none; }
+    .sx-table, .sx-table tbody { display: block; }
+    .sx-table tbody tr { display: grid; grid-template-columns: 3.4rem 1fr 1fr; gap: 0.15rem 0.4rem; align-items: start;
+                         background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.45rem 0.5rem; margin-bottom: 0.45rem; }
+    .sx-table tbody th.sx-char { position: static; box-shadow: none; grid-row: span 6; border: 0; padding: 0; width: auto; }
+    .sx-table td { display: block; border: 0; padding: 0.1rem 0; text-align: left; }
+    .sx-table td.is-empty { display: none; }
+    .sx-table td::before { content: attr(data-label); display: block; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--sx-muted); }
+    .sx-table td.sx-en { grid-column: 2 / -1; max-width: none; }
+    .sx-r { display: inline-block; margin: 1px 2px 1px 0; }
+    .sx-p { display: inline; margin-left: 0.2rem; }
+  }
   .sx-r-wenfa { background: #FBF0E6; border-color: #e8c9b5; color: var(--sx-red); font-weight: 600; }
   .sx-th-src { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; text-decoration: underline dotted;
                 text-underline-offset: 3px; cursor: pointer; background: none; border: 0; padding: 0.2rem 0.1rem; }
   .sx-th-src small { text-transform: none; font-weight: 500; }
   .sx-r-doubt { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+  .sx-r-wenfa .sx-p, .sx-guess .sx-p { color: inherit; opacity: .7; }
   .sx-source { width: min(32rem, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 0.9rem; box-shadow: 0 12px 40px rgb(0 0 0 / .3); }
   .sx-source::backdrop { background: rgb(38 31 28 / .45); }
   .sx-source [data-src-body] { padding: 1rem 1.1rem 0.5rem; display: grid; gap: 0.5rem; font-size: 0.9rem; color: #3A3430; }
@@ -85,9 +113,8 @@
     <h2 class="font-display text-2xl font-bold text-gray-800">Dictionnaire des caractères</h2>
     <p class="sx-count" id="sx-summary">Chargement…</p>
   </div>
-  <p class="text-sm text-gray-700">Chaque caractère du lexique et des dictionnaires Bao'an et McIver, avec ses lectures hakka, cantonaises et
-    mandarin et son sens anglais. Hors lexique, une lecture Wenfa est déduite des
-    <a class="underline font-semibold" href="{% url 'pronunciation_comparison' %}">correspondances entre les sources</a>.</p>
+  <p class="text-sm text-gray-700">Lectures de chaque caractère dans le lexique, 5 sources hakka (avec leurs pages), en cantonais et en mandarin.
+    Hors lexique : lecture Wenfa déduite des <a class="underline font-semibold" href="{% url 'pronunciation_comparison' %}">correspondances</a>.</p>
   <!-- 3. Every character of every source -->
   <section data-sxpanel="lectures" class="space-y-2">
     <div class="sx-tools">
@@ -97,17 +124,21 @@
         <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
         <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
         <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
-        <button type="button" class="sx-chip" data-sxfilter="doubt" aria-pressed="false" title="Lectures Bao'an ou McIver (transcrites de scans) qui ne concordent avec aucune autre source hakka">⚠ Lectures douteuses</button>
+        <button type="button" class="sx-chip" data-sxfilter="doubt" aria-pressed="false" title="Lectures transcrites de scans ou de manuscrits qui ne concordent avec aucune autre source hakka">⚠ Douteuses</button>
       </div>
     </div>
-    <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
-      Touchez le nom d'une colonne pour la source complète. Chappell & Lamarre : survolez pour les mots d'exemple.
-      <span class="sx-r sx-r-doubt">⚠</span> lecture d'un index transcrit depuis un scan qui ne concorde avec aucune autre source hakka. Cantonais, mandarin et sens anglais : Unicode Unihan.</p>
+    <div class="sx-cols" role="group" aria-label="Colonnes affichées"><span>Colonnes</span><span id="sx-cols"></span></div>
+    <details class="sx-legend"><summary>Légende</summary>
+      <span class="sx-r sx-r-wenfa" style="display:inline-block">lexique</span>
+      <span class="sx-guess">≈ déduite</span> (source, confiance) ·
+      <span class="sx-r sx-r-doubt" style="display:inline-block">⚠ douteuse</span> scan qui ne concorde avec aucune autre source ·
+      <span class="sx-r sx-r-low" style="display:inline-block">grise</span> vue une seule fois dans la source ·
+      p. = page (dictionnaire pour Bao'an et McIver, PDF pour les livres). Touchez un nom de colonne pour la source complète.</details>
     <p class="sx-count" id="sx-count" role="status"></p>
     <div class="sx-wrap">
       <table class="sx-table no-auto-csv">
-        <thead><tr><th>Caractère</th><th><button type="button" class="sx-th-src" data-src-info="lexique">Lexique <small>Wenfa</small></button></th><th><button type="button" class="sx-th-src" data-src-info="baoan">Bao'an <small>陳志明</small></button></th><th><button type="button" class="sx-th-src" data-src-info="mciver">McIver <small>1926</small></button></th><th><button type="button" class="sx-th-src" data-src-info="chappell">Chappell & Lamarre <small>Bâle</small></button></th><th><button type="button" class="sx-th-src" data-src-info="cantonese">Cantonais <small>Unihan</small></button></th><th><button type="button" class="sx-th-src" data-src-info="mandarin">Mandarin <small>Unihan</small></button></th><th><button type="button" class="sx-th-src" data-src-info="english">Anglais <small>Unihan</small></button></th></tr></thead>
-        <tbody id="sx-rows"><tr><td colspan="8" class="sx-none py-6">Chargement…</td></tr></tbody>
+        <thead id="sx-head"></thead>
+        <tbody id="sx-rows"><tr><td class="sx-none py-6">Chargement…</td></tr></tbody>
       </table>
     </div>
     <button type="button" id="sx-more" class="sx-chip sx-more" hidden>Afficher plus</button>
