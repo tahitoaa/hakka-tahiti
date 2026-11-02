@@ -50,7 +50,7 @@
     }
 
     function rowHtml(r) {
-        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese] = r;
+        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese, chappell, chappellEx] = r;
         let lex = readings(wenfa, 'sx-r-wenfa');
         if (!wenfa && guess) {
             const [reading, source, confidence] = guess.split('|');
@@ -60,6 +60,7 @@
         return `<tr><td class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
             + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</td>`
             + `<td>${lex}</td><td>${readings(baoan, '')}</td><td>${readings(mciver, '')}</td>`
+            + `<td${chappellEx ? ` title="${esc(chappellEx)}"` : ''}>${readings(chappell, 'sx-r-basel')}</td>`
             + `<td>${readings(cantonese, 'sx-r-man')}</td><td>${readings(mandarin, 'sx-r-man')}</td>`
             + `<td class="sx-en" lang="en">${esc(english)}</td></tr>`;
     }
@@ -80,7 +81,7 @@
         $('sx-count').textContent = `${found.length.toLocaleString('fr-FR')} caractère${found.length > 1 ? 's' : ''}`
             + (found.length > state.limit ? ` · ${state.limit.toLocaleString('fr-FR')} affichés` : '');
         $('sx-rows').innerHTML = found.length ? found.slice(0, state.limit).map(rowHtml).join('')
-            : '<tr><td colspan="7" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>';
+            : '<tr><td colspan="8" class="sx-none py-6">Aucun caractère ne correspond.</td></tr>';
         $('sx-more').hidden = found.length <= state.limit;
     }
 
@@ -249,7 +250,7 @@
         renderRules();
         showTab();
     }).catch(() => {
-        $('sx-rows').innerHTML = '<tr><td colspan="7" class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
+        $('sx-rows').innerHTML = '<tr><td colspan="8" class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';
     });
     showTab();
 })();

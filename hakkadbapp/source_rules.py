@@ -230,8 +230,31 @@ def predict(rules, source_id, reading):
 
 # ---- the page's data -------------------------------------------------------------------------------
 
+def chappell():
+    """{simplified char: (["sang¹", ...], "生 sang1 life; ...")} from
+    data/chappell_prons.json (manage.py build_chappell_index): readings and
+    example words from Chappell & Lamarre's grammar. Shown, not learnt from."""
+    path = ps.DATA_DIR / "chappell_prons.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    by_char = defaultdict(lambda: ([], ""))
+    raw = [row[0] for row in data["prons"]]
+    simplified = convert_all(ps._t2s, raw)
+    for char, syllable, tone in data["prons"]:
+        key = simplified[char]
+        texts, _ = by_char[key]
+        text = f"{syllable}{str(tone or '').translate(SUPERSCRIPT)}"
+        if text not in texts:
+            texts.append(text)
+        examples = " ; ".join(f"{w} {r} « {g} »" for w, r, g in data.get("examples", {}).get(char, []))
+        by_char[key] = (texts, examples)
+    return dict(by_char)
+
+
 def table_payload():
-    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese]], "rules": ...}.
+    """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese,
+    chappell, chappell_examples]], "rules": ...}.
     `wenfa`: the lexicon's readings; `guess`: for a character the lexicon
     doesn't have, the Wenfa reading deduced from the best source available
     ("ga¹|Bao'an|72")."""
@@ -240,7 +263,8 @@ def table_payload():
     rules = learn(lexicon)
     order = sorted(SOURCES, key=lambda s: -rules[s["id"]]["accuracy"]["all"])
     rows = []
-    chars = sorted(all_chars() | set(lexicon))
+    basel = chappell()
+    chars = sorted(all_chars() | set(lexicon) | set(basel))
     traditional = convert_all(ps._s2t, chars)
     for char in chars:
         info = unihan_entry(char)
@@ -261,6 +285,7 @@ def table_payload():
             " ".join(source_text(SOURCES[1], r) for r in readings["mciver"]),
             " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess,
             " ".join(source_text(SOURCES[2], r) for r in readings["cantonese"]),
+            " ".join(basel.get(char, ([], ""))[0]), basel.get(char, ([], ""))[1],
         ])
     # The lexicon's characters first (by Wenfa reading), then the others.
     rows.sort(key=lambda r: (not r[2], r[2], r[0]))
