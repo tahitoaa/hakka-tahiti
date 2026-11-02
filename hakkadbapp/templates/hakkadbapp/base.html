@@ -368,6 +368,7 @@
             {% if can_edit %}
             <li><a href="{% url 'saisie' %}" class="nav-link{% if page == 'saisie' %} is-active{% endif %}">Saisie</a></li>
             <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Validation</a></li>
+            <li><a href="{% url 'document_import' %}" class="nav-link{% if page == 'document_import' %} is-active{% endif %}">Importer</a></li>
             {% endif %}
             <li><a href="{% url 'recordings' %}" class="nav-link{% if page == 'recordings' %} is-active{% endif %}">À enregistrer</a></li>
             <!-- Logout must be a POST since Django 5 (LogoutView). -->

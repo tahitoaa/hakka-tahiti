@@ -159,6 +159,14 @@ def validation(request):
     })
 
 
+def document_import(request):
+    """Import words from a document (importer.py), on its own page of the
+    members' area; what is proposed goes to Validation."""
+    if not is_editor(request.user):
+        return _deny(request)
+    return render(request, "hakkadbapp/document_import.html", {"title": "Importer", "page": "document_import"})
+
+
 @editor_required
 def additions_api(request):
     """GET: every addition. POST: create one from a JSON payload."""

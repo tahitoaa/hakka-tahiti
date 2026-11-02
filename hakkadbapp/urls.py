@@ -75,6 +75,7 @@ urlpatterns = [
     path("word-notes/<int:word_id>", views.word_note_entry, name="word_note_entry"),
     path("saisie/", additions.saisie, name="saisie"),
     path("validation/", additions.validation, name="validation"),
+    path("importer/", additions.document_import, name="document_import"),
     path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),

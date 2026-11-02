@@ -1,0 +1,157 @@
+{# Styles of the Validation table, also used by the import page (vt-*, vs-*). #}
+<style>
+  /* A table made for an iPad in landscape: big tick boxes, rows that tick
+     when tapped, the bulk buttons always in reach (sticky). */
+  .vt-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+            padding: 0.6rem 0.75rem; background: #fff; border: 1px solid #DDD0BD; border-radius: 0.75rem;
+            box-shadow: 0 2px 6px rgb(0 0 0 / .06); }
+  .vt-bar .vt-count { font-weight: 600; color: #544D45; margin-right: auto; min-width: 9rem; }
+  .vt-ai-count input { width: 3.4rem; min-height: 2rem; padding: 0 0.3rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; text-align: center; }
+  .vt-facets { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-size: 0.8rem; }
+  .vt-facets label { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.15rem 0 0.55rem; min-height: 2rem;
+                     border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; color: #6E655C; }
+  .vt-facets label.is-on { border-color: #9B1C1C; background: #FBF0E6; color: #9B1C1C; font-weight: 600; }
+  .vt-facets select { border: 0; background: transparent; font: inherit; color: #261F1C; max-width: 11rem; padding: 0.15rem 0.2rem; }
+  .vt-facets-reset { color: #9B1C1C; font-weight: 600; padding: 0 0.5rem; min-height: 2rem; }
+  .vt-group td { background: #F6EFE4; padding-top: 0.3rem; padding-bottom: 0.3rem; font-size: 0.85rem; color: #3A3430; }
+  .vt-src { font-size: 0.7rem; color: #6E655C; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vt-more { display: block; margin: 0.5rem auto; }
+  .vt-import-source { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; color: #544D45; margin: 0.25rem 0; }
+  .vt-import-source input { flex: 1 1 14rem; max-width: 24rem; min-height: 2.1rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-weight: 400; }
+  .vt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #E8DFD2; border-radius: 0.75rem; background: #fff; }
+  .vt-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  .vt-table th { position: sticky; top: 0; background: #F6EFE4; color: #544D45; font-size: 0.75rem; font-weight: 700;
+                 text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 0.55rem 0.6rem; white-space: nowrap; }
+  .vt-table td { padding: 0.55rem 0.6rem; border-top: 1px solid #F0E8DC; vertical-align: middle; color: #261F1C; }
+  .vt-table tbody tr { cursor: pointer; transition: background-color .12s; }
+  .vt-table tbody tr:hover { background: #FDFAF5; }
+  .vt-table tbody tr.is-selected { background: #FBF0E6; box-shadow: inset 4px 0 0 var(--color-brand, #9B1C1C); }
+  .vt-table tr.is-busy td { opacity: 0.55; }
+  .vt-check { width: 3.25rem; text-align: center; }
+  .vt-check input, #validation-all { width: 1.5rem; height: 1.5rem; accent-color: var(--color-brand, #9B1C1C); cursor: pointer; }
+  .vt-hanzi { font-size: 1.4rem; white-space: nowrap; }
+  .vt-pinyin { white-space: nowrap; color: #544D45; }
+  .vt-french { min-width: 12rem; }
+  .vt-meta { font-size: 0.85rem; color: #544D45; white-space: nowrap; }
+  .vt-sub { font-size: 0.75rem; color: #8C8478; white-space: normal; }
+  .vt-actions { width: 3.5rem; text-align: right; }
+  .vt-actions .saisie-btn { min-width: 2.75rem; min-height: 2.75rem; font-size: 1.1rem; }
+  .vt-empty { padding: 1.5rem !important; text-align: center; color: #8C8478; cursor: default; }
+  .vt-status { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 9999px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .vt-status-draft { background: #F0EBE3; color: #544D45; }
+  .vt-status-review { background: #fef3c7; color: #92400e; }
+  .vt-status-validated { background: #d1fae5; color: #065f46; }
+  .vt-status-rejected { background: #fee2e2; color: #991b1b; }
+  /* Narrower than a landscape iPad: the author column goes. */
+  .vt-who { white-space: nowrap; }
+  /* iPad held upright: the author stays, the type/theme column goes (it is in the slideshow). */
+  @media (max-width: 899px) { .vt-table .vt-type { display: none; } }
+  /* AI assistant: remarks under a row, its badge, the two tabs. */
+  .vt-tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
+  .vt-tabs button { min-height: 2.75rem; padding: 0.4rem 1rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .vt-tabs button[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+  .vt-ai-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.6rem 0.75rem; border: 1px dashed #c4b5fd;
+                 background: #faf7ff; border-radius: 0.75rem; font-size: 0.85rem; color: #4c1d95; }
+  .vt-ai-tools[hidden] { display: none; }
+  .vt-ai-tools b { margin-right: auto; }
+  .saisie-btn-ai { background: #5b21b6; color: #fff; }
+  .saisie-btn-ai:hover:not(:disabled) { background: #4c1d95; }
+  .vt-ai-badge { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; background: #ede9fe; color: #5b21b6; font-weight: 700; font-size: 0.75rem; }
+  .vt-ia { width: 5.5rem; text-align: center; }
+  .vt-ia-btn { min-height: 2.75rem; min-width: 2.75rem; padding: 0 0.5rem; border-radius: 0.5rem; border: 1px solid #E8DFD2; background: #fff; color: #8C8478; font-size: 0.85rem; white-space: nowrap; }
+  .vt-ia-btn.has-remarks { border-color: #a78bfa; background: #f5f0ff; color: #5b21b6; font-weight: 700; }
+  .vt-table tr.vt-detail { cursor: default; background: #FDFAF5; }
+  .vt-table tr.vt-detail:hover { background: #FDFAF5; }
+  .vt-detail-box { display: grid; gap: 0.6rem; padding: 0.25rem 0 0.5rem 3.25rem; }
+  .vt-remarks { display: grid; gap: 0.5rem; }
+  .vt-remark { background: #fff; border: 1px solid #E8DFD2; border-left: 4px solid #a78bfa; border-radius: 0.5rem; padding: 0.5rem 0.75rem; display: grid; gap: 0.3rem; font-size: 0.9rem; }
+  .vt-remark-correction { border-left-color: #047857; }
+  .vt-remark-head { font-size: 0.75rem; color: #8C8478; font-weight: 600; }
+  .vt-diff del { color: #991b1b; background: #fee2e2; text-decoration: line-through; padding: 0 0.2rem; }
+  .vt-diff ins { color: #065f46; background: #d1fae5; text-decoration: none; padding: 0 0.2rem; }
+  .vt-remark-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .vt-detail-box > [data-remark="mute"] { justify-self: start; }
+  .vt-remark-head .hanzi { color: #261F1C; }
+  .vt-comment-form { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .vt-comment-form input { flex: 1 1 14rem; min-height: 2.5rem; padding: 0.3rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #fff; }
+  .vt-lexicon { display: grid; gap: 0.75rem; }
+  .vt-lexicon ul { display: grid; gap: 0.5rem; }
+  @media (max-width: 640px) { .vt-detail-box { padding-left: 0; } }
+  /* Import of a text document: a preview to tick before proposing. */
+  .vt-import { border: 1px solid #E8DFD2; background: #fff; border-radius: 0.75rem; }
+  .vt-import > summary { cursor: pointer; padding: 0.7rem 0.9rem; font-weight: 700; color: #544D45; min-height: 2.75rem; }
+  .vt-import-body { display: grid; gap: 0.75rem; padding: 0 0.9rem 0.9rem; }
+  .vt-import form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .vt-import input[type=file] { flex: 1 1 16rem; min-height: 2.75rem; padding: 0.4rem; border: 1px dashed #DDD0BD; border-radius: 0.5rem; background: #FDFAF5; }
+  .vt-import-summary { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .vt-import-table td { padding: 0.45rem 0.5rem; }
+  .vt-state { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .vt-state-new { background: #d1fae5; color: #065f46; }
+  .vt-state-known, .vt-state-duplicate { background: #F0EBE3; color: #544D45; }
+  .vt-state-proposed { background: #fef3c7; color: #92400e; }
+  .vt-state-rejected { background: #fee2e2; color: #991b1b; }
+  .vt-warn { color: #b45309; font-size: 0.75rem; }
+  .vt-import-table tr.is-off td { opacity: 0.55; }
+  /* Compact layout: small action bar, thin rows, columns that fit a
+     landscape iPad without sideways scrolling. */
+  .vt-bar { padding: 0.35rem 0.5rem; gap: 0.35rem; border-radius: 0.6rem; }
+  .vt-bar .vt-count { font-size: 0.85rem; min-width: 7rem; }
+  .vt-bar .saisie-btn, .vt-ai-tools .saisie-btn { min-height: 2rem; padding: 0.2rem 0.6rem; font-size: 0.8rem; }
+  .vt-table { font-size: 0.85rem; line-height: 1.25; }
+  .vt-table th { padding: 0.35rem 0.4rem; font-size: 0.68rem; }
+  .vt-table td { padding: 0.12rem 0.4rem; }
+  .vt-check { width: 2.25rem; }
+  .vt-check input, #validation-all { width: 1.15rem; height: 1.15rem; }
+  .vt-table .hanzi { font-size: 1.15rem !important; line-height: 1.2; }
+  .vt-french { min-width: 9rem; }
+  .vt-meta { font-size: 0.78rem; white-space: normal; }
+  .vt-sub { font-size: 0.7rem; line-height: 1.2; }
+  .vt-status { padding: 0.05rem 0.45rem; font-size: 0.7rem; }
+  .vt-ia { width: 4.25rem; }
+  .vt-ia-btn { min-height: 1.6rem; min-width: 2rem; padding: 0 0.35rem; font-size: 0.75rem; }
+  .vt-actions { width: 2.5rem; }
+  .vt-actions .saisie-btn { min-width: 1.75rem; min-height: 1.6rem; padding: 0; font-size: 0.85rem; }
+  .vt-tabs button { min-height: 2.25rem; padding: 0.25rem 0.75rem; font-size: 0.9rem; }
+  .vt-ai-tools { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+  .vt-import > summary { padding: 0.45rem 0.75rem; min-height: 2.25rem; font-size: 0.9rem; }
+  #saisie-filters .saisie-chip { min-height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; }
+  #validation-status { min-height: 0; }
+  .vs-open { min-height: 2rem; padding: 0 0.8rem; border-radius: 9999px; background: var(--color-brand, #9B1C1C); color: #fff; font-weight: 700; font-size: 0.8rem; }
+  .vs-dialog { width: min(42rem, calc(100vw - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 0; border: 0; border-radius: 1rem;
+               background: #fff; color: #261F1C; box-shadow: 0 16px 48px rgb(0 0 0 / .35); }
+  .vs-dialog::backdrop { background: rgb(38 31 28 / .6); }
+  .vs-head { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; background: var(--color-brand, #9B1C1C); color: #fff; }
+  .vs-head b { font-variant-numeric: tabular-nums; }
+  .vs-close { min-width: 2.5rem; min-height: 2.5rem; border-radius: 9999px; color: #fff; font-size: 1.1rem; }
+  .vs-card { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; min-height: 19rem;
+             padding: 1rem; transition: opacity .12s ease; }
+  .vs-card.is-changing { opacity: 0.25; }
+  .vs-meta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.35rem 0.75rem; font-size: 0.82rem; color: #6E655C; }
+  .vs-author b { color: #3A3430; }
+  .vs-hanzi { font-size: clamp(3rem, 12vw, 5rem) !important; line-height: 1.1; color: #9B1C1C; }
+  .vs-pinyin { font-size: 1.6rem; font-weight: 700; color: #3A3430; }
+  .vs-french { font-size: 1.3rem; }
+  .vs-english { font-size: 1rem; font-style: italic; color: #544D45; }
+  .vs-obs { font-size: 0.85rem; color: #6E655C; max-width: 34rem; }
+  .vs-edit { display: grid; gap: 0.4rem; width: 100%; max-width: 30rem; text-align: left; }
+  .vs-field { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #544D45; }
+  .vs-field input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-size: 1rem; }
+  .vs-edit-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+  .vs-remarks { width: 100%; max-width: 34rem; display: grid; gap: 0.4rem; text-align: left; font-size: 0.85rem; }
+  .vs-remarks li { border: 1px solid #E8DFD2; border-left: 4px solid #a78bfa; border-radius: 0.5rem; padding: 0.4rem 0.6rem; }
+  .vs-remarks del { color: #991b1b; background: #fee2e2; } .vs-remarks ins { color: #065f46; background: #d1fae5; text-decoration: none; }
+  .vs-remark-actions { display: flex; gap: 0.35rem; margin-top: 0.3rem; }
+  .vs-message { min-height: 1.2rem; font-weight: 700; color: #065f46; }
+  .vs-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; padding: 0.6rem 0.75rem 0; }
+  .vs-actions button { min-height: 3rem; border-radius: 0.6rem; font-weight: 700; font-size: 0.95rem; touch-action: manipulation; user-select: none; }
+  .vs-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; padding: 0.6rem 0.75rem 0.75rem; }
+  .vs-nav button { min-height: 2.75rem; border-radius: 0.6rem; border: 1px solid #DDD0BD; background: #fff; color: #544D45; font-weight: 700;
+                   touch-action: manipulation; user-select: none; }
+  .vs-actions button:disabled, .vs-nav button:disabled { opacity: 0.4; }
+  @media (max-width: 520px) { .vs-actions { grid-template-columns: 1fr 1fr; } .vs-field { grid-template-columns: 1fr; } }
+  /* Hakka columns: larger and centred. */
+  .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
+  .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.05; }
+  .vt-table td.vt-pinyin { font-size: 1rem; font-weight: 600; color: #3A3430; }
+  .vt-obs { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+</style>

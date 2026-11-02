@@ -385,6 +385,9 @@ class SaisieEntry {
             // A field the AI filled stays tinted until the editor changes it.
             [this.el.french, this.el.english, this.el.themes].forEach((input) =>
                 input.addEventListener('input', () => input.classList.remove('is-ai')));
+            // 📋 Copy what the form holds (characters, reading, senses, theme).
+            document.getElementById('saisie-copy')?.addEventListener('click', (event) =>
+                AdditionList.copy(AdditionList.clipboardText(this.values()), event.currentTarget));
             // Shift+1..9 picks a suggestion, as on the "Écrire" page.
             this.el.form.addEventListener('keydown', (event) => {
                 if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;

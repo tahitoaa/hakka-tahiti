@@ -168,6 +168,39 @@ class AdditionList {
             : `<li class="py-3 text-sm text-gray-500">${AdditionList.escapeHtml(this.empty)}</li>`;
     }
 
+    /** One line for the clipboard: 船只 shon²zak⁵ — navires — ships — Thème. */
+    static clipboardText(a) {
+        const pinyin = a.pinyin ? AdditionList.displayPinyin(a.pinyin) : '';
+        return [[a.hanzi, pinyin].filter(Boolean).join(' '), a.french, a.english, a.themes]
+            .map((x) => (x || '').trim()).filter(Boolean).join(' — ');
+    }
+
+    /** Copies `text`; the button says « ✓ » for a moment. */
+    static async copy(text, button) {
+        let ok = false;
+        try {
+            await navigator.clipboard.writeText(text);
+            ok = true;
+        } catch (e) {
+            const area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+            area.remove();
+        }
+        if (button) {
+            const label = button.dataset.label || button.innerHTML;
+            button.dataset.label = label;
+            button.innerHTML = ok ? '✓ Copié' : '✕';
+            setTimeout(() => { button.innerHTML = button.dataset.label; }, 1200);
+        }
+        return ok;
+    }
+
     /** Member of « Validateurs » (permissions.is_validator): may validate,
      *  reject, or take an addition out of those statuses. The server checks too. */
     static canValidate() {
@@ -281,6 +314,9 @@ class ValidationTable extends AdditionList {
         Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status,
             facets: options.facets, more: options.more });
         this.facets = {};            // facet -> chosen value ('' = all)
+        // Opened from the import page: ?origine=<source> shows that import.
+        const origin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('origine') : null;
+        if (origin) this.facets.origin = origin;
         this.groupBy = '';
         this.limit = ValidationTable.PAGE;
         this.el.facets?.addEventListener('change', (event) => {
@@ -298,6 +334,12 @@ class ValidationTable extends AdditionList {
             this.render();
         });
         this.el.more?.addEventListener('click', () => { this.limit += ValidationTable.PAGE; this.render(); });
+        this.el.list.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-copy]');
+            if (!btn) return;
+            const a = this.additions.find((x) => x.id === Number(btn.dataset.copy));
+            if (a) AdditionList.copy(AdditionList.clipboardText(a), btn);
+        });
         this.el.list.addEventListener('change', (event) => {
             const box = event.target.closest('[data-group]');
             if (!box) return;
@@ -500,7 +542,8 @@ class ValidationTable extends AdditionList {
             <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
-            <td class="vt-actions"><button type="button" data-action="edit" class="saisie-btn saisie-btn-neutral"
+            <td class="vt-actions"><button type="button" data-copy="${a.id}" class="saisie-btn saisie-btn-neutral"
+                aria-label="Copier ${esc(a.hanzi)}" title="Copier dans le presse-papiers">📋</button><button type="button" data-action="edit" class="saisie-btn saisie-btn-neutral"
                 aria-label="Modifier ${esc(a.hanzi)}" title="Modifier">✎</button></td>
         </tr>`;
         return open ? row + this.renderDetail(a, remarks, muted) : row;
@@ -952,8 +995,11 @@ class DocumentImport {
         rejected: 'déjà rejeté', duplicate: 'en double dans le fichier',
     };
 
-    constructor(table) {
+    /** `table`: the Validation table to add the proposed words to, or null
+     *  on the import page (a link to Validation is shown instead). */
+    constructor(table = null, validationUrl = '/validation/') {
         this.table = table;
+        this.validationUrl = validationUrl;
         const $ = (id) => document.getElementById(id);
         this.form = $('import-form');
         this.file = $('import-file');
@@ -1148,11 +1194,18 @@ class DocumentImport {
             try {
                 const source = this.result.querySelector('[data-source-name]')?.value.trim() || '';
                 const data = await this.post(`/api/import/${this.doc.document}/proposer`, { entries, source });
-                data.additions.forEach((a) => this.table.additions.unshift(a));
-                this.table.render();
-                this.table.flash(data.additions.map((a) => a.id));
+                if (this.table) {
+                    data.additions.forEach((a) => this.table.additions.unshift(a));
+                    this.table.render();
+                    this.table.flash(data.additions.map((a) => a.id));
+                }
                 const n = data.additions.length;
+                const origin = data.additions[0]?.source || source;
                 this.setStatus(`✓ ${n} mot${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} à la validation${data.skipped ? ` (${data.skipped} ignoré${data.skipped > 1 ? 's' : ''} : déjà connus)` : ''}.`);
+                if (!this.table && n) {
+                    const url = `${this.validationUrl}?origine=${encodeURIComponent(origin)}`;
+                    this.status.insertAdjacentHTML('beforeend', ` <a class="underline font-semibold" href="${AdditionList.escapeHtml(url)}">Voir dans Validation →</a>`);
+                }
                 this.reset();
                 this.form.reset();
             } catch (err) {
@@ -1161,6 +1214,11 @@ class DocumentImport {
         });
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const page = document.getElementById('import-page');
+    if (page) window.documentImport = new DocumentImport(null, page.dataset.validationUrl);
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('validation-page');

@@ -1,0 +1,28 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+{% include "hakkadbapp/components/validation_styles.html" %}
+
+<div id="import-page" data-validation-url="{% url 'validation' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-3">
+  <h2 class="font-display text-xl font-bold text-gray-800">Importer des mots
+    <details class="help-tip font-sans font-normal"><summary aria-label="Aide : import">ⓘ</summary><div>Excel (.xlsx), CSV, TSV, texte (.txt),
+      Word (.docx) ou PDF contenant du texte : pas de scans ni d'images. Un tableau avec des colonnes « Caractères », « Pinyin »,
+      « Français » s'importe sans IA. Rien n'est ajouté avant que vous cochiez les mots. Les mots sont enregistrés en caractères
+      simplifiés, avec une lecture Wenfa déduite et l'origine (fichier, source, page, utilisateur) ; l'IA vérifie le français et
+      l'anglais. Ils arrivent « À valider » dans <a href="{% url 'validation' %}" class="underline">Validation</a>.</div></details></h2>
+
+  <section class="vt-import">
+    <div class="vt-import-body pt-3">
+      <form id="import-form">
+        <label class="sr-only" for="import-file">Document à importer</label>
+        <input id="import-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.docx,.pdf" required>
+        <button type="submit" class="saisie-btn saisie-btn-neutral">Analyser</button>
+      </form>
+      <div id="import-status" class="text-sm" role="status" aria-live="polite"></div>
+      <div id="import-result"></div>
+    </div>
+  </section>
+</div>
+<script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+{% endblock %}
