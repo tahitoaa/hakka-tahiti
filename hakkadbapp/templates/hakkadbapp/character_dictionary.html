@@ -26,6 +26,18 @@
   .sx-table td.sx-en { text-align: left; color: #544D45; font-style: italic; font-size: 0.8rem; max-width: 18rem; }
   .sx-r { display: inline-block; margin: 1px 2px; padding: 0 0.35rem; border-radius: 0.3rem; background: var(--sx-soft); border: 1px solid var(--sx-line); white-space: nowrap; }
   .sx-r-wenfa { background: #FBF0E6; border-color: #e8c9b5; color: var(--sx-red); font-weight: 600; }
+  .sx-th-src { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; text-decoration: underline dotted;
+                text-underline-offset: 3px; cursor: pointer; background: none; border: 0; padding: 0.2rem 0.1rem; }
+  .sx-th-src small { text-transform: none; font-weight: 500; }
+  .sx-r-doubt { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+  .sx-source { width: min(32rem, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 0.9rem; box-shadow: 0 12px 40px rgb(0 0 0 / .3); }
+  .sx-source::backdrop { background: rgb(38 31 28 / .45); }
+  .sx-source [data-src-body] { padding: 1rem 1.1rem 0.5rem; display: grid; gap: 0.5rem; font-size: 0.9rem; color: #3A3430; }
+  .sx-source h3 { font-weight: 700; font-size: 1.1rem; } .sx-source h3 small { color: #8C8478; font-weight: 500; }
+  .sx-src-full { font-style: italic; }
+  .sx-source dl { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.3rem 0.6rem; }
+  .sx-source dt { color: #8C8478; font-size: 0.8rem; } .sx-source dd { margin: 0; }
+  .sx-source footer { padding: 0.5rem 1.1rem 0.9rem; text-align: right; }
   .sx-r-basel { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
   .sx-r-man { background: var(--sx-man-bg); border-color: #c7d2fe; color: var(--sx-man); }
   .sx-guess { color: var(--sx-guess); background: var(--sx-guess-bg); border: 1px dashed #d9c27a; border-radius: 0.3rem; padding: 0 0.35rem; font-style: italic; white-space: nowrap; }
@@ -85,14 +97,16 @@
         <button type="button" class="sx-chip" data-sxfilter="all" aria-pressed="true">Tous</button>
         <button type="button" class="sx-chip" data-sxfilter="lexicon" aria-pressed="false">Dans le lexique</button>
         <button type="button" class="sx-chip" data-sxfilter="guess" aria-pressed="false">Hors lexique</button>
+        <button type="button" class="sx-chip" data-sxfilter="doubt" aria-pressed="false" title="Lectures Bao'an ou McIver (transcrites de scans) qui ne concordent avec aucune autre source hakka">⚠ Lectures douteuses</button>
       </div>
     </div>
     <p class="sx-legend">Lexique en rouge. Hors lexique, <span class="sx-guess">lecture Wenfa déduite</span> par les règles de la source la plus fiable (source, confiance).
-      Chappell & Lamarre : lectures relevées dans leur grammaire (survolez pour les mots d'exemple). Cantonais, mandarin et sens anglais : Unicode Unihan.</p>
+      Touchez le nom d'une colonne pour la source complète. Chappell & Lamarre : survolez pour les mots d'exemple.
+      <span class="sx-r sx-r-doubt">⚠</span> lecture d'un index transcrit depuis un scan qui ne concorde avec aucune autre source hakka. Cantonais, mandarin et sens anglais : Unicode Unihan.</p>
     <p class="sx-count" id="sx-count" role="status"></p>
     <div class="sx-wrap">
       <table class="sx-table no-auto-csv">
-        <thead><tr><th>Caractère</th><th>Lexique <small>Wenfa</small></th><th>Bao'an</th><th>McIver</th><th title="Chappell & Lamarre, grammaire des textes de la Mission de Bâle (dialecte de Sin-on)">Chappell & Lamarre <small>Bâle</small></th><th>Cantonais <small>jyutping</small></th><th>Mandarin <small>pinyin</small></th><th>Anglais <small>Unihan</small></th></tr></thead>
+        <thead><tr><th>Caractère</th><th><button type="button" class="sx-th-src" data-src-info="lexique">Lexique <small>Wenfa</small></button></th><th><button type="button" class="sx-th-src" data-src-info="baoan">Bao'an <small>陳志明</small></button></th><th><button type="button" class="sx-th-src" data-src-info="mciver">McIver <small>1926</small></button></th><th><button type="button" class="sx-th-src" data-src-info="chappell">Chappell & Lamarre <small>Bâle</small></button></th><th><button type="button" class="sx-th-src" data-src-info="cantonese">Cantonais <small>Unihan</small></button></th><th><button type="button" class="sx-th-src" data-src-info="mandarin">Mandarin <small>Unihan</small></button></th><th><button type="button" class="sx-th-src" data-src-info="english">Anglais <small>Unihan</small></button></th></tr></thead>
         <tbody id="sx-rows"><tr><td colspan="8" class="sx-none py-6">Chargement…</td></tr></tbody>
       </table>
     </div>
@@ -100,5 +114,9 @@
   </section>
 
 </div>
+<dialog class="sx-source" id="sx-source" aria-label="Source">
+  <div data-src-body></div>
+  <footer><button type="button" class="sx-chip" data-src-close>Fermer</button></footer>
+</dialog>
 <script src="{% static 'hakkadbapp/js/sources_page.js' %}" data-url="{% url 'api_sources_table' %}" data-hanzi-url="{% url 'hanzi' '__H__' %}"></script>
 {% endblock %}

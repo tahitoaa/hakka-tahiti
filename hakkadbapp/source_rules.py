@@ -230,6 +230,57 @@ def predict(rules, source_id, reading):
 
 # ---- the page's data -------------------------------------------------------------------------------
 
+# What every source is, for the page (a click on a column header shows it).
+SOURCE_INFO = [
+    {"id": "lexique", "short": "Lexique", "sub": "Wenfa",
+     "full": "Lexique hakka de l'association Wenfa (Tahiti)", "origin": "Base du site, saisie et validée par l'association.",
+     "romanization": "Wenfa (tons 1 à 6)", "scan": False},
+    {"id": "baoan", "short": "Bao'an", "sub": "陳志明",
+     "full": "陳志明, 客家話大辭典（寶安腔）, index des caractères",
+     "origin": "Transcrit à partir du PDF scanné de l'index (43 pages) : reconnaissance de texte (OCR) et relecture visuelle. "
+               "Des erreurs de lecture restent possibles.",
+     "romanization": "Romanisation du dictionnaire, accent de Bao'an (tons 1, 2, 3, 5, 7, 8)", "scan": True},
+    {"id": "mciver", "short": "McIver", "sub": "1926",
+     "full": "D. MacIver, A Chinese-English Dictionary, Hakka-Dialect as spoken in Kwang-tung Province (1926), index hakka",
+     "origin": "Transcrit visuellement depuis le scan de l'index ; numéros recoupés par reconnaissance de texte (OCR). "
+               "Des erreurs de lecture restent possibles.",
+     "romanization": "Romanisation de MacIver (aspiration notée h : kh, th…)", "scan": True},
+    {"id": "chappell", "short": "Chappell & Lamarre", "sub": "Bâle",
+     "full": "H. Chappell et C. Lamarre, A Grammar and Lexicon of Hakka: Historical Materials from the Basel Mission Library",
+     "origin": "Relevé dans le texte du PDF (HAL) : mots cités avec leur lecture et leur sens anglais.",
+     "romanization": "Romanisation de la Mission de Bâle, dialecte de Sin-on (tš, š, ny…)", "scan": False},
+    {"id": "cantonese", "short": "Cantonais", "sub": "Unihan",
+     "full": "Unicode Unihan Database, champ kCantonese", "origin": "Base de données du consortium Unicode.",
+     "romanization": "Jyutping (tons 1 à 6)", "scan": False},
+    {"id": "mandarin", "short": "Mandarin", "sub": "Unihan",
+     "full": "Unicode Unihan Database, champs kMandarin et kHanyuPinyin", "origin": "Base de données du consortium Unicode.",
+     "romanization": "Pinyin (accents)", "scan": False},
+    {"id": "english", "short": "Anglais", "sub": "Unihan",
+     "full": "Unicode Unihan Database, champ kDefinition", "origin": "Base de données du consortium Unicode.",
+     "romanization": "", "scan": False},
+]
+
+
+def doubtful(rules, lexicon, char, readings):
+    """For the sources transcribed from scans (Bao'an, McIver): the indexes
+    of their readings that agree with no other Hakka source -- read in
+    Wenfa through the learnt rules, neither the initial nor the final of
+    any lexicon reading or of the other dictionary's readings. A sign of a
+    possible misreading of the scan (or of a real disagreement). Only
+    flagged when there is something to compare with."""
+    out = {}
+    predicted = {sid: [predict(rules, sid, r)[0] for r in readings[sid]] for sid in ("baoan", "mciver")}
+    for sid, other in (("baoan", "mciver"), ("mciver", "baoan")):
+        others = list(lexicon.get(char, [])) + [p for p in predicted[other] if p]
+        if not others:
+            continue
+        bad = [k for k, p in enumerate(predicted[sid])
+               if p and all(p[0] != o[0] and p[1] != o[1] for o in others)]
+        if bad:
+            out[sid] = bad
+    return out
+
+
 def chappell():
     """{simplified char: (["sang¹", ...], "生 sang1 life; ...")} from
     data/chappell_prons.json (manage.py build_chappell_index): readings and
@@ -254,7 +305,8 @@ def chappell():
 
 def table_payload():
     """{"rows": [[char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese,
-    chappell, chappell_examples]], "rules": ...}.
+    chappell, chappell_examples, doubtful]], "rules": ..., "sources": SOURCE_INFO + counts}.
+    `doubtful`: {"baoan": [indexes], ...} of readings that may be misread scans.
     `wenfa`: the lexicon's readings; `guess`: for a character the lexicon
     doesn't have, the Wenfa reading deduced from the best source available
     ("ga¹|Bao'an|72")."""
@@ -264,6 +316,7 @@ def table_payload():
     order = sorted(SOURCES, key=lambda s: -rules[s["id"]]["accuracy"]["all"])
     rows = []
     basel = chappell()
+    flagged = Counter()
     chars = sorted(all_chars() | set(lexicon) | set(basel))
     traditional = convert_all(ps._s2t, chars)
     for char in chars:
@@ -278,6 +331,9 @@ def table_payload():
                         guess = f"{wenfa_text(reading)}|{s['label']}|{confidence}"
                         break
         trad = traditional[char]
+        flags = doubtful(rules, lexicon, char, readings)
+        for sid, ks in flags.items():
+            flagged[sid] += len(ks)
         rows.append([
             char, trad if trad != char else "",
             " ".join(wenfa_text(r) for r in lexicon.get(char, [])),
@@ -286,12 +342,18 @@ def table_payload():
             " ".join(info.get("mandarin", [])), info.get("meaning", ""), guess,
             " ".join(source_text(SOURCES[2], r) for r in readings["cantonese"]),
             " ".join(basel.get(char, ([], ""))[0]), basel.get(char, ([], ""))[1],
+            flags,
         ])
     # The lexicon's characters first (by Wenfa reading), then the others.
     rows.sort(key=lambda r: (not r[2], r[2], r[0]))
     for r in rules.values():
         r.pop("best", None)
-    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order]}
+    counts = {"lexique": sum(1 for r in rows if r[2]), "baoan": sum(1 for r in rows if r[3]),
+              "mciver": sum(1 for r in rows if r[4]), "chappell": sum(1 for r in rows if r[9]),
+              "cantonese": sum(1 for r in rows if r[8]), "mandarin": sum(1 for r in rows if r[5]),
+              "english": sum(1 for r in rows if r[6])}
+    sources = [{**s, "chars": counts.get(s["id"], 0), "doubtful": flagged.get(s["id"], 0)} for s in SOURCE_INFO]
+    return {"rows": rows, "rules": rules, "order": [s["id"] for s in order], "sources": sources}
 
 
 def cached_payload():

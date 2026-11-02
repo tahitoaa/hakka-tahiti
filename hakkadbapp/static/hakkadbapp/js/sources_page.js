@@ -45,12 +45,17 @@
     window.addEventListener('hashchange', showTab);
 
     // ---- 1. the table -------------------------------------------------------------------------
-    function readings(text, cls) {
+    function readings(text, cls, doubtful = []) {
+        if (doubtful.length && text) {
+            return text.split(' ').map((r, k) => (doubtful.includes(k)
+                ? `<span class="sx-r ${cls} sx-r-doubt" title="Lecture transcrite d'un scan qui ne concorde avec aucune autre source hakka : erreur de lecture possible (ou vrai désaccord).">⚠ ${esc(r)}</span>`
+                : `<span class="sx-r ${cls}">${esc(r)}</span>`)).join('');
+        }
         return text ? text.split(' ').map((r) => `<span class="sx-r ${cls}">${esc(r)}</span>`).join('') : '<span class="sx-none">—</span>';
     }
 
     function rowHtml(r) {
-        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese, chappell, chappellEx] = r;
+        const [char, trad, wenfa, baoan, mciver, mandarin, english, guess, cantonese, chappell, chappellEx, doubt = {}] = r;
         let lex = readings(wenfa, 'sx-r-wenfa');
         if (!wenfa && guess) {
             const [reading, source, confidence] = guess.split('|');
@@ -59,7 +64,7 @@
         }
         return `<tr><td class="sx-char"><a class="hanzi" href="${HANZI_URL.replace('__H__', encodeURIComponent(char))}">${esc(char)}</a>`
             + `${trad ? `<small class="hanzi">${esc(trad)}</small>` : ''}</td>`
-            + `<td>${lex}</td><td>${readings(baoan, '')}</td><td>${readings(mciver, '')}</td>`
+            + `<td>${lex}</td><td>${readings(baoan, '', doubt.baoan)}</td><td>${readings(mciver, '', doubt.mciver)}</td>`
             + `<td${chappellEx ? ` title="${esc(chappellEx)}"` : ''}>${readings(chappell, 'sx-r-basel')}</td>`
             + `<td>${readings(cantonese, 'sx-r-man')}</td><td>${readings(mandarin, 'sx-r-man')}</td>`
             + `<td class="sx-en" lang="en">${esc(english)}</td></tr>`;
@@ -71,6 +76,7 @@
         return data.rows.filter((r, i) => {
             if (state.filter === 'lexicon' && !r[2]) return false;
             if (state.filter === 'guess' && r[2]) return false;
+            if (state.filter === 'doubt' && !(r[11] && Object.keys(r[11]).length)) return false;
             return words.every((w) => data.hay[i].includes(w));
         });
     }
@@ -236,6 +242,27 @@
     });
     $('sx-graph')?.addEventListener('keydown', (e) => {
         if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.node')) { e.preventDefault(); highlight(e.target.closest('.node')); }
+    });
+
+    // ---- what each source is (a click on its column header) ------------------------------------
+    function showSource(id) {
+        const s = (data?.sources || []).find((x) => x.id === id);
+        const box = $('sx-source');
+        if (!s || !box) return;
+        box.querySelector('[data-src-body]').innerHTML = `<h3>${esc(s.short)} <small>${esc(s.sub)}</small></h3>
+            <p class="sx-src-full">${esc(s.full)}</p>
+            <dl><dt>Origine</dt><dd>${esc(s.origin)}</dd>
+              ${s.romanization ? `<dt>Notation</dt><dd>${esc(s.romanization)}</dd>` : ''}
+              <dt>Caractères</dt><dd>${s.chars.toLocaleString('fr-FR')}</dd>
+              ${s.scan ? `<dt>Lectures douteuses</dt><dd>⚠ ${s.doubtful.toLocaleString('fr-FR')} lectures ne concordent avec aucune autre
+                source hakka (filtre « ⚠ Lectures douteuses »).</dd>` : ''}</dl>`;
+        if (!box.open) box.showModal();
+    }
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-src-info]');
+        if (b) { showSource(b.dataset.srcInfo); return; }
+        const box = $('sx-source');
+        if (box && (e.target === box || e.target.closest('[data-src-close]'))) box.close();
     });
 
     // ---- load -----------------------------------------------------------------------------------
