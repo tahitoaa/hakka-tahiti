@@ -360,7 +360,7 @@ class ValidationTable extends AdditionList {
     renderItem(a) {
         const esc = AdditionList.escapeHtml;
         const on = this.selected.has(a.id);
-        const date = new Date(a.updated_at).toLocaleDateString('fr-FR');
+        const date = new Date(a.updated_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
         const who = a.by_ai ? '<span class="vt-ai-badge">🤖 IA</span>'
             : esc(a.updated_by && a.updated_by !== a.created_by ? `${a.created_by} → ${a.updated_by}` : a.created_by);
         const remarks = this.openRemarks(a.id);
@@ -375,7 +375,7 @@ class ValidationTable extends AdditionList {
             <td class="vt-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</td>
             <td class="vt-french">${esc(a.french)}${a.english ? `<span class="vt-sub italic"> · ${esc(a.english)}</span>` : ''}
                 ${a.observations ? `<div class="vt-sub vt-obs" title="${esc(a.observations)}">${esc(a.observations)}</div>` : ''}</td>
-            <td class="vt-meta">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
+            <td class="vt-meta vt-type">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span></td>
             <td><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
@@ -534,6 +534,176 @@ class ValidationTable extends AdditionList {
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
+        });
+    }
+}
+
+/* The validation slideshow: the additions of the table (as filtered), one
+   at a time, large, to validate, reject, send back to draft or correct
+   (French, English, theme, observations) on the spot, with the AI's
+   remarks. After a decision, the next item comes by itself. A double click
+   never skips an item: a second click within 450 ms is ignored, as are the
+   repeated clicks of one gesture and held-down keys. */
+class ValidationShow {
+    constructor(table) {
+        this.table = table;
+        this.dialog = document.getElementById('vs-dialog');
+        this.card = document.getElementById('vs-card');
+        this.ids = [];
+        this.pos = 0;
+        this.lockedUntil = 0;
+        this.editing = false;
+        this.busy = false;
+        document.getElementById('vs-open').addEventListener('click', () => this.open());
+        this.dialog.addEventListener('click', (e) => this.onClick(e));
+        this.dialog.addEventListener('keydown', (e) => {
+            if (e.repeat || this.editing || e.target.closest('input, textarea')) return;
+            if (e.key === 'ArrowRight') { e.preventDefault(); this.move(1); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); this.move(-1); }
+        });
+        let x0 = null;
+        this.card.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        this.card.addEventListener('touchend', (e) => {
+            if (x0 === null || this.editing) return;
+            const dx = e.changedTouches[0].clientX - x0;
+            x0 = null;
+            if (Math.abs(dx) > 60) this.move(dx < 0 ? 1 : -1);
+        });
+    }
+
+    current() {
+        return this.table.additions.find((a) => a.id === this.ids[this.pos]);
+    }
+
+    open(startId = null) {
+        this.ids = this.table.visible().map((a) => a.id);
+        if (!this.ids.length) { this.table.setStatus('Aucun ajout à afficher avec ce filtre.', true); return; }
+        this.pos = Math.max(0, startId === null ? 0 : this.ids.indexOf(startId));
+        this.editing = false;
+        this.render();
+        if (!this.dialog.open) this.dialog.showModal();
+    }
+
+    locked() {
+        const now = Date.now();
+        if (now < this.lockedUntil || this.busy) return true;
+        this.lockedUntil = now + 450;
+        return false;
+    }
+
+    move(step, { force = false } = {}) {
+        if (!force && this.locked()) return;
+        const next = Math.min(this.ids.length - 1, Math.max(0, this.pos + step));
+        if (next === this.pos) return;
+        this.pos = next;
+        this.editing = false;
+        this.card.classList.add('is-changing');
+        setTimeout(() => { this.render(); this.card.classList.remove('is-changing'); }, 120);
+    }
+
+    render(message = '') {
+        const a = this.current();
+        const esc = AdditionList.escapeHtml;
+        const head = document.getElementById('vs-count');
+        if (!a) { this.card.innerHTML = '<p class="vs-empty">Cet ajout n’existe plus.</p>'; return; }
+        head.innerHTML = `${esc(this.table.statusLabels[this.table.filter] || 'Ajouts')} · <b>${this.pos + 1} / ${this.ids.length}</b>`;
+        const date = new Date(a.updated_at).toLocaleDateString('fr-FR');
+        const author = a.by_ai ? '🤖 IA' : esc(a.created_by || '?');
+        const edited = a.updated_by && a.updated_by !== a.created_by ? `, modifié par ${esc(a.updated_by)}` : '';
+        const remarks = this.table.openRemarks(a.id);
+        const field = (name, label, value) => `<label class="vs-field"><span>${label}</span>
+            <input type="text" data-vs-field="${name}" value="${esc(value)}"></label>`;
+        this.card.innerHTML = `
+            <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>
+              <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
+              <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span></div>
+            <div class="hanzi vs-hanzi">${esc(a.hanzi)}</div>
+            <div class="vs-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</div>
+            ${this.editing ? `<div class="vs-edit">
+                ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
+                ${field('themes', 'Thème', a.themes)}${field('observations', 'Observations', a.observations)}
+                <div class="vs-edit-actions"><button type="button" class="saisie-btn saisie-btn-validate" data-vs="save">Enregistrer la correction</button>
+                  <button type="button" class="saisie-btn saisie-btn-neutral" data-vs="cancel">Annuler</button></div></div>`
+            : `<div class="vs-french">${esc(a.french) || '<i>sans traduction</i>'}</div>
+               ${a.english ? `<div class="vs-english" lang="en">${esc(a.english)}</div>` : ''}
+               ${a.observations ? `<div class="vs-obs">${esc(a.observations)}</div>` : ''}`}
+            ${remarks.length ? `<ul class="vs-remarks">${remarks.map((c) => `<li>
+                <b>${c.by_ai ? '🤖 IA' : esc(c.author)}</b> ${c.kind === 'correction'
+                    ? `· ${esc(c.field_label)} : <del>${esc(c.current_value) || 'vide'}</del> → <ins>${esc(c.proposed_value)}</ins>` : ''}
+                <div>${esc(c.text)}</div>
+                <span class="vs-remark-actions">${c.applicable ? `<button type="button" class="saisie-btn saisie-btn-validate" data-vs-remark="apply" data-cid="${c.id}">Appliquer</button>` : ''}
+                  <button type="button" class="saisie-btn saisie-btn-neutral" data-vs-remark="dismiss" data-cid="${c.id}">Écarter</button></span></li>`).join('')}</ul>` : ''}
+            <p class="vs-message" role="status">${esc(message)}</p>`;
+        this.dialog.querySelector('[data-vs-nav="-1"]').disabled = this.pos === 0;
+        this.dialog.querySelector('[data-vs-nav="1"]').disabled = this.pos === this.ids.length - 1;
+        this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
+            b.disabled = this.editing || b.dataset.vsStatus === a.status;
+        });
+        this.dialog.querySelector('[data-vs="edit"]').disabled = this.editing;
+        if (this.editing) this.card.querySelector('[data-vs-field="french"]')?.focus();
+    }
+
+    async onClick(e) {
+        const b = e.target.closest('button');
+        if (e.target === this.dialog || b?.dataset.vs === 'close') { this.dialog.close(); return; }
+        if (!b || e.detail > 1) return;                       // the 2nd click of a double click
+        if (b.dataset.vsNav) { this.move(Number(b.dataset.vsNav)); return; }
+        if (b.dataset.vs === 'edit') { this.editing = true; this.render(); return; }
+        if (b.dataset.vs === 'cancel') { this.editing = false; this.render(); return; }
+        if (this.locked()) return;
+        const a = this.current();
+        if (!a) return;
+        if (b.dataset.vsStatus) return this.decide(a, b.dataset.vsStatus, b);
+        if (b.dataset.vs === 'save') return this.save(a, b);
+        if (b.dataset.vsRemark) return this.remark(a, b);
+    }
+
+    async run(button, label, task) {
+        this.busy = true;
+        try {
+            await AdditionList.whileBusy(button, label, task);
+        } catch (err) {
+            this.render(`Échec : ${err.message}`);
+        } finally {
+            this.busy = false;
+        }
+    }
+
+    replace(addition) {
+        this.table.additions = this.table.additions.map((x) => (x.id === addition.id ? addition : x));
+        this.table.render();
+    }
+
+    async decide(a, status, button) {
+        const done = { validated: '✓ Validé', rejected: '✕ Rejeté', draft: '↺ Renvoyé en brouillon', review: '↑ Remis à valider' };
+        await this.run(button, '…', async () => {
+            const data = await AdditionList.request(`${AdditionList.API}${a.id}`, { status });
+            this.replace(data.addition);
+            this.render(done[status] || 'Enregistré');
+        });
+        // On to the next item, once the change has been seen.
+        if (this.current()?.status === status && this.pos < this.ids.length - 1) {
+            setTimeout(() => this.move(1, { force: true }), 600);
+        }
+    }
+
+    async save(a, button) {
+        const values = {};
+        this.card.querySelectorAll('[data-vs-field]').forEach((input) => { values[input.dataset.vsField] = input.value; });
+        await this.run(button, 'Enregistrement…', async () => {
+            const data = await AdditionList.request(`${AdditionList.API}${a.id}`, values);
+            this.editing = false;
+            this.replace(data.addition);
+            this.render('✓ Correction enregistrée');
+        });
+    }
+
+    async remark(a, button) {
+        await this.run(button, '…', async () => {
+            const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}/${button.dataset.cid}`, { action: button.dataset.vsRemark });
+            this.table.comments = this.table.comments.map((c) => (c.id === data.comment.id ? data.comment : c));
+            if (data.addition) this.replace(data.addition); else this.table.render();
+            this.render(button.dataset.vsRemark === 'apply' ? '✓ Correction appliquée' : 'Remarque écartée');
         });
     }
 }
@@ -809,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.validationTable = table;
     table.load();
+    if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
     if (document.getElementById('import-form')) window.documentImport = new DocumentImport(table);
     document.querySelectorAll('[data-new-words]').forEach((btn) =>
         btn.addEventListener('click', () => table.aiNewWords(btn.dataset.newWords, btn)));

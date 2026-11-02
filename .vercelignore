@@ -13,3 +13,4 @@ package.json
 tests/
 node_modules/
 venv/
+tools/

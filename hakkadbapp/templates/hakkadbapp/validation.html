@@ -34,7 +34,9 @@
   .vt-status-validated { background: #d1fae5; color: #065f46; }
   .vt-status-rejected { background: #fee2e2; color: #991b1b; }
   /* Narrower than a landscape iPad: the author column goes. */
-  @media (max-width: 899px) { .vt-who { display: none; } }
+  .vt-who { white-space: nowrap; }
+  /* iPad held upright: the author stays, the type/theme column goes (it is in the slideshow). */
+  @media (max-width: 899px) { .vt-table .vt-type { display: none; } }
   /* AI assistant: remarks under a row, its badge, the two tabs. */
   .vt-tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
   .vt-tabs button { min-height: 2.75rem; padding: 0.4rem 1rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
@@ -88,7 +90,7 @@
   .vt-bar .saisie-btn, .vt-ai-tools .saisie-btn { min-height: 2rem; padding: 0.2rem 0.6rem; font-size: 0.8rem; }
   .vt-table { font-size: 0.85rem; line-height: 1.25; }
   .vt-table th { padding: 0.35rem 0.4rem; font-size: 0.68rem; }
-  .vt-table td { padding: 0.22rem 0.4rem; }
+  .vt-table td { padding: 0.12rem 0.4rem; }
   .vt-check { width: 2.25rem; }
   .vt-check input, #validation-all { width: 1.15rem; height: 1.15rem; }
   .vt-table .hanzi { font-size: 1.15rem !important; line-height: 1.2; }
@@ -97,17 +99,50 @@
   .vt-sub { font-size: 0.7rem; line-height: 1.2; }
   .vt-status { padding: 0.05rem 0.45rem; font-size: 0.7rem; }
   .vt-ia { width: 4.25rem; }
-  .vt-ia-btn { min-height: 1.85rem; min-width: 2rem; padding: 0 0.35rem; font-size: 0.75rem; }
+  .vt-ia-btn { min-height: 1.6rem; min-width: 2rem; padding: 0 0.35rem; font-size: 0.75rem; }
   .vt-actions { width: 2.5rem; }
-  .vt-actions .saisie-btn { min-width: 1.85rem; min-height: 1.85rem; padding: 0; font-size: 0.85rem; }
+  .vt-actions .saisie-btn { min-width: 1.75rem; min-height: 1.6rem; padding: 0; font-size: 0.85rem; }
   .vt-tabs button { min-height: 2.25rem; padding: 0.25rem 0.75rem; font-size: 0.9rem; }
   .vt-ai-tools { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
   .vt-import > summary { padding: 0.45rem 0.75rem; min-height: 2.25rem; font-size: 0.9rem; }
   #saisie-filters .saisie-chip { min-height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; }
   #validation-status { min-height: 0; }
+  .vs-open { min-height: 2rem; padding: 0 0.8rem; border-radius: 9999px; background: var(--color-brand, #9B1C1C); color: #fff; font-weight: 700; font-size: 0.8rem; }
+  .vs-dialog { width: min(42rem, calc(100vw - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 0; border: 0; border-radius: 1rem;
+               background: #fff; color: #261F1C; box-shadow: 0 16px 48px rgb(0 0 0 / .35); }
+  .vs-dialog::backdrop { background: rgb(38 31 28 / .6); }
+  .vs-head { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; background: var(--color-brand, #9B1C1C); color: #fff; }
+  .vs-head b { font-variant-numeric: tabular-nums; }
+  .vs-close { min-width: 2.5rem; min-height: 2.5rem; border-radius: 9999px; color: #fff; font-size: 1.1rem; }
+  .vs-card { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; min-height: 19rem;
+             padding: 1rem; transition: opacity .12s ease; }
+  .vs-card.is-changing { opacity: 0.25; }
+  .vs-meta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.35rem 0.75rem; font-size: 0.82rem; color: #6E655C; }
+  .vs-author b { color: #3A3430; }
+  .vs-hanzi { font-size: clamp(3rem, 12vw, 5rem) !important; line-height: 1.1; color: #9B1C1C; }
+  .vs-pinyin { font-size: 1.6rem; font-weight: 700; color: #3A3430; }
+  .vs-french { font-size: 1.3rem; }
+  .vs-english { font-size: 1rem; font-style: italic; color: #544D45; }
+  .vs-obs { font-size: 0.85rem; color: #6E655C; max-width: 34rem; }
+  .vs-edit { display: grid; gap: 0.4rem; width: 100%; max-width: 30rem; text-align: left; }
+  .vs-field { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #544D45; }
+  .vs-field input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-size: 1rem; }
+  .vs-edit-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+  .vs-remarks { width: 100%; max-width: 34rem; display: grid; gap: 0.4rem; text-align: left; font-size: 0.85rem; }
+  .vs-remarks li { border: 1px solid #E8DFD2; border-left: 4px solid #a78bfa; border-radius: 0.5rem; padding: 0.4rem 0.6rem; }
+  .vs-remarks del { color: #991b1b; background: #fee2e2; } .vs-remarks ins { color: #065f46; background: #d1fae5; text-decoration: none; }
+  .vs-remark-actions { display: flex; gap: 0.35rem; margin-top: 0.3rem; }
+  .vs-message { min-height: 1.2rem; font-weight: 700; color: #065f46; }
+  .vs-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; padding: 0.6rem 0.75rem 0; }
+  .vs-actions button { min-height: 3rem; border-radius: 0.6rem; font-weight: 700; font-size: 0.95rem; touch-action: manipulation; user-select: none; }
+  .vs-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; padding: 0.6rem 0.75rem 0.75rem; }
+  .vs-nav button { min-height: 2.75rem; border-radius: 0.6rem; border: 1px solid #DDD0BD; background: #fff; color: #544D45; font-weight: 700;
+                   touch-action: manipulation; user-select: none; }
+  .vs-actions button:disabled, .vs-nav button:disabled { opacity: 0.4; }
+  @media (max-width: 520px) { .vs-actions { grid-template-columns: 1fr 1fr; } .vs-field { grid-template-columns: 1fr; } }
   /* Hakka columns: larger and centred. */
   .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
-  .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.15; }
+  .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.05; }
   .vt-table td.vt-pinyin { font-size: 1rem; font-weight: 600; color: #3A3430; }
   .vt-obs { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
@@ -152,6 +187,7 @@
     <button type="button" class="saisie-chip px-4 min-h-11 rounded-full border border-gray-300 bg-white" data-filter="{{ value }}" aria-pressed="{% if value == 'review' %}true{% else %}false{% endif %}">{{ label }}</button>
     {% endfor %}
     <button type="button" class="saisie-chip px-4 min-h-11 rounded-full border border-gray-300 bg-white" data-filter="all" aria-pressed="false">Tous</button>
+    <button type="button" id="vs-open" class="vs-open">▶ Diaporama</button>
   </div>
 
   <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
@@ -173,7 +209,7 @@
           <th class="vt-hk">Caractères</th>
           <th class="vt-hk">Pinyin</th>
           <th>Français</th>
-          <th>Type · thème</th>
+          <th class="vt-type">Type · thème</th>
           <th class="vt-who">Par</th>
           <th>Statut</th>
           <th class="vt-ia">Remarques</th>
@@ -205,6 +241,21 @@
   </section>
 </div>
 
+<dialog class="vs-dialog" id="vs-dialog" aria-labelledby="vs-count">
+  <div class="vs-head"><span id="vs-count" aria-live="polite"></span>
+    <button type="button" class="vs-close" data-vs="close" aria-label="Fermer le diaporama">✕</button></div>
+  <div class="vs-card" id="vs-card"></div>
+  <div class="vs-actions">
+    <button type="button" class="saisie-btn-validate" data-vs-status="validated">✓ Valider</button>
+    <button type="button" class="saisie-btn-reject" data-vs-status="rejected">✕ Rejeter</button>
+    <button type="button" class="saisie-btn-neutral" data-vs="edit">✎ Corriger</button>
+    <button type="button" class="saisie-btn-neutral" data-vs-status="draft">↺ Brouillon</button>
+  </div>
+  <div class="vs-nav">
+    <button type="button" data-vs-nav="-1">← Précédent</button>
+    <button type="button" data-vs-nav="1">Suivant →</button>
+  </div>
+</dialog>
 {{ status_labels|json_script:"saisie-status-labels" }}
 <script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
 {% endblock %}
