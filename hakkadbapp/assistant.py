@@ -38,7 +38,8 @@ from .permissions import AI_USERNAME, ASSISTANTS_GROUP, editor_required, is_edit
 logger = logging.getLogger(__name__)
 
 MAX_REVIEW_ITEMS = 12      # items read in one request
-MAX_NEW_WORDS = 5          # words suggested in one request
+MAX_NEW_WORDS = 5          # words suggested in one request, by default
+MAX_NEW_WORDS_REQUEST = 10  # at most in one request (Vercel's 60 s); the page loops for more
 NIGHTLY_REVIEW_ITEMS = 10
 # Fields the assistant may comment on or propose a correction for.
 REVIEW_FIELDS = {
@@ -381,7 +382,7 @@ def _valid_reading(hanzi, reading, readings, pinned=""):
     return split(reading, list(_norm(hanzi)))
 
 
-def _create_from(words, candidates, themes, origin):
+def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS):
     readings = char_readings()
     by_hanzi = {c["hanzi"]: c for c in candidates}
     created = []
@@ -400,7 +401,7 @@ def _create_from(words, candidates, themes, origin):
                                     note)
         if addition:
             created.append(addition)
-        if len(created) >= MAX_NEW_WORDS:
+        if len(created) >= limit:
             break
     return created
 
@@ -413,7 +414,7 @@ def suggest_missing(limit=MAX_NEW_WORDS):
     data = _call(NEW_WORDS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False),
                  "Candidates (words seen in the data, missing from the lexicon):\n"
                  + json.dumps(candidates, ensure_ascii=False), _new_words_schema(themes))
-    return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus")[:limit]
+    return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus", limit)
 
 
 EXPRESSIONS_SYSTEM = CONTEXT + """
@@ -586,12 +587,17 @@ def api_review(request):
 @require_POST
 @editor_required
 def api_new_words(request):
-    """POST {mode: "missing" | "expressions"}: the AI suggests a few words or expressions."""
+    """POST {mode: "missing" | "expressions", count}: the AI suggests up to
+    `count` words or expressions (1 to MAX_NEW_WORDS_REQUEST; the page asks
+    again for more)."""
     from .additions import _addition_json
 
     payload = _json(request) or {}
+    count = payload.get("count", MAX_NEW_WORDS)
+    count = max(1, min(MAX_NEW_WORDS_REQUEST, count if isinstance(count, int) else MAX_NEW_WORDS))
     try:
-        created = suggest_expressions() if payload.get("mode") in ("expressions", "compounds") else suggest_missing()
+        created = (suggest_expressions(count) if payload.get("mode") in ("expressions", "compounds")
+                   else suggest_missing(count))
     except AssistantError as err:
         return _error(err)
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created]})

@@ -9,6 +9,7 @@
             padding: 0.6rem 0.75rem; background: #fff; border: 1px solid #DDD0BD; border-radius: 0.75rem;
             box-shadow: 0 2px 6px rgb(0 0 0 / .06); }
   .vt-bar .vt-count { font-weight: 600; color: #544D45; margin-right: auto; min-width: 9rem; }
+  .vt-ai-count input { width: 3.4rem; min-height: 2rem; padding: 0 0.3rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; text-align: center; }
   .vt-facets { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-size: 0.8rem; }
   .vt-facets label { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.15rem 0 0.55rem; min-height: 2rem;
                      border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; color: #6E655C; }
@@ -173,7 +174,9 @@
   <div id="additions-panel" role="tabpanel" class="space-y-3">
   <div class="vt-ai-tools" data-needs-ai hidden>
     <b>🤖 Assistant IA</b>
-    <span>Suggérer :</span>
+    <span>Suggérer</span>
+    <label class="vt-ai-count" title="Nombre de suggestions (par lots de 10)"><input type="number" id="ai-count" min="1" max="50" value="5" inputmode="numeric"
+      aria-label="Nombre de suggestions"></label>
     <button type="button" class="saisie-btn saisie-btn-ai" data-new-words="missing" title="Mots des expressions et transcriptions absents du lexique">Mots manquants</button>
     <button type="button" class="saisie-btn saisie-btn-ai" data-new-words="expressions" title="Phrases ou groupes de mots du lexique">Expressions</button>
   </div>

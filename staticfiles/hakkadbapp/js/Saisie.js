@@ -79,6 +79,18 @@ class SaisieEntry {
         this.setText(this.model.text);
     }
 
+    /** No character for a pending syllable: it becomes a placeholder with
+     *  its reading pinned, -(man4) (stored notation when the typed syllable
+     *  converts to one), which the site reads as « unknown character ». */
+    unknown(sylIndex) {
+        const syl = this.model.syllables[sylIndex];
+        if (syl === undefined) return false;
+        const reading = this.readingFor('', syl) || String(syl).replace(/’/g, "'").toLowerCase();
+        this.model.replace(sylIndex, `-(${reading})`);
+        this.setText(this.model.text);
+        return true;
+    }
+
     /** A character typed for a pending syllable (one no source knows):
      *  written with its reading pinned, unless that is the character's
      *  only lexicon reading. False when the reading stays ambiguous. */
@@ -304,6 +316,7 @@ class SaisieEntry {
             this.kindButtons = [...this.el.form.querySelectorAll('[data-kind]')];
             this.suggestionBar = new SuggestionBar(this.el.suggestions, {
                 onSelect: (index) => this.pickSuggestion(index),
+                onUnknown: () => { if (this.entry.unknown(this.active)) this.afterChange(); },
             });
 
             // "Lectures" (components/reading_settings.html): the same sources
@@ -589,7 +602,7 @@ class SaisieEntry {
 
         renderSuggestions() {
             this.visible = this.entry.syllables.length ? this.entry.suggestions(this.active) : [];
-            this.suggestionBar.render(this.visible);
+            this.suggestionBar.render(this.visible, { unknown: this.entry.syllables[this.active] || '' });
         }
 
         values() {

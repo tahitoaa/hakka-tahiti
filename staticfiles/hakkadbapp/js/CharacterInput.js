@@ -173,6 +173,7 @@ const SUGGESTION_BAR_CSS = `
 .sugg .sugg-uh { margin-top: 0.15rem; width: 100%; font-size: 0.6rem; line-height: 1.15; color: #6E655C; text-align: center;
                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sugg .sugg-uh b { color: #3730a3; font-weight: 600; }
+.sugg.sugg-unknown { border-style: dashed; color: #8C8478; background: #FDFAF5; }
 `;
 
 function injectSuggestionBarCss() {
@@ -184,12 +185,15 @@ function injectSuggestionBarCss() {
 }
 
 class SuggestionBar {
-    constructor(container, { onSelect, anchorTo, shortcutLabel = 'Maj' } = {}) {
+    constructor(container, { onSelect, onUnknown, anchorTo, shortcutLabel = 'Maj' } = {}) {
         injectSuggestionBarCss();
         this.container = container;
         this.shortcutLabel = shortcutLabel; // modifier shown in the tooltips
         this.container.classList.add('sugg-bar');
         this.onSelect = onSelect;
+        // « ? » tile: the character is unknown, keep the reading as -(man4).
+        this.onUnknown = onUnknown;
+        this.unknown = '';
         this.anchorTo = anchorTo;
         this.suggestions = [];
 
@@ -218,7 +222,7 @@ class SuggestionBar {
 
     updateVisibility() {
         if (!this.anchorTo) return;
-        const show = document.activeElement === this.anchorTo && this.suggestions.length > 0;
+        const show = document.activeElement === this.anchorTo && (this.suggestions.length > 0 || !!this.unknown);
         // Inline style rather than a `hidden` class: this element also
         // carries `flex`, and Tailwind's utility ordering doesn't reliably
         // guarantee `display: none` wins over `display: flex` when both
@@ -227,16 +231,24 @@ class SuggestionBar {
     }
 
     handleClick(event) {
+        if (event.target.closest('[data-suggestion-unknown]')) { this.onUnknown?.(); return; }
         const btn = event.target.closest('[data-suggestion-index]');
         if (!btn) return;
         this.onSelect?.(parseInt(btn.dataset.suggestionIndex, 10));
     }
 
-    render(suggestions) {
+    /** `unknown`: the pending syllable (as typed) when the bar offers the
+     *  « ? » tile (onUnknown given) -- shown even with no suggestion. */
+    render(suggestions, { unknown = '' } = {}) {
         this.suggestions = suggestions || [];
+        this.unknown = this.onUnknown ? unknown : '';
+        const unknownTile = this.unknown
+            ? `<button type="button" data-suggestion-unknown class="sugg sugg-unknown" title="Caractère inconnu : garder seulement la lecture, -(${escapeSugg(this.unknown)})">`
+              + `<span class="hanzi sugg-hanzi">?</span><span class="sugg-py">inconnu</span></button>`
+            : '';
 
         if (!this.suggestions.length) {
-            this.container.innerHTML = '';
+            this.container.innerHTML = unknownTile;
             this.updateVisibility();
             return;
         }
@@ -273,7 +285,7 @@ class SuggestionBar {
                 + `<span class="sugg-py"><span class="sugg-hk">${pinyin}</span>${mandarin}</span>`
                 + english
                 + `</button>`;
-        }).join('');
+        }).join('') + unknownTile;
 
         this.container.classList.toggle?.('has-uh', withUnihan);
         this.updateVisibility();

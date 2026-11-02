@@ -628,13 +628,23 @@ class ValidationTable extends AdditionList {
     /** The AI suggests a few new words; they arrive "À valider". */
     async aiNewWords(mode, button) {
         this.setStatus('');
+        const wanted = Math.max(1, Math.min(50, Number(document.getElementById('ai-count')?.value) || 5));
+        const PER_REQUEST = 10;
         await AdditionList.whileBusy(button, 'L’IA cherche…', async () => {
             try {
-                const data = await AdditionList.request('/api/ia/mots', { mode });
-                data.additions.forEach((a) => this.additions.unshift(a));
-                this.render();
-                this.flash(data.additions.map((a) => a.id));
-                const n = data.additions.length;
+                // Batches of at most 10 (each request must end within Vercel's 60 s).
+                const added = [];
+                while (added.length < wanted) {
+                    const count = Math.min(PER_REQUEST, wanted - added.length);
+                    if (wanted > PER_REQUEST) this.setStatus(`🤖 L’IA cherche : ${added.length} sur ${wanted}…`);
+                    const data = await AdditionList.request('/api/ia/mots', { mode, count });
+                    data.additions.forEach((a) => this.additions.unshift(a));
+                    added.push(...data.additions);
+                    this.render();
+                    if (!data.additions.length) break;
+                }
+                this.flash(added.map((a) => a.id));
+                const n = added.length;
                 const what = mode === 'expressions' ? ['expression', 'expressions', 'proposée', 'proposées', 'nouvelle expression']
                     : ['mot', 'mots', 'proposé', 'proposés', 'nouveau mot'];
                 this.setStatus(n ? `🤖 ${n} ${n > 1 ? what[1] : what[0]} ${n > 1 ? what[3] : what[2]} par l’IA, en tête de liste « À valider ».`
