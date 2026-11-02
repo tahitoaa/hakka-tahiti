@@ -476,8 +476,12 @@ def check_candidates(candidates):
     rules = DocumentRules(pairs[:2000]) if len(pairs) >= DocumentRules.MIN_PAIRS else None
     seen = set()
     for c in candidates:
-        c["hanzi"] = " ".join(c["hanzi"].split())
-        key = _norm("".join(c["hanzi"].split()))
+        # The lexicon is in simplified characters: so is the addition; the
+        # document's own form (often traditional) is kept alongside.
+        original = " ".join((c.get("document_hanzi") or c["hanzi"]).split())
+        c["document_hanzi"] = original
+        c["hanzi"] = " ".join(_norm(token) for token in original.split())
+        key = "".join(c["hanzi"].split())
         kind = c.get("type", "").lower()
         c["kind"] = (LexiconAddition.KIND_EXPRESSION if kind.startswith(("expr", "locution", "phrase"))
                      else LexiconAddition.KIND_WORD if kind.startswith("mot")
@@ -644,7 +648,8 @@ def api_propose(request, document_id):
         return JsonResponse({"error": "Rien à proposer."}, status=400)
     clean = []
     for e in entries:
-        fields = ("hanzi", "pinyin", "french", "english", "themes", "location", "source_sense", "remark", "type")
+        fields = ("hanzi", "document_hanzi", "pinyin", "french", "english", "themes", "location", "source_sense",
+                  "remark", "type")
         if not isinstance(e, dict) or not all(isinstance(e.get(k, ""), str) for k in fields):
             return JsonResponse({"error": "Entrée mal formée."}, status=400)
         ai_fields = e.get("ai_fields") if isinstance(e.get("ai_fields"), list) else []
@@ -658,6 +663,8 @@ def api_propose(request, document_id):
             continue
         where = f" ({c['location']})" if c["location"] else ""
         notes = [f"Importé de « {doc.filename} »{where} par {request.user.username} ; source : {source}."]
+        if c["document_hanzi"] != c["hanzi"]:
+            notes.append(f"Forme du document : {c['document_hanzi']}.")
         doc_reading = " ".join(c["pinyin"].split())
         if doc_reading and doc_reading.replace(" ", "") != c["reading"].replace(" ", ""):
             notes.append(f"Lecture du document : {doc_reading}.")

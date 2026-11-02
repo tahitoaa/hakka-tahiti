@@ -1110,7 +1110,8 @@ class DocumentImport {
               <tbody>${this.entries.map((e, i) => `<tr class="${e.state === 'new' ? '' : 'is-off'}">
                 <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}
                     aria-label="Proposer ${esc(e.hanzi)}"></td>
-                <td class="hanzi vt-hanzi">${esc(e.hanzi)}</td>
+                <td class="hanzi vt-hanzi">${esc(e.hanzi)}${e.document_hanzi && e.document_hanzi !== e.hanzi
+                    ? `<small class="vt-sub" title="Forme du document">${esc(e.document_hanzi)}</small>` : ''}</td>
                 <td class="vt-pinyin">${e.reading ? esc(AdditionList.displayPinyin(e.reading)) : `<i>${esc(e.pinyin) || '—'}</i>`}
                     ${e.reading_note ? `<div class="vt-warn">⚠ ${esc(e.reading_note)}</div>` : ''}</td>
                 <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated || e.ai_fields?.includes('french') ? ' <span class="vt-ai-badge">IA</span>' : ''}
@@ -1123,7 +1124,7 @@ class DocumentImport {
 
     async propose(button) {
         const entries = this.entries.filter((e) => e.picked).map((e) => ({
-            hanzi: e.hanzi, pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
+            hanzi: e.hanzi, document_hanzi: e.document_hanzi || '', pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
             themes: e.themes || '', location: e.location || '', translated: !!e.translated, ai_fields: e.ai_fields || [],
             source_sense: e.source_sense || '', remark: e.remark || '', type: e.type || '',
         }));
