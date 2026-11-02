@@ -218,6 +218,43 @@ class Command(BaseCommand):
             ),
         )
 
+    @staticmethod
+    def lexicon_targets():
+        """[(model, row id, target_type, platform_id)] for every ReviewComment
+        and AITarget on a lexicon word or expression, before the reset."""
+        from hakkadbapp.models import AITarget, Expression, ReviewComment, Word
+
+        ids = {"word": dict(Word.objects.values_list("id", "platform_id")),
+               "expression": dict(Expression.objects.values_list("id", "platform_id"))}
+        out = []
+        for model in (ReviewComment, AITarget):
+            for row_id, target_type, target_id in model.objects.filter(
+                    target_type__in=ids).values_list("id", "target_type", "target_id"):
+                out.append((model, row_id, target_type, ids[target_type].get(target_id)))
+        return out
+
+    @staticmethod
+    def repoint_lexicon_targets(pinned):
+        """After the reset: each remark / AI setting back on the item with
+        the same platform_id. Returns (re-pointed, left as they were)."""
+        from hakkadbapp.models import Expression, Word
+
+        new_ids = {"word": dict(Word.objects.exclude(platform_id=None).values_list("platform_id", "id")),
+                   "expression": dict(Expression.objects.exclude(platform_id=None).values_list("platform_id", "id"))}
+        moved = orphaned = 0
+        # Out of the way first: AITarget is unique on (type, target_id), and
+        # a new id may equal an old one not moved yet.
+        for model, row_id, _type, _pid in pinned:
+            model.objects.filter(id=row_id).update(target_id=-row_id)
+        for model, row_id, target_type, platform_id in pinned:
+            new_id = new_ids[target_type].get(platform_id) if platform_id else None
+            if new_id is None:
+                orphaned += 1
+                continue
+            model.objects.filter(id=row_id).update(target_id=new_id)
+            moved += 1
+        return moved, orphaned
+
     def handle(self, *args, **options):
         base_corpus_dir = Path("../e_reo_json")
         if options.get("corpus_dir"):
@@ -317,11 +354,19 @@ class Command(BaseCommand):
         }
 
         with transaction.atomic():
+            # Remarks and AI settings on lexicon items (ReviewComment,
+            # AITarget) point at Word/Expression pks, which the reset
+            # renumbers: remember each one's platform_id, re-point after.
+            pinned = self.lexicon_targets()
             word_result = import_words_from_df(
                 words_df, reset=True, traces_details=f"Source: platform_to_vercel ({corpus_dir})",
                 platform_data=platform_data,
             )
             expression_result = import_expressions_from_df(expressions_df, reset=True)
+            moved, orphaned = self.repoint_lexicon_targets(pinned)
+        self.stdout.write(self.style.SUCCESS(
+            f"Remarques / réglages IA du lexique rattachés : {moved} ; sans mot correspondant (laissés tels quels) : {orphaned}"
+        ))
 
         self.stdout.write(self.style.SUCCESS(
             f"Words imported: {word_result['rows_imported']} | Pronunciations: {word_result['pronunciations']}"
