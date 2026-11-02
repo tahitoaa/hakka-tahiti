@@ -12,9 +12,49 @@ from .models import LexiconAddition
 
 @admin.register(LexiconAddition)
 class LexiconAdditionAdmin(admin.ModelAdmin):
-    list_display = ("hanzi", "pinyin", "french", "kind", "status", "created_by", "updated_at")
-    list_filter = ("kind", "status", "created_by")
-    search_fields = ("hanzi", "pinyin", "french", "english")
+    """Same rule as the site: only the group « Validateurs » sets or changes
+    the « Validé » / « Rejeté » status (permissions.status_change_refused)."""
+    list_display = ("hanzi", "pinyin", "french", "kind", "status", "source", "created_by", "updated_at")
+    list_filter = ("kind", "status", "created_by", "source")
+    search_fields = ("hanzi", "pinyin", "french", "english", "source", "observations")
+
+    def get_readonly_fields(self, request, obj=None):
+        from .permissions import is_validator
+
+        fields = super().get_readonly_fields(request, obj)
+        if not is_validator(request.user) and obj and obj.status in ("validated", "rejected"):
+            return (*fields, "status")
+        return fields
+
+    def get_form(self, request, obj=None, **kwargs):
+        """A refused status change is shown as a form error, not a 403 page."""
+        from django.core.exceptions import ValidationError
+
+        from .permissions import status_change_refused
+
+        form_class = super().get_form(request, obj, **kwargs)
+        old = obj.status if obj else "draft"
+
+        class CheckedForm(form_class):
+            def clean(self):
+                data = super().clean()
+                message = status_change_refused(request.user, old, data.get("status", old))
+                if message:
+                    raise ValidationError(message)
+                return data
+
+        return CheckedForm
+
+    def save_model(self, request, obj, form, change):
+        from django.core.exceptions import PermissionDenied
+
+        from .permissions import status_change_refused
+
+        old = LexiconAddition.objects.filter(pk=obj.pk).values_list("status", flat=True).first() if change else "draft"
+        message = status_change_refused(request.user, old, obj.status)
+        if message:
+            raise PermissionDenied(message)
+        super().save_model(request, obj, form, change)
 
 
 from .models import SharedTranscript

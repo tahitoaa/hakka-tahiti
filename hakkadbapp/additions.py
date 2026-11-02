@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 from .ai import ai_enabled
 from .models import Expression, LexiconAddition, Word
-from .permissions import AI_USERNAME, editor_required, is_editor
+from .permissions import AI_USERNAME, editor_required, is_editor, status_change_refused
 
 EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source")
 KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
@@ -173,6 +173,9 @@ def additions_api(request):
         message = _apply_payload(addition, payload)
         if message:
             return JsonResponse({"error": message}, status=400)
+        message = status_change_refused(request.user, LexiconAddition.STATUS_DRAFT, addition.status)
+        if message:
+            return JsonResponse({"error": message}, status=403)
         words, message = _save_with_new_words(request, addition, payload)
         if message:
             return JsonResponse({"error": message}, status=400)
@@ -190,9 +193,13 @@ def addition_update(request, addition_id):
     payload, error = _read_json(request)
     if error:
         return error
+    old_status = addition.status
     message = _apply_payload(addition, payload)
     if message:
         return JsonResponse({"error": message}, status=400)
+    message = status_change_refused(request.user, old_status, addition.status)
+    if message:
+        return JsonResponse({"error": message}, status=403)
     addition.updated_by = request.user
     words, message = _save_with_new_words(request, addition, payload)
     if message:
@@ -236,6 +243,9 @@ def additions_bulk(request):
     status = payload.get("status")
     if status not in STATUSES:
         return JsonResponse({"error": "Statut invalide."}, status=400)
+    refused = next((m for m in (status_change_refused(request.user, a.status, status) for a in additions) if m), None)
+    if refused:
+        return JsonResponse({"error": refused}, status=403)
     with transaction.atomic():
         for addition in additions:
             addition.status = status

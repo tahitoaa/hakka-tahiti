@@ -168,6 +168,12 @@ class AdditionList {
             : `<li class="py-3 text-sm text-gray-500">${AdditionList.escapeHtml(this.empty)}</li>`;
     }
 
+    /** Member of « Validateurs » (permissions.is_validator): may validate,
+     *  reject, or take an addition out of those statuses. The server checks too. */
+    static canValidate() {
+        return typeof document !== 'undefined' && document.body?.dataset?.canValidate === '1';
+    }
+
     renderItem(a) {
         const esc = AdditionList.escapeHtml;
         const button = (action, label, status = '', variant = 'neutral') =>
@@ -176,12 +182,15 @@ class AdditionList {
         // The step forward first and coloured; the others plain.
         const actions = [];
         if (a.status === 'draft') actions.push(button('status', '↑ Proposer', 'review', 'review'));
-        if (a.status === 'review') {
+        const decider = AdditionList.canValidate();
+        if (a.status === 'review' && decider) {
             actions.push(button('status', '✓ Valider', 'validated', 'validate'));
             actions.push(button('status', '✕ Rejeter', 'rejected', 'reject'));
         }
         actions.push(button('edit', '✎ Modifier'));
-        if (a.status !== 'draft') actions.push(button('status', '↺ Repasser en brouillon', 'draft'));
+        if (a.status !== 'draft' && (decider || !['validated', 'rejected'].includes(a.status))) {
+            actions.push(button('status', '↺ Repasser en brouillon', 'draft'));
+        }
         if (['draft', 'rejected'].includes(a.status)) actions.push(button('delete', 'Supprimer', '', 'delete'));
 
         const date = new Date(a.updated_at).toLocaleDateString('fr-FR');
@@ -459,9 +468,12 @@ class ValidationTable extends AdditionList {
                 b.title = n > ValidationTable.MAX_AI_REVIEW ? `Au plus ${ValidationTable.MAX_AI_REVIEW} lignes à la fois` : '';
                 return;
             }
+            const decider = AdditionList.canValidate();
+            const decided = (s) => ['validated', 'rejected'].includes(s);
+            if (decided(action)) b.hidden = !decider;
             b.disabled = !n || (action === 'delete'
-                ? chosen.some((a) => !['draft', 'rejected'].includes(a.status))
-                : chosen.every((a) => a.status === action));
+                ? chosen.some((a) => !['draft', 'rejected'].includes(a.status)) || (!decider && chosen.some((a) => decided(a.status)))
+                : chosen.every((a) => a.status === action) || (!decider && (decided(action) || chosen.some((a) => decided(a.status)))));
         });
     }
 
@@ -754,8 +766,11 @@ class ValidationShow {
             <p class="vs-message" role="status">${esc(message)}</p>`;
         this.dialog.querySelector('[data-vs-nav="-1"]').disabled = this.pos === 0;
         this.dialog.querySelector('[data-vs-nav="1"]').disabled = this.pos === this.ids.length - 1;
+        const decider = AdditionList.canValidate();
+        const decided = (s) => ['validated', 'rejected'].includes(s);
         this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
-            b.disabled = this.editing || b.dataset.vsStatus === a.status;
+            if (decided(b.dataset.vsStatus)) b.hidden = !decider;
+            b.disabled = this.editing || b.dataset.vsStatus === a.status || (!decider && decided(a.status));
         });
         this.dialog.querySelector('[data-vs="edit"]').disabled = this.editing;
         if (this.editing) this.card.querySelector('[data-vs-field="french"]')?.focus();

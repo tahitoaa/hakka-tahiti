@@ -71,23 +71,23 @@
     </div>
 
     <div>
-      <label for="saisie-pinyin" class="block text-sm font-semibold text-gray-700 mb-1">Texte (comme sur la page Écrire)</label>
+      <div class="text-sm font-semibold text-gray-700 mb-1"><label for="saisie-pinyin">Texte</label>
+        <details class="help-tip"><summary aria-label="Aide : texte">ⓘ</summary><div id="saisie-pinyin-help">
+        Tapez les syllabes avec leur ton (<code>wuk5ka1</code>, <code>_</code> sans ton : <code>ngai_</code>), dans le système « Je tape en ».
+        Expression : un espace entre les mots (<code>ngai_ oi4 wuk5ka1</code>). Chaque caractère choisi remplace sa syllabe ;
+        une lecture choisie s'écrit entre parenthèses (<code>生(sen1)</code>). Caractère inconnu : « ? » garde la lecture, <code>-(man4)</code>.
+        Le pinyin est enregistré en Wenfa.</div></details></div>
       <input id="saisie-pinyin" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
              placeholder="ex. wuk5ka1"
              class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
       <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
-      <p id="saisie-pinyin-help" class="mt-1 text-xs text-gray-500">
-        Tapez les syllabes avec leur ton (<code>wuk5ka1</code>, <code>_</code> sans ton : <code>ngai_</code>), dans le système « Je tape en » (réglages ci-dessus).
-        Pour une expression, mettez un espace entre les mots (<code>ngai_ oi4 wuk5ka1</code>). Chaque caractère choisi remplace sa syllabe dans le texte,
-        comme sur la page Écrire ; la lecture d'un caractère à plusieurs lectures s'écrit entre parenthèses (<code>生(sen1)</code>).
-        Le pinyin est enregistré en Wenfa.
-      </p>
     </div>
 
     <div>
-      <div class="text-sm font-semibold text-gray-700 mb-1">Caractères</div>
+      <div class="text-sm font-semibold text-gray-700 mb-1">Caractères
+        <details class="help-tip"><summary aria-label="Aide : caractères">ⓘ</summary><div>Touchez une case vide puis un caractère proposé
+        (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.</div></details></div>
       <div id="saisie-slots" class="flex flex-wrap gap-2 min-h-12 items-end"></div>
-      <p class="mt-1 text-xs text-gray-500">Touchez une case vide puis un caractère proposé ci-dessous (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.</p>
     </div>
 
     <!-- Each word against the lexicon (same matching as the Écrire page) -->
@@ -148,13 +148,12 @@
   <!-- 2. Drafts (what is proposed is on the Validation tab) -->
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="font-display text-xl font-bold text-gray-800">Brouillons</h2>
+      <h2 class="font-display text-xl font-bold text-gray-800">Brouillons
+        <details class="help-tip font-sans font-normal"><summary aria-label="Aide : brouillons">ⓘ</summary><div>Les ajouts proposés se valident
+        ou se rejettent dans l'onglet <a href="{% url 'validation' %}" class="underline font-semibold">Validation</a>.</div></details></h2>
       <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les brouillons"
              class="min-h-10 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold">
     </div>
-    <p class="text-xs text-gray-500 mb-2">
-      Les ajouts proposés se valident ou se rejettent dans l'onglet <a href="{% url 'validation' %}" class="underline font-semibold">Validation</a>.
-    </p>
     <ul id="saisie-list" class="divide-y divide-gray-100"></ul>
   </section>
 </div>

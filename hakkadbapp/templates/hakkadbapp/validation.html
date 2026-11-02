@@ -184,8 +184,9 @@
   <details class="vt-import" id="import-panel">
     <summary>📄 Importer des mots depuis un document</summary>
     <div class="vt-import-body">
-      <p class="text-xs text-gray-500">Excel (.xlsx), CSV, texte (.txt), Word (.docx) ou PDF contenant du texte : pas de scans ni d'images.
-        Un tableau avec des colonnes « Caractères », « Pinyin », « Français » s'importe sans IA. Rien n'est ajouté avant que vous cochiez les mots.</p>
+      <details class="help-tip"><summary aria-label="Aide : import">ⓘ Formats</summary><div>Excel (.xlsx), CSV, texte (.txt), Word (.docx) ou PDF contenant du texte : pas de scans ni d'images.
+        Un tableau avec des colonnes « Caractères », « Pinyin », « Français » s'importe sans IA. Rien n'est ajouté avant que vous cochiez les mots.
+        Les mots sont enregistrés en caractères simplifiés, avec une lecture Wenfa déduite ; l'IA vérifie le français et l'anglais.</div></details>
       <form id="import-form">
         <label class="sr-only" for="import-file">Document à importer</label>
         <input id="import-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.docx,.pdf" required>
@@ -238,11 +239,12 @@
   </div>
   <button type="button" id="vt-more" class="saisie-btn saisie-btn-neutral vt-more" hidden>Afficher plus</button>
 
-  <p class="text-xs text-gray-500">
+  <details class="help-tip"><summary aria-label="Aide : validation">ⓘ Aide</summary><div>
     Touchez une ligne pour la cocher, puis choisissez l'action. « ✎ » ouvre l'ajout dans l'onglet
     <a href="{% url 'saisie' %}" class="underline font-semibold">Saisie</a>. « 💬 » montre les remarques : l'IA
     commente et propose des corrections, elle ne modifie, ne valide et ne supprime jamais rien.
-  </p>
+  
+    Valider et rejeter : membres du groupe « Validateurs ».</div></details>
   </div>
 
   <section id="lexicon-panel" role="tabpanel" class="vt-lexicon" hidden>

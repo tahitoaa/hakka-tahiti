@@ -79,14 +79,13 @@
 
   <!-- 1. The rules as an automaton (correspondences) -->
   <section data-sxpanel="correspondances" class="space-y-3">
-    <p class="text-sm text-gray-700">Comment une lecture <b>Bao'an</b>, <b>McIver</b>, <b>cantonaise</b> ou <b>mandarin</b> devient une lecture <b>Wenfa</b> :
-      les correspondances observées entre les sources et le lexique, étape par étape (initiale, finale, ton).
-      Pour chercher un caractère dans toutes les sources : <a class="underline font-semibold" href="{% url 'character_dictionary' %}">Dictionnaire des caractères</a>.</p>
+    <p class="text-sm text-gray-700">Comment une lecture de chaque source devient une lecture <b>Wenfa</b>, étape par étape.
+      Chercher un caractère : <a class="underline font-semibold" href="{% url 'character_dictionary' %}">Dictionnaire des caractères</a>.</p>
     <div class="flex flex-wrap gap-1.5 items-center" role="group" aria-label="Source" data-sxsource-group></div>
     <svg class="sx-chain" id="sx-chain" viewBox="0 0 640 90" role="img" aria-label="Automate : initiale, finale, ton"></svg>
-    <p class="sx-legend">Un transducteur à trois étapes : chaque syllabe source passe par l'initiale, la finale puis le ton, et chaque étape
+    <details class="help-tip"><summary aria-label="Lire le schéma">ⓘ Lire le schéma</summary><div>Un transducteur à trois étapes : chaque syllabe source passe par l'initiale, la finale puis le ton, et chaque étape
       transforme la valeur source (à gauche) en valeur Wenfa (à droite). Épaisseur : nombre de caractères ; rouge : la correspondance la
-      plus fréquente pour cette valeur. Touchez une étape ci-dessus, puis une valeur pour voir ses transitions.</p>
+      plus fréquente pour cette valeur. Touchez une étape ci-dessus, puis une valeur pour voir ses transitions.</div></details>
     <label class="text-sm text-gray-700 inline-flex items-center gap-2"><input type="checkbox" id="sx-rare"> afficher les correspondances rares (moins de 5 %)</label>
     <p class="sx-detail" id="sx-detail" aria-live="polite"></p>
     <div class="sx-graph-wrap"><svg class="sx-graph" id="sx-graph" role="img" aria-label="Transitions de l'étape choisie"></svg></div>
@@ -95,8 +94,8 @@
   <!-- 2. The rules, per source -->
   <section data-sxpanel="regles" class="space-y-3" hidden>
     <div class="flex flex-wrap gap-1.5" role="group" aria-label="Source" data-sxsource-group></div>
-    <p class="sx-legend">Appris sur les caractères du lexique qui ont une seule lecture dans le lexique et une seule dans la source.
-      Chaque règle donne la valeur Wenfa la plus fréquente, et la part des cas où elle s'applique.</p>
+    <details class="help-tip"><summary aria-label="Comment les règles sont apprises">ⓘ</summary><div>Appris sur les caractères du lexique qui ont une seule lecture dans le lexique et une seule dans la source.
+      Chaque règle donne la valeur Wenfa la plus fréquente, et la part des cas où elle s'applique.</div></details>
     <div class="sx-acc" id="sx-acc"></div>
     <div class="sx-rules" id="sx-rules"></div>
   </section>

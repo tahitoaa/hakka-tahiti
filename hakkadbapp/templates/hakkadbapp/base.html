@@ -247,8 +247,19 @@
 }
 </style>
 
+<style>
+  /* Help tucked away (todo: compact UI): <details class="help-tip"><summary>ⓘ</summary>…</details> */
+  details.help-tip { display: inline; font-size: 0.75rem; color: #6E655C; }
+  details.help-tip > summary { display: inline-flex; align-items: center; justify-content: center; list-style: none; cursor: pointer;
+    min-width: 1.5rem; min-height: 1.5rem; border-radius: 9999px; color: #8C8478; font-size: 0.85rem; user-select: none; }
+  details.help-tip > summary::-webkit-details-marker { display: none; }
+  details.help-tip > summary:hover, details.help-tip[open] > summary { color: #9B1C1C; background: #FBF0E6; }
+  details.help-tip[open] { display: block; margin-top: 0.15rem; }
+  details.help-tip > div { margin-top: 0.15rem; padding: 0.4rem 0.6rem; background: #FDFAF5; border: 1px solid #E8DFD2;
+    border-radius: 0.5rem; line-height: 1.45; }
+</style>
 </head>
-<body class="bg-brand-cream text-gray-900 min-h-screen flex flex-col font-sans">
+<body class="bg-brand-cream text-gray-900 min-h-screen flex flex-col font-sans" data-can-validate="{% if can_validate %}1{% endif %}">
 
 <!-- Header -->
 <header class="bg-brand text-white shadow-md">
