@@ -435,6 +435,55 @@ def api_extract(request, document_id):
         return JsonResponse({"error": str(err)}, status=503)
 
 
+TRANSLATE_BATCH = 80
+TRANSLATE_SYSTEM = CONTEXT + """
+
+Translate dictionary senses into French for a Hakka lexicon. Each item has the Hakka word (Chinese
+characters), its sense as given by a source document (in English, or in Chinese), and sometimes a
+remark. Give a short, natural French dictionary sense: a few words, alternatives separated by
+« ; », grammatical labels translated (VERB → verbe, CLASSIFIER → classificateur, etc.), no
+explanation. Keep the meaning of the source; do not add senses of your own. Return one item per
+input, with the same i."""
+
+
+def translate_senses(items):
+    """[{i, hanzi, sense, remark}] -> {i: French sense}, one AI call."""
+    schema = {"type": "object", "additionalProperties": False, "required": ["items"], "properties": {
+        "items": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                             "required": ["i", "french"],
+                                             "properties": {"i": {"type": "integer"}, "french": {"type": "string"}}}}}}
+    data = _call(TRANSLATE_SYSTEM, json.dumps(items, ensure_ascii=False), schema, max_tokens=6000)
+    asked = {it["i"] for it in items}
+    return {it["i"]: it["french"].strip()[:300] for it in data.get("items", [])
+            if isinstance(it.get("i"), int) and it["i"] in asked and isinstance(it.get("french"), str) and it["french"].strip()}
+
+
+@require_POST
+@editor_required
+def api_translate(request):
+    """POST {entries: [{hanzi, english, source_sense, remark}]} (at most
+    TRANSLATE_BATCH): {french: [...]} in the same order ("" when not translated)."""
+    entries = (_json(request) or {}).get("entries")
+    if not isinstance(entries, list) or not entries or len(entries) > TRANSLATE_BATCH:
+        return JsonResponse({"error": f"Entre 1 et {TRANSLATE_BATCH} entrées par requête."}, status=400)
+    items = []
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            return JsonResponse({"error": "Entrée mal formée."}, status=400)
+        get = lambda k: e.get(k) if isinstance(e.get(k), str) else ""
+        sense = get("english").strip() or get("source_sense").strip()
+        if sense and get("hanzi").strip():
+            items.append({"i": i, "hanzi": get("hanzi")[:60], "sense": sense[:300]}
+                         | ({"remark": get("remark")[:200]} if get("remark").strip() else {}))
+    if not items:
+        return JsonResponse({"ok": True, "french": [""] * len(entries)})
+    try:
+        done = translate_senses(items)
+    except AssistantError as err:
+        return JsonResponse({"error": str(err)}, status=503)
+    return JsonResponse({"ok": True, "french": [done.get(i, "") for i in range(len(entries))]})
+
+
 @require_POST
 @editor_required
 def api_propose(request, document_id):

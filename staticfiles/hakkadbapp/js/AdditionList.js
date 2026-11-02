@@ -834,6 +834,7 @@ class DocumentImport {
         });
         this.result.addEventListener('click', (event) => {
             if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
+            if (event.target.closest('[data-translate]')) this.translate(event.target.closest('[data-translate]'));
         });
     }
 
@@ -919,6 +920,45 @@ class DocumentImport {
         const picked = this.entries.filter((e) => e.picked).length;
         button.textContent = `↑ Proposer ${picked} mot${picked > 1 ? 's' : ''} à la validation`;
         button.disabled = !picked;
+        const translate = this.result.querySelector('[data-translate]');
+        const untranslated = this.untranslated().length;
+        if (translate) {
+            translate.hidden = !untranslated;
+            translate.textContent = `✨ Traduire ${untranslated} sens en français`;
+        }
+    }
+
+    /** Ticked entries whose meaning is only in English or in the document's own words. */
+    untranslated() {
+        return this.entries.filter((e) => e.picked && !e.french && (e.english || e.source_sense));
+    }
+
+    async translate(button) {
+        const todo = this.untranslated();
+        if (!todo.length) return;
+        const BATCH = 80;
+        await AdditionList.whileBusy(button, 'Traduction…', async () => {
+            try {
+                for (let start = 0; start < todo.length; start += BATCH) {
+                    const batch = todo.slice(start, start + BATCH);
+                    this.setStatus(`L’IA traduit les sens : ${start + 1}–${start + batch.length} sur ${todo.length}…`);
+                    const data = await this.post('/api/import/traduire', {
+                        entries: batch.map((e) => ({ hanzi: e.hanzi, english: e.english || '', source_sense: e.source_sense || '', remark: e.remark || '' })),
+                    });
+                    batch.forEach((e, i) => {
+                        if (!data.french[i]) return;
+                        e.french = data.french[i];
+                        e.translated = true;
+                        e.reading_note = (e.reading_note || '').split(' ; ').filter((n) => n !== 'sens français à traduire').join(' ; ');
+                    });
+                }
+                const done = todo.filter((e) => e.translated).length;
+                this.setStatus(`${done} sens traduit${done > 1 ? 's' : ''} en français par l’IA : vérifiez avant de proposer.`);
+            } catch (err) {
+                this.setStatus(`Échec de la traduction : ${err.message}`, true);
+            }
+            this.render();
+        });
     }
 
     render() {
@@ -926,6 +966,7 @@ class DocumentImport {
         if (!this.entries.length) { this.result.innerHTML = ''; return; }
         this.result.innerHTML = `
             <div class="vt-import-summary"><span data-summary></span>
+              <button type="button" class="saisie-btn saisie-btn-lg" data-translate hidden></button>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
               <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Lecture</th>

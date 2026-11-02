@@ -86,6 +86,7 @@ urlpatterns = [
     path("api/commentaires", assistant.api_comments, name="comments"),
     path("api/commentaires/<int:comment_id>", assistant.api_comment_action, name="comment_action"),
     path("api/import/analyse", importer.api_analyse, name="import_analyse"),
+    path("api/import/traduire", importer.api_translate, name="import_translate"),
     path("api/sources", sources.api_sources, name="sources"),
     path("api/import/<int:document_id>/extraire", importer.api_extract, name="import_extract"),
     path("api/import/<int:document_id>/proposer", importer.api_propose, name="import_propose"),
