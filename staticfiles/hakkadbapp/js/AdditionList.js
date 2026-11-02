@@ -944,7 +944,7 @@ class DocumentImport {
         });
         this.result.addEventListener('click', (event) => {
             if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
-            if (event.target.closest('[data-translate]')) this.translate(event.target.closest('[data-translate]'));
+            if (event.target.closest('[data-languages]')) this.checkLanguages(event.target.closest('[data-languages]'));
         });
     }
 
@@ -1000,8 +1000,10 @@ class DocumentImport {
                 this.doc = data;
                 if (data.kind === 'table') {
                     this.add(data.candidates);
-                    this.setStatus(`Tableau lu${data.used_ai ? ' (colonnes reconnues par l’IA)' : ' sans IA'} : ${data.candidates.length} entrée(s).`);
+                    this.setStatus(`Tableau lu${data.used_ai ? ' (colonnes reconnues par l’IA)' : ' sans IA'} : ${data.candidates.length} entrée(s)`
+                        + `${data.candidates[0]?.romanization ? ` · romanisation reconnue : ${data.candidates[0].romanization}` : ''}.`);
                     this.render();
+                    await this.checkLanguages();
                     return;
                 }
                 if (!data.chunks) {
@@ -1020,6 +1022,7 @@ class DocumentImport {
                 }
                 this.setStatus(`Texte lu par l’IA (${data.chunks} partie${data.chunks > 1 ? 's' : ''}${data.truncated ? ', début du texte seulement' : ''}) : ${this.entries.length} entrée(s).`);
                 this.render();
+                await this.checkLanguages();
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
@@ -1037,45 +1040,48 @@ class DocumentImport {
         const picked = this.entries.filter((e) => e.picked).length;
         button.textContent = `↑ Proposer ${picked} mot${picked > 1 ? 's' : ''} à la validation`;
         button.disabled = !picked;
-        const translate = this.result.querySelector('[data-translate]');
-        const untranslated = this.untranslated().length;
-        if (translate) {
-            translate.hidden = !untranslated;
-            translate.textContent = `✨ Traduire ${untranslated} sens en français`;
-        }
+        const check = this.result.querySelector('[data-languages]');
+        if (check) check.hidden = !this.toCheck().length;
     }
 
-    /** Ticked entries whose meaning is only in English or in the document's own words. */
-    untranslated() {
-        return this.entries.filter((e) => e.picked && !e.french && (e.english || e.source_sense));
+    /** Ticked entries whose French and English the AI has not checked yet. */
+    toCheck() {
+        return this.entries.filter((e) => e.picked && !e.checked && (e.french || e.english || e.source_sense));
     }
 
-    async translate(button) {
-        const todo = this.untranslated();
+    /** French really in French, English really in English, the missing one
+     *  translated: the AI, in batches (run after each analysis). */
+    async checkLanguages(button = null) {
+        const todo = this.toCheck();
         if (!todo.length) return;
-        const BATCH = 80;
-        await AdditionList.whileBusy(button, 'Traduction…', async () => {
+        const BATCH = 60;
+        const run = async () => {
             try {
                 for (let start = 0; start < todo.length; start += BATCH) {
                     const batch = todo.slice(start, start + BATCH);
-                    this.setStatus(`L’IA traduit les sens : ${start + 1}–${start + batch.length} sur ${todo.length}…`);
-                    const data = await this.post('/api/import/traduire', {
-                        entries: batch.map((e) => ({ hanzi: e.hanzi, english: e.english || '', source_sense: e.source_sense || '', remark: e.remark || '' })),
+                    this.setStatus(`L’IA vérifie le français et l’anglais : ${start + 1}–${start + batch.length} sur ${todo.length}…`);
+                    const data = await this.post('/api/import/langues', {
+                        entries: batch.map((e) => ({ hanzi: e.hanzi, french: e.french || '', english: e.english || '',
+                            source_sense: e.source_sense || '', remark: e.remark || '' })),
                     });
                     batch.forEach((e, i) => {
-                        if (!data.french[i]) return;
-                        e.french = data.french[i];
-                        e.translated = true;
-                        e.reading_note = (e.reading_note || '').split(' ; ').filter((n) => n !== 'sens français à traduire').join(' ; ');
+                        const r = data.entries[i];
+                        e.french = r.french;
+                        e.english = r.english;
+                        e.ai_fields = [...new Set([...(e.ai_fields || []), ...r.changed])];
+                        e.checked = true;
                     });
+                    this.render();
                 }
-                const done = todo.filter((e) => e.translated).length;
-                this.setStatus(`${done} sens traduit${done > 1 ? 's' : ''} en français par l’IA : vérifiez avant de proposer.`);
+                const n = todo.filter((e) => e.ai_fields?.length).length;
+                this.setStatus(`Français et anglais vérifiés : ${n} sens traduit${n > 1 ? 's' : ''} par l’IA (badge IA), à relire avant de proposer.`);
             } catch (err) {
-                this.setStatus(`Échec de la traduction : ${err.message}`, true);
+                this.setStatus(`Vérification FR / EN impossible : ${err.message}. Vous pouvez réessayer.`, true);
             }
             this.render();
-        });
+        };
+        if (button) await AdditionList.whileBusy(button, 'Vérification…', run);
+        else await run();
     }
 
     render() {
@@ -1086,7 +1092,7 @@ class DocumentImport {
                 value="${esc(this.sourceName || DocumentImport.sourceName(this.doc?.filename || ''))}"
                 placeholder="Livre, auteur, page web…" title="Nom de la source, enregistré avec chaque mot : filtre « Origine » de la validation"></label>
             <div class="vt-import-summary"><span data-summary></span>
-              <button type="button" class="saisie-btn saisie-btn-lg" data-translate hidden></button>
+              <button type="button" class="saisie-btn saisie-btn-lg" data-languages hidden>✨ Vérifier FR / EN</button>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
               <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Lecture</th>
@@ -1097,8 +1103,8 @@ class DocumentImport {
                 <td class="hanzi vt-hanzi">${esc(e.hanzi)}</td>
                 <td class="vt-pinyin">${e.reading ? esc(AdditionList.displayPinyin(e.reading)) : `<i>${esc(e.pinyin) || '—'}</i>`}
                     ${e.reading_note ? `<div class="vt-warn">⚠ ${esc(e.reading_note)}</div>` : ''}</td>
-                <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated ? ' <span class="vt-ai-badge">traduit IA</span>' : ''}
-                    ${e.english ? `<div class="vt-sub italic">${esc(e.english)}</div>` : ''}</td>
+                <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated || e.ai_fields?.includes('french') ? ' <span class="vt-ai-badge">IA</span>' : ''}
+                    ${e.english ? `<div class="vt-sub italic" lang="en">${esc(e.english)}${e.ai_fields?.includes('english') ? ' <span class="vt-ai-badge">IA</span>' : ''}</div>` : ''}</td>
                 <td class="vt-meta vt-who"${e.remark || e.source_sense ? ` title="${esc([e.source_sense, e.remark].filter(Boolean).join(' — '))}"` : ''}>${esc(e.location)}</td>
                 <td><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
               </tr>`).join('')}</tbody></table></div>`;
@@ -1108,7 +1114,7 @@ class DocumentImport {
     async propose(button) {
         const entries = this.entries.filter((e) => e.picked).map((e) => ({
             hanzi: e.hanzi, pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
-            themes: e.themes || '', location: e.location || '', translated: !!e.translated,
+            themes: e.themes || '', location: e.location || '', translated: !!e.translated, ai_fields: e.ai_fields || [],
             source_sense: e.source_sense || '', remark: e.remark || '', type: e.type || '',
         }));
         if (!entries.length || !this.doc) return;

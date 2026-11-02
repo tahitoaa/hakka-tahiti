@@ -13,6 +13,7 @@ words are proposed "À valider". The extracted text is kept
 import csv
 import io
 import json
+import os
 import re
 import zipfile
 
@@ -308,36 +309,148 @@ def _stored_options(syllable, tone):
     return options
 
 
-def resolve_reading(hanzi, raw, readings):
-    """(Wenfa reading, note): one reading per character, matched against
-    the lexicon's readings of that character; else derived from the
-    lexicon when a character has only one reading; else '' and a note."""
+_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸", "012345678")
+
+
+class Deduced:
+    """{simplified char: (Wenfa reading, source, confidence)} for characters
+    the lexicon doesn't have: the reading the Dictionnaire des caractères
+    deduces from the Hakka dictionaries through the learnt correspondences
+    (source_rules). Computed only when a character needs it."""
+
+    def __init__(self):
+        self._map = None
+
+    def get(self, char):
+        if self._map is None:
+            from . import source_rules
+            self._map = {}
+            try:
+                for row in source_rules.cached_payload()["rows"]:
+                    if not row[2] and row[3]:
+                        reading, source, confidence = row[3].split("|")
+                        self._map[row[0]] = (reading.translate(_DIGITS), source, confidence)
+            except Exception:  # no dictionary data: no deduction
+                pass
+        return self._map.get(char)
+
+
+class DocumentRules:
+    """Which dictionary romanization the document uses, guessed from its
+    words the lexicon already reads, and the correspondences learnt for
+    that source (source_rules) to turn its other syllables into Wenfa:
+    Basel « šak5 » is yangru, so Wenfa sak6, which no plain conversion knows."""
+
+    MIN_PAIRS = 5
+
+    def __init__(self, pairs):
+        """pairs: [(char, syllable, tone)] of the document, the char having
+        exactly one lexicon reading (known to be right) -- given as
+        (syllable, tone, wenfa)."""
+        from . import source_rules as sr
+        self.sr, self.source, self.label, self.rate = sr, None, "", 0
+        try:
+            payload = sr.cached_payload()
+        except Exception:
+            return
+        self.rules = payload["rules"]
+        maps = sr._cache.get("maps") or sr.load_sources()
+        best = (0, None)
+        for s in sr.HAKKA:
+            initials = maps["initials"][s["id"]]
+            right = sum(1 for syl, tone, wenfa in pairs
+                        if "".join(sr.predict(self.rules, s["id"], self._split(s, syl, tone, initials))[0] or ()) == wenfa)
+            if right > best[0]:
+                best = (right, s)
+        if best[1] and best[0] >= self.MIN_PAIRS:
+            self.source = best[1]
+            self.initials = maps["initials"][best[1]["id"]]
+            self.label = best[1]["label"]
+            self.rate = round(100 * best[0] / len(pairs))
+
+    def _split(self, source, syl, tone, initials):
+        if source["system"]:
+            return self.sr.split_source(syl, tone, source["system"], initials)
+        return self.sr.split_book(syl, tone, initials)
+
+    def convert(self, syl, tone):
+        """(Wenfa reading, confidence %) or (None, 0)."""
+        if not self.source:
+            return None, 0
+        reading, confidence = self.sr.predict(self.rules, self.source["id"],
+                                              self._split(self.source, syl, tone, self.initials))
+        return ("".join(reading), confidence) if reading else (None, 0)
+
+
+def _closest(options, known):
+    """The lexicon reading nearest the document's (same tone, then longest common start)."""
+    def score(k):
+        best = 0
+        for o in options:
+            common = len(os.path.commonprefix([o, k]))
+            best = max(best, common + (10 if o[-1:] == k[-1:] else 0))
+        return (-best, k)
+    return sorted(known, key=score)[0]
+
+
+def resolve_reading(hanzi, raw, readings, deduced=None, rules=None):
+    """(Wenfa reading, note), character by character:
+    1. the document's syllable, in any romanization, that is one of the
+       lexicon's readings of the character;
+    2. else the lexicon's reading (the nearest one when it has several);
+    3. else (character unknown to the lexicon) the document's syllable
+       converted to Wenfa through the correspondences of the document's
+       romanization (DocumentRules), else through the romanization systems
+       (the dictionaries' deduced reading if it is one of the conversions);
+    4. else the reading deduced from the dictionaries.
+    "" and a note when a character stays without a reading."""
     chars = [_norm(c) for c in "".join(hanzi.split())]
     syllables = SYLLABLE_RE.findall(raw.translate(SUPERSCRIPTS).replace("-", " "))
-    result, note = [], ""
-    if syllables and len(syllables) == len(chars):
-        for char, (syl, tone) in zip(chars, syllables):
-            options = _stored_options(syl.lower(), tone)
-            known = [o for o in options if o in readings.get(char, ())]
-            if known:
-                result.append(known[0])
+    per_char = syllables if len(syllables) == len(chars) else [None] * len(chars)
+    result, notes = [], []
+
+    def note(text):
+        if text not in notes:
+            notes.append(text)
+
+    if syllables and per_char[0] is None:
+        note("lecture du document non alignée sur les caractères")
+    for char, syl in zip(chars, per_char):
+        options = _stored_options(syl[0].lower(), syl[1]) if syl else []
+        known = readings.get(char, set())
+        converted, confidence = rules.convert(syl[0].lower(), syl[1]) if rules and syl else (None, 0)
+        if converted:
+            options = [converted] + [o for o in options if o != converted]
+        hit = [o for o in options if o in known]
+        if hit:
+            result.append(hit[0])
+        elif known:
+            result.append(_closest(options, known) if options else sorted(known)[0])
+            if len(known) > 1:
+                note(f"{char} : plusieurs lectures dans le lexique, à vérifier")
+        else:
+            guess = deduced.get(char) if deduced else None
+            if converted:
+                result.append(converted)
+                note(f"{char} : lecture convertie selon {rules.label} ({confidence} %), absente du lexique")
             elif options:
-                result.append(options[0])
-                note = "lecture absente du lexique, à vérifier"
+                if guess and guess[0] in options:
+                    result.append(guess[0])
+                else:
+                    result.append(options[0])
+                note(f"{char} : lecture du document convertie (absente du lexique)")
+            elif guess:
+                result.append(guess[0])
+                note(f"{char} : lecture déduite ({guess[1]}, {guess[2]} %)")
             else:
-                return "", "lecture non reconnue, à vérifier"
-    elif all(len(readings.get(c, ())) == 1 for c in chars) and chars:
-        result = [next(iter(readings[c])) for c in chars]
-        note = "lecture reprise du lexique" if not raw.strip() else "lecture du document illisible, reprise du lexique"
-    else:
-        return "", "lecture à compléter"
+                return "", "lecture à compléter"
     # Back to the entry's words: one group per space-separated token.
     groups, i = [], 0
     for token in hanzi.split():
         n = len(token)
         groups.append("".join(result[i:i + n]))
         i += n
-    return " ".join(groups), note
+    return " ".join(groups), " ; ".join(notes)
 
 
 def check_candidates(candidates):
@@ -351,6 +464,16 @@ def check_candidates(candidates):
         if additions.get(key) != "proposed":
             additions[key] = "rejected" if a.status == LexiconAddition.STATUS_REJECTED else "proposed"
     readings = char_readings()
+    deduced = Deduced()
+    # The document's own romanization: its syllables for characters with a single lexicon reading.
+    pairs = []
+    for c in candidates:
+        chars = [_norm(ch) for ch in "".join(c["hanzi"].split())]
+        syllables = SYLLABLE_RE.findall((c.get("pinyin") or "").translate(SUPERSCRIPTS).replace("-", " "))
+        if syllables and len(syllables) == len(chars):
+            pairs += [(syl.lower(), tone, next(iter(readings[ch]))) for ch, (syl, tone) in zip(chars, syllables)
+                      if len(readings.get(ch, ())) == 1]
+    rules = DocumentRules(pairs[:2000]) if len(pairs) >= DocumentRules.MIN_PAIRS else None
     seen = set()
     for c in candidates:
         c["hanzi"] = " ".join(c["hanzi"].split())
@@ -359,12 +482,10 @@ def check_candidates(candidates):
         c["kind"] = (LexiconAddition.KIND_EXPRESSION if kind.startswith(("expr", "locution", "phrase"))
                      else LexiconAddition.KIND_WORD if kind.startswith("mot")
                      else LexiconAddition.KIND_EXPRESSION if " " in c["hanzi"] or len(key) > 6 else LexiconAddition.KIND_WORD)
-        c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings)
+        c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings, deduced, rules)
+        c["romanization"] = f"{rules.label} ({rules.rate} %)" if rules and rules.source else ""
         c["state"] = ("duplicate" if key in seen else "known" if key in known_lexicon
                       else additions.get(key, "new"))
-        if not c.get("french") and c["state"] == "new":
-            missing = "sens français à traduire" if c.get("english") or c.get("source_sense") else "sens manquant"
-            c["reading_note"] = (c["reading_note"] + " ; " if c["reading_note"] else "") + missing
         seen.add(key)
     return candidates
 
@@ -435,60 +556,82 @@ def api_extract(request, document_id):
         return JsonResponse({"error": str(err)}, status=503)
 
 
-TRANSLATE_BATCH = 80
-TRANSLATE_SYSTEM = CONTEXT + """
+LANGUAGES_BATCH = 60
+LANGUAGES_SYSTEM = CONTEXT + """
 
-Translate dictionary senses into French for a Hakka lexicon. Each item has the Hakka word (Chinese
-characters), its sense as given by a source document (in English, or in Chinese), and sometimes a
-remark. Give a short, natural French dictionary sense: a few words, alternatives separated by
-« ; », grammatical labels translated (VERB → verbe, CLASSIFIER → classificateur, etc.), no
-explanation. Keep the meaning of the source; do not add senses of your own. Return one item per
-input, with the same i."""
+You check the two sense fields of words imported from a document into a Hakka lexicon. Each item
+has the Hakka word (Chinese characters), "french" and "english" as read from the document (either
+may be empty or in the wrong language), and sometimes the document's own sense (often Chinese) and
+a remark. Return for each item:
+- french: a French dictionary sense. If the given french is good French, return it verbatim. If it
+  is in another language (often English) or empty, translate the meaning into short, natural French
+  (a few words, alternatives separated by « ; », grammatical labels translated: VERB → verbe,
+  CLASSIFIER → classificateur...).
+- english: the same for English: verbatim when it is good English; else an English translation.
+  When the given french was really English, it becomes the english (if english was empty).
+- changed: the fields you wrote yourself (translated or moved), among "french", "english".
+Keep the meaning of the document; do not add senses of your own; no explanation. "" for a field only
+when the item has no meaning at all. Return one item per input, with the same i."""
 
 
-def translate_senses(items):
-    """[{i, hanzi, sense, remark}] -> {i: French sense}, one AI call."""
+def check_languages(items):
+    """[{i, hanzi, french, english, sense?, remark?}] -> {i: (french, english, changed)}, one AI call."""
     schema = {"type": "object", "additionalProperties": False, "required": ["items"], "properties": {
-        "items": {"type": "array", "items": {"type": "object", "additionalProperties": False,
-                                             "required": ["i", "french"],
-                                             "properties": {"i": {"type": "integer"}, "french": {"type": "string"}}}}}}
-    data = _call(TRANSLATE_SYSTEM, json.dumps(items, ensure_ascii=False), schema, max_tokens=6000)
-    asked = {it["i"] for it in items}
-    return {it["i"]: it["french"].strip()[:300] for it in data.get("items", [])
-            if isinstance(it.get("i"), int) and it["i"] in asked and isinstance(it.get("french"), str) and it["french"].strip()}
+        "items": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["i", "french", "english", "changed"],
+            "properties": {"i": {"type": "integer"}, "french": {"type": "string"}, "english": {"type": "string"},
+                           "changed": {"type": "array", "items": {"type": "string", "enum": ["french", "english"]}}}}}}}
+    data = _call(LANGUAGES_SYSTEM, json.dumps(items, ensure_ascii=False), schema, max_tokens=12000)
+    asked = {it["i"]: it for it in items}
+    out = {}
+    for it in data.get("items", []):
+        i = it.get("i")
+        if i not in asked or not isinstance(it.get("french"), str) or not isinstance(it.get("english"), str):
+            continue
+        french, english = it["french"].strip()[:300], it["english"].strip()[:300]
+        # What counts as changed is what differs from the document, whatever the AI says.
+        changed = [f for f, v in (("french", french), ("english", english)) if v and v != asked[i][f]]
+        out[i] = (french or asked[i]["french"], english or asked[i]["english"], changed)
+    return out
 
 
 @require_POST
 @editor_required
-def api_translate(request):
-    """POST {entries: [{hanzi, english, source_sense, remark}]} (at most
-    TRANSLATE_BATCH): {french: [...]} in the same order ("" when not translated)."""
+def api_languages(request):
+    """POST {entries: [{hanzi, french, english, source_sense, remark}]} (at
+    most LANGUAGES_BATCH): {entries: [{french, english, changed}]} in the
+    same order -- French really in French, English really in English, the
+    missing one translated by the AI."""
     entries = (_json(request) or {}).get("entries")
-    if not isinstance(entries, list) or not entries or len(entries) > TRANSLATE_BATCH:
-        return JsonResponse({"error": f"Entre 1 et {TRANSLATE_BATCH} entrées par requête."}, status=400)
+    if not isinstance(entries, list) or not entries or len(entries) > LANGUAGES_BATCH:
+        return JsonResponse({"error": f"Entre 1 et {LANGUAGES_BATCH} entrées par requête."}, status=400)
     items = []
     for i, e in enumerate(entries):
         if not isinstance(e, dict):
             return JsonResponse({"error": "Entrée mal formée."}, status=400)
-        get = lambda k: e.get(k) if isinstance(e.get(k), str) else ""
-        sense = get("english").strip() or get("source_sense").strip()
-        if sense and get("hanzi").strip():
-            items.append({"i": i, "hanzi": get("hanzi")[:60], "sense": sense[:300]}
-                         | ({"remark": get("remark")[:200]} if get("remark").strip() else {}))
-    if not items:
-        return JsonResponse({"ok": True, "french": [""] * len(entries)})
-    try:
-        done = translate_senses(items)
-    except AssistantError as err:
-        return JsonResponse({"error": str(err)}, status=503)
-    return JsonResponse({"ok": True, "french": [done.get(i, "") for i in range(len(entries))]})
+        get = lambda k: (e.get(k) if isinstance(e.get(k), str) else "").strip()
+        if get("hanzi") and (get("french") or get("english") or get("source_sense")):
+            items.append({"i": i, "hanzi": get("hanzi")[:60], "french": get("french")[:300], "english": get("english")[:300]}
+                         | ({"sense": get("source_sense")[:300]} if get("source_sense") else {})
+                         | ({"remark": get("remark")[:200]} if get("remark") else {}))
+    done = {}
+    if items:
+        try:
+            done = check_languages(items)
+        except AssistantError as err:
+            return JsonResponse({"error": str(err)}, status=503)
+    out = []
+    for i, e in enumerate(entries):
+        french, english, changed = done.get(i, (e.get("french") or "", e.get("english") or "", []))
+        out.append({"french": french, "english": english, "changed": changed})
+    return JsonResponse({"ok": True, "entries": out})
 
 
 @require_POST
 @editor_required
 def api_propose(request, document_id):
     """POST {entries: [{hanzi, reading, french, english, themes, location,
-    reading_note, translated, source_sense, remark, type}]}: the ticked entries become additions
+    reading_note, translated, ai_fields, source_sense, remark, type}], source}: the ticked entries become additions
     "À valider", checked again here (the browser is not trusted)."""
     from .additions import _addition_json
 
@@ -504,14 +647,17 @@ def api_propose(request, document_id):
         fields = ("hanzi", "pinyin", "french", "english", "themes", "location", "source_sense", "remark", "type")
         if not isinstance(e, dict) or not all(isinstance(e.get(k, ""), str) for k in fields):
             return JsonResponse({"error": "Entrée mal formée."}, status=400)
+        ai_fields = e.get("ai_fields") if isinstance(e.get("ai_fields"), list) else []
         clean.append({k: e.get(k, "")[:300] for k in fields}
-                     | {"translated": bool(e.get("translated"))})
+                     | {"translated": bool(e.get("translated")),
+                        "ai_fields": [f for f in ("french", "english") if f in ai_fields]})
     created, skipped = [], 0
     for c in check_candidates(clean):
         if c["state"] != "new":
             skipped += 1
             continue
-        notes = [f"Importé de « {doc.filename} » ({c['location']})." if c["location"] else f"Importé de « {doc.filename} »."]
+        where = f" ({c['location']})" if c["location"] else ""
+        notes = [f"Importé de « {doc.filename} »{where} par {request.user.username} ; source : {source}."]
         doc_reading = " ".join(c["pinyin"].split())
         if doc_reading and doc_reading.replace(" ", "") != c["reading"].replace(" ", ""):
             notes.append(f"Lecture du document : {doc_reading}.")
@@ -519,8 +665,11 @@ def api_propose(request, document_id):
             notes.append(f"Sens dans le document : {c['source_sense'].strip()}.")
         if c.get("remark"):
             notes.append(f"Remarque du document : {c['remark'].strip().rstrip('.')}.")
-        if c.get("translated"):
-            notes.append("Sens traduit en français par l'IA.")
+        ai_fields = set(c.get("ai_fields") or []) | ({"french"} if c.get("translated") else set())
+        if ai_fields:
+            labels = {"french": "français", "english": "anglais"}
+            notes.append("Sens " + " et ".join(labels[f] for f in ("french", "english") if f in ai_fields)
+                         + " traduit" + ("s" if len(ai_fields) > 1 else "") + " par l'IA.")
         if c["reading_note"]:
             notes.append(c["reading_note"].capitalize() + ".")
         created.append(LexiconAddition.objects.create(
