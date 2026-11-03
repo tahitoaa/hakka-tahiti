@@ -95,6 +95,16 @@ class SaisieEntry {
         this.setText(this.model.text);
     }
 
+    /** A character read several ways (ba3/pa3): its reading chosen, written
+     *  in the text right after it -- 把(ba3) -- so it is the one saved. */
+    pinAt(pos, reading) {
+        const char = [...this.text.slice(pos)][0];
+        if (!char || !/\p{Script=Han}/u.test(char)) return false;
+        const after = pos + char.length;
+        this.setText(`${this.text.slice(0, after)}(${reading})${this.text.slice(after)}`);
+        return true;
+    }
+
     /** No character for a pending syllable: it becomes a placeholder with
      *  its reading pinned, -(man4) (stored notation when the typed syllable
      *  converts to one), which the site reads as « unknown character ». */
@@ -204,7 +214,7 @@ class SaisieEntry {
         const ambiguous = tokens.filter((t) => t.pinyin.includes('/'));
         if (ambiguous.length) {
             return `Plusieurs lectures pour ${ambiguous.map((t) => `${t.plain} (${t.pinyin})`).join(', ')} : `
-                + 'indiquez la bonne entre parenthèses (生(sen1)), ou retapez la syllabe et choisissez le caractère.';
+                + 'touchez la bonne lecture sous le caractère (en orange).';
         }
         return '';
     }
@@ -279,7 +289,7 @@ class SaisieEntry {
             }
             if (/\p{Script=Han}/u.test(char)) hanIndex += 1;
             charIndex += 1;
-            group.push({ type: 'char', char, reading });
+            group.push({ type: 'char', char, reading, pos: m.index });
         }
         return groups;
     }
@@ -397,6 +407,15 @@ class SaisieEntry {
                 this.afterChange();
             };
             this.el.slots.addEventListener('input', onSlotInput);
+            // A reading chosen for an ambiguous character.
+            this.el.slots.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin]')) event.preventDefault(); });
+            this.el.slots.addEventListener('click', (event) => {
+                const b = event.target.closest('[data-pin]');
+                if (b && this.entry.pinAt(Number(b.dataset.pin), b.dataset.reading)) {
+                    this.el.text.value = this.entry.text;
+                    this.updateText();
+                }
+            });
             this.el.slots.addEventListener('compositionend', onSlotInput);
             this.el.form.addEventListener('submit', (event) => {
                 event.preventDefault();
@@ -643,7 +662,14 @@ class SaisieEntry {
             this.el.slots.innerHTML = groups.map((group) => `<span class="saisie-word">${group.map((u) => u.type === 'syl'
                 ? `<label class="saisie-slot"><input class="hanzi" data-slot="${u.index}" value="" inputmode="text" `
                     + `aria-label="Caractère pour ${escapeHtml(u.syl)}"><small>${escapeHtml(superscriptTones(u.syl))}</small></label>`
-                : `<span class="saisie-slot is-char"><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
+                : u.reading.includes('/')
+                    // Several readings: one button each; the chosen one is pinned.
+                    ? `<span class="saisie-slot is-char is-ambiguous" title="Plusieurs lectures : choisissez la bonne">`
+                        + `<span class="hanzi saisie-char">${escapeHtml(u.char)}</span><span class="saisie-ambig">`
+                        + u.reading.split('/').map((r) => `<button type="button" data-pin="${u.pos}" data-reading="${escapeHtml(r)}"`
+                            + ` aria-label="Lire ${escapeHtml(u.char)} ${escapeHtml(displayPinyin(r))}">${escapeHtml(displayPinyin(r))}</button>`).join('')
+                        + '</span></span>'
+                    : `<span class="saisie-slot is-char"><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
                     + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`).join('')}</span>`).join('')
                 || '<span class="text-sm text-gray-400">Les cases apparaissent quand vous tapez le texte.</span>';
             this.renderSlotStates();
@@ -794,6 +820,9 @@ class SaisieEntry {
         async save(status, button = null) {
             const problem = this.entry.problem();
             if (problem) return this.setStatus(problem, true);
+            if (this.entry.values().pinyin.includes('/')) {
+                return this.setStatus('Choisissez la lecture des caractères en orange (plusieurs lectures possibles).', true);
+            }
             if (!this.el.french.value.trim()) return this.setStatus('Indiquez la traduction en français.', true);
             const newWords = this.newWordsPayload();
             const untranslated = newWords.filter((w) => !w.french);

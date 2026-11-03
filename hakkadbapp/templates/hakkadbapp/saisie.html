@@ -4,6 +4,11 @@
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 <style>
   .saisie-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+  .saisie-slot.is-ambiguous .saisie-char { color: #c2410c; }
+  .saisie-ambig { display: flex; flex-direction: column; gap: 3px; }
+  .saisie-ambig button { min-height: 1.9rem; min-width: 3rem; padding: 0 0.4rem; border: 1px solid #fdba74; border-radius: 0.4rem;
+                         background: #fff7ed; color: #9a3412; font-size: 0.82rem; font-weight: 700; }
+  .saisie-ambig button:hover { background: #ffedd5; }
   .saisie-slot input {
     width: 2.6rem; height: 2.6rem; text-align: center; font-size: 1.4rem;
     border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #fff;

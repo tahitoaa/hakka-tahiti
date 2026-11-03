@@ -149,6 +149,15 @@ test("platform rendering: no spaces, no :sense hint, Chinese punctuation in the 
   assert.equal(ctx.AdditionList.platformPinyin("fat6 dao4 lao3 ， tuk6"), "fat⁶ dao⁴ lao³ , tuk⁶");
 });
 
+test("an ambiguous character gets its reading pinned where it stands", () => {
+  const { entry } = load();
+  entry.setText("ngai_ 生人", "expression");
+  const pos = entry.text.indexOf("生");
+  assert.equal(entry.pinAt(pos, "sang1"), true);
+  assert.equal(entry.text, "ngai_ 生(sang1)人");
+  assert.equal(entry.pinAt(0, "x1"), false, "not a character");
+});
+
 test("an addition reopened with the lexicon: a reading is written only where needed", () => {
   const { context } = load();
   const P = context.Pronunciation;
