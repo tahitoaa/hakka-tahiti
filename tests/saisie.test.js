@@ -136,6 +136,19 @@ test("boxes: characters with their reading, pending syllables, grouped by word",
   assert.deepEqual([...groups], [["[ngai_]"], ["屋:wuk5", "家:ka1"]]);
 });
 
+function loadAdditionList() {
+  const context = createContext({ document: makeDocumentStub() });
+  loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);
+  return context;
+}
+
+test("platform rendering: no spaces, no :sense hint, Chinese punctuation in the characters, Latin in the pinyin", () => {
+  const ctx = loadAdditionList();
+  assert.equal(ctx.AdditionList.platformHanzi("活到老 , 读到老 ?"), "活到老，读到老？");
+  assert.equal(ctx.AdditionList.platformHanzi("我 把:prendre 书"), "我把书");
+  assert.equal(ctx.AdditionList.platformPinyin("fat6 dao4 lao3 ， tuk6"), "fat⁶ dao⁴ lao³ , tuk⁶");
+});
+
 test("an addition reopened with the lexicon: a reading is written only where needed", () => {
   const { context } = load();
   const P = context.Pronunciation;

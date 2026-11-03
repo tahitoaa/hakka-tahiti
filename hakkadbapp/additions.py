@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 
 from .ai import ai_enabled
+from .text_to_words import REVERSE_PUNCT_MAP, _PUNCT_ONLY_TOKEN_RE, normalize_punctuation
 from .models import Expression, LexiconAddition, Word
 from .permissions import AI_USERNAME, editor_required, is_editor, status_change_refused
 
@@ -73,7 +74,16 @@ def _apply_payload(addition, payload):
             value = payload[field]
             if not isinstance(value, str):
                 return f"'{field}' doit être une chaîne."
-            setattr(addition, field, " ".join(value.split()) if field in ("hanzi", "pinyin") else value.strip())
+            if field == "hanzi":
+                # Punctuation in the characters: the Chinese mark (，。？), whatever was typed.
+                value = normalize_punctuation(" ".join(value.split()))
+            elif field == "pinyin":
+                # ...and the Latin one (, . ?) in the pinyin, as on the platform.
+                value = " ".join(tok.replace("…", "...").translate(REVERSE_PUNCT_MAP) if _PUNCT_ONLY_TOKEN_RE.match(tok) else tok
+                                 for tok in value.split())
+            else:
+                value = value.strip()
+            setattr(addition, field, value)
     if not addition.hanzi:
         return "Les caractères sont obligatoires."
     return None
@@ -158,6 +168,11 @@ def validation(request):
         "status_choices": [c for c in LexiconAddition.STATUS_CHOICES if c[0] != LexiconAddition.STATUS_DRAFT],
         "status_labels": dict(LexiconAddition.STATUS_CHOICES),
     })
+
+
+def input_guide(request):
+    """The input syntax, for members with little computer experience."""
+    return render(request, "hakkadbapp/guide_saisie.html", {"title": "Guide de saisie", "page": "guide_saisie"})
 
 
 def document_import(request):

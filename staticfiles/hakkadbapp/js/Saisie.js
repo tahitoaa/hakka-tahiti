@@ -214,6 +214,9 @@ class SaisieEntry {
      *  already proposed (not rejected), not to propose again.
      *  status: 'known' | 'reading' (in the lexicon, read otherwise) |
      *  'proposed' | 'unknown' | 'incomplete'. */
+    // A token of punctuation only, Latin or Chinese (as text_to_words._PUNCT_ONLY_TOKEN_RE).
+    static PUNCT_RE = /^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()[\]{}'"]+$/;
+
     check(additions = []) {
         return this.tokens().map((t) => {
             const w = { hanzi: t.plain, pinyin: t.pinyin };
@@ -222,9 +225,14 @@ class SaisieEntry {
             const proposed = additions.find((a) => a.kind === 'word' && a.status !== 'rejected'
                 && a.hanzi === t.plain && a.pinyin.replace(/\s+/g, '') === t.pinyin);
             if (proposed) return { ...w, status: 'proposed', addition: proposed };
+            // Punctuation (, 。 ? ...) is not a word to add.
+            if (SaisieEntry.PUNCT_RE.test(t.plain)) return { ...w, status: 'punct' };
             const same = this.sentence.findMatches(t.plain, null, null).map((m) => m.dataset || m);
+            // 把:prendre while the lexicon only has 把 « classificateur »: a new sense to add.
+            const sense = (this.sentence.parseToken(t.token).constraints || []).join(', ');
+            if (same.length && sense) return { ...w, status: 'sense', sense, entries: same };
             if (same.length) return { ...w, status: 'reading', entries: same };
-            return { ...w, status: 'unknown' };
+            return { ...w, status: 'unknown', sense };
         });
     }
 
@@ -287,6 +295,8 @@ class SaisieEntry {
     const CHECK_LABELS = {
         known: 'dans le lexique',
         reading: 'dans le lexique, autre lecture',
+        sense: 'nouveau sens',
+        punct: 'ponctuation',
         proposed: 'déjà proposé',
         unknown: 'inconnu du lexique',
         incomplete: 'à compléter',
@@ -652,6 +662,7 @@ class SaisieEntry {
             const describe = (c) => {
                 if (c.status === 'known') return `${escapeHtml(lexiconPinyin(c.entry))} « ${escapeHtml(c.entry.french || '?')} »`;
                 if (c.status === 'reading') return `lu ${c.entries.map((d) => `${escapeHtml(lexiconPinyin(d))} « ${escapeHtml(d.french || '?')} »`).join(', ')}`;
+                if (c.status === 'sense') return `« ${escapeHtml(c.sense)} » absent ; le lexique a : ${c.entries.map((d) => `« ${escapeHtml(d.french || '?')} »`).join(', ')}`;
                 if (c.status === 'proposed') return `${escapeHtml(this.statusLabels[c.addition.status] || c.addition.status)} : « ${escapeHtml(c.addition.french || '?')} »`;
                 return '';
             };
@@ -661,6 +672,7 @@ class SaisieEntry {
                     : c.status === 'known' ? `Ce mot est déjà dans le lexique : ${describe(c)}.`
                     : c.status === 'proposed' ? `Ce mot est déjà proposé (${describe(c)}).`
                     : c.status === 'reading' ? `Ces caractères sont dans le lexique avec une autre lecture (${describe(c)}) : vérifiez la lecture.`
+                    : c.status === 'sense' ? `Nouveau sens : ${describe(c)}.`
                     : 'Nouveau mot : absent du lexique.';
                 this.el.check.innerHTML = message ? `<p class="saisie-check-${c.status}">${message}</p>` : '';
                 this.el.newWords.innerHTML = '';
@@ -674,7 +686,7 @@ class SaisieEntry {
         }
 
         newWordKey(c) {
-            return `${c.hanzi}|${c.pinyin}`;
+            return `${c.hanzi}|${c.pinyin}${c.sense ? `|${c.sense}` : ''}`;
         }
 
         /** The words to add with the expression: the unknown ones (checked
@@ -682,7 +694,7 @@ class SaisieEntry {
          *  once their reading is settled. */
         newWordCandidates() {
             return (this.checks || [])
-                .filter((c) => (c.status === 'unknown' || c.status === 'reading') && c.pinyin && !/[?/]/.test(c.pinyin))
+                .filter((c) => ['unknown', 'reading', 'sense'].includes(c.status) && c.pinyin && !/[?/]/.test(c.pinyin))
                 .filter((c, i, all) => all.findIndex((x) => this.newWordKey(x) === this.newWordKey(c)) === i);
         }
 
@@ -695,7 +707,8 @@ class SaisieEntry {
                 ${candidates.map((c) => {
                     const key = this.newWordKey(c);
                     if (!this.newWords.has(key)) {
-                        this.newWords.set(key, { checked: c.status === 'unknown', french: '', english: '', themes: '', ai: {} });
+                        // A sense given with « : » (把:prendre) is the new word's French.
+                        this.newWords.set(key, { checked: c.status !== 'reading', french: c.sense || '', english: '', themes: '', ai: {} });
                     }
                     const state = this.newWords.get(key);
                     const field = (name, placeholder, extra = '') => `<input type="text" data-nw="${name}" value="${escapeHtml(state[name])}"

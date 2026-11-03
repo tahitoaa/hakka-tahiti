@@ -36,13 +36,23 @@ class AdditionList {
     /** As imported on the platform (e-reo « target »): Wenfa with tone
      *  superscripts, words separated by spaces... */
     static platformPinyin(pinyin) {
-        return AdditionList.superscriptTones(String(pinyin || '').trim().replace(/\s+/g, ' '));
+        return AdditionList.superscriptTones(String(pinyin || '').trim().split(/\s+/)
+            .map((t) => (AdditionList.PUNCT_TOKEN.test(t) ? [...t].map((c) => AdditionList.PUNCT_TO_LATIN[c] || c).join('') : t)).join(' '));
     }
 
-    /** ...and the characters run together, no spaces. */
+    /** ...and the characters run together, no spaces, no 把:sense hint,
+     *  punctuation in its Chinese form (，。？). */
     static platformHanzi(hanzi) {
-        return String(hanzi || '').replace(/\s+/g, '');
+        return String(hanzi || '').trim().split(/\s+/)
+            .map((t) => (AdditionList.PUNCT_TOKEN.test(t) ? t.replace(/\.\.\./g, '…').replace(/[,.;:?!()[\]{}]/g, (c) => AdditionList.PUNCT_TO_CHINESE[c]) : t.split(':')[0]))
+            .join('');
     }
+
+    static PUNCT_TOKEN = /^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()[\]{}'"]+$/;
+    static PUNCT_TO_LATIN = { '，': ',', '、': ',', '。': '.', '；': ';', '：': ':', '？': '?', '！': '!', '（': '(', '）': ')',
+        '【': '[', '】': ']', '｛': '{', '｝': '}', '‘': "'", '’': "'", '“': '"', '”': '"', '—': '-', '…': '...' };
+    static PUNCT_TO_CHINESE = { ',': '，', '.': '。', ';': '；', ':': '：', '?': '？', '!': '！', '(': '（', ')': '）',
+        '[': '【', ']': '】', '{': '｛', '}': '｝' };
 
     static displayPinyin(pinyin) {
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
@@ -815,6 +825,9 @@ class ValidationShow {
             <div class="hanzi vs-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${this.editing ? `<div class="vs-edit">
+                ${field('hanzi', 'Caractères', a.hanzi)}${field('pinyin', 'Pinyin (Wenfa)', a.pinyin)}
+                <p class="vs-hint">Un espace entre les mots d'une expression ; tons en chiffres (<code>mong4teu2</code>).
+                  Avec les suggestions : <a href="${esc(this.table.saisieUrl || '/saisie/')}?modifier=${a.id}" class="underline">ouvrir dans la Saisie</a>.</p>
                 ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
                 ${field('themes', 'Thème', a.themes)}${field('observations', 'Observations', a.observations)}
                 <div class="vs-edit-actions"><button type="button" class="saisie-btn saisie-btn-validate" data-vs="save">Enregistrer la correction</button>
@@ -888,6 +901,9 @@ class ValidationShow {
     async save(a, button) {
         const values = {};
         this.card.querySelectorAll('[data-vs-field]').forEach((input) => { values[input.dataset.vsField] = input.value; });
+        // New characters or reading: the text typed in the Saisie no longer
+        // matches; it will be rebuilt from them when reopened.
+        if (values.hanzi !== a.hanzi || values.pinyin !== a.pinyin) values.input_text = '';
         await this.run(button, 'Enregistrement…', async () => {
             const data = await AdditionList.request(`${AdditionList.API}${a.id}`, values);
             this.editing = false;
@@ -1253,6 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filter: 'review', empty: 'Rien à afficher ici.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
+    table.saisieUrl = root.dataset.saisieUrl;
     window.validationTable = table;
     table.load();
     if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
