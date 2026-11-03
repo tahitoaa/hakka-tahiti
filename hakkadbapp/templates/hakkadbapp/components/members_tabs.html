@@ -4,6 +4,7 @@
   <a href="{% url 'ai_suggestions' %}" {% if page == 'ai_suggestions' %}aria-current="page"{% endif %}>🤖 IA</a>
   <a href="{% url 'document_import' %}" {% if page == 'document_import' %}aria-current="page"{% endif %}>📄 Importer</a>
   <a href="{% url 'validation' %}" {% if page == 'validation' %}aria-current="page"{% endif %}>✓ Validation <span class="mt-count" data-review-count hidden></span></a>
+  <a href="{% url 'platform_corrections' %}" {% if page == 'platform_corrections' %}aria-current="page"{% endif %} title="Corrections à faire sur la plateforme e-reo">🛠 e-reo</a>
   <a href="{% url 'input_guide' %}" {% if page == 'guide_saisie' %}aria-current="page"{% endif %} title="Guide de saisie">❓ Guide</a>
 </nav>
 <style>

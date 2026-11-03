@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
-from . import additions, ai, assistant, importer, recordings, sources
+from . import additions, ai, assistant, importer, platform_corrections, recordings, sources
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -78,6 +78,8 @@ urlpatterns = [
     path("importer/", additions.document_import, name="document_import"),
     path("guide-saisie/", additions.input_guide, name="input_guide"),
     path("suggestions-ia/", additions.ai_suggestions, name="ai_suggestions"),
+    path("corrections-ereo/", platform_corrections.page, name="platform_corrections"),
+    path("api/corrections-ereo", platform_corrections.api, name="api_platform_corrections"),
     path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
