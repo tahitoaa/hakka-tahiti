@@ -15,7 +15,7 @@ from .ai import ai_enabled
 from .models import Expression, LexiconAddition, Word
 from .permissions import AI_USERNAME, editor_required, is_editor, status_change_refused
 
-EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source")
+EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source", "input_text")
 KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
 STATUSES = {s for s, _ in LexiconAddition.STATUS_CHOICES}
 
@@ -38,6 +38,7 @@ def _addition_json(a):
         "themes": a.themes,
         "observations": a.observations,
         "source": a.source,
+        "input_text": a.input_text,
         "platform_id": a.platform_id,
         "created_by": a.created_by.username if a.created_by else "",
         "by_ai": bool(a.created_by and a.created_by.username == AI_USERNAME),

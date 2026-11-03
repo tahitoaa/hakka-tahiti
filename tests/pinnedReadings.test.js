@@ -48,6 +48,21 @@ test("picking a polyphone pins the chosen reading; a single-reading character st
   assert.equal(model.text, "生(sen1) 人");
 });
 
+test("with a lexicon, the pin depends on the lexicon only (not the dictionaries in use)", () => {
+  const context = load();
+  const P = context.Pronunciation;
+  const dico = makeDico(context);
+  // 人 is known to the dictionaries in use but not to the lexicon: pinned.
+  dico.lexiconPronunciations = [new P({ simp: "生", trad: "生", initial: "s", final: "en", tone: "1" })];
+  const model = new context.SyllableInputModel(dico);
+  model.parse("ngin2 sen1");
+  model.select(model.suggestions.findIndex((s) => s.pron.simp === "人"));
+  assert.equal(model.text, "人(ngin2) sen1");
+  // 生 has one lexicon reading, the one chosen: bare.
+  model.select(model.suggestions.findIndex((s) => s.pron.simp === "生" && s.pron.final === "en"));
+  assert.equal(model.text, "人(ngin2) 生");
+});
+
 test("parse() ignores pinned readings, :constraints and *comments*", () => {
   const context = load();
   const model = new context.SyllableInputModel(makeDico(context));

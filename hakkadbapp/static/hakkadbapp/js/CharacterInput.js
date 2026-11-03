@@ -72,14 +72,23 @@ class SyllableInputModel {
     textFor(pron, typed = '') {
         const char = pron.simp;
         if (!char || !this.dico?.getMatchesForHanzi) return char;
-        const readings = new Set(
-            this.dico.getMatchesForHanzi(char).map((p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`))
-        );
-        if (readings.size < 2) return char;
+        // Whether the reading must be written is judged on the lexicon alone
+        // (when the dictionary has one), whatever the « Lectures » mode: the
+        // saved pinyin is Wenfa and the lexicon decides it, so the text means
+        // the same in every mode. Pinned: a character the lexicon reads in
+        // several ways, or doesn't know (a dictionary reading), or knows
+        // with another reading than the one chosen.
+        const key = (p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`);
+        const pool = this.dico.lexiconPronunciations
+            ? this.dico.lexiconPronunciations.filter((p) => p.simp === char || p.trad === char)
+            : this.dico.getMatchesForHanzi(char);
+        const readings = new Set(pool.map(key));
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
         const reading = this.dico.wenfaReadingFor
             ? this.dico.wenfaReadingFor(pron, typed, R ? R.inputSystem() : null)
-            : `${pron.initial}${pron.final}${pron.tone ?? ''}`;
+            : key(pron);
+        if (readings.size === 1 && readings.has(reading)) return char;
+        if (!this.dico.lexiconPronunciations && readings.size < 2) return char;
         return `${char}(${reading})`;
     }
 

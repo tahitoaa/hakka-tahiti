@@ -284,6 +284,9 @@ class LexiconAddition(models.Model):
     # Where the word comes from: the imported document's source ("Chappell &
     # Lamarre"), a book, a person... Empty for a plain entry.
     source = models.CharField(max_length=200, blank=True, default="")
+    # The Saisie text exactly as typed (生(sen1) 人...), given back as is when
+    # the addition is reopened; empty for imports and AI suggestions.
+    input_text = models.TextField(blank=True, default="")
     platform_id = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
 
     created_by = models.ForeignKey(

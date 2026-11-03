@@ -136,6 +136,22 @@ test("boxes: characters with their reading, pending syllables, grouped by word",
   assert.deepEqual([...groups], [["[ngai_]"], ["屋:wuk5", "家:ka1"]]);
 });
 
+test("an addition reopened with the lexicon: a reading is written only where needed", () => {
+  const { context } = load();
+  const P = context.Pronunciation;
+  const dico = { lexiconPronunciations: [
+    new P({ simp: "屋", trad: "屋", initial: "w", final: "uk", tone: "5" }),
+    new P({ simp: "家", trad: "家", initial: "k", final: "a", tone: "1" }),
+    new P({ simp: "生", trad: "生", initial: "s", final: "en", tone: "1" }),
+    new P({ simp: "生", trad: "生", initial: "s", final: "ang", tone: "1" }),
+  ] };
+  const SaisieEntry = context.SaisieEntry;
+  assert.equal(SaisieEntry.textFromStored("屋家", "wuk5ka1", "word", dico), "屋家");
+  assert.equal(SaisieEntry.textFromStored("屋家 生", "wuk5ka1 sang1", "expression", dico), "屋家 生(sang1)");
+  assert.equal(SaisieEntry.textFromStored("人", "ngin2", "word", dico), "人(ngin2)");      // unknown to the lexicon
+  assert.equal(SaisieEntry.textFromStored("屋", "wuk6", "word", dico), "屋(wuk6)");       // another reading than the lexicon's
+});
+
 test("an addition edited: read back with its stored readings pinned", () => {
   const { context, entry } = load();
   context.Romanization.setInput("hakka_dict");

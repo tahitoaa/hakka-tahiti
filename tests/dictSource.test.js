@@ -182,7 +182,9 @@ test("dictionary mode: the Wenfa reading comes from the lexicon first, then what
   assert.equal(pick(model, "fan4", "飯", "fan", 3), "饭(fan4)", "typed fan4 fits ³: kept");
 
   dico.lexiconPronunciations = [new context.Pronunciation({ simp: "饭", trad: "飯", initial: "f", final: "an", tone: "4" })];
-  assert.equal(pick(model, "fan_", "飯", "fan", 3), "饭(fan4)", "the lexicon knows 飯 as fan4: that wins");
+  assert.equal(pick(model, "fan_", "飯", "fan", 3), "饭", "the lexicon knows 飯 only as fan4, the reading chosen: nothing to write");
+  dico.lexiconPronunciations.push(new context.Pronunciation({ simp: "饭", trad: "飯", initial: "f", final: "an", tone: "3" }));
+  assert.equal(pick(model, "fan4", "飯", "fan", 3), "饭(fan4)", "two lexicon readings: the one chosen is written");
 });
 
 test("dictionary mode: a Wenfa pin follows the display system like everything else", () => {

@@ -37,16 +37,32 @@ class SaisieEntry {
 
     /** Working text back from a stored addition: each word with its
      *  stored reading pinned (屋家(wuk5ka1)), so Sentence reads it as saved. */
-    static textFromStored(hanzi, pinyin, kind) {
+    static textFromStored(hanzi, pinyin, kind, dico = null) {
         const plain = (t) => t.split(':')[0].replace(/\([^()]*\)/g, '');
         const hs = String(hanzi || '').trim().split(/\s+/).filter(Boolean);
         const ps = String(pinyin || '').trim().split(/\s+/).filter(Boolean);
+        // With the lexicon: a word's reading is written only when the lexicon
+        // can't give it by itself (a character with several readings, none,
+        // or another one) -- same rule as picking a suggestion.
+        const lexicon = dico?.lexiconPronunciations;
+        const readingsOf = (char) => new Set(lexicon.filter((p) => p.simp === char || p.trad === char)
+            .map((p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`)));
+        const pinned = (word, reading) => {
+            if (!lexicon) return `${word}(${reading})`;
+            const chars = [...word];
+            const syllables = String(reading).match(/[^\d\s]+\d?/g) || [];
+            const clear = syllables.length === chars.length && chars.every((c, i) => {
+                const rs = readingsOf(c);
+                return rs.size === 1 && rs.has(syllables[i]);
+            });
+            return clear ? word : `${word}(${reading})`;
+        };
         if (kind === 'word') {
             const h = hs.map(plain).join('');
-            return ps.length ? `${h}(${ps.join('')})` : h;
+            return ps.length ? pinned(h, ps.join('')) : h;
         }
         if (ps.length !== hs.length) return hs.join(' ');
-        return hs.map((h, i) => `${plain(h)}(${ps[i]})${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
+        return hs.map((h, i) => `${pinned(plain(h), ps[i])}${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
     }
 
     /** A word is one token whatever spaces were typed; an expression has
@@ -744,7 +760,7 @@ class SaisieEntry {
                 return this.setStatus(`Indiquez le français des mots à ajouter (${untranslated.map((w) => w.hanzi).join(', ')}), ou décochez-les.`, true);
             }
 
-            const payload = { ...this.values(), status, new_words: newWords };
+            const payload = { ...this.values(), input_text: this.el.text.value.trim(), status, new_words: newWords };
             const buttons = [...this.el.form.querySelectorAll('button[type="submit"]'), this.el.cancel];
             this.setStatus('');
             await whileBusy(button, status === 'review' ? 'Envoi pour validation…' : 'Enregistrement…', async () => {
@@ -780,8 +796,10 @@ class SaisieEntry {
             // An addition already proposed (opened from the Validation tab)
             // keeps its status when saved; a draft can still be proposed.
             this.setSaveButtons(addition.status);
-            // Each word with its stored reading pinned: read back as saved.
-            this.el.text.value = SaisieEntry.textFromStored(addition.hanzi, addition.pinyin, addition.kind);
+            // The text as it was typed; else (imports, AI, older additions)
+            // rebuilt with a reading only where the lexicon needs one.
+            this.el.text.value = addition.input_text
+                || SaisieEntry.textFromStored(addition.hanzi, addition.pinyin, addition.kind, this.dico);
             this.newWords.clear();
             this.setKind(addition.kind);
             [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
