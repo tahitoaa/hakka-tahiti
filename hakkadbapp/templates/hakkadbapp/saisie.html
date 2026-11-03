@@ -28,6 +28,19 @@
   .saisie-check-proposed { border-left-color: #6366f1 !important; } p.saisie-check-proposed { background: #FBF0E6; color: #9B1C1C; }
   .saisie-check-unknown { border-left-color: #dc2626 !important; } p.saisie-check-unknown { background: #ecfdf5; color: #065f46; }
   .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1.1fr)); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+  /* Mot / Expression: two big choices, and the form's edge in the mode's colour. */
+  .saisie-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .saisie-kind button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.55rem 0.75rem; min-height: 3.25rem;
+                        border: 2px solid #DDD0BD; border-radius: 0.7rem; background: #fff; font-weight: 700; color: #544D45; text-align: left; }
+  .saisie-kind button small { font-weight: 500; font-size: 0.75rem; color: #8C8478; }
+  .saisie-kind button[data-kind="word"][aria-pressed="true"] { border-color: #1d4ed8; background: #eff6ff; color: #1e3a8a; }
+  .saisie-kind button[data-kind="expression"][aria-pressed="true"] { border-color: #7c3aed; background: #f5f3ff; color: #4c1d95; }
+  .saisie-kind button[aria-pressed="true"] small { color: inherit; opacity: 0.8; }
+  #saisie-form.is-word { border-left: 6px solid #1d4ed8; }
+  #saisie-form.is-expression { border-left: 6px solid #7c3aed; }
+  .saisie-kind-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; padding: 0.4rem 0.6rem;
+                         border-radius: 0.5rem; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-size: 0.85rem; }
+  .saisie-kind-warning button { padding: 0.2rem 0.6rem; border-radius: 0.4rem; background: #9a3412; color: #fff; font-weight: 700; font-size: 0.8rem; }
   @media (max-width: 640px) { .saisie-new-word { grid-template-columns: 1fr 1fr; } .saisie-new-word > label { grid-column: 1 / -1; } }
   /* AI suggestions: a proposal to accept, never saved on its own. */
   .saisie-ai { border: 1px dashed #c4b5fd; background: #faf7ff; border-radius: 0.75rem; padding: 0.75rem; display: grid; gap: 0.6rem; }
@@ -65,10 +78,10 @@
   <form id="saisie-form" data-validation-url="{% url 'validation' %}" class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5 space-y-4" autocomplete="off">
     <div class="flex items-center justify-between gap-2">
       <h2 id="saisie-form-title" class="font-display text-xl font-bold text-gray-800">Nouvel ajout</h2>
-      <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm" role="group" aria-label="Type">
-        <button type="button" class="saisie-chip px-3 min-h-10 border-r border-gray-300" data-kind="word" aria-pressed="true">Mot</button>
-        <button type="button" class="saisie-chip px-3 min-h-10" data-kind="expression" aria-pressed="false">Expression</button>
-      </div>
+    </div>
+    <div class="saisie-kind" role="group" aria-label="Type d'ajout">
+      <button type="button" data-kind="word" aria-pressed="true">📝 Mot <small>un seul mot, sans espace</small></button>
+      <button type="button" data-kind="expression" aria-pressed="false">💬 Expression <small>plusieurs mots, séparés par des espaces</small></button>
     </div>
 
     <div>
@@ -81,6 +94,7 @@
       <input id="saisie-pinyin" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
              placeholder="ex. wuk5ka1"
              class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      <div id="saisie-kind-warning" aria-live="polite"></div>
       <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
     </div>
 

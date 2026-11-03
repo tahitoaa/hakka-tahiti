@@ -413,6 +413,10 @@ class SaisieEntry {
             // A field the AI filled stays tinted until the editor changes it.
             [this.el.french, this.el.english, this.el.themes].forEach((input) =>
                 input.addEventListener('input', () => input.classList.remove('is-ai')));
+            document.getElementById('saisie-kind-warning')?.addEventListener('click', (event) => {
+                const b = event.target.closest('[data-switch-kind]');
+                if (b) this.setKind(b.dataset.switchKind);
+            });
             // 📋 Copy what the form holds (characters, reading, senses, theme).
             document.getElementById('saisie-copy')?.addEventListener('click', (event) =>
                 AdditionList.copy(AdditionList.clipboardText(this.values()), event.currentTarget));
@@ -447,6 +451,8 @@ class SaisieEntry {
         setKind(kind) {
             this.kind = kind;
             this.kindButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
+            this.el.form.classList.toggle('is-word', kind === 'word');
+            this.el.form.classList.toggle('is-expression', kind === 'expression');
             const example = typeof ReadingSourceSwitch !== 'undefined' && ReadingSourceSwitch.inputExample
                 ? ReadingSourceSwitch.inputExample() : '';
             this.el.text.placeholder = example ? `ex. ${example}` : (kind === 'word' ? 'ex. wuk5ka1' : 'ex. ngai2 oi4 wuk5ka1');
@@ -458,6 +464,25 @@ class SaisieEntry {
             this.entry.setText(this.el.text.value, this.kind);
             this.active = Math.max(0, Math.min(this.active, this.entry.syllables.length - 1));
             this.renderAll();
+        }
+
+        /** A word never has a space; an expression has at least two words.
+         *  Said at once, with the switch one tap away. */
+        renderKindWarning() {
+            const box = document.getElementById('saisie-kind-warning');
+            if (!box) return;
+            const text = this.el.text.value.trim();
+            let message = '';
+            let other = '';
+            if (this.kind === 'word' && /\s/.test(text)) {
+                message = 'Un mot ne contient jamais d’espace (ils seront retirés).';
+                other = 'expression';
+            } else if (this.kind === 'expression' && text && !/\s/.test(text) && !this.entry.syllables.length) {
+                message = 'Une expression contient au moins deux mots séparés par un espace.';
+                other = 'word';
+            }
+            box.innerHTML = message ? `<div class="saisie-kind-warning">⚠ ${message}
+                <button type="button" data-switch-kind="${other}">${other === 'word' ? '📝 C’est un mot' : '💬 C’est une expression'}</button></div>` : '';
         }
 
         /** The model rewrote the text (suggestion picked, character typed). */
@@ -486,6 +511,7 @@ class SaisieEntry {
         }
 
         renderAll() {
+            this.renderKindWarning();
             this.renderSlots();
             this.renderPreview();
             // A proposal made for other characters no longer applies.

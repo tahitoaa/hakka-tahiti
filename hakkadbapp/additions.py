@@ -84,6 +84,10 @@ def _apply_payload(addition, payload):
             else:
                 value = value.strip()
             setattr(addition, field, value)
+    if addition.kind == LexiconAddition.KIND_WORD:
+        # A word never contains a space (an expression has one per word).
+        addition.hanzi = "".join(addition.hanzi.split())
+        addition.pinyin = "".join(addition.pinyin.split())
     if not addition.hanzi:
         return "Les caractères sont obligatoires."
     return None
