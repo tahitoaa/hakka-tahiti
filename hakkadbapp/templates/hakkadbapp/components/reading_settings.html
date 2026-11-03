@@ -11,6 +11,7 @@
   - Je tape en / J'affiche en: components/romanization_settings.html.
 {% endcomment %}
 <div class="reading-settings">
+  <div class="settings-line">
   <div class="settings-row">
     <span class="rom-setting-label" id="source-label">Lectures</span>
     <div id="source-switch" role="group" aria-labelledby="source-label" class="segmented">
@@ -31,6 +32,7 @@
   </div>
   <div class="settings-rows">
     {% include "hakkadbapp/components/romanization_settings.html" %}
+  </div>
   </div>
   <p id="settings-summary" class="settings-summary" aria-live="polite"></p>
   <p id="source-legend" class="settings-legend" hidden></p>
@@ -60,8 +62,42 @@
                                        font-size: 0.75rem; color: #544D45; align-items: center; }
   .reading-settings .settings-legend[hidden] { display: none; }
   .reading-settings .settings-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+  /* Wide screens: the three settings on one line, small labels. */
+  @media (min-width: 640px) {
+    .reading-settings .settings-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+    .reading-settings .settings-row, .reading-settings .rom-setting { grid-template-columns: auto minmax(0, 1fr); gap: 0.4rem; }
+    .reading-settings .settings-row { flex: 1 1 20rem; }
+    .reading-settings .settings-rows { display: flex; gap: 0.75rem; margin-top: 0; }
+    .reading-settings .rom-setting-label, .reading-settings #source-label { font-size: 0.78rem; }
+    .reading-settings .source-btn { min-height: 2rem; font-size: 0.8rem; }
+    .reading-settings .rom-setting-select { min-height: 2rem; font-size: 0.8rem; }
+  }
+  .reading-settings .settings-summary { font-size: 0.8rem; }
+  /* « ⚙ Lexique · tape Wenfa · affiche Wenfa »: the settings in one line, for a folded block. */
+  .settings-brief { font-weight: 500; color: #6E655C; }
   @media (max-width: 380px) {
     .reading-settings .settings-row, .reading-settings .rom-setting { grid-template-columns: 1fr; gap: 0.25rem; }
   }
 </style>
 <script src="{% static 'hakkadbapp/js/ReadingSources.js' %}"></script>
+<script>
+  // The current settings in one line, in [data-settings-brief] (a folded block's summary).
+  (function () {
+    const blocks = document.querySelectorAll('.reading-settings');
+    const root = blocks[blocks.length - 1];   // this one: the last parsed so far
+    const brief = () => {
+      const source = root.querySelector('.source-btn[aria-pressed="true"]')?.textContent.trim() || '';
+      const typed = root.querySelector('#romanization-input-menu');
+      const shown = root.querySelector('.romanization-display-menu');
+      const label = (sel) => sel?.selectedOptions[0]?.textContent.trim() || '';
+      const text = `${source} · tape ${label(typed)} · affiche ${label(shown)}`;
+      document.querySelectorAll('[data-settings-brief]').forEach((el) => { el.textContent = text; });
+    };
+    root.addEventListener('click', () => setTimeout(brief, 0));
+    root.addEventListener('change', brief);
+    document.addEventListener('romanization-change', brief);
+    document.addEventListener('romanization-input-change', brief);
+    document.addEventListener('DOMContentLoaded', () => setTimeout(brief, 0));
+    brief();
+  })();
+</script>

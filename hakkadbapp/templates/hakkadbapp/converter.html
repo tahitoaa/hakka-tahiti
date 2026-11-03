@@ -7,10 +7,13 @@
   </label>
 
   <!-- Reading settings: source, input system, display system. -->
-  <section id="reading-settings" aria-label="Paramètres de saisie"
-           class="mx-auto max-w-xl text-left bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4">
-    {% include "hakkadbapp/components/reading_settings.html" %}
-  </section>
+  <details id="reading-settings" aria-label="Paramètres de saisie"
+           class="mx-auto max-w-xl text-left bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2 sm:px-4">
+    <summary class="cursor-pointer select-none text-sm font-semibold text-gray-700">⚙ Réglages <span class="settings-brief" data-settings-brief></span></summary>
+    <div class="pt-2">
+      {% include "hakkadbapp/components/reading_settings.html" %}
+    </div>
+  </details>
 
   <details class="mx-auto max-w-xl mt-2 text-left text-xs text-gray-600">
     <summary class="cursor-pointer select-none text-sm text-gray-700 py-1">Aide à la saisie</summary>
