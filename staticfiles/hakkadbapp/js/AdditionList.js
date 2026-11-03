@@ -50,7 +50,7 @@ class AdditionList {
 
     /** The four cells every table of entries shares (Validation, Suggestions
      *  IA, Import): Caractères | Pinyin | Français (+ anglais, observations) |
-     *  Type · thème -- in the platform's format (Wenfa, superscript tones,
+     *  Thème -- in the platform's format (Wenfa, superscript tones,
      *  characters run together), as the lexicon's own entries.
      *  `opts`: docHanzi (the document's form), rawPinyin (shown when there is
      *  no reading yet), warn, aiFrench / aiEnglish (badges). */
@@ -65,7 +65,14 @@ class AdditionList {
             <td class="vt-french">${esc(e.french) || '<i>—</i>'}${opts.aiFrench ? ai : ''}${e.english
                 ? `<span class="vt-sub italic" lang="en"> · ${esc(e.english)}${opts.aiEnglish ? ai : ''}</span>` : ''}
                 ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
-            <td class="vt-meta vt-type">${e.kind === 'expression' ? 'Expr.' : 'Mot'}${e.themes ? `<span class="vt-sub"> · ${esc(e.themes)}</span>` : ''}</td>`;
+            <td class="vt-meta vt-type">${esc(e.themes || '')}</td>`;
+    }
+
+    /** « 📝 Mots (12) | 💬 Expressions (5) »: two tabs over a table of entries. */
+    static kindTabs(current, counts, attr) {
+        const tab = (kind, label) => `<button type="button" role="tab" ${attr}="${kind}" aria-selected="${current === kind}">${label}
+            <span class="vt-kinds-n">${counts[kind] || 0}</span></button>`;
+        return tab('word', '📝 Mots') + tab('expression', '💬 Expressions');
     }
 
     static PUNCT_TOKEN = /^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()[\]{}'"]+$/;
@@ -340,7 +347,7 @@ class ValidationTable extends AdditionList {
     static PAGE = 100;
     // Filters beyond the status, and what rows can be grouped by.
     static FACETS = [
-        ['origin', 'Origine'], ['author', 'Auteur'], ['kind', 'Type'], ['theme', 'Thème'],
+        ['origin', 'Origine'], ['author', 'Auteur'], ['theme', 'Thème'],
     ];
 
     /** The values of `facet` for an addition (several for the themes). */
@@ -360,6 +367,15 @@ class ValidationTable extends AdditionList {
         Object.assign(this.el, { all: options.all, bar: options.bar, count: options.count, status: options.status,
             facets: options.facets, more: options.more });
         this.facets = {};            // facet -> chosen value ('' = all)
+        this.kindTab = 'word';       // words and expressions: two tabs
+        this.el.kinds = document.getElementById('vt-kinds');
+        this.el.kinds?.addEventListener('click', (event) => {
+            const b = event.target.closest('[data-kind-tab]');
+            if (!b) return;
+            this.kindTab = b.dataset.kindTab;
+            this.limit = ValidationTable.PAGE;
+            this.render();
+        });
         // Opened from the import page: ?origine=<source> shows that import.
         const origin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('origine') : null;
         if (origin) this.facets.origin = origin;
@@ -469,9 +485,15 @@ class ValidationTable extends AdditionList {
         return super.visible();
     }
 
-    visible() {
+    /** The status, the search and the facets -- both kinds. */
+    faceted() {
         const chosen = Object.entries(this.facets || {}).filter(([, v]) => v);
         return this.unfaceted().filter((a) => chosen.every(([f, v]) => ValidationTable.facetValues(a, f).includes(v)));
+    }
+
+    visible() {
+        const all = this.faceted();
+        return this.el.kinds ? all.filter((a) => a.kind === this.kindTab) : all;
     }
 
     /** Filter selects with counts (within the status and the search), and « Grouper par ». */
@@ -509,6 +531,11 @@ class ValidationTable extends AdditionList {
         [...this.selected].forEach((id) => { if (!shown.has(id)) this.selected.delete(id); });
         super.render();   // status chips (counts)
         this.renderFacets();
+        if (this.el.kinds) {
+            const all = this.faceted();
+            const counts = { word: all.filter((a) => a.kind === 'word').length, expression: all.filter((a) => a.kind === 'expression').length };
+            this.el.kinds.innerHTML = AdditionList.kindTabs(this.kindTab, counts, 'data-kind-tab');
+        }
         const esc = AdditionList.escapeHtml;
         if (!visible.length) {
             this.el.list.innerHTML = `<tr><td colspan="9" class="vt-empty">${esc(this.empty)}</td></tr>`;
@@ -1072,6 +1099,8 @@ class DocumentImport {
         this.result.addEventListener('click', (event) => {
             if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
             if (event.target.closest('[data-languages]')) this.checkLanguages(event.target.closest('[data-languages]'));
+            const kindTab = event.target.closest('[data-import-kind]');
+            if (kindTab) { this.kindTab = kindTab.dataset.importKind; this.render(); }
         });
     }
 
@@ -1082,6 +1111,7 @@ class DocumentImport {
     }
 
     reset() {
+        this.kindTab = null;
         this.sourceName = '';
         this.doc = null;
         this.entries = [];
@@ -1214,6 +1244,8 @@ class DocumentImport {
     render() {
         const esc = AdditionList.escapeHtml;
         if (!this.entries.length) { this.result.innerHTML = ''; return; }
+        // The tab with entries first (words, unless the document has none).
+        if (!this.kindTab) this.kindTab = this.entries.some((e) => e.kind !== 'expression') ? 'word' : 'expression';
         this.result.innerHTML = `
             <label class="vt-import-source">Source <input type="text" data-source-name maxlength="200"
                 value="${esc(this.sourceName || DocumentImport.sourceName(this.doc?.filename || ''))}"
@@ -1221,10 +1253,13 @@ class DocumentImport {
             <div class="vt-import-summary"><span data-summary></span>
               <button type="button" class="saisie-btn saisie-btn-lg" data-languages hidden>✨ Vérifier FR / EN</button>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
+            <div class="vt-kinds" role="tablist" aria-label="Mots ou expressions">${AdditionList.kindTabs(this.kindTab, {
+                word: this.entries.filter((e) => e.kind !== 'expression').length,
+                expression: this.entries.filter((e) => e.kind === 'expression').length }, 'data-import-kind')}</div>
             <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
               <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Pinyin</th>
-                <th>Français</th><th class="vt-type">Type · thème</th><th class="vt-who">Origine</th><th class="vt-st">État</th></tr></thead>
-              <tbody>${this.entries.map((e, i) => `<tr class="${e.state === 'new' ? '' : 'is-off'}">
+                <th>Français</th><th class="vt-type">Thème</th><th class="vt-who">Origine</th><th class="vt-st">État</th></tr></thead>
+              <tbody>${this.entries.map((e, i) => ((e.kind === 'expression') !== (this.kindTab === 'expression') ? '' : `<tr class="${e.state === 'new' ? '' : 'is-off'}">
                 <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}
                     aria-label="Proposer ${esc(e.hanzi)}"></td>
                 ${AdditionList.entryCells({ hanzi: e.hanzi, pinyin: e.reading, french: e.french, english: e.english,
@@ -1232,7 +1267,7 @@ class DocumentImport {
                     aiFrench: e.translated || e.ai_fields?.includes('french'), aiEnglish: e.ai_fields?.includes('english') })}
                 <td class="vt-meta vt-who"${e.remark || e.source_sense ? ` title="${esc([e.source_sense, e.remark].filter(Boolean).join(' — '))}"` : ''}>${esc(e.location)}</td>
                 <td class="vt-st"><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
-              </tr>`).join('')}</tbody></table></div>`;
+              </tr>`)).join('')}</tbody></table></div>`;
         this.renderSummary();
     }
 

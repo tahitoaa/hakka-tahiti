@@ -46,6 +46,13 @@
   .vt-who { white-space: nowrap; }
   /* iPad held upright: the author stays, the type/theme column goes (it is in the slideshow). */
   @media (max-width: 899px) { .vt-table .vt-type { display: none; } }
+  /* Words / expressions: two tabs over the table. */
+  .vt-kinds { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; margin-bottom: 0.25rem; }
+  .vt-kinds button { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.8rem; font-weight: 700; font-size: 0.85rem;
+                     color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .vt-kinds button[aria-selected="true"] { color: #9B1C1C; border-bottom-color: #9B1C1C; }
+  .vt-kinds-n { min-width: 1.4rem; padding: 0 0.35rem; border-radius: 9999px; background: #F0EBE3; color: #544D45; font-size: 0.72rem; line-height: 1.3rem; text-align: center; }
+  .vt-kinds button[aria-selected="true"] .vt-kinds-n { background: #9B1C1C; color: #fff; }
   /* AI assistant: remarks under a row, its badge, the two tabs. */
   .vt-tabs { display: flex; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
   .vt-tabs button { min-height: 2.75rem; padding: 0.4rem 1rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
