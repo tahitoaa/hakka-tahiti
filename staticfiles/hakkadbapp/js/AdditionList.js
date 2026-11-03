@@ -33,6 +33,17 @@ class AdditionList {
     }
 
     /** A stored (Wenfa) pinyin as shown, in the "J'affiche en" system. */
+    /** As imported on the platform (e-reo « target »): Wenfa with tone
+     *  superscripts, words separated by spaces... */
+    static platformPinyin(pinyin) {
+        return AdditionList.superscriptTones(String(pinyin || '').trim().replace(/\s+/g, ' '));
+    }
+
+    /** ...and the characters run together, no spaces. */
+    static platformHanzi(hanzi) {
+        return String(hanzi || '').replace(/\s+/g, '');
+    }
+
     static displayPinyin(pinyin) {
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
         return AdditionList.superscriptTones(R ? R.fromPinyin(pinyin) : pinyin);
@@ -156,6 +167,8 @@ class AdditionList {
     }
 
     render() {
+        const review = this.additions.filter((a) => a.status === 'review').length;
+        document.querySelectorAll('[data-review-count]').forEach((el) => { el.textContent = review; el.hidden = !review; });
         this.el.filters?.querySelectorAll('[data-filter]').forEach((b) => {
             b.dataset.label ||= b.textContent.trim();
             const count = this.additions.filter((a) => this.matchesFilter(a, b.dataset.filter)).length;
@@ -170,8 +183,9 @@ class AdditionList {
 
     /** One line for the clipboard: 船只 shon²zak⁵ — navires — ships — Thème. */
     static clipboardText(a) {
-        const pinyin = a.pinyin ? AdditionList.displayPinyin(a.pinyin) : '';
-        return [[a.hanzi, pinyin].filter(Boolean).join(' '), a.french, a.english, a.themes]
+        // The platform line first (pinyin then characters, as e-reo's « target »).
+        const target = [AdditionList.platformPinyin(a.pinyin), AdditionList.platformHanzi(a.hanzi)].filter(Boolean).join(' ');
+        return [target, a.french, a.english, a.themes]
             .map((x) => (x || '').trim()).filter(Boolean).join(' — ');
     }
 
@@ -319,6 +333,9 @@ class ValidationTable extends AdditionList {
         if (origin) this.facets.origin = origin;
         this.groupBy = '';
         this.limit = ValidationTable.PAGE;
+        // Phones: the settings start folded; the summary says what is active.
+        const settings = document.getElementById('vt-settings');
+        if (settings && window.matchMedia?.('(max-width: 640px)').matches) settings.open = false;
         this.el.facets?.addEventListener('change', (event) => {
             const select = event.target.closest('select');
             if (!select) return;
@@ -444,6 +461,11 @@ class ValidationTable extends AdditionList {
             <option value="">—</option>${ValidationTable.FACETS.map(([f, l]) => `<option value="${f}" ${f === this.groupBy ? 'selected' : ''}>${l}</option>`).join('')}
             </select></label>`;
         const active = Object.values(this.facets).some(Boolean) || this.groupBy;
+        const summary = document.getElementById('vt-settings-summary');
+        if (summary) {
+            const status = this.el.filters?.querySelector('[aria-pressed="true"]')?.dataset.label || '';
+            summary.textContent = ` · ${[status, ...Object.values(this.facets).filter(Boolean)].filter(Boolean).join(' · ')}`;
+        }
         this.el.facets.innerHTML = selects + group
             + (active ? '<button type="button" class="vt-facets-reset" data-facets-reset>✕ Effacer</button>' : '');
     }
@@ -533,8 +555,8 @@ class ValidationTable extends AdditionList {
         const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
-            <td class="hanzi vt-hanzi">${esc(a.hanzi)}</td>
-            <td class="vt-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</td>
+            <td class="hanzi vt-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</td>
+            <td class="vt-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</td>
             <td class="vt-french">${esc(a.french)}${a.english ? `<span class="vt-sub italic"> · ${esc(a.english)}</span>` : ''}
                 ${a.observations ? `<div class="vt-sub vt-obs" title="${esc(a.observations)}">${esc(a.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
@@ -790,8 +812,8 @@ class ValidationShow {
             <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>
               <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
               <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span></div>
-            <div class="hanzi vs-hanzi">${esc(a.hanzi)}</div>
-            <div class="vs-pinyin">${esc(AdditionList.displayPinyin(a.pinyin))}</div>
+            <div class="hanzi vs-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</div>
+            <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${this.editing ? `<div class="vs-edit">
                 ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
                 ${field('themes', 'Thème', a.themes)}${field('observations', 'Observations', a.observations)}

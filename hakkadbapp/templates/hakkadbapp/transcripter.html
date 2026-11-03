@@ -77,7 +77,7 @@
   <section id="eaf-share" class="eaf-new no-print" aria-label="Partager" hidden>
     <div class="eaf-new-head">
       <b>Partager avec le groupe</b>
-      <span class="text-gray-500">— une page à lire et écouter sur téléphone, pour les membres connectés (<a class="underline" href="{% url 'transcriptions' %}" target="_blank">Écouter</a>).</span>
+      <span class="text-gray-500">— une page à lire et écouter sur téléphone, pour les membres connectés (<a class="underline" href="{% url 'transcriptions' %}" target="_blank">Transcriptions</a>).</span>
       <span class="grow"></span>
       <button type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" data-share="close" title="Fermer">✕</button>
     </div>
@@ -133,7 +133,7 @@
     <ul>
       <li><b>Ouvrir un dossier</b> : choisissez le dossier qui contient le <b>.eaf</b> et son <b>audio</b> (l'audio référencé par le fichier, sinon le seul du dossier). <b>Enregistrer</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) écrase le .eaf après avoir copié l'ancienne version dans le sous-dossier <b>sauvegardes/</b> (nom daté). « Rouvrir » reprend le dernier fichier ouvert. Sans cette fonction du navigateur (Chrome, Edge), « Fichiers… » ouvre le .eaf et l'audio, et le .eaf est téléchargé.</li>
       <li><b>Nouveau fichier</b> : choisissez l'audio (son dossier), puis les participants (nom complet et nom du tier, le prénom par défaut). Le .eaf vide est créé à côté de l'audio, sur le modèle anavevo : pour chaque participant, un tier <i>transcription</i> et ses tiers enfants Traduction, Pinyin, Mixed et Hanzi. Découpez ensuite les segments dans ELAN, puis rouvrez le fichier ici.</li>
-      <li><b>PDF</b> : le texte segment par segment (locuteur, temps, hanzi, pinyin, français) dans un nouvel onglet ; choisissez « Enregistrer au format PDF » dans la fenêtre d'impression. <b>Partager</b> : publie la transcription et une copie compressée de l'audio (MP3, ~18 Mo par heure) sur la page <b>Écouter</b>, lisible sur téléphone par les membres connectés. Publiez à nouveau après une séance de travail pour mettre la page à jour (l'audio n'est renvoyé que s'il a changé). Les locuteurs masqués ne sont pas inclus.</li>
+      <li><b>PDF</b> : le texte segment par segment (locuteur, temps, hanzi, pinyin, français) dans un nouvel onglet ; choisissez « Enregistrer au format PDF » dans la fenêtre d'impression. <b>Partager</b> : publie la transcription et une copie compressée de l'audio (MP3, ~18 Mo par heure) sur la page <b>Transcriptions</b>, lisible sur téléphone par les membres connectés. Publiez à nouveau après une séance de travail pour mettre la page à jour (l'audio n'est renvoyé que s'il a changé). Les locuteurs masqués ne sont pas inclus.</li>
       <li>Chaque tier principal du fichier est un locuteur (une colonne).</li>
       <li><b>Lectures</b> : lexique, un dictionnaire ou toutes les sources ; <b>Je tape en</b> et <b>J'affiche en</b> : systèmes de saisie et d'affichage, indépendants de la source (mêmes réglages que la page Écrire).</li>
       <li>Cliquez un segment pour l'éditer. Vous éditez le <b>Transcript</b>, c'est-à-dire le tier principal du locuteur : la romanisation tapée dans ELAN, que vous convertissez en choisissant les caractères dans les suggestions (mots séparés par des espaces, lectures entre parenthèses : <code>吾(nga1) 爸(ba1)爸(ba1)</code>), et le <b>Français</b> (tier enfant Traduction). Les tiers enfants <b>Pinyin</b> (dans le système « J'affiche en »), <b>Mixte</b> et <b>Hanzi</b> (caractères seuls) sont recalculés automatiquement.</li>

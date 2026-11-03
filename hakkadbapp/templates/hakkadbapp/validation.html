@@ -5,6 +5,7 @@
 {% include "hakkadbapp/components/validation_styles.html" %}
 
 <div id="validation-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
+  {% include "hakkadbapp/components/members_tabs.html" %}
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 class="font-display text-xl font-bold text-gray-800">Validation</h2>
     <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les ajouts"
@@ -17,6 +18,9 @@
   </div>
 
   <div id="additions-panel" role="tabpanel" class="space-y-3">
+  <details class="vt-settings" id="vt-settings" open>
+  <summary>⚙ Filtres<span id="vt-settings-summary"></span></summary>
+  <div class="vt-settings-body">
   <div class="vt-ai-tools" data-needs-ai hidden>
     <b>🤖 Assistant IA</b>
     <span>Suggérer</span>
@@ -26,7 +30,6 @@
     <button type="button" class="saisie-btn saisie-btn-ai" data-new-words="expressions" title="Phrases ou groupes de mots du lexique">Expressions</button>
   </div>
 
-  <p class="text-sm"><a href="{% url 'document_import' %}" class="underline font-semibold">📄 Importer des mots depuis un document</a></p>
 
   <div id="saisie-filters" class="flex flex-wrap gap-2 text-sm" role="group" aria-label="Filtrer par statut">
     {% for value, label in status_choices %}
@@ -36,6 +39,8 @@
     <button type="button" id="vs-open" class="vs-open">▶ Diaporama</button>
   </div>
   <div id="vt-facets" class="vt-facets" role="group" aria-label="Filtrer et grouper"></div>
+  </div>
+  </details>
 
   <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
     <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>

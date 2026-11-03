@@ -198,15 +198,17 @@ class SuggestionBar {
         this.suggestions = [];
 
         this.container.addEventListener('click', (event) => this.handleClick(event));
+        // Tapping a suggestion must not take the focus (and the caret) away
+        // from the field being typed in: the button never gets the focus.
+        ['mousedown', 'pointerdown'].forEach((type) => this.container.addEventListener?.(type, (event) => {
+            if (event.target.closest?.('button')) event.preventDefault();
+        }));
         if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
             document.addEventListener('hanzi-info-ready', () => { if (this.suggestions.length) this.render(this.suggestions); });
         }
 
         if (this.anchorTo) {
-            // Tapping/clicking a suggestion would otherwise move focus to the
-            // button first, blurring the field and hiding the popover before
-            // the click is even handled — suppress that default.
-            this.container.addEventListener('mousedown', (event) => event.preventDefault());
+            // (The focus stays in the field: see the mousedown handler above.)
 
             this.container.classList.add(
                 'absolute', 'z-30', 'top-full', 'left-1', 'right-1', 'mt-1',

@@ -50,7 +50,8 @@
   @media (max-width: 480px) { .saisie-ai-row { grid-template-columns: minmax(0, 1fr) auto; } .saisie-ai-row b { grid-column: 1 / -1; } }
 </style>
 
-<div class="mt-4 sm:mt-8 w-full max-w-screen-md mx-auto space-y-6">
+<div class="mt-2 sm:mt-4 w-full max-w-screen-md mx-auto space-y-4">
+  {% include "hakkadbapp/components/members_tabs.html" %}
 
   <!-- 0. Reading settings: same as the "Écrire" page. -->
   <details class="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4">
@@ -133,11 +134,13 @@
     <div id="saisie-status" class="text-sm" role="status"></div>
 
     <div class="flex flex-wrap gap-2">
-      <button type="submit" data-status="draft" class="saisie-btn saisie-btn-lg saisie-btn-save">
-        ✓ Enregistrer
+      <button type="submit" data-status="draft" class="saisie-btn saisie-btn-lg saisie-btn-save"
+              title="Garder pour plus tard : visible seulement dans vos brouillons ci-dessous">
+        💾 Garder en brouillon
       </button>
-      <button type="submit" data-status="review" class="saisie-btn saisie-btn-lg saisie-btn-review">
-        ↑ Enregistrer et proposer à la validation
+      <button type="submit" data-status="review" class="saisie-btn saisie-btn-lg saisie-btn-review"
+              title="Envoyer à la validation (Charles valide ou rejette)">
+        ↑ Proposer à la validation
       </button>
       <button type="button" id="saisie-copy" class="saisie-btn saisie-btn-lg saisie-btn-neutral" title="Copier dans le presse-papiers">📋 Copier</button>
       <button type="button" id="saisie-cancel" hidden class="saisie-btn saisie-btn-lg saisie-btn-neutral">

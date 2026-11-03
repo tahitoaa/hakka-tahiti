@@ -5,6 +5,7 @@
 {% include "hakkadbapp/components/validation_styles.html" %}
 
 <div id="import-page" data-validation-url="{% url 'validation' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-3">
+  {% include "hakkadbapp/components/members_tabs.html" %}
   <h2 class="font-display text-xl font-bold text-gray-800">Importer des mots
     <details class="help-tip font-sans font-normal"><summary aria-label="Aide : import">ⓘ</summary><div>Excel (.xlsx), CSV, TSV, texte (.txt),
       Word (.docx) ou PDF contenant du texte : pas de scans ni d'images. Un tableau avec des colonnes « Caractères », « Pinyin »,

@@ -1,0 +1,14 @@
+{# The members' word workflow, one tap from each other: Saisie -> Validation, Importer. #}
+<nav class="mt-tabs" aria-label="Ajouts">
+  <a href="{% url 'saisie' %}" {% if page == 'saisie' %}aria-current="page"{% endif %}>✎ Saisie</a>
+  <a href="{% url 'validation' %}" {% if page == 'validation' %}aria-current="page"{% endif %}>✓ Validation <span class="mt-count" data-review-count hidden></span></a>
+  <a href="{% url 'document_import' %}" {% if page == 'document_import' %}aria-current="page"{% endif %}>📄 Importer</a>
+</nav>
+<style>
+  .mt-tabs { display: flex; gap: 0.3rem; padding: 0.25rem; background: #F6EFE4; border-radius: 0.75rem; width: fit-content; max-width: 100%; }
+  .mt-tabs a { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2.25rem; padding: 0 0.85rem; border-radius: 0.55rem;
+               font-weight: 600; font-size: 0.9rem; color: #6E655C; white-space: nowrap; }
+  .mt-tabs a[aria-current="page"] { background: #fff; color: #9B1C1C; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
+  .mt-count { min-width: 1.3rem; padding: 0 0.35rem; border-radius: 9999px; background: #9B1C1C; color: #fff; font-size: 0.72rem; line-height: 1.3rem; text-align: center; }
+  @media (max-width: 420px) { .mt-tabs a { padding: 0 0.55rem; font-size: 0.85rem; } }
+</style>

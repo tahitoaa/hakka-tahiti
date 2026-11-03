@@ -1793,7 +1793,7 @@ def _transcript_summary(shared):
 @login_required
 def transcriptions(request):
     return render(request, "hakkadbapp/transcriptions.html", {
-        "title": "Écouter",
+        "title": "Transcriptions",
         "page": "transcriptions",
         "items": [_transcript_summary(t) for t in SharedTranscript.objects.all()],
         "can_edit": is_editor(request.user),

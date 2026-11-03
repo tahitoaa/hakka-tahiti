@@ -725,7 +725,36 @@ class SharePanel {
         }
     }
 
-    compress(file) {
+    /** A .wav is read by the worker piece by piece; any other format the
+     *  browser can play (ogg, aac, opus, webm, flac, 3gp, a video's sound)
+     *  is decoded here first, mixed to mono, then compressed the same way. */
+    async compress(file) {
+        const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+        const tag = (o) => String.fromCharCode(...head.slice(o, o + 4));
+        if (tag(0) === 'RIFF' && tag(8) === 'WAVE') return this.encode({ file });
+        this.step('Lecture de l\'audio…', 0);
+        let decoded;
+        try {
+            const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            const ctx = new Ctx(1, 1, 44100);
+            const buf = await file.arrayBuffer();
+            // Callback form too: older Safari has no promise-returning decodeAudioData.
+            decoded = await new Promise((resolve, reject) => {
+                const p = ctx.decodeAudioData(buf, resolve, reject);
+                if (p && p.then) p.then(resolve, reject);
+            });
+        } catch (err) {
+            throw new Error(`format audio non lu par ce navigateur (${file.name}) : enregistrez-le en WAV, MP3 ou M4A`);
+        }
+        const pcm = new Float32Array(decoded.length);
+        for (let c = 0; c < decoded.numberOfChannels; c++) {
+            const data = decoded.getChannelData(c);
+            for (let i = 0; i < data.length; i++) pcm[i] += data[i] / decoded.numberOfChannels;
+        }
+        return this.encode({ pcm, rate: decoded.sampleRate }, [pcm.buffer]);
+    }
+
+    encode(message, transfer = []) {
         return new Promise((resolve, reject) => {
             const worker = new Worker(SHARE.worker);
             this.step('Compression de l\'audio…', 0);
@@ -735,7 +764,7 @@ class SharePanel {
                 if (data.error) { worker.terminate(); reject(new Error(data.error)); }
             };
             worker.onerror = (e) => { worker.terminate(); reject(new Error(e.message || 'compression impossible')); };
-            worker.postMessage({ file, lameUrl: new URL(SHARE.lame, location.href).href });
+            worker.postMessage({ ...message, lameUrl: new URL(SHARE.lame, location.href).href }, transfer);
         });
     }
 

@@ -799,8 +799,9 @@ class SaisieEntry {
             const [save, propose] = this.el.form.querySelectorAll('button[type="submit"]');
             save.dataset.label ||= save.innerHTML;
             save.dataset.status = status;
+            // An addition already proposed keeps its status: the button only saves the changes.
             save.innerHTML = status === 'draft' ? save.dataset.label
-                : `✓ Enregistrer (reste « ${escapeHtml(this.statusLabels[status] || status)} »)`;
+                : `✓ Enregistrer les modifications <small class="font-normal opacity-80">(statut inchangé : ${escapeHtml(this.statusLabels[status] || status)})</small>`;
             if (propose) propose.hidden = status !== 'draft';
         }
 

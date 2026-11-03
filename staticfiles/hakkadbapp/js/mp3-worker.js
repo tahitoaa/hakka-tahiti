@@ -5,7 +5,11 @@
    .wav is ~600 MB, too much to decode at once), mixed down to mono,
    resampled, and fed to lamejs (vendor/lamejs, LGPL).
 
-   In:  { file: File, lameUrl }
+   Any other format (ogg, aac, opus, webm, flac, 3gp, a video's sound...)
+   is decoded by the page (transcripter.js, decodeAudioData: workers have
+   no AudioContext) and arrives here as mono samples.
+
+   In:  { file: File, lameUrl } (a .wav) or { pcm: Float32Array, rate, lameUrl }
    Out: { progress: 0..1 } … then { blob } or { error }
    ========================================================================= */
 
@@ -14,7 +18,8 @@ const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]
 self.onmessage = async ({ data }) => {
     try {
         importScripts(data.lameUrl);
-        const blob = await encodeWav(data.file, (p) => self.postMessage({ progress: p }));
+        const progress = (p) => self.postMessage({ progress: p });
+        const blob = data.pcm ? await encodePcm(data.pcm, data.rate, progress) : await encodeWav(data.file, progress);
         self.postMessage({ blob });
     } catch (err) {
         self.postMessage({ error: err.message || String(err) });
@@ -80,29 +85,44 @@ function sampleReader(fmt) {
 async function encodeWav(file, onProgress) {
     const fmt = await readHeader(file);
     const read = sampleReader(fmt);
-    const outRate = MP3_RATES.filter((r) => r <= Math.min(fmt.rate, 22050)).pop() || 8000;
+    const bytesPerSample = fmt.bits / 8;
+    return encodeMono(fmt.rate, Math.floor(fmt.length / fmt.blockAlign), async (frame, frames) => {
+        const view = await readBytes(file, fmt.start + frame * fmt.blockAlign, frames * fmt.blockAlign);
+        const mono = new Float32Array(frames);
+        for (let i = 0; i < frames; i++) {
+            let sum = 0;
+            const base = i * fmt.blockAlign;
+            for (let c = 0; c < fmt.channels; c++) sum += read(view, base + c * bytesPerSample);
+            mono[i] = sum / fmt.channels;
+        }
+        return mono;
+    }, onProgress);
+}
+
+/** Mono samples already decoded by the page (any format the browser reads). */
+function encodePcm(pcm, rate, onProgress) {
+    return encodeMono(rate, pcm.length, async (frame, frames) => pcm.subarray(frame, frame + frames), onProgress);
+}
+
+/** Resamples mono blocks (readBlock(frame, frames) -> Float32Array, -1..1) to a speech MP3. */
+async function encodeMono(rate, totalFrames, readBlock, onProgress) {
+    if (!totalFrames) throw new Error('Aucun son dans ce fichier.');
+    const outRate = MP3_RATES.filter((r) => r <= Math.min(rate, 22050)).pop() || 8000;
     const kbps = outRate >= 22050 ? 40 : outRate >= 16000 ? 32 : 24;
     const encoder = new lamejs.Mp3Encoder(1, outRate, kbps);
-    const ratio = fmt.rate / outRate;          // >= 1: box-average downsampling
+    const ratio = rate / outRate;              // >= 1: box-average downsampling
     const chunks = [];
 
-    const bytesPerSample = fmt.bits / 8;
-    const framesPerBlock = fmt.rate * 10;
-    const totalFrames = Math.floor(fmt.length / fmt.blockAlign);
+    const framesPerBlock = rate * 10;
     let carry = new Float32Array(0);           // source samples not consumed yet
     let pos = 0;                               // fractional position in carry
 
     for (let frame = 0; frame < totalFrames; frame += framesPerBlock) {
         const frames = Math.min(framesPerBlock, totalFrames - frame);
-        const view = await readBytes(file, fmt.start + frame * fmt.blockAlign, frames * fmt.blockAlign);
+        const block = await readBlock(frame, frames);
         const buffer = new Float32Array(carry.length + frames);
         buffer.set(carry);
-        for (let i = 0; i < frames; i++) {
-            let sum = 0;
-            const base = i * fmt.blockAlign;
-            for (let c = 0; c < fmt.channels; c++) sum += read(view, base + c * bytesPerSample);
-            buffer[carry.length + i] = sum / fmt.channels;
-        }
+        buffer.set(block, carry.length);
         const out = new Int16Array(Math.floor((buffer.length - pos) / ratio) + 1);
         let n = 0;
         while (pos + ratio <= buffer.length) {

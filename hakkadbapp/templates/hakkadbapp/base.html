@@ -364,7 +364,7 @@
         <p class="nav-group-title text-center sm:text-left">🔒 Espace membres</p>
         {% if user.is_authenticated %}
         <ul class="no-print sm:flex sm:flex-wrap sm:gap-x-4 text-sm sm:text-base font-medium">
-            <li><a href="{% url 'transcriptions' %}" class="nav-link{% if page == 'transcriptions' %} is-active{% endif %}">Écouter</a></li>
+            <li><a href="{% url 'transcriptions' %}" class="nav-link{% if page == 'transcriptions' %} is-active{% endif %}">Transcriptions</a></li>
             {% if can_edit %}
             <li><a href="{% url 'saisie' %}" class="nav-link{% if page == 'saisie' %} is-active{% endif %}">Saisie</a></li>
             <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Validation</a></li>
@@ -383,7 +383,7 @@
         {% else %}
         <ul class="no-print text-sm sm:text-base font-medium">
           <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="nav-link{% if page == 'login' %} is-active{% endif %}"
-                 title="Écouter, Saisie, Validation, À enregistrer">Connexion</a></li>
+                 title="Transcriptions, Saisie, Validation, Importer, À enregistrer">Connexion</a></li>
         </ul>
         {% endif %}
       </div>

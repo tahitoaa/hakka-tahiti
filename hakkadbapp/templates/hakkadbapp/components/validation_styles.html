@@ -155,6 +155,28 @@
   .vs-actions button:disabled, .vs-nav button:disabled { opacity: 0.4; }
   @media (max-width: 520px) { .vs-actions { grid-template-columns: 1fr 1fr; } .vs-field { grid-template-columns: 1fr; } }
   .vs-actions button[hidden] { display: none; }
+  /* Settings (status, filters, AI): always open on a large screen; a
+     one-line « ⚙ Filtres » to open on a phone. */
+  .vt-settings > summary { display: none; }
+  .vt-settings-body { display: grid; gap: 0.5rem; }
+  @media (max-width: 640px) {
+    .vt-settings { border: 1px solid #E8DFD2; border-radius: 0.6rem; background: #fff; }
+    .vt-settings > summary { display: flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; padding: 0 0.7rem; cursor: pointer;
+                             font-size: 0.85rem; font-weight: 700; color: #544D45; list-style: none; }
+    .vt-settings > summary::-webkit-details-marker { display: none; }
+    .vt-settings > summary span { font-weight: 500; color: #8C8478; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vt-settings-body { padding: 0 0.5rem 0.5rem; gap: 0.35rem; }
+    #saisie-filters { gap: 0.25rem; }
+    #saisie-filters .saisie-chip { min-height: 2rem; padding: 0 0.6rem; font-size: 0.78rem; }
+    #saisie-filters .vs-open { min-height: 2rem; }
+    .vt-facets { gap: 0.25rem; font-size: 0.75rem; }
+    .vt-facets label { min-height: 1.8rem; padding-left: 0.45rem; }
+    .vt-facets select { max-width: 7.5rem; }
+    .vt-ai-tools { gap: 0.3rem; font-size: 0.78rem; }
+    .vt-bar { padding: 0.25rem 0.35rem; gap: 0.25rem; }
+    .vt-bar .vt-count { min-width: 0; font-size: 0.78rem; }
+    .vt-bar .saisie-btn { min-height: 1.9rem; padding: 0.1rem 0.45rem; font-size: 0.75rem; }
+  }
   /* Hakka columns: larger and centred. */
   .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
   .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.05; }
