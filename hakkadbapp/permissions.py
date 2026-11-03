@@ -40,6 +40,30 @@ def status_change_refused(user, old, new):
     return None
 
 
+def is_owner(user):
+    """The site's owner (the superuser, tahit): the only one to see the
+    Expressions page and change its mesh / export settings."""
+    return bool(user and user.is_authenticated and user.is_active and user.is_superuser)
+
+
+def owner_required(view):
+    """Pages and endpoints for the owner only: a login redirect for a
+    page, a JSON 403 for an endpoint."""
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not is_owner(request.user):
+            if request.method == "GET" and "application/json" not in request.headers.get("Accept", ""):
+                from django.contrib.auth.views import redirect_to_login
+                from django.http import HttpResponseForbidden
+
+                if not request.user.is_authenticated:
+                    return redirect_to_login(request.get_full_path())
+                return HttpResponseForbidden("Page réservée.")
+            return JsonResponse({"error": "Réservé au propriétaire du site."}, status=403)
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
 def is_assistant(user):
     return user.is_authenticated and user.groups.filter(name=ASSISTANTS_GROUP).exists()
 
@@ -69,4 +93,5 @@ def editor_required(view):
 def context_processor(request):
     """`can_edit` and `can_validate` in every template (e.g. to show the
     "Saisie" menu entry, the « Valider » buttons)."""
-    return {"can_edit": is_editor(request.user), "can_validate": is_validator(request.user)}
+    return {"can_edit": is_editor(request.user), "can_validate": is_validator(request.user),
+            "is_owner": is_owner(request.user)}

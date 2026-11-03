@@ -870,9 +870,7 @@ class ValidationShow {
             <div class="hanzi vs-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${this.editing ? `<div class="vs-edit">
-                ${field('hanzi', 'Caractères', a.hanzi)}${field('pinyin', 'Pinyin (Wenfa)', a.pinyin)}
-                <p class="vs-hint">Un espace entre les mots d'une expression ; tons en chiffres (<code>mong4teu2</code>).
-                  Avec les suggestions : <a href="${esc(this.table.saisieUrl || '/saisie/')}?modifier=${a.id}" class="underline">ouvrir dans la Saisie</a>.</p>
+                <a class="saisie-btn saisie-btn-neutral vs-saisie-link" href="${esc(this.table.saisieUrl || '/saisie/')}?modifier=${a.id}">✎ Corriger les caractères ou le pinyin dans la Saisie</a>
                 ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
                 ${field('themes', 'Thème', a.themes)}${field('observations', 'Observations', a.observations)}
                 <div class="vs-edit-actions"><button type="button" class="saisie-btn saisie-btn-validate" data-vs="save">Enregistrer la correction</button>
@@ -946,9 +944,6 @@ class ValidationShow {
     async save(a, button) {
         const values = {};
         this.card.querySelectorAll('[data-vs-field]').forEach((input) => { values[input.dataset.vsField] = input.value; });
-        // New characters or reading: the text typed in the Saisie no longer
-        // matches; it will be rebuilt from them when reopened.
-        if (values.hanzi !== a.hanzi || values.pinyin !== a.pinyin) values.input_text = '';
         await this.run(button, 'Enregistrement…', async () => {
             const data = await AdditionList.request(`${AdditionList.API}${a.id}`, values);
             this.editing = false;

@@ -35,7 +35,7 @@ from .illustrations import illustration_for
 from . import expression_mesh
 from . import word_notes
 from . import pronunciation_sources
-from .permissions import editor_required
+from .permissions import editor_required, owner_required
 
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
@@ -1271,6 +1271,7 @@ def build_expression_platform_components():
     return by_platform_id, snapshot.timestamp
 
 
+@owner_required
 def expressions(request):
     context = get_all_data()
     context["title"] = "Expressions"
@@ -1383,6 +1384,7 @@ def _expression_mesh_preview(excel_format):
     return preview
 
 
+@owner_required
 def expression_mesh_download(request):
     buf = StringIO()
     writer = csv.DictWriter(buf, fieldnames=expression_mesh.FIELDNAMES)
@@ -1405,6 +1407,7 @@ def expression_mesh_download(request):
 
 @require_POST
 @editor_required
+@owner_required
 def expression_mesh_upload(request):
     uploaded = request.FILES.get("file")
     if not uploaded:
@@ -1453,6 +1456,7 @@ def _expression_note_json(expr, note):
 
 
 @editor_required
+@owner_required
 def expression_mesh_entry(request, expr_id):
     """GET: return (creating -- seeded from the platform's own published
     text where matched, see expression_mesh.get_or_create_entry -- if
@@ -1521,6 +1525,7 @@ def expression_mesh_entry(request, expr_id):
 
 @require_POST
 @editor_required
+@owner_required
 def expression_mesh_reset(request, expr_id):
     """Reset one expression's maillage (excel_format) back to the platform
     state (see expression_mesh.reset_entry) -- leaves commentaire and
@@ -1534,6 +1539,7 @@ def expression_mesh_reset(request, expr_id):
     return JsonResponse({"ok": True, **_expression_note_json(expr, note)})
 
 
+@owner_required
 def export_corpus_generate(request):
     """Runs the DB -> corpus export (expression_mesh.export_corpus: only
     the words/expressions explicitly marked "use in export", recomputing
@@ -1591,6 +1597,7 @@ def export_corpus_generate(request):
     return response
 
 
+@owner_required
 def export_expressions_spreadsheet(request):
     """Companion export: a .zip containing a single .xlsx reviewing just
     the exported expressions (français, anglais, hanzi, pinyin+hanzi,
@@ -1638,6 +1645,7 @@ def export_expressions_spreadsheet(request):
 
 @require_POST
 @editor_required
+@owner_required
 def expression_mesh_sync(request):
     """Ensure every current DB expression (with a platform_id) has an
     ExpressionNote (creating any missing ones verbatim from expr.text)
