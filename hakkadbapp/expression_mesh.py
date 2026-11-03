@@ -149,7 +149,25 @@ def reference_corpora():
     return data.get("words", {}) or {}, data.get("expressions", {}) or {}
 
 
-def excel_format_from_platform_target(target):
+def platform_split_context(targets):
+    """(words, known characters) for excel_format_from_platform_target over
+    many targets at once: one batch of queries for a whole page instead of
+    three per expression (the Expressions page: ~870 queries, 21 s)."""
+    from .models import Pronunciation
+    from .text_to_words import _CJK_RE, build_all_words_for_tokens
+    from .views import split_target
+
+    chars = set()
+    for target in targets:
+        chars.update(_CJK_RE.findall(split_target(target or "")[1]))
+    if not chars:
+        return [], set()
+    words = list(build_all_words_for_tokens(["".join(sorted(chars))]))
+    known = set(Pronunciation.objects.filter(hanzi__in=chars).values_list("hanzi", flat=True))
+    return words, known
+
+
+def excel_format_from_platform_target(target, context=None):
     """Reconstruct a space-per-word excel_format phrase from the
     platform's own raw "pinyin hanzi" target string.
 
@@ -214,10 +232,14 @@ def excel_format_from_platform_target(target):
         return None
 
     hanzi_groups = [g for _, g in groups if g]
-    all_words = list(build_all_words_for_tokens(hanzi_groups))
-    known_hanzi = set(Pronunciation.objects.filter(
-        hanzi__in={ch for g in hanzi_groups for ch in _CJK_RE.findall(g)}
-    ).values_list("hanzi", flat=True))
+    if context is not None:
+        # Shared by a whole page (platform_split_context): no query here.
+        all_words, known_hanzi = context
+    else:
+        all_words = list(build_all_words_for_tokens(hanzi_groups))
+        known_hanzi = set(Pronunciation.objects.filter(
+            hanzi__in={ch for g in hanzi_groups for ch in _CJK_RE.findall(g)}
+        ).values_list("hanzi", flat=True))
 
     words = []
     for digits, hanzi_group in groups:

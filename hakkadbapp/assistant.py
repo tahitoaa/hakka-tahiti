@@ -169,7 +169,9 @@ def suggest_new_word(hanzi, pinyin, french, english="", themes="", observations=
 # ---- what the lexicon knows ------------------------------------------------------------
 
 def _norm(hanzi):
-    return t2s.convert(hanzi)
+    from .models import to_simp  # cached: called for every word, many times
+
+    return to_simp(hanzi)
 
 
 def known_words(include_additions=True):

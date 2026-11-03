@@ -1,4 +1,5 @@
 import uuid
+from functools import lru_cache
 
 from django.conf import settings
 from django.db import models
@@ -9,6 +10,19 @@ from opencc import OpenCC
 # Create converter: 's2t' = Simplified to Traditional, 't2s' = Traditional to Simplified
 s2t = OpenCC('s2t')
 t2s = OpenCC('t2s')
+
+
+# The same few thousand characters are converted millions of times by the
+# word lookups (text_to_words.find_words_by_hanzi_with_disambiguation): one
+# OpenCC conversion each, kept.
+@lru_cache(maxsize=None)
+def to_trad(text):
+    return s2t.convert(text)
+
+
+@lru_cache(maxsize=None)
+def to_simp(text):
+    return t2s.convert(text)
 
 class Initial(models.Model):
     initial = models.CharField(max_length=10, null=True)  # Adjust this as per your requirements
@@ -48,10 +62,10 @@ class Pronunciation(models.Model):
             return f'{simp}           {self.pinyin()}'
         
     def simp(self):
-        return t2s.convert(self.hanzi) 
-    
+        return to_simp(self.hanzi)
+
     def trad(self):
-        return s2t.convert(self.hanzi)
+        return to_trad(self.hanzi)
     
     def pinyin(self):
         superscript_map = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "":""}

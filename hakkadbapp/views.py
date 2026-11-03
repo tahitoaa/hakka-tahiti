@@ -520,7 +520,8 @@ def reports(request):
     context['page'] = "reports"
     # cmd = import_lexique.Command()
     # cmd.parse_sheets("1-MMXRTQ8_0r7jfqmFf6WIS4FMVNHIqMCFbV6JdMT-SQ")
-    traces = Traces.objects.order_by('-timestamp')[:2]
+    # Without platform_data: a full copy of the platform per import, not used here.
+    traces = Traces.objects.defer('platform_data').order_by('-timestamp')[:2]
     context['traces'] = {
         'last': traces[0] if traces else None,
         'errors': traces[0].details.count('❌') if traces else 0,
@@ -1293,6 +1294,10 @@ def expressions(request):
         )
     }
     effective_excel_format_by_id = {}
+    # The words and characters every platform target needs, fetched once.
+    split_context = expression_mesh.platform_split_context(
+        [components_by_hanzi[e.platform_id]["target"] for e in expressions
+         if e.platform_id and e.platform_id in components_by_hanzi])
     for expr in expressions:
         expr.note = notes_by_id.get(expr.platform_id)
         # Reconstructed here (Python) rather than in expressions.js: turning
@@ -1307,7 +1312,7 @@ def expressions(request):
         # reconstruction couldn't fully account for the hanzi.
         platform_entry = components_by_hanzi.get(expr.platform_id) if expr.platform_id else None
         expr.platform_split = (
-            expression_mesh.excel_format_from_platform_target(platform_entry["target"])
+            expression_mesh.excel_format_from_platform_target(platform_entry["target"], split_context)
             if platform_entry else None
         ) or ""
         if expr.platform_id:

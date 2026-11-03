@@ -143,6 +143,26 @@ def build_all_words_for_tokens(tokens):
     )
 
 
+# The last word list seen, indexed by characters (simplified and traditional):
+# callers look up hundreds of tokens in the same list, and scanning every
+# word each time (with its characters rebuilt) made a page take 20 s.
+_word_index = (None, {})
+
+
+def _words_by_hanzi(all_words):
+    global _word_index
+    if _word_index[0] is not all_words:
+        index = {}
+        for word in all_words:
+            simp = word.char()
+            trad = getattr(word, "trad", lambda: None)()
+            index.setdefault(simp, []).append(word)
+            if trad and trad != simp:
+                index.setdefault(trad, []).append(word)
+        _word_index = (all_words, index)
+    return _word_index[1]
+
+
 def find_words_by_hanzi_with_disambiguation(token, all_words):
     """
     token format:
@@ -158,13 +178,7 @@ def find_words_by_hanzi_with_disambiguation(token, all_words):
 
     matches = []
 
-    for word in all_words:
-        simp = word.char()
-        trad = getattr(word, "trad", lambda: None)()
-
-        if simp != hanzi and trad != hanzi:
-            continue
-
+    for word in _words_by_hanzi(all_words).get(hanzi, ()):
         french = (word.french or "").lower()
         pinyin = (word.pinyin() or "").lower()
 
