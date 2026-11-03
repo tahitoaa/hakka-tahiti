@@ -48,6 +48,26 @@ class AdditionList {
             .join('');
     }
 
+    /** The four cells every table of entries shares (Validation, Suggestions
+     *  IA, Import): Caractères | Pinyin | Français (+ anglais, observations) |
+     *  Type · thème -- in the platform's format (Wenfa, superscript tones,
+     *  characters run together), as the lexicon's own entries.
+     *  `opts`: docHanzi (the document's form), rawPinyin (shown when there is
+     *  no reading yet), warn, aiFrench / aiEnglish (badges). */
+    static entryCells(e, opts = {}) {
+        const esc = AdditionList.escapeHtml;
+        const ai = ' <span class="vt-ai-badge">IA</span>';
+        const hanzi = AdditionList.platformHanzi(e.hanzi);
+        const pinyin = e.pinyin ? esc(AdditionList.platformPinyin(e.pinyin)) : `<i>${esc(opts.rawPinyin || '') || '—'}</i>`;
+        return `<td class="hanzi vt-hanzi">${esc(hanzi)}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
+                ? `<small class="vt-sub" title="Forme du document">${esc(opts.docHanzi)}</small>` : ''}</td>
+            <td class="vt-pinyin">${pinyin}${opts.warn ? `<div class="vt-warn">⚠ ${esc(opts.warn)}</div>` : ''}</td>
+            <td class="vt-french">${esc(e.french) || '<i>—</i>'}${opts.aiFrench ? ai : ''}${e.english
+                ? `<span class="vt-sub italic" lang="en"> · ${esc(e.english)}${opts.aiEnglish ? ai : ''}</span>` : ''}
+                ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
+            <td class="vt-meta vt-type">${e.kind === 'expression' ? 'Expr.' : 'Mot'}${e.themes ? `<span class="vt-sub"> · ${esc(e.themes)}</span>` : ''}</td>`;
+    }
+
     static PUNCT_TOKEN = /^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()[\]{}'"]+$/;
     static PUNCT_TO_LATIN = { '，': ',', '、': ',', '。': '.', '；': ';', '：': ':', '？': '?', '！': '!', '（': '(', '）': ')',
         '【': '[', '】': ']', '｛': '{', '｝': '}', '‘': "'", '’': "'", '“': '"', '”': '"', '—': '-', '…': '...' };
@@ -256,14 +276,14 @@ class AdditionList {
         const who = a.updated_by && a.updated_by !== a.created_by ? `${a.created_by}, modifié par ${a.updated_by}` : a.created_by;
         return `<li data-id="${a.id}" class="py-3 flex flex-col gap-2">
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="hanzi text-lg text-gray-900">${esc(a.hanzi)}</span>
-                <span class="text-sm text-gray-700">${esc(AdditionList.displayPinyin(a.pinyin))}</span>
+                <span class="hanzi text-lg text-gray-900">${esc(AdditionList.platformHanzi(a.hanzi))}</span>
+                <span class="text-sm font-semibold text-gray-700">${esc(AdditionList.platformPinyin(a.pinyin))}</span>
                 <span class="text-sm text-gray-900">${esc(a.french)}</span>
-                ${a.english ? `<span class="text-sm text-gray-500 italic">${esc(a.english)}</span>` : ''}
+                ${a.english ? `<span class="text-sm text-gray-500 italic" lang="en">${esc(a.english)}</span>` : ''}
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                 <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">${a.kind === 'word' ? 'Mot' : 'Expression'}</span>
-                <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">${esc(this.statusLabels[a.status] || a.status)}</span>
+                <span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>
                 ${a.themes ? `<span>${esc(a.themes)}</span>` : ''}
                 <span>${esc(who)} · ${date}</span>
                 ${a.observations ? `<span class="w-full text-gray-600">${esc(a.observations)}</span>` : ''}
@@ -567,11 +587,7 @@ class ValidationTable extends AdditionList {
         const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
-            <td class="hanzi vt-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</td>
-            <td class="vt-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</td>
-            <td class="vt-french">${esc(a.french)}${a.english ? `<span class="vt-sub italic"> · ${esc(a.english)}</span>` : ''}
-                ${a.observations ? `<div class="vt-sub vt-obs" title="${esc(a.observations)}">${esc(a.observations)}</div>` : ''}</td>
-            <td class="vt-meta vt-type">${a.kind === 'word' ? 'Mot' : 'Expr.'}${a.themes ? `<span class="vt-sub"> · ${esc(a.themes)}</span>` : ''}</td>
+            ${AdditionList.entryCells(a)}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
@@ -1206,19 +1222,16 @@ class DocumentImport {
               <button type="button" class="saisie-btn saisie-btn-lg" data-languages hidden>✨ Vérifier FR / EN</button>
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-wrap"><table class="vt-table vt-import-table no-auto-csv">
-              <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Lecture</th>
-                <th>Français</th><th class="vt-who">Origine</th><th>État</th></tr></thead>
+              <thead><tr><th class="vt-check"><span class="sr-only">Proposer</span></th><th class="vt-hk">Caractères</th><th class="vt-hk">Pinyin</th>
+                <th>Français</th><th class="vt-type">Type · thème</th><th class="vt-who">Origine</th><th class="vt-st">État</th></tr></thead>
               <tbody>${this.entries.map((e, i) => `<tr class="${e.state === 'new' ? '' : 'is-off'}">
                 <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}
                     aria-label="Proposer ${esc(e.hanzi)}"></td>
-                <td class="hanzi vt-hanzi">${esc(e.hanzi)}${e.document_hanzi && e.document_hanzi !== e.hanzi
-                    ? `<small class="vt-sub" title="Forme du document">${esc(e.document_hanzi)}</small>` : ''}</td>
-                <td class="vt-pinyin">${e.reading ? esc(AdditionList.displayPinyin(e.reading)) : `<i>${esc(e.pinyin) || '—'}</i>`}
-                    ${e.reading_note ? `<div class="vt-warn">⚠ ${esc(e.reading_note)}</div>` : ''}</td>
-                <td class="vt-french">${esc(e.french) || '<i>—</i>'}${e.translated || e.ai_fields?.includes('french') ? ' <span class="vt-ai-badge">IA</span>' : ''}
-                    ${e.english ? `<div class="vt-sub italic" lang="en">${esc(e.english)}${e.ai_fields?.includes('english') ? ' <span class="vt-ai-badge">IA</span>' : ''}</div>` : ''}</td>
+                ${AdditionList.entryCells({ hanzi: e.hanzi, pinyin: e.reading, french: e.french, english: e.english,
+                    kind: e.kind, themes: e.themes }, { docHanzi: e.document_hanzi, rawPinyin: e.pinyin, warn: e.reading_note,
+                    aiFrench: e.translated || e.ai_fields?.includes('french'), aiEnglish: e.ai_fields?.includes('english') })}
                 <td class="vt-meta vt-who"${e.remark || e.source_sense ? ` title="${esc([e.source_sense, e.remark].filter(Boolean).join(' — '))}"` : ''}>${esc(e.location)}</td>
-                <td><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
+                <td class="vt-st"><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>
               </tr>`).join('')}</tbody></table></div>`;
         this.renderSummary();
     }

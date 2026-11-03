@@ -1,5 +1,11 @@
 {# Styles of the addition list (AdditionList.js), shared by the Saisie and Validation pages. #}
 <style>
+  /* Status badges, the same colours on every page (Saisie, Validation, IA, Import). */
+  .vt-status { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+  .vt-status-draft { background: #F0EBE3; color: #544D45; }
+  .vt-status-review { background: #fef3c7; color: #92400e; }
+  .vt-status-validated { background: #d1fae5; color: #065f46; }
+  .vt-status-rejected { background: #fee2e2; color: #991b1b; }
   .saisie-chip[aria-pressed="true"] { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
   /* Action buttons: one colour per action, a spinner while the server answers. */
   .saisie-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 2.25rem;
