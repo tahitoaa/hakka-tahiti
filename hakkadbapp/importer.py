@@ -453,6 +453,20 @@ def resolve_reading(hanzi, raw, readings, deduced=None, rules=None):
     return " ".join(groups), " ; ".join(notes)
 
 
+def segment(hanzi, words, longest=6):
+    """An expression written in one block (做生理人), split into the
+    lexicon's words, longest match first: "做 生理 人". A character in no
+    word stands alone. `words`: the lexicon's words, simplified."""
+    out, i = [], 0
+    while i < len(hanzi):
+        for n in range(min(longest, len(hanzi) - i), 0, -1):
+            if n == 1 or hanzi[i:i + n] in words:
+                out.append(hanzi[i:i + n])
+                i += n
+                break
+    return " ".join(out)
+
+
 def check_candidates(candidates):
     """Adds to each candidate: kind, Wenfa reading, notes, and state:
     new | known (in the lexicon) | proposed (already an addition) |
@@ -486,6 +500,11 @@ def check_candidates(candidates):
         c["kind"] = (LexiconAddition.KIND_EXPRESSION if kind.startswith(("expr", "locution", "phrase"))
                      else LexiconAddition.KIND_WORD if kind.startswith("mot")
                      else LexiconAddition.KIND_EXPRESSION if " " in c["hanzi"] or len(key) > 6 else LexiconAddition.KIND_WORD)
+        if c["kind"] == LexiconAddition.KIND_EXPRESSION and " " not in c["hanzi"]:
+            # One space per word, as an expression typed in the Saisie.
+            c["hanzi"] = segment(c["hanzi"], known_lexicon)
+        elif c["kind"] == LexiconAddition.KIND_WORD:
+            c["hanzi"] = "".join(c["hanzi"].split())
         c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings, deduced, rules)
         c["romanization"] = f"{rules.label} ({rules.rate} %)" if rules and rules.source else ""
         c["state"] = ("duplicate" if key in seen else "known" if key in known_lexicon
