@@ -117,22 +117,25 @@
   #saisie-filters .saisie-chip { min-height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; }
   #validation-status { min-height: 0; }
   .vs-open { min-height: 2rem; padding: 0 0.8rem; border-radius: 9999px; background: var(--color-brand, #9B1C1C); color: #fff; font-weight: 700; font-size: 0.8rem; }
-  .vs-dialog { width: min(42rem, calc(100vw - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 0; border: 0; border-radius: 1rem;
-               background: #fff; color: #261F1C; box-shadow: 0 16px 48px rgb(0 0 0 / .35); }
+  /* Full screen: header, the item centred in the space left, then the
+     buttons in a fixed bar -- they never move from one item to the next. */
+  .vs-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; inset: 0; padding: 0; border: 0;
+               border-radius: 0; background: #fff; color: #261F1C; }
+  .vs-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; }
   .vs-dialog::backdrop { background: rgb(38 31 28 / .6); }
   .vs-head { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; background: var(--color-brand, #9B1C1C); color: #fff; }
   .vs-head b { font-variant-numeric: tabular-nums; }
   .vs-close { min-width: 2.5rem; min-height: 2.5rem; border-radius: 9999px; color: #fff; font-size: 1.1rem; }
-  .vs-card { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; min-height: 19rem;
-             padding: 1rem; transition: opacity .12s ease; }
+  .vs-card { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 0.6rem; text-align: center;
+             min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem 1rem 1.25rem; transition: opacity .12s ease; }
   .vs-card.is-changing { opacity: 0.25; }
   .vs-meta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.35rem 0.75rem; font-size: 0.82rem; color: #6E655C; }
   .vs-author b { color: #3A3430; }
-  .vs-hanzi { font-size: clamp(3rem, 12vw, 5rem) !important; line-height: 1.1; color: #9B1C1C; }
-  .vs-pinyin { font-size: 1.6rem; font-weight: 700; color: #3A3430; }
-  .vs-french { font-size: 1.3rem; }
-  .vs-english { font-size: 1rem; font-style: italic; color: #544D45; }
-  .vs-obs { font-size: 0.85rem; color: #6E655C; max-width: 34rem; }
+  .vs-hanzi { font-size: clamp(3.5rem, 16vmin, 9rem) !important; line-height: 1.1; color: #9B1C1C; }
+  .vs-pinyin { font-size: clamp(1.6rem, 5vmin, 2.6rem); font-weight: 700; color: #3A3430; }
+  .vs-french { font-size: clamp(1.3rem, 3.6vmin, 2rem); max-width: 48rem; }
+  .vs-english { font-size: clamp(1rem, 2.6vmin, 1.4rem); font-style: italic; color: #544D45; max-width: 48rem; }
+  .vs-obs { font-size: 0.9rem; color: #6E655C; max-width: 40rem; }
   .vs-edit { display: grid; gap: 0.4rem; width: 100%; max-width: 30rem; text-align: left; }
   .vs-field { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #544D45; }
   .vs-field input { min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-size: 1rem; }
@@ -142,13 +145,16 @@
   .vs-remarks del { color: #991b1b; background: #fee2e2; } .vs-remarks ins { color: #065f46; background: #d1fae5; text-decoration: none; }
   .vs-remark-actions { display: flex; gap: 0.35rem; margin-top: 0.3rem; }
   .vs-message { min-height: 1.2rem; font-weight: 700; color: #065f46; }
-  .vs-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; padding: 0.6rem 0.75rem 0; }
+  .vs-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0.4rem; width: 100%; max-width: 48rem;
+                margin: 0 auto; padding: 0.6rem 0.75rem 0; border-top: 1px solid #F0E8DC; }
   .vs-actions button { min-height: 3rem; border-radius: 0.6rem; font-weight: 700; font-size: 0.95rem; touch-action: manipulation; user-select: none; }
-  .vs-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; padding: 0.6rem 0.75rem 0.75rem; }
+  .vs-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; max-width: 48rem; margin: 0 auto;
+            padding: 0.6rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom)); }
   .vs-nav button { min-height: 2.75rem; border-radius: 0.6rem; border: 1px solid #DDD0BD; background: #fff; color: #544D45; font-weight: 700;
                    touch-action: manipulation; user-select: none; }
   .vs-actions button:disabled, .vs-nav button:disabled { opacity: 0.4; }
   @media (max-width: 520px) { .vs-actions { grid-template-columns: 1fr 1fr; } .vs-field { grid-template-columns: 1fr; } }
+  .vs-actions button[hidden] { display: none; }
   /* Hakka columns: larger and centred. */
   .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
   .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.05; }

@@ -821,7 +821,7 @@ class ValidationShow {
 
     async onClick(e) {
         const b = e.target.closest('button');
-        if (e.target === this.dialog || b?.dataset.vs === 'close') { this.dialog.close(); return; }
+        if (b?.dataset.vs === 'close') { this.dialog.close(); return; }
         if (!b || e.detail > 1) return;                       // the 2nd click of a double click
         if (b.dataset.vsNav) { this.move(Number(b.dataset.vsNav)); return; }
         if (b.dataset.vs === 'edit') { this.editing = true; this.render(); return; }
