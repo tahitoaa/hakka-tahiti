@@ -42,7 +42,8 @@
   .rec-table td.rec-hk { font-size: 1.05rem; font-weight: 600; color: #3A3430; }
   .rec-file { font-family: ui-monospace, monospace; font-size: 0.8rem; color: #544D45; }
   .rec-origin { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600; }
-  .rec-origin-lexique { background: #F0EBE3; color: #544D45; }
+  /* ① lexicon entries without audio come first (absolute priority), ② then validated additions. */
+  .rec-origin-lexique { background: #fee2e2; color: #991b1b; }
   .rec-origin-ajout { background: #d1fae5; color: #065f46; }
   .rec-wrap { overflow-x: auto; border: 1px solid #E8DFD2; border-radius: 0.75rem; }
   .rec-example { font-size: 0.8rem; color: #544D45; }
@@ -93,7 +94,7 @@
           <td class="rec-example">{% if r.example %}{{ r.example.target }}<small>{{ r.example.french }}</small>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
           <td class="text-gray-600">{{ r.theme }}</td>
           <td class="rec-file">{{ r.filename }}</td>
-          <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{{ r.origin }}</span></td>
+          <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{% if r.origin == 'Lexique' %}① {% else %}② {% endif %}{{ r.origin }}</span></td>
         </tr>
         {% empty %}
         <tr><td colspan="7" class="text-center text-gray-500 py-6">Tous les mots ont leur audio.</td></tr>
@@ -112,7 +113,7 @@
           <td>{{ r.french }}</td>
           <td class="text-gray-600">{{ r.theme }}</td>
           <td class="rec-file">{{ r.filename }}</td>
-          <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{{ r.origin }}</span></td>
+          <td><span class="rec-origin {% if r.origin == 'Lexique' %}rec-origin-lexique{% else %}rec-origin-ajout{% endif %}">{% if r.origin == 'Lexique' %}① {% else %}② {% endif %}{{ r.origin }}</span></td>
         </tr>
         {% empty %}
         <tr><td colspan="5" class="text-center text-gray-500 py-6">Toutes les expressions ont leur audio.</td></tr>

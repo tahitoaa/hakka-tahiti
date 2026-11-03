@@ -96,8 +96,10 @@ def to_record():
             expressions.append({"hanzi": a.hanzi, "pinyin": a.pinyin, "french": a.french, "theme": a.themes,
                                 "furigana": furigana(a.hanzi, a.pinyin),
                                 "filename": f"{hanzi}.wav", "origin": "Ajout validé"})
-    words.sort(key=lambda r: (r["theme"].lower(), r["pinyin"]))
-    expressions.sort(key=lambda r: (r["theme"].lower(), r["hanzi"]))
+    # Priority 1: the lexicon's own entries with no audio; then the
+    # validated additions. Within each, by theme.
+    words.sort(key=lambda r: (r["origin"] != "Lexique", r["theme"].lower(), r["pinyin"]))
+    expressions.sort(key=lambda r: (r["origin"] != "Lexique", r["theme"].lower(), r["hanzi"]))
     return words, expressions, (snapshot.timestamp if snapshot else None)
 
 
