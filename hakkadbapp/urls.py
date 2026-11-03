@@ -77,6 +77,7 @@ urlpatterns = [
     path("validation/", additions.validation, name="validation"),
     path("importer/", additions.document_import, name="document_import"),
     path("guide-saisie/", additions.input_guide, name="input_guide"),
+    path("suggestions-ia/", additions.ai_suggestions, name="ai_suggestions"),
     path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),

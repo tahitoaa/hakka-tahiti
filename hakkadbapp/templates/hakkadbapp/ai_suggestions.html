@@ -1,0 +1,90 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+{% include "hakkadbapp/components/validation_styles.html" %}
+<style>
+  .ai-gen { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.7rem 0.8rem; background: #fff;
+            border: 1px solid #E8DFD2; border-radius: 0.75rem; }
+  .ai-gen label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: #544D45; font-weight: 600; }
+  .ai-gen select, .ai-gen input { min-height: 2.4rem; padding: 0 0.5rem; border: 1px solid #DDD0BD; border-radius: 0.45rem; background: #fff; font-weight: 400; }
+  .ai-gen input[type=number] { width: 4rem; text-align: center; }
+  .ai-gen select { max-width: 12rem; }
+</style>
+
+<div id="ai-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
+  {% include "hakkadbapp/components/members_tabs.html" %}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="font-display text-xl font-bold text-gray-800">Suggestions de l'IA
+      <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>L'IA propose des mots absents du lexique
+        (repérés dans les expressions et les transcriptions) ou des expressions faites de mots du lexique. Ses suggestions restent ici
+        en brouillon : cochez celles qui conviennent, corrigez-les (✎ ou ▶ diaporama), puis « Proposer à la validation ». « Écarter »
+        supprime les autres. L'IA ne propose jamais rien elle-même.</div></details></h2>
+    <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les suggestions"
+           class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
+  </div>
+
+  {% if ai_enabled %}
+  <div class="ai-gen">
+    <label>Générer <select id="ai-mode">
+      <option value="missing">des mots manquants</option>
+      <option value="expressions">des expressions</option>
+    </select></label>
+    <label id="ai-theme-wrap" hidden>Thème <select id="ai-theme"><option value="">au hasard</option>
+      {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select></label>
+    <label>Nombre <input type="number" id="ai-count" min="1" max="50" value="5" inputmode="numeric"></label>
+    <button type="button" id="ai-generate" class="saisie-btn saisie-btn-ai">🤖 Générer</button>
+  </div>
+  {% else %}
+  <p class="text-sm text-red-700">L'IA n'est pas configurée sur ce serveur.</p>
+  {% endif %}
+
+  <div id="vt-facets" class="vt-facets" role="group" aria-label="Filtrer et grouper"></div>
+
+  <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
+    <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
+    <button type="button" data-bulk="review" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
+    <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-delete" disabled>🗑 Écarter</button>
+    <button type="button" id="vs-open" class="vs-open">▶ Diaporama</button>
+  </div>
+  <div id="validation-status" class="text-sm min-h-5" role="status"></div>
+
+  <div class="vt-wrap">
+    <table class="vt-table no-auto-csv">
+      <thead>
+        <tr>
+          <th class="vt-check"><input type="checkbox" id="validation-all" aria-label="Tout sélectionner"></th>
+          <th class="vt-hk">Caractères</th>
+          <th class="vt-hk">Pinyin</th>
+          <th>Français</th>
+          <th class="vt-type">Type · thème</th>
+          <th class="vt-who">Par</th>
+          <th>Statut</th>
+          <th class="vt-ia">Remarques</th>
+          <th><span class="sr-only">Modifier</span></th>
+        </tr>
+      </thead>
+      <tbody id="validation-rows">
+        <tr><td colspan="9" class="vt-empty">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <button type="button" id="vt-more" class="saisie-btn saisie-btn-neutral vt-more" hidden>Afficher plus</button>
+</div>
+
+<dialog class="vs-dialog" id="vs-dialog" aria-labelledby="vs-count">
+  <div class="vs-head"><span id="vs-count" aria-live="polite"></span>
+    <button type="button" class="vs-close" data-vs="close" aria-label="Fermer le diaporama">✕</button></div>
+  <div class="vs-card" id="vs-card"></div>
+  <div class="vs-actions">
+    <button type="button" class="saisie-btn-review" data-vs-status="review">↑ Proposer</button>
+    <button type="button" class="saisie-btn-neutral" data-vs="edit">✎ Corriger</button>
+  </div>
+  <div class="vs-nav">
+    <button type="button" data-vs-nav="-1">← Précédent</button>
+    <button type="button" data-vs-nav="1">Suivant →</button>
+  </div>
+</dialog>
+{{ status_labels|json_script:"saisie-status-labels" }}
+<script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+{% endblock %}

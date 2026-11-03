@@ -334,6 +334,8 @@ class SaisieEntry {
             // Every addition is loaded (for "déjà proposé"); only the drafts are listed.
             this.list = new AdditionList({
                 list: $('saisie-list'), search: $('saisie-search'), filter: 'draft',
+                // The AI's drafts are sorted on the « Suggestions IA » page.
+                scope: (a) => !a.by_ai,
                 empty: 'Aucun brouillon.',
                 onEdit: (a) => this.edit(a),
                 onLoad: () => this.afterLoad(),

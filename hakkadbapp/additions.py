@@ -170,6 +170,19 @@ def validation(request):
     })
 
 
+def ai_suggestions(request):
+    """The AI's suggestions: generated as its drafts, filtered and corrected
+    here, then proposed to Validation (or set aside) by a person."""
+    if not is_editor(request.user):
+        return _deny(request)
+    from .assistant import _themes
+
+    return render(request, "hakkadbapp/ai_suggestions.html", {
+        "title": "Suggestions IA", "page": "ai_suggestions", "ai_enabled": ai_enabled(), "themes": _themes(),
+        "status_labels": dict(LexiconAddition.STATUS_CHOICES),
+    })
+
+
 def input_guide(request):
     """The input syntax, for members with little computer experience."""
     return render(request, "hakkadbapp/guide_saisie.html", {"title": "Guide de saisie", "page": "guide_saisie"})

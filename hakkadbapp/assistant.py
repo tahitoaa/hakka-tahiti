@@ -153,14 +153,15 @@ def add_comment(item, kind, text, field="", proposed=""):
         field=field, current_value=current, proposed_value=proposed, author=ai_user())
 
 
-def suggest_new_word(hanzi, pinyin, french, english="", themes="", observations=""):
-    """A new word, "À valider", by the assistant -- unless the lexicon or
-    the additions already have it, or an editor already rejected it."""
+def suggest_new_word(hanzi, pinyin, french, english="", themes="", observations="", status=None):
+    """A new word by the assistant, "À valider" (or `status`: a draft for
+    the « Suggestions IA » page, proposed by a person) -- unless the lexicon
+    or the additions already have it, or an editor already rejected it."""
     hanzi, pinyin = "".join(hanzi.split()), "".join(pinyin.split())
     if not hanzi or not french.strip() or hanzi in known_words():
         return None
     return LexiconAddition.objects.create(
-        kind=LexiconAddition.KIND_WORD, status=LexiconAddition.STATUS_REVIEW, hanzi=hanzi, pinyin=pinyin,
+        kind=LexiconAddition.KIND_WORD, status=status or LexiconAddition.STATUS_REVIEW, hanzi=hanzi, pinyin=pinyin,
         french=french.strip()[:300], english=english.strip()[:300], themes=themes[:200],
         observations=observations.strip()[:1000], created_by=ai_user(), updated_by=ai_user())
 
@@ -382,7 +383,7 @@ def _valid_reading(hanzi, reading, readings, pinned=""):
     return split(reading, list(_norm(hanzi)))
 
 
-def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS):
+def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=None):
     readings = char_readings()
     by_hanzi = {c["hanzi"]: c for c in candidates}
     created = []
@@ -398,7 +399,7 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS):
         note = f"Suggestion de l'IA ({origin}). {w.get('note', '')}".strip()
         addition = suggest_new_word(hanzi, w["reading"].replace(" ", "").lower(), w.get("french", ""),
                                     w.get("english", ""), ", ".join(t for t in w.get("themes", []) if t in themes),
-                                    note)
+                                    note, status=status)
         if addition:
             created.append(addition)
         if len(created) >= limit:
@@ -406,7 +407,7 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS):
     return created
 
 
-def suggest_missing(limit=MAX_NEW_WORDS):
+def suggest_missing(limit=MAX_NEW_WORDS, status=None):
     candidates = missing_candidates(limit * 2)
     if not candidates:
         return []
@@ -414,7 +415,7 @@ def suggest_missing(limit=MAX_NEW_WORDS):
     data = _call(NEW_WORDS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False),
                  "Candidates (words seen in the data, missing from the lexicon):\n"
                  + json.dumps(candidates, ensure_ascii=False), _new_words_schema(themes))
-    return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus", limit)
+    return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus", limit, status)
 
 
 EXPRESSIONS_SYSTEM = CONTEXT + """
@@ -453,7 +454,7 @@ def known_expressions():
     return texts
 
 
-def suggest_expressions(limit=MAX_NEW_WORDS, theme=None):
+def suggest_expressions(limit=MAX_NEW_WORDS, theme=None, status=None):
     """New expressions made of lexicon words: the AI picks the words (by
     ref) and translates; the characters and the reading come from those
     lexicon words, never from the AI."""
@@ -497,7 +498,7 @@ def suggest_expressions(limit=MAX_NEW_WORDS, theme=None):
             continue
         known.add(key)
         created.append(LexiconAddition.objects.create(
-            kind=LexiconAddition.KIND_EXPRESSION, status=LexiconAddition.STATUS_REVIEW, hanzi=hanzi,
+            kind=LexiconAddition.KIND_EXPRESSION, status=status or LexiconAddition.STATUS_REVIEW, hanzi=hanzi,
             pinyin=" ".join(p for _h, p in parts), french=e["french"].strip()[:300],
             english=str(e.get("english", "")).strip()[:300],
             themes=", ".join(t for t in e.get("themes", []) if t in themes)[:200],
@@ -595,9 +596,13 @@ def api_new_words(request):
     payload = _json(request) or {}
     count = payload.get("count", MAX_NEW_WORDS)
     count = max(1, min(MAX_NEW_WORDS_REQUEST, count if isinstance(count, int) else MAX_NEW_WORDS))
+    # {draft: true}: the AI's drafts, sorted on the « Suggestions IA » page
+    # before a person proposes them (the AI itself never proposes them).
+    status = LexiconAddition.STATUS_DRAFT if payload.get("draft") is True else None
+    theme = payload.get("theme") if isinstance(payload.get("theme"), str) and payload.get("theme") else None
     try:
-        created = (suggest_expressions(count) if payload.get("mode") in ("expressions", "compounds")
-                   else suggest_missing(count))
+        created = (suggest_expressions(count, theme, status) if payload.get("mode") in ("expressions", "compounds")
+                   else suggest_missing(count, status))
     except AssistantError as err:
         return _error(err)
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created]})

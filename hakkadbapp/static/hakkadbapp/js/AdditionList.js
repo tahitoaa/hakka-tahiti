@@ -105,8 +105,9 @@ class AdditionList {
      *   onEdit(addition): "Modifier" clicked;
      *   onLoad(), onRemove(id): after the additions loaded / one deleted.
      */
-    constructor({ list, search = null, filters = null, filter = 'open', empty = 'Aucun ajout ici.', onEdit, onLoad, onRemove }) {
+    constructor({ list, search = null, filters = null, filter = 'open', empty = 'Aucun ajout ici.', onEdit, onLoad, onRemove, scope = null }) {
         this.el = { list, search, filters };
+        this.scope = scope;          // which additions this list is about (all by default)
         this.filter = filter;
         this.empty = empty;
         this.onEdit = onEdit || (() => {});
@@ -169,6 +170,7 @@ class AdditionList {
     visible() {
         const needle = (this.el.search?.value || '').trim().toLowerCase();
         return this.additions.filter((a) => {
+            if (this.scope && !this.scope(a)) return false;
             if (!this.matchesFilter(a)) return false;
             if (!needle) return true;
             return [a.hanzi, a.pinyin, a.french, a.english, a.themes, a.source || '', a.observations || '']
@@ -310,7 +312,7 @@ class ValidationTable extends AdditionList {
     static BULK = {
         validated: { busy: 'Validation…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} validé${n > 1 ? 's' : ''}.` },
         rejected: { busy: 'Rejet…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} rejeté${n > 1 ? 's' : ''}.` },
-        review: { busy: 'Proposition…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} remis à valider.` },
+        review: { busy: 'Proposition…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} à la validation.` },
         draft: { busy: 'Retour en brouillon…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} renvoyé${n > 1 ? 's' : ''} en brouillon.` },
         delete: { busy: 'Suppression…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}.` },
     };
@@ -1252,6 +1254,55 @@ class DocumentImport {
         });
     }
 }
+
+/* « Suggestions IA »: the AI's drafts, generated here, filtered, corrected,
+   then proposed to Validation or set aside -- by a person. */
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('ai-page');
+    if (!root) return;
+    const $ = (id) => document.getElementById(id);
+    const table = new ValidationTable({
+        list: $('validation-rows'), search: $('saisie-search'), filters: null,
+        all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
+        facets: $('vt-facets'), more: $('vt-more'), filter: 'all',
+        scope: (a) => a.by_ai && a.status === 'draft',
+        empty: 'Aucune suggestion en attente : générez-en ci-dessus.',
+        onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
+    });
+    table.saisieUrl = root.dataset.saisieUrl;
+    window.validationTable = table;
+    table.load();
+    if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
+    const mode = $('ai-mode');
+    const syncTheme = () => { $('ai-theme-wrap').hidden = mode.value !== 'expressions'; };
+    mode.addEventListener('change', syncTheme);
+    syncTheme();
+    $('ai-generate').addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        const wanted = Math.max(1, Math.min(50, Number($('ai-count').value) || 5));
+        const PER_REQUEST = 10;
+        table.setStatus('');
+        await AdditionList.whileBusy(button, 'L’IA cherche…', async () => {
+            const added = [];
+            try {
+                while (added.length < wanted) {
+                    const count = Math.min(PER_REQUEST, wanted - added.length);
+                    table.setStatus(`🤖 L’IA cherche : ${added.length} sur ${wanted}…`);
+                    const data = await AdditionList.request('/api/ia/mots', { mode: mode.value, count, theme: $('ai-theme').value, draft: true });
+                    data.additions.forEach((a) => table.additions.unshift(a));
+                    added.push(...data.additions);
+                    table.render();
+                    if (!data.additions.length) break;
+                }
+                table.flash(added.map((a) => a.id));
+                table.setStatus(added.length ? `🤖 ${added.length} suggestion${added.length > 1 ? 's' : ''} : triez, corrigez, puis proposez à la validation.`
+                    : '🤖 L’IA n’a rien trouvé de nouveau à proposer.');
+            } catch (err) {
+                table.setStatus(`Échec : ${err.message}${added.length ? ` (${added.length} déjà générée${added.length > 1 ? 's' : ''})` : ''}`, true);
+            }
+        });
+    });
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const page = document.getElementById('import-page');
