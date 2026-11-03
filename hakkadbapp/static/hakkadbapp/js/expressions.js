@@ -360,18 +360,27 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="field-value"><span class="no-match">Pas de platform_id -- relancez <span class="mono">platform_to_vercel --yes</span></span></div>
         </div>`;
 
-    return `<div class="compare-card${it.hasMismatch ? " has-mismatch" : ""}" data-index="${it.index}">
-      <div class="compare-card-head">
-        <span class="idx">#${it.index}</span>
-        ${it.category ? `<span class="cat">${escapeHtml(it.category)}</span>` : ""}
-        ${statusBadge}
-        ${it.entryUrl ? `
+    // One table row (as on the Validation page) and, under it, its details,
+    // shown with ✎: the comparison with the platform, the comment, the Split.
+    const exportToggle = it.entryUrl ? `
         <label class="use-export-toggle${it.useInExport ? " is-on" : ""}${(it.useInExport && !it.exportOk) ? " needs-review" : ""}"
-          data-role="use-export-label"${it.exportBlockReason ? ` title="${escapeAttr(it.exportBlockReason)}"` : ""}>
-          <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""} ${(!it.useInExport && !it.exportOk) ? "disabled" : ""}>
-          Utiliser dans l'export${(it.useInExport && !it.exportOk) ? " &#9888;" : ""}
-        </label>` : ""}
-      </div>
+          data-role="use-export-label" title="${escapeAttr(it.exportBlockReason || "Utiliser le Split dans l'export")}">
+          <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""} ${(!it.useInExport && !it.exportOk) ? "disabled" : ""}
+            aria-label="Utiliser dans l'export">${(it.useInExport && !it.exportOk) ? " &#9888;" : ""}
+        </label>` : `<span class="no-match">—</span>`;
+    const platformHanzi = (it.hanziLine || it.text || "").replace(/\s+/g, "");
+    const row = `<tr class="ex-row${it.hasMismatch ? " has-mismatch" : ""}" data-index="${it.index}">
+      <td class="hanzi vt-hanzi">${escapeHtml(platformHanzi)}</td>
+      <td class="vt-pinyin">${escapeHtml(it.pinyinLine || "")}</td>
+      <td class="vt-french">${escapeHtml(it.french) || "<i>—</i>"}${it.english ? `<span class="vt-sub italic" lang="en"> · ${escapeHtml(it.english)}</span>` : ""}
+        ${it.commentaire ? `<div class="vt-sub vt-obs" title="${escapeAttr(it.commentaire)}">💬 ${escapeHtml(it.commentaire)}</div>` : ""}</td>
+      <td class="vt-meta vt-type">${escapeHtml(it.category)}</td>
+      <td class="ex-gap">${statusBadge}</td>
+      <td class="ex-export">${exportToggle}</td>
+      <td class="vt-actions"><button type="button" class="saisie-btn saisie-btn-neutral" data-role="expand" aria-expanded="false"
+        aria-label="Détails de ${escapeAttr(platformHanzi)}" title="Comparaison, commentaire, Split">✎</button></td>
+    </tr>`;
+    return row + `<tr class="ex-detail" data-index="${it.index}" hidden><td colspan="7"><div class="compare-card ex-detail-body">
       <div class="diff-header"><span>Champ</span><div class="cols"><span>Vercel / base</span><span>Plateforme</span></div></div>
       ${diffField("Français", it.french, it.platformPrimary, it.hasPlatformMatch)}
       ${diffField("English", it.english, it.platformSecondary, it.hasPlatformMatch)}
@@ -392,7 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
       ${editableSection}
-    </div>`;
+    </div></td></tr>`;
   }
 
   // --- Build every row once; filtering only shows/hides/reorders it -----
@@ -400,7 +409,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // analysis makes a full rebuild on every keystroke in the search box
   // noticeably slower once there are a few hundred expressions).
   output.innerHTML = items.map(cardHtml).join("");
-  const rowByIndex = Array.from(output.children);
+  const rowByIndex = Array.from(output.querySelectorAll("tr.ex-row"));
+  const detailByIndex = Array.from(output.querySelectorAll("tr.ex-detail"));
+  const expanded = new Set();
 
   // --- UI ---
   const categorySelect = document.getElementById("expr-category");
@@ -456,10 +467,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function rerender() {
     const list = applyFilters();
     const matched = new Set(list.map((it) => it.index));
-    list.forEach((it, pos) => { rowByIndex[it.index].style.order = pos; });
-    rowByIndex.forEach((row, i) => { row.style.display = matched.has(i) ? "" : "none"; });
-    updateOverview(overview, list.length, items.length, totalComponentMismatches, totalPronunciationMismatches);
-    if (countEl) countEl.textContent = `${list.length} / ${items.length}`;
+    rowByIndex.forEach((row, i) => {
+      row.hidden = !matched.has(i);
+      detailByIndex[i].hidden = !matched.has(i) || !expanded.has(i);
+    });
+    const gaps = list.filter((it) => it.hasMismatch).length;
+    if (countEl) countEl.textContent = `${list.length} / ${items.length} · ${gaps} avec écart · ${totalComponentMismatches} composants, ${totalPronunciationMismatches} prononciations en écart`;
     if (emptyEl) emptyEl.hidden = list.length !== 0;
   }
 
@@ -485,7 +498,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function rowFor(el) {
-    const card = el.closest(".compare-card");
+    const card = el.closest("[data-index]");
     if (!card) return null;
     return items[Number(card.dataset.index)];
   }
@@ -509,7 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
     textarea.dataset.analysisRendered = "1";
     const it = rowFor(textarea);
     if (!it) return;
-    const card = textarea.closest(".compare-card");
+    const card = textarea.closest("[data-index]");
     const analysisEl = card.querySelector('[data-role="split-analysis"]');
     if (analysisEl) analysisEl.innerHTML = renderSplitAnalysis(textarea.value, it.french);
   });
@@ -520,7 +533,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!textarea) return;
     const it = rowFor(textarea);
     if (!it) return;
-    const card = textarea.closest(".compare-card");
+    const card = textarea.closest("[data-index]");
     const analysisEl = card.querySelector('[data-role="split-analysis"]');
     if (analysisEl) analysisEl.innerHTML = renderSplitAnalysis(textarea.value, it.french);
   });
@@ -538,16 +551,40 @@ document.addEventListener("DOMContentLoaded", () => {
       body: JSON.stringify({ commentaire: textarea.value }),
     })
       .then(jsonOrThrow)
-      .then((data) => { it.commentaire = data.commentaire; })
+      .then((data) => {
+        it.commentaire = data.commentaire;
+        // The row shows the comment too.
+        const cell = rowByIndex[it.index].querySelector(".vt-french");
+        cell.querySelector(".vt-obs")?.remove();
+        if (it.commentaire) cell.insertAdjacentHTML("beforeend", `<div class="vt-sub vt-obs" title="${escapeAttr(it.commentaire)}">💬 ${escapeHtml(it.commentaire)}</div>`);
+      })
       .catch((err) => console.warn("[expressions] échec sauvegarde commentaire:", err.message));
   });
 
   output.addEventListener("click", (e) => {
+    const expand = e.target.closest('[data-role="expand"]');
+    if (expand) {
+      const i = Number(expand.closest("tr").dataset.index);
+      const open = !expanded.has(i);
+      if (open) expanded.add(i); else expanded.delete(i);
+      detailByIndex[i].hidden = !open;
+      rowByIndex[i].classList.toggle("is-open", open);
+      expand.setAttribute("aria-expanded", String(open));
+      if (open) {
+        const textarea = detailByIndex[i].querySelector('[data-role="split"]');
+        const analysisEl = detailByIndex[i].querySelector('[data-role="split-analysis"]');
+        if (textarea && analysisEl && !textarea.dataset.analysisRendered) {
+          textarea.dataset.analysisRendered = "1";
+          analysisEl.innerHTML = renderSplitAnalysis(textarea.value, items[i].french);
+        }
+      }
+      return;
+    }
     const saveBtn = e.target.closest('[data-role="split-save"]');
     const resetBtn = e.target.closest('[data-role="split-reset"]');
     if (!saveBtn && !resetBtn) return;
 
-    const card = e.target.closest(".compare-card");
+    const card = e.target.closest("[data-index]");
     const it = rowFor(e.target);
     if (!it || !it.entryUrl) return;
     const textarea = card.querySelector('[data-role="split"]');

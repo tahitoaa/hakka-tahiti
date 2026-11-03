@@ -19,11 +19,13 @@
 <div id="ai-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
   {% include "hakkadbapp/components/members_tabs.html" %}
   <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
     <h2 class="font-display text-xl font-bold text-gray-800">Suggestions de l'IA
       <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>L'IA propose des mots absents du lexique
         (repérés dans les expressions et les transcriptions) ou des expressions faites de mots du lexique. Ses suggestions restent ici
         en brouillon : cochez celles qui conviennent, corrigez-les (✎ ou ▶ diaporama), puis « Proposer à la validation ». « Écarter »
         supprime les autres. L'IA ne propose jamais rien elle-même.</div></details></h2>
+    <button type="button" id="vs-open" class="vs-open vs-open-lg" title="Passer les suggestions une par une, en grand">▶ Diaporama</button></div>
     <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les suggestions"
            class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
   </div>
@@ -59,7 +61,6 @@
     <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
     <button type="button" data-bulk="review" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
     <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-delete" disabled>🗑 Écarter</button>
-    <button type="button" id="vs-open" class="vs-open">▶ Diaporama</button>
   </div>
   <div id="validation-status" class="text-sm min-h-5" role="status"></div>
 

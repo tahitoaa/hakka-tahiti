@@ -1,8 +1,10 @@
 {% extends "hakkadbapp/base.html" %}
 {% load static %}
 {% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+{% include "hakkadbapp/components/validation_styles.html" %}
 
-<div id="expr-app">
+<div id="expr-app" class="w-full max-w-screen-xl mx-auto mt-1 sm:mt-2 space-y-2">
 <style>
   #expr-app {
     --surface-1:      #fcfcfb;
@@ -102,6 +104,29 @@
   }
 
   #expr-app * { box-sizing: border-box; }
+  /* Aligned with Validation: compact head, the same filter bar, a table whose
+     rows unfold (✎) into the detailed comparison and the Split editor. */
+  #expr-app { background: transparent; }
+  #expr-app .ex-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+  #expr-app .ex-sub { font-size: 0.8rem; color: #6E655C; }
+  #expr-app .ex-tools { background: #fff; border: 1px solid #E8DFD2; border-radius: 0.6rem; padding: 0.3rem 0.7rem; }
+  #expr-app .ex-tools > summary { cursor: pointer; font-size: 0.85rem; font-weight: 700; color: #544D45; }
+  #expr-app .ex-search { flex: 1 1 12rem; min-height: 2rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-size: 0.8rem; }
+  #expr-app .ex-count { font-size: 0.75rem; color: #8C8478; }
+  #expr-app .ex-table td.ex-gap { max-width: 18rem; }
+  #expr-app .ex-table .meta-chip { font-size: 0.66rem; padding: 0 0.35rem; margin: 1px 2px 1px 0; }
+  #expr-app .ex-table .ok-badge { font-size: 0.75rem; }
+  #expr-app .ex-export-col, #expr-app .ex-table td.ex-export { width: 4.5rem; text-align: center; }
+  #expr-app .ex-table .use-export-toggle { margin: 0; justify-content: center; font-size: 0.72rem; gap: 0.25rem; }
+  #expr-app .ex-table tr.ex-row.has-mismatch td:first-child { box-shadow: inset 3px 0 0 rgba(208,59,59,0.55); }
+  #expr-app .ex-table tr.ex-row.is-open { background: #FBF0E6; }
+  #expr-app .ex-table tr.ex-detail td { background: #FDFAF5; padding: 0.4rem 0.6rem 0.7rem; cursor: default; }
+  #expr-app .ex-table tr.ex-detail:hover { background: #FDFAF5; }
+  #expr-app .status-legend { margin-top: 0.4rem; }
+  @media (max-width: 640px) {
+    #expr-app .ex-table .vt-type, #expr-app .ex-table td.ex-gap, #expr-app .ex-table th:nth-child(5) { display: none; }
+    #expr-app .diff-field, #expr-app .diff-field .field-value { grid-template-columns: 1fr; }
+  }
   #expr-app a { color: inherit; }
   #expr-app header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
   #expr-app header.top h1 { font-size: 21px; margin: 0 0 3px; }
@@ -258,47 +283,32 @@
   }
 </style>
 
-  <header class="top">
-    <div>
-      <h1>Phrases et expressions</h1>
-      <p>{{ expressions_count }} expressions.
-        {% if platform_snapshot_timestamp %}
-          Instantané plateforme : {{ platform_snapshot_timestamp|date:"j F Y à H:i" }}.
-        {% else %}
-          Aucun instantané plateforme (lancez <span class="mono">platform_to_vercel --yes</span>).
-        {% endif %}
-      </p>
-    </div>
-    <button class="theme-toggle" id="expr-theme-toggle" type="button">Thème</button>
-  </header>
-
-  {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
-
-  <div class="overview" id="expr-overview"></div>
-
-  <p class="hint">
-    <span class="legend-swatch col-vercel">Vercel / base</span> = calculé aujourd'hui &middot;
-    <span class="legend-swatch col-platform">Plateforme</span> = valeur brute du dernier
-    <span class="mono">platform_to_vercel --yes</span>. Commentaire et Split sont éditables ;
-    "Utiliser dans l'export" décide si le Split d'une expression remplace ses données d'origine dans
-    <span class="mono">ExportCorpus</span> (désactivé par défaut) -- décochable, mais ne peut être coché que si le
-    Split se résout entièrement (aucun terme ambigu, aucun caractère non résolu "~").
-  </p>
-
-  <div class="status-legend">
-    <span class="legend-item"><span class="legend-dot cat-components"></span>Composants (manque/en trop, DB &harr; plateforme)</span>
-    <span class="legend-item"><span class="legend-dot cat-pronunciation"></span>Prononciation/ton différent</span>
-    <span class="legend-item"><span class="legend-dot cat-spelling"></span>Orthographe différente &rarr; export = doublon, suppression manuelle sur la plateforme</span>
-    <span class="legend-item"><span class="legend-dot cat-punctuation"></span>Ponctuation différente uniquement</span>
-    <span class="legend-item"><span class="legend-dot cat-platform"></span>Pas de plateforme / introuvable</span>
-    <span class="legend-item"><span class="legend-dot cat-ok"></span>Aucun écart</span>
+  <div class="ex-head">
+    <h2 class="font-display text-xl font-bold text-gray-800">Expressions
+      <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>
+        Chaque expression du lexique, comparée à la plateforme : <span class="legend-swatch col-vercel">Vercel / base</span> = calculé
+        aujourd'hui, <span class="legend-swatch col-platform">Plateforme</span> = valeur du dernier import (<span class="mono">platform_to_vercel --yes</span>).
+        <div class="status-legend">
+          <span class="legend-item"><span class="legend-dot cat-components"></span>Composants (manque / en trop)</span>
+          <span class="legend-item"><span class="legend-dot cat-pronunciation"></span>Prononciation / ton différent</span>
+          <span class="legend-item"><span class="legend-dot cat-spelling"></span>Orthographe différente → export = doublon, suppression manuelle sur la plateforme</span>
+          <span class="legend-item"><span class="legend-dot cat-punctuation"></span>Ponctuation seulement</span>
+          <span class="legend-item"><span class="legend-dot cat-platform"></span>Pas de plateforme / introuvable</span>
+        </div>
+        ✎ déplie la ligne : comparaison détaillée, commentaire et Split. « Export » : le Split remplace les données d'origine dans
+        <span class="mono">ExportCorpus</span> ; ne peut être coché que si le Split se résout entièrement (aucun terme ambigu, aucun « ~ »).
+      </div></details></h2>
+    <p class="ex-sub" id="expr-overview">{{ expressions_count }} expressions{% if platform_snapshot_timestamp %} · plateforme du {{ platform_snapshot_timestamp|date:"j F Y" }}{% else %} · aucun instantané plateforme{% endif %}</p>
   </div>
 
-  <div class="controls" id="expr-controls">
-    <select class="sort-select" id="expr-category"></select>
-    <select class="sort-select" id="expr-anomaly-filter">
+  <details class="ex-tools"><summary>⚙ Export et synchronisation</summary>
+  {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
+  </details>
+
+  <div class="vt-facets ex-filters" id="expr-controls" role="group" aria-label="Filtrer">
+    <label><span>Écart</span><select id="expr-anomaly-filter">
       <option value="">Tous</option>
-      <option value="any">&#9888; Écarts uniquement</option>
+      <option value="any">⚠ Écarts uniquement</option>
       <option value="no-components">Sans composant</option>
       <option value="missing-components">Composants manquants</option>
       <option value="pronunciation-diff">Prononciation différente</option>
@@ -306,12 +316,21 @@
       <option value="punctuation-diff">Ponctuation différente</option>
       <option value="other">Autres écarts</option>
       <option value="ok">Aucun écart</option>
-    </select>
-    <input class="search" type="search" id="expr-search" placeholder="Rechercher&hellip;">
-    <span class="count-badge" id="expr-count"></span>
+    </select></label>
+    <label><span>Thème</span><select id="expr-category"></select></label>
+    <input class="ex-search" type="search" id="expr-search" placeholder="Rechercher…" aria-label="Rechercher">
+    <span class="ex-count" id="expr-count"></span>
   </div>
 
-  <div class="compare-list" id="output"></div>
+  <div class="vt-wrap">
+    <table class="vt-table no-auto-csv ex-table">
+      <thead><tr>
+        <th class="vt-hk">Caractères</th><th class="vt-hk">Pinyin</th><th>Français</th><th class="vt-type">Thème</th>
+        <th>Écart plateforme</th><th class="ex-export-col">Export</th><th><span class="sr-only">Détails</span></th>
+      </tr></thead>
+      <tbody id="output"></tbody>
+    </table>
+  </div>
   <div class="empty-state" id="expr-empty" hidden>Aucune expression ne correspond à ces filtres.</div>
 </div>
 
