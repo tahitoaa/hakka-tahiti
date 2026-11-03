@@ -182,5 +182,33 @@
   .vt-table td.vt-hanzi, .vt-table td.vt-pinyin, .vt-table th.vt-hk { text-align: center; }
   .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.5rem !important; line-height: 1.05; }
   .vt-table td.vt-pinyin { font-size: 1rem; font-weight: 600; color: #3A3430; }
+  /* Compact table: smaller type, narrow columns, two lines at most per cell. */
+  .vt-table { font-size: 0.78rem; line-height: 1.2; }
+  .vt-table th { padding: 0.25rem 0.3rem; font-size: 0.6rem; }
+  .vt-table td { padding: 0.1rem 0.3rem; }
+  .vt-check { width: 1.9rem; }
+  .vt-check input, #validation-all { width: 1rem; height: 1rem; }
+  .vt-table td.vt-hanzi, .vt-table td.vt-hanzi.hanzi { font-size: 1.1rem !important; line-height: 1.1; }
+  .vt-table td.vt-pinyin { font-size: 0.8rem; }
+  .vt-french { min-width: 7rem; max-width: 22rem; }
+  .vt-french .vt-sub { font-size: 0.72rem; }
+  .vt-meta { font-size: 0.68rem; }
+  .vt-table .vt-type { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; }
+  .vt-table .vt-who { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vt-src { font-size: 0.62rem; max-width: 7rem; }
+  .vt-status { padding: 0 0.35rem; font-size: 0.62rem; }
+  .vt-ia { width: 2.6rem; }
+  .vt-ia-btn { min-height: 1.4rem; min-width: 1.7rem; padding: 0 0.25rem; font-size: 0.68rem; }
+  .vt-actions { width: 3.6rem; white-space: nowrap; }
+  .vt-actions .saisie-btn { min-width: 1.5rem; min-height: 1.4rem; padding: 0 0.15rem; font-size: 0.75rem; }
+  @media (max-width: 640px) {
+    .vt-table .vt-who, .vt-table .vt-ia, .vt-table .vt-st { display: none; }
+    .vt-french { min-width: 5.5rem; }
+    .vt-table td.vt-pinyin { white-space: normal; }
+    .vt-table td.vt-hanzi { white-space: normal; word-break: break-all; }
+    .vt-actions { width: auto; }
+    .vt-table td.vt-french, .vt-table td.vt-pinyin, .vt-obs { overflow-wrap: anywhere; }
+    .vt-table { table-layout: auto; width: 100%; }
+  }
   .vt-obs { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

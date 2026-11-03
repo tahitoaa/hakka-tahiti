@@ -90,6 +90,9 @@ def _apply_payload(addition, payload):
         addition.pinyin = "".join(addition.pinyin.split())
     if not addition.hanzi:
         return "Les caractères sont obligatoires."
+    if "/" in addition.pinyin:
+        # A character read several ways (zung1/zhung1): its reading must be chosen.
+        return "Choisissez une seule lecture pour chaque caractère (pas de « / » dans le pinyin)."
     return None
 
 

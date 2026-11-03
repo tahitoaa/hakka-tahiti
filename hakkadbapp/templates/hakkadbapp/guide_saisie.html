@@ -13,6 +13,10 @@
   .ex kbd { background: #F6EFE4; border: 1px solid #DDD0BD; font-family: ui-monospace, monospace; color: var(--ink); }
   .ex .out { background: #FBF0E6; border: 1px solid #e8c9b5; color: var(--red); font-weight: 600; }
   .ex .arrow { color: var(--muted); font-size: 1.2rem; }
+  /* The result as on the platform: pinyin (tones as superscripts), then the characters. */
+  .ex .out .py { font-weight: 600; color: #3A3430; }
+  .ex .out .hanzi { font-size: 1.25rem; color: var(--red); }
+  .ex .out .note { display: block; font-size: 0.78rem; font-weight: 500; color: var(--muted); }
   .ex small { display: block; grid-column: 1 / -1; color: var(--muted); font-size: 0.85rem; margin-top: -0.2rem; }
   /* The journey of a word */
   .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.6rem; align-items: stretch; }
@@ -33,7 +37,8 @@
 <div class="gd w-full max-w-screen-md mx-auto mt-2 space-y-4">
   {% include "hakkadbapp/components/members_tabs.html" %}
   <h1 class="font-display text-2xl font-bold text-gray-800">Guide de saisie</h1>
-  <p class="text-gray-700">Comment écrire un mot ou une expression hakka dans l'outil, en quelques règles simples.</p>
+  <p class="text-gray-700">Comment écrire un mot ou une expression hakka dans l'outil, en quelques règles simples.
+    À droite, le résultat tel qu'il part sur la plateforme : le pinyin, puis les caractères.</p>
 
   <section id="parcours">
     <h2><span class="n">1</span> Le parcours d'un mot</h2>
@@ -54,11 +59,11 @@
   <section>
     <h2><span class="n">2</span> Taper le hakka</h2>
     <p>Tapez chaque syllabe avec son <b>ton en chiffre</b>, puis touchez le bon caractère dans la liste.</p>
-    <div class="ex"><kbd>wuk5ka1</kbd><span class="arrow">→</span><span class="out hanzi">屋家</span>
+    <div class="ex"><kbd>wuk5ka1</kbd><span class="arrow">→</span><span class="out"><span class="py">wuk⁵ka¹</span> <span class="hanzi">屋家</span></span>
       <small>Touchez 屋 puis 家 dans la liste (ou Maj + 1, 2… au clavier).</small></div>
     <div class="ex"><kbd>ngai_</kbd><span class="arrow">→</span><span class="out">ngai, tous les tons</span>
       <small>Ton inconnu ? Tapez <code>_</code> à la place du chiffre.</small></div>
-    <div class="ex"><kbd>ngai2 oi4 wuk5ka1</kbd><span class="arrow">→</span><span class="out hanzi">我 爱 屋家</span>
+    <div class="ex"><kbd>ngai2 oi4 wuk5ka1</kbd><span class="arrow">→</span><span class="out"><span class="py">ngai² oi⁴ wuk⁵ka¹</span> <span class="hanzi">我爱屋家</span></span>
       <small>Expression : <b>un espace entre chaque mot</b>, pas entre les syllabes d'un même mot.</small></div>
     <p class="tip">Choisissez d'abord <b>📝 Mot</b> (un seul mot, jamais d'espace) ou <b>💬 Expression</b> (au moins deux mots séparés par des espaces).
       Le formulaire prend la couleur du choix : bleu pour un mot, violet pour une expression.</p>
@@ -67,29 +72,29 @@
   <section>
     <h2><span class="n">3</span> Préciser la lecture</h2>
     <p>Quand un caractère se lit de plusieurs façons, l'outil écrit la lecture choisie entre parenthèses. Vous pouvez aussi l'écrire vous-même.</p>
-    <div class="ex"><kbd>生(sen1)</kbd><span class="arrow">→</span><span class="out">生 lu sen¹ (et non sang¹)</span></div>
+    <div class="ex"><kbd>生(sen1)</kbd><span class="arrow">→</span><span class="out"><span class="py">sen¹</span> <span class="hanzi">生</span><small class="note">et non sang¹</small></span></div>
     <p class="tip">Les parenthèses n'apparaissent que si elles sont utiles : si le lexique ne connaît qu'une lecture du caractère, rien n'est ajouté.</p>
   </section>
 
   <section>
     <h2><span class="n">4</span> Préciser le sens</h2>
     <p>Un même caractère peut avoir deux sens, même avec une seule lecture. Ajoutez <b>deux-points</b> et un mot du sens voulu, sans espace.</p>
-    <div class="ex"><kbd>把:prendre</kbd><span class="arrow">→</span><span class="out">把 au sens « prendre »</span></div>
-    <div class="ex"><kbd>把:classificateur</kbd><span class="arrow">→</span><span class="out">把 au sens « classificateur »</span></div>
+    <div class="ex"><kbd>把:prendre</kbd><span class="arrow">→</span><span class="out"><span class="py">ba³</span> <span class="hanzi">把</span><small class="note">« prendre »</small></span></div>
+    <div class="ex"><kbd>把:classificateur</kbd><span class="arrow">→</span><span class="out"><span class="py">ba³</span> <span class="hanzi">把</span><small class="note">« classificateur »</small></span></div>
     <p class="tip">Si ce sens n'est pas encore dans le lexique, l'outil propose d'ajouter le mot avec ce sens (« nouveau sens »), français pré-rempli.</p>
   </section>
 
   <section>
     <h2><span class="n">5</span> Ponctuation</h2>
     <p>Dans une expression, tapez la ponctuation <b>comme un mot, entourée d'espaces</b>. La virgule normale suffit.</p>
-    <div class="ex"><kbd>fat6 dao4 lao3 , tuk6 dao4 lao3</kbd><span class="arrow">→</span><span class="out hanzi">活到老，读到老</span>
+    <div class="ex"><kbd>fat6 dao4 lao3 , tuk6 dao4 lao3</kbd><span class="arrow">→</span><span class="out"><span class="py">fat⁶ dao⁴ lao³ , tuk⁶ dao⁴ lao³</span> <span class="hanzi">活到老，读到老</span></span>
       <small>Les caractères reçoivent la ponctuation chinoise (，。？！), le pinyin garde la latine (, . ? !).</small></div>
   </section>
 
   <section>
     <h2><span class="n">6</span> Caractère inconnu</h2>
     <p>Aucun caractère ne correspond ? Touchez <b>« ? »</b> à la fin de la liste : la lecture est gardée, le caractère sera ajouté plus tard.</p>
-    <div class="ex"><kbd>man4</kbd><span class="arrow">→</span><span class="out">-(man4)</span></div>
+    <div class="ex"><kbd>man4</kbd><span class="arrow">→</span><span class="out"><span class="py">man⁴</span> <span class="hanzi">-</span><small class="note">caractère à trouver</small></span></div>
   </section>
 
   <section>
