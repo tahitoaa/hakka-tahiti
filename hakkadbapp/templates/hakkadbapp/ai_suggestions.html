@@ -10,6 +10,10 @@
   .ai-gen select, .ai-gen input { min-height: 2.4rem; padding: 0 0.5rem; border: 1px solid #DDD0BD; border-radius: 0.45rem; background: #fff; font-weight: 400; }
   .ai-gen input[type=number] { width: 4rem; text-align: center; }
   .ai-gen select { max-width: 12rem; }
+  .hd-box { background: #fff; border: 1px solid #E8DFD2; border-radius: 0.75rem; padding: 0.6rem 0.75rem; display: grid; gap: 0.5rem; }
+  .hd-entry { font-size: 0.82rem; color: #3A3430; }
+  .hd-entry b { color: #9B1C1C; }
+  .hd-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 </style>
 
 <div id="ai-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
@@ -35,6 +39,16 @@
     <label>Nombre <input type="number" id="ai-count" min="1" max="50" value="5" inputmode="numeric"></label>
     <button type="button" id="ai-generate" class="saisie-btn saisie-btn-ai">🤖 Générer</button>
   </div>
+  <div class="ai-gen" id="hd-panel">
+    <label for="hd-q">📖 Chercher dans <a href="https://www.hakkadictionary.com/zh-tw/hakkadict/" target="_blank" rel="noopener" class="underline">hakkadictionary.com</a></label>
+    <input id="hd-q" type="text" maxlength="2" placeholder="番" class="hanzi" style="width:3.5rem;text-align:center;font-size:1.2rem" aria-label="Caractère à chercher">
+    <button type="button" id="hd-go" class="saisie-btn saisie-btn-neutral">Chercher</button>
+    <details class="help-tip"><summary aria-label="Aide">ⓘ</summary><div>Le site interroge le 客家話大辭典 (Bao'an) pour ce caractère :
+      ses lectures et sens, puis les mots parlés 〈…〉 qu'il cite (les mots littéraires 〔…〕 sont écartés). Le pinyin Wenfa est déduit du
+      lexique (et des lectures que le dictionnaire indique). Cochez les mots utiles : ils deviennent des suggestions ci-dessous,
+      traduites en français et en anglais par l'IA, à vérifier avant de les proposer.</div></details>
+  </div>
+  <div id="hd-result"></div>
   {% else %}
   <p class="text-sm text-red-700">L'IA n'est pas configurée sur ce serveur.</p>
   {% endif %}

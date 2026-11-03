@@ -1290,6 +1290,74 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncTheme = () => { $('ai-theme-wrap').hidden = mode.value !== 'expressions'; };
     mode.addEventListener('change', syncTheme);
     syncTheme();
+    // 📖 hakkadictionary.com: a character's words, ticked, become the AI's drafts.
+    const hd = { data: null };
+    const esc = AdditionList.escapeHtml;
+    const renderHd = () => {
+        const box = $('hd-result');
+        const d = hd.data;
+        if (!d) { box.innerHTML = ''; return; }
+        const fresh = d.words.filter((w) => !w.known);
+        box.innerHTML = `<div class="hd-box">
+            ${d.entries.map((e) => `<div class="hd-entry"><b>${esc(e.reading)}</b> ${esc((e.senses || []).join(' ; ') || e.text).slice(0, 300)}</div>`).join('')}
+            <div class="hd-bar"><span class="text-sm">${d.words.length} mot${d.words.length > 1 ? 's' : ''} cité${d.words.length > 1 ? 's' : ''}, ${fresh.length} absent${fresh.length > 1 ? 's' : ''} du lexique</span>
+              <button type="button" class="saisie-btn saisie-btn-ai" id="hd-create"></button></div>
+            <div class="vt-wrap"><table class="vt-table no-auto-csv"><thead><tr><th class="vt-check"></th><th class="vt-hk">Caractères</th><th class="vt-hk">Pinyin</th>
+              <th>Sens (dictionnaire)</th><th class="vt-st">État</th></tr></thead><tbody>
+            ${d.words.map((w, i) => `<tr class="${w.known ? 'is-off' : ''}">
+              <td class="vt-check"><input type="checkbox" data-hd="${i}" ${w.known ? 'disabled' : (w.picked ? 'checked' : '')} aria-label="Retenir ${esc(w.hanzi)}"></td>
+              <td class="hanzi vt-hanzi">${esc(w.hanzi)}${w.trad !== w.hanzi ? `<small class="vt-sub">${esc(w.trad)}</small>` : ''}</td>
+              <td class="vt-pinyin">${w.pinyin ? esc(AdditionList.platformPinyin(w.pinyin)) : '<i>—</i>'}${w.note ? `<div class="vt-warn">${esc(w.note)}</div>` : ''}</td>
+              <td class="vt-french" lang="zh">${esc(w.definition)}</td>
+              <td class="vt-st">${w.known ? 'dans le lexique' : 'nouveau'}</td></tr>`).join('')}
+            </tbody></table></div></div>`;
+        const picked = d.words.filter((w) => w.picked).length;
+        $('hd-create').textContent = `🤖 Créer ${picked} suggestion${picked > 1 ? 's' : ''} (traduites par l’IA)`;
+        $('hd-create').disabled = !picked;
+    };
+    const searchHd = async () => {
+        const q = $('hd-q').value.trim();
+        if (!q) return;
+        await AdditionList.whileBusy($('hd-go'), 'Recherche…', async () => {
+            try {
+                hd.data = await AdditionList.request(`/api/hakkadict?q=${encodeURIComponent(q)}`);
+                // Ticked by default: new words with a reading.
+                hd.data.words.forEach((w) => { w.picked = !w.known && !!w.pinyin; });
+                table.setStatus('');
+            } catch (err) {
+                hd.data = null;
+                table.setStatus(`Échec : ${err.message}`, true);
+            }
+            renderHd();
+        });
+    };
+    $('hd-go')?.addEventListener('click', searchHd);
+    $('hd-q')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchHd(); } });
+    $('hd-result')?.addEventListener('change', (e) => {
+        const box = e.target.closest('[data-hd]');
+        if (!box || !hd.data) return;
+        hd.data.words[Number(box.dataset.hd)].picked = box.checked;
+        renderHd();
+    });
+    $('hd-result')?.addEventListener('click', async (e) => {
+        const button = e.target.closest('#hd-create');
+        if (!button || !hd.data) return;
+        const words = hd.data.words.filter((w) => w.picked);
+        await AdditionList.whileBusy(button, 'L’IA traduit…', async () => {
+            try {
+                const data = await AdditionList.request('/api/hakkadict/brouillons', { char: hd.data.char, words });
+                data.additions.forEach((a) => table.additions.unshift(a));
+                table.render();
+                table.flash(data.additions.map((a) => a.id));
+                words.forEach((w) => { w.known = true; w.picked = false; });
+                table.setStatus(`📖 ${data.additions.length} suggestion${data.additions.length > 1 ? 's' : ''} depuis hakkadictionary.com : vérifiez, puis proposez à la validation.`);
+            } catch (err) {
+                table.setStatus(`Échec : ${err.message}`, true);
+            }
+            renderHd();
+        });
+    });
+
     $('ai-generate').addEventListener('click', async (event) => {
         const button = event.currentTarget;
         const wanted = Math.max(1, Math.min(50, Number($('ai-count').value) || 5));
