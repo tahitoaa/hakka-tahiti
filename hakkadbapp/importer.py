@@ -1,10 +1,15 @@
 """Importing words from text documents (Validation page): Excel, CSV, text,
 Word, and PDFs that contain text -- never images or scans, to keep AI use
-low. The server extracts the text itself; the AI only sees what it must:
-- a spreadsheet whose columns are recognised costs no AI call; otherwise
-  only its first rows go to the AI, to name the columns;
-- a free text goes by chunks, only the lines with Chinese characters,
-  lines whose words the lexicon already has left out.
+low. The server reads the documents itself, without the AI:
+- a spreadsheet (or the tables of a Word file) whose headers are
+  recognised is read at once; otherwise the editor says which column is
+  which (an « écran de correspondance », prefilled by a guess, remembered
+  in the browser for the next document of that source);
+- a text is read line by line with templates (import_rules: « caractères
+  · lecture · sens », glossed examples...); the other lines give a short
+  list of candidate words with their context. The AI only defines that
+  list, when asked (api_define), or reads the whole text (api_extract,
+  by chunks), when explicitly asked.
 Every candidate is then checked by the server: already in the lexicon,
 already proposed or rejected, reading converted to Wenfa and checked
 against the lexicon. The editor ticks what to keep in a preview, and the
@@ -25,6 +30,7 @@ from .ai import HAN_RE, ai_enabled
 from .assistant import AssistantError, CONTEXT, _call, _norm, char_readings, known_words
 from .models import ImportedDocument, LexiconAddition
 from .permissions import editor_required
+from . import import_rules
 
 MAX_FILE_BYTES = 4 * 1024 * 1024     # Vercel refuses larger request bodies
 MAX_TEXT_CHARS = 50_000              # text sent to the AI, per document at most
@@ -182,40 +188,20 @@ def _guess_columns(rows):
     return (0, columns) if "french" in columns or "pinyin" in columns else None
 
 
-def _ai_columns(rows):
-    """One small AI call: the header and first rows only."""
-    sample = rows[:8]
-    schema = {"type": "object", "properties": {
-        "header_row": {"type": "integer"},
-        **{f: {"type": "integer"} for f in ("hanzi", "pinyin", "french", "english", "themes")}},
-        "required": ["header_row", "hanzi", "pinyin", "french", "english", "themes"], "additionalProperties": False}
-    data = _call(CONTEXT + "\n\nYou are given the first rows of a spreadsheet of vocabulary. Give the 0-based index "
-                 "of the column holding each field (-1 when absent): hanzi (Chinese characters), pinyin (romanized "
-                 "reading), french, english, themes; and header_row, the index of the header row (-1 if none).",
-                 json.dumps(sample, ensure_ascii=False), schema, max_tokens=500)
-    columns = {f: data[f] for f in ("hanzi", "pinyin", "french", "english", "themes") if isinstance(data.get(f), int) and data[f] >= 0}
-    return (max(data.get("header_row", -1), -1) + 1, columns) if "hanzi" in columns else None
-
-
-def table_candidates(rows):
+def table_candidates(rows, layout=None):
     """[{hanzi, pinyin, french, english, themes, location, page, source_sense,
-    remark, type}] and whether the AI was used. Everything the table says
-    about a word is kept: it ends up in the addition's observations."""
-    used_ai = False
-    found = _header_map(rows)
-    start = found[0] + 1 if found else 0
-    columns = found[1] if found else None
-    if not columns:
-        guessed = _guess_columns(rows)
-        if guessed:
-            start, columns = guessed
-    if not columns and ai_enabled():
-        guessed = _ai_columns(rows)
-        used_ai = True
-        if guessed:
-            start, columns = guessed
-    if not columns:
-        raise ImportError_("Colonne des caractères introuvable : ajoutez une ligne d'en-tête (Caractères, Pinyin, Français).")
+    remark, type}] and False (no AI). `layout`: (first data row, {field:
+    column}) as the editor mapped them; else the recognised headers -- None
+    when there are none (the editor maps the columns). Everything the table
+    says about a word is kept: it ends up in the addition's observations."""
+    if layout is None:
+        found = _header_map(rows)
+        if not found:
+            return None, False
+        layout = (found[0] + 1, found[1])
+    start, columns = layout
+    if "hanzi" not in columns:
+        raise ImportError_("Indiquez la colonne des caractères.")
     out = []
     for n, row in enumerate(rows[start:], start + 1):
         get = lambda f: row[columns[f]] if f in columns and columns[f] < len(row) else ""
@@ -229,7 +215,19 @@ def table_candidates(rows):
             page = entry.pop("page")
             entry["location"] = (f"p. {page}" if page and not page.lower().startswith("p") else page) or f"ligne {n}"
             out.append(entry)
-    return out, used_ai
+    return out, False
+
+
+MAPPABLE = ("hanzi", "pinyin", "french", "english", "themes", "type", "page", "source_sense", "remark")
+
+
+def _mapping_reply(doc, rows):
+    """No recognised header: the first rows, and a guess of the columns, for
+    the editor to confirm (no AI)."""
+    guessed = _guess_columns(rows)
+    return JsonResponse({"ok": True, "document": doc.id, "filename": doc.filename, "kind": "mapping",
+                         "width": max(len(r) for r in rows[:20]), "preview": rows[:8],
+                         "guess": guessed[1] if guessed else {}})
 
 
 # ---- free text: the AI extracts the entries, chunk by chunk ----------------------------------------
@@ -539,26 +537,99 @@ def api_analyse(request):
         return JsonResponse({"error": "Fichier trop lourd (4 Mo au plus)."}, status=400)
     data = upload.read()
     try:
-        if kind in ("xlsx", "csv"):
-            rows = read_rows(kind, data)
+        rows = read_rows(kind, data) if kind in ("xlsx", "csv") else []
+        if kind == "docx":
+            # A Word file's tables are read as a spreadsheet.
+            tables = import_rules.docx_tables(data)
+            if sum(1 for r in tables if any(HAN_RE.search(c) for c in r)) >= 2:
+                rows = tables
+        if kind in ("xlsx", "csv") or rows:
             if not rows:
                 raise ImportError_("Le fichier est vide.")
-            candidates, used_ai = table_candidates(rows)
             doc = ImportedDocument.objects.create(filename=upload.name[:255], kind=ImportedDocument.KIND_TABLE,
                                                   text="\n".join("\t".join(r) for r in rows), uploaded_by=request.user)
+            candidates, _ = table_candidates(rows)
+            if candidates is None:
+                return _mapping_reply(doc, rows)
             return JsonResponse({"ok": True, "document": doc.id, "filename": doc.filename, "kind": "table",
-                                 "used_ai": used_ai, "candidates": check_candidates(candidates)})
+                                 "used_ai": False, "candidates": check_candidates(candidates)})
         text = read_text(kind, data)
-        chunks = text_chunks(text)
         doc = ImportedDocument.objects.create(filename=upload.name[:255], kind=ImportedDocument.KIND_TEXT,
                                               text=text, uploaded_by=request.user)
+        # Without the AI: the lines a template reads, then the candidate words.
+        entries, rest = import_rules.read_lines(text)
+        candidates = check_candidates(entries + import_rules.shortlist(
+            rest, known_words(), char_readings(), segment, _norm))
+        templates = {}
+        for e in entries:
+            templates[e["template"]] = templates.get(e["template"], 0) + 1
+        chunks = text_chunks(text)
         return JsonResponse({"ok": True, "document": doc.id, "filename": doc.filename, "kind": "text",
+                             "candidates": candidates, "templates": templates,
+                             "shortlist": sum(1 for c in candidates if c.get("template") == "candidat"),
                              "chunks": len(chunks), "chars": sum(len(c) for c in chunks),
                              "truncated": len(text) > MAX_TEXT_CHARS, "ai_enabled": ai_enabled()})
     except ImportError_ as err:
         return JsonResponse({"error": str(err)}, status=400)
     except AssistantError as err:
         return JsonResponse({"error": str(err)}, status=503)
+
+
+@require_POST
+@editor_required
+def api_columns(request, document_id):
+    """POST {columns: {field: column index}, header: bool}: the table read
+    with the columns the editor chose (no AI)."""
+    doc = ImportedDocument.objects.filter(id=document_id, kind=ImportedDocument.KIND_TABLE).first()
+    payload = _json(request) or {}
+    columns = payload.get("columns")
+    if not doc or not isinstance(columns, dict):
+        return JsonResponse({"error": "Document ou colonnes introuvables."}, status=400)
+    columns = {f: c for f, c in columns.items() if f in MAPPABLE and isinstance(c, int) and c >= 0}
+    rows = [line.split("\t") for line in doc.text.split("\n")]
+    try:
+        candidates, _ = table_candidates(rows, (1 if payload.get("header") else 0, columns))
+    except ImportError_ as err:
+        return JsonResponse({"error": str(err)}, status=400)
+    return JsonResponse({"ok": True, "candidates": check_candidates(candidates)})
+
+
+DEFINE_SYSTEM = CONTEXT + """
+
+You are given candidate Hakka words found in a document (Chinese characters), each with the
+sentence it comes from. For each: keep = true only if it is really a word or a fixed expression
+(not a fragment cut across two words, not a name of a person or place); then its meaning in that
+sentence: french (short dictionary sense, alternatives separated by « ; ») and english. Use the
+context; do not invent. Return one item per input, with the same i."""
+
+
+@require_POST
+@editor_required
+def api_define(request):
+    """POST {entries: [{hanzi, context}]} (60 at most): the candidate words
+    the server found in a text, judged and defined by the AI -- one small
+    call instead of the whole text."""
+    entries = (_json(request) or {}).get("entries")
+    if not isinstance(entries, list) or not entries or len(entries) > 60:
+        return JsonResponse({"error": "Entre 1 et 60 candidats."}, status=400)
+    items = [{"i": i, "hanzi": str(e.get("hanzi", ""))[:20], "context": str(e.get("context", ""))[:120]}
+             for i, e in enumerate(entries) if isinstance(e, dict)]
+    schema = {"type": "object", "additionalProperties": False, "required": ["items"], "properties": {
+        "items": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                             "required": ["i", "keep", "french", "english"],
+                                             "properties": {"i": {"type": "integer"}, "keep": {"type": "boolean"},
+                                                            "french": {"type": "string"}, "english": {"type": "string"}}}}}}
+    try:
+        data = _call(DEFINE_SYSTEM, json.dumps(items, ensure_ascii=False), schema, max_tokens=6000)
+    except AssistantError as err:
+        return JsonResponse({"error": str(err)}, status=503)
+    by_i = {it.get("i"): it for it in data.get("items", []) if isinstance(it, dict)}
+    out = []
+    for i in range(len(entries)):
+        it = by_i.get(i, {})
+        out.append({"keep": bool(it.get("keep", True)), "french": str(it.get("french", "")).strip()[:300],
+                    "english": str(it.get("english", "")).strip()[:300]})
+    return JsonResponse({"ok": True, "entries": out})
 
 
 @require_POST

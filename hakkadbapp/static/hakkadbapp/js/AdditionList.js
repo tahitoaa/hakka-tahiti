@@ -1094,6 +1094,9 @@ class DocumentImport {
         this.result.addEventListener('click', (event) => {
             if (event.target.closest('[data-propose]')) this.propose(event.target.closest('[data-propose]'));
             if (event.target.closest('[data-languages]')) this.checkLanguages(event.target.closest('[data-languages]'));
+            if (event.target.closest('[data-map-apply]')) this.applyMapping(event.target.closest('[data-map-apply]'));
+            if (event.target.closest('[data-define]')) this.define(event.target.closest('[data-define]'));
+            if (event.target.closest('[data-read-all]')) this.readAllWithAi(event.target.closest('[data-read-all]'));
             const kindTab = event.target.closest('[data-import-kind]');
             if (kindTab) { this.kindTab = kindTab.dataset.importKind; this.render(); }
         });
@@ -1139,10 +1142,16 @@ class DocumentImport {
         });
     }
 
+    /** Lights up the mode cards used (page Importer): table, lines, candidates, ai. */
+    static showModes(...modes) {
+        document.querySelectorAll('[data-import-mode]').forEach((el) => el.classList.toggle('is-on', modes.includes(el.dataset.importMode)));
+    }
+
     async analyse() {
         const file = this.file.files[0];
         if (!file) return;
         this.reset();
+        DocumentImport.showModes();
         const button = this.form.querySelector('button');
         await AdditionList.whileBusy(button, 'Lecture…', async () => {
             try {
@@ -1151,6 +1160,7 @@ class DocumentImport {
                 const data = await this.post('/api/import/analyse', body);
                 this.doc = data;
                 if (data.kind === 'table') {
+                    DocumentImport.showModes('table');
                     this.add(data.candidates);
                     this.setStatus(`Tableau lu${data.used_ai ? ' (colonnes reconnues par l’IA)' : ' sans IA'} : ${data.candidates.length} entrée(s)`
                         + `${data.candidates[0]?.romanization ? ` · romanisation reconnue : ${data.candidates[0].romanization}` : ''}.`);
@@ -1158,26 +1168,121 @@ class DocumentImport {
                     await this.checkLanguages();
                     return;
                 }
-                if (!data.chunks) {
-                    this.setStatus('Aucun mot nouveau à lire dans ce texte (pas de caractères chinois inconnus du lexique).');
+                if (data.kind === 'mapping') {
+                    DocumentImport.showModes('table');
+                    // No recognised header: the editor says which column is which.
+                    this.setStatus('Colonnes non reconnues : indiquez ce que contient chaque colonne (sans IA).');
+                    this.renderMapping(data);
                     return;
                 }
-                if (!data.ai_enabled) {
-                    this.setStatus('Ce texte doit être lu par l’IA, qui n’est pas configurée sur ce serveur.', true);
-                    return;
+                // A text, read without the AI: the lines a template reads, and candidate words.
+                DocumentImport.showModes(...(Object.keys(data.templates || {}).length ? ['lines'] : []), ...(data.shortlist ? ['candidates'] : []));
+                this.add(data.candidates);
+                const read = Object.entries(data.templates || {}).map(([t, n]) => `${n} « ${t} »`).join(', ');
+                this.setStatus(`Texte lu sans IA : ${read || 'aucune ligne de vocabulaire reconnue'}`
+                    + `${data.shortlist ? ` · ${data.shortlist} mot${data.shortlist > 1 ? 's' : ''} candidat${data.shortlist > 1 ? 's' : ''} (sens à trouver)` : ''}.`);
+                this.render();
+                await this.checkLanguages();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    /** The columns of a table without recognised headers: one menu per
+     *  column, prefilled by the server's guess -- or by what was chosen for
+     *  this source before (kept in this browser). */
+    renderMapping(data) {
+        const esc = AdditionList.escapeHtml;
+        const FIELDS = [['', '— ignorer —'], ['hanzi', 'Caractères'], ['pinyin', 'Lecture'], ['french', 'Français'],
+            ['english', 'Anglais'], ['themes', 'Thème'], ['type', 'Type (mot / expression)'], ['page', 'Page'],
+            ['source_sense', 'Sens (autre langue)'], ['remark', 'Remarque']];
+        const key = `import-columns:${DocumentImport.sourceName(data.filename || '')}:${data.width}`;
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { saved = null; }
+        const chosen = {};
+        Object.entries((saved && saved.columns) || data.guess || {}).forEach(([f, c]) => { chosen[c] = f; });
+        const header = saved ? !!saved.header : false;
+        this.mapping = { key, data };
+        this.result.innerHTML = `<div class="vt-import-map">
+            <label class="text-sm"><input type="checkbox" data-map-header ${header ? 'checked' : ''}> La première ligne est une en-tête</label>
+            <div class="vt-wrap"><table class="vt-table no-auto-csv"><thead><tr>${Array.from({ length: data.width }, (_, c) => `<th>
+              <select data-map-col="${c}" aria-label="Colonne ${c + 1}">${FIELDS.map(([f, l]) => `<option value="${f}" ${chosen[c] === f ? 'selected' : ''}>${l}</option>`).join('')}</select></th>`).join('')}</tr></thead>
+              <tbody>${data.preview.map((r) => `<tr>${Array.from({ length: data.width }, (_, c) => `<td>${esc(r[c] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+            <button type="button" class="saisie-btn saisie-btn-review" data-map-apply>Lire le tableau avec ces colonnes</button>
+          </div>`;
+    }
+
+    async applyMapping(button) {
+        const columns = {};
+        this.result.querySelectorAll('[data-map-col]').forEach((sel) => { if (sel.value) columns[sel.value] = Number(sel.dataset.mapCol); });
+        const header = !!this.result.querySelector('[data-map-header]')?.checked;
+        if (!('hanzi' in columns)) { this.setStatus('Indiquez au moins la colonne des caractères.', true); return; }
+        try { localStorage.setItem(this.mapping.key, JSON.stringify({ columns, header })); } catch (e) { /* private mode */ }
+        await AdditionList.whileBusy(button, 'Lecture…', async () => {
+            try {
+                const data = await this.post(`/api/import/${this.doc.document}/colonnes`, { columns, header });
+                this.entries = [];
+                this.add(data.candidates);
+                this.setStatus(`Tableau lu sans IA : ${data.candidates.length} entrée(s).`);
+                this.render();
+                await this.checkLanguages();
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    /** Candidate words (no meaning yet) the AI may define -- a short list, not the text. */
+    toDefine() {
+        return this.entries.filter((e) => e.template === 'candidat' && !e.defined && !e.french && !e.english && e.state === 'new');
+    }
+
+    async define(button) {
+        const todo = this.toDefine();
+        if (!todo.length) return;
+        await AdditionList.whileBusy(button, 'L’IA définit…', async () => {
+            try {
+                for (let start = 0; start < todo.length; start += 60) {
+                    const batch = todo.slice(start, start + 60);
+                    const data = await this.post('/api/import/definir', { entries: batch.map((e) => ({ hanzi: e.hanzi, context: e.context || '' })) });
+                    batch.forEach((e, i) => {
+                        const r = data.entries[i];
+                        e.defined = true;
+                        e.french = r.french;
+                        e.english = r.english;
+                        e.ai_fields = ['french', 'english'];
+                        if (!r.keep) { e.picked = false; e.reading_note = [e.reading_note, 'pas un mot selon l’IA'].filter(Boolean).join(' ; '); }
+                    });
                 }
+                const kept = todo.filter((e) => e.picked).length;
+                this.setStatus(`L’IA a défini ${todo.length} candidat${todo.length > 1 ? 's' : ''} (${kept} retenu${kept > 1 ? 's' : ''}) : vérifiez avant de proposer.`);
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+            this.render();
+        });
+    }
+
+    /** The old way, on demand only: the AI reads the whole text, by parts. */
+    async readAllWithAi(button) {
+        const data = this.doc;
+        if (!data?.chunks) return;
+        if (!window.confirm(`L’IA va lire tout le texte (${data.chunks} partie${data.chunks > 1 ? 's' : ''}) : c’est la lecture la plus coûteuse. Continuer ?`)) return;
+        DocumentImport.showModes('ai');
+        await AdditionList.whileBusy(button, 'L’IA lit…', async () => {
+            try {
                 for (let n = 0; n < data.chunks; n += 1) {
                     this.setStatus(`L’IA lit le texte : partie ${n + 1} sur ${data.chunks}…`);
                     const part = await this.post(`/api/import/${data.document}/extraire`, { chunk: n });
                     this.add(part.candidates);
                     this.render();
                 }
-                this.setStatus(`Texte lu par l’IA (${data.chunks} partie${data.chunks > 1 ? 's' : ''}${data.truncated ? ', début du texte seulement' : ''}) : ${this.entries.length} entrée(s).`);
-                this.render();
-                await this.checkLanguages();
+                this.setStatus(`Texte lu par l’IA (${data.chunks} partie${data.chunks > 1 ? 's' : ''}) : ${this.entries.length} entrée(s).`);
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
+            this.render();
         });
     }
 
@@ -1247,6 +1352,9 @@ class DocumentImport {
                 placeholder="Livre, auteur, page web…" title="Nom de la source, enregistré avec chaque mot : filtre « Origine » de la validation"></label>
             <div class="vt-import-summary"><span data-summary></span>
               <button type="button" class="saisie-btn saisie-btn-lg" data-languages hidden>✨ Vérifier FR / EN</button>
+              ${this.toDefine().length ? `<button type="button" class="saisie-btn saisie-btn-lg saisie-btn-ai" data-define>✨ Définir les ${this.toDefine().length} candidats (IA)</button>` : ''}
+              ${this.doc?.kind === 'text' && this.doc.chunks && this.doc.ai_enabled ? `<button type="button" class="saisie-btn saisie-btn-lg saisie-btn-neutral" data-read-all
+                  title="La lecture la plus coûteuse : tout le texte passe par l’IA">Lire tout le texte avec l’IA (${this.doc.chunks} partie${this.doc.chunks > 1 ? 's' : ''})</button>` : ''}
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-kinds" role="tablist" aria-label="Mots ou expressions">${AdditionList.kindTabs(this.kindTab, {
                 word: this.entries.filter((e) => e.kind !== 'expression').length,

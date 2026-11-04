@@ -3,15 +3,46 @@
 {% block content %}
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 {% include "hakkadbapp/components/validation_styles.html" %}
+<style>
+  .imp-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.5rem; }
+  .imp-mode { background: #fff; border: 2px solid #E8DFD2; border-radius: 0.75rem; padding: 0.55rem 0.7rem; }
+  .imp-mode b { font-size: 0.95rem; color: #261F1C; margin-right: 0.35rem; }
+  .imp-mode p { margin-top: 0.25rem; font-size: 0.78rem; line-height: 1.35; color: #544D45; }
+  .imp-mode .hanzi { font-size: 1em !important; color: #9B1C1C; }
+  .imp-free, .imp-ai { display: inline-block; padding: 0 0.45rem; border-radius: 9999px; font-size: 0.68rem; font-weight: 700; margin-right: 0.2rem; }
+  .imp-free { background: #d1fae5; color: #065f46; }
+  .imp-ai { background: #ede9fe; color: #5b21b6; }
+  .imp-mode.is-on { border-color: #9B1C1C; background: #FBF0E6; box-shadow: 0 2px 6px rgb(155 28 28 / .15); }
+  .imp-note { font-size: 0.75rem; color: #6E655C; }
+</style>
 
 <div id="import-page" data-validation-url="{% url 'validation' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-3">
   {% include "hakkadbapp/components/members_tabs.html" %}
   <h2 class="font-display text-xl font-bold text-gray-800">Importer des mots
-    <details class="help-tip font-sans font-normal"><summary aria-label="Aide : import">ⓘ</summary><div>Excel (.xlsx), CSV, TSV, texte (.txt),
-      Word (.docx) ou PDF contenant du texte : pas de scans ni d'images. Un tableau avec des colonnes « Caractères », « Pinyin »,
-      « Français » s'importe sans IA. Rien n'est ajouté avant que vous cochiez les mots. Les mots sont enregistrés en caractères
-      simplifiés, avec une lecture Wenfa déduite et l'origine (fichier, source, page, utilisateur) ; l'IA vérifie le français et
-      l'anglais. Ils arrivent « À valider » dans <a href="{% url 'validation' %}" class="underline">Validation</a>.</div></details></h2>
+    <details class="help-tip font-sans font-normal"><summary aria-label="Aide : import">ⓘ</summary><div>
+      <b>Sans IA :</b> un tableau (Excel, CSV, TSV, ou les tableaux d'un Word) avec des en-têtes « Caractères », « Pinyin »,
+      « Français »… est lu directement ; sans en-têtes, vous indiquez ce que contient chaque colonne (mémorisé pour la source).
+      Un texte (.txt, .docx, PDF avec texte) est lu ligne par ligne : « 屋家 wuk5ka1 maison », « 屋家 (wuk5ka1) maison »,
+      « šon2 tšak6 船隻 ‘ships’ », « 番鬼 : étranger ». Le reste donne une courte liste de <b>mots candidats</b> avec leur contexte.
+      <b>IA, seulement si vous le demandez :</b> « Définir les candidats » (une petite liste) ou « Lire tout le texte » (le plus coûteux).
+      Pas de scans ni d'images. Rien n'est ajouté avant que vous cochiez les mots ; ils arrivent « À valider » dans
+      <a href="{% url 'validation' %}" class="underline">Validation</a>, en caractères simplifiés, avec leur origine.</div></details></h2>
+
+  <!-- The reading modes, from free to costly: the one used lights up after « Analyser ». -->
+  <div class="imp-modes" aria-label="Modes de lecture">
+    <div class="imp-mode" data-import-mode="table"><b>📊 Tableau</b><span class="imp-free">sans IA</span>
+      <p>Excel, CSV, TSV, ou les tableaux d'un Word. En-têtes « Caractères », « Pinyin », « Français »… reconnues :
+        lu directement. Sinon, vous indiquez ce que contient chaque colonne (mémorisé pour la source).</p></div>
+    <div class="imp-mode" data-import-mode="lines"><b>📄 Lignes de vocabulaire</b><span class="imp-free">sans IA</span>
+      <p>Texte, Word, PDF avec texte. Lignes reconnues : <span class="hanzi">屋家</span> wuk5ka1 maison ·
+        <span class="hanzi">屋家</span> (wuk5ka1) maison · šon2 tšak6 <span class="hanzi">船隻</span> ‘ships’ · <span class="hanzi">番鬼</span> : étranger.</p></div>
+    <div class="imp-mode" data-import-mode="candidates"><b>🔎 Mots candidats</b><span class="imp-free">sans IA</span><span class="imp-ai">IA en option</span>
+      <p>Le reste du texte : les mots absents du lexique, avec leur contexte. Pour leur sens : « ✨ Définir les candidats »
+        (une petite liste envoyée à l'IA).</p></div>
+    <div class="imp-mode" data-import-mode="ai"><b>🤖 Lecture complète</b><span class="imp-ai">IA, coûteux</span>
+      <p>Sur demande seulement : « Lire tout le texte avec l'IA », partie par partie.</p></div>
+  </div>
+  <p class="imp-note">✨ Après chaque lecture, l'IA vérifie automatiquement que le français est en français et l'anglais en anglais (une petite requête).</p>
 
   <section class="vt-import">
     <div class="vt-import-body pt-3">
