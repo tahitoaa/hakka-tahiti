@@ -14,6 +14,18 @@
   .imp-ai { background: #ede9fe; color: #5b21b6; }
   .imp-mode.is-on { border-color: #9B1C1C; background: #FBF0E6; box-shadow: 0 2px 6px rgb(155 28 28 / .15); }
   .imp-note { font-size: 0.75rem; color: #6E655C; }
+  .imp-want { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.9rem; padding: 0.5rem 0.7rem; background: #fff;
+              border: 1px solid #E8DFD2; border-radius: 0.6rem; font-size: 0.88rem; }
+  .imp-want > span { font-weight: 700; color: #544D45; }
+  .imp-want label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+  .imp-want input { accent-color: #9B1C1C; }
+  .imp-steps { margin: 0.3rem 0 0.4rem 1.1rem; list-style: decimal; display: grid; gap: 0.2rem; }
+  .imp-paste { display: grid; gap: 0.35rem; }
+  .imp-paste textarea { width: 100%; min-height: 7rem; padding: 0.5rem 0.65rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #FDFAF5;
+                        font-size: 1rem; line-height: 1.5; resize: vertical; }
+  .imp-paste-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .imp-paste-bar input { flex: 1 1 12rem; min-height: 2.4rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.45rem; }
+  .imp-or { text-align: center; font-size: 0.75rem; color: #8C8478; }
 </style>
 
 <div id="import-page" data-validation-url="{% url 'validation' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-3">
@@ -41,11 +53,43 @@
         (une petite liste envoyée à l'IA).</p></div>
     <div class="imp-mode" data-import-mode="ai"><b>🤖 Lecture complète</b><span class="imp-ai">IA, coûteux</span>
       <p>Sur demande seulement : « Lire tout le texte avec l'IA », partie par partie.</p></div>
+    <div class="imp-mode" data-import-mode="paste"><b>📋 Texte collé</b><span class="imp-ai">IA</span>
+      <p>Collez un texte ci-dessous (page web, message, extrait) : l'IA y relève les mots et expressions avec leur sens.
+        Seules les lignes en caractères chinois inconnus du lexique lui sont envoyées.</p></div>
   </div>
+  <div class="imp-want" role="group" aria-label="Que faut-il importer ?">
+    <span>Importer :</span>
+    <label><input type="radio" name="import-want" value="all" checked> 📝 Mots et 💬 expressions</label>
+    <label><input type="radio" name="import-want" value="words"> 📝 Mots seulement</label>
+    <label><input type="radio" name="import-want" value="expressions"> 💬 Expressions seulement</label>
+    <details class="help-tip"><summary aria-label="Comment une expression est reconnue">ⓘ Mot ou expression ?</summary><div>
+      <b>Comment l'import décide :</b>
+      <ol class="imp-steps">
+        <li><b>Une colonne « Type »</b> (mot / expression) dans le tableau : elle fait foi.</li>
+        <li><b>Sinon</b> : un espace entre les caractères (<span class="hanzi">我 爱 屋家</span>) ou plus de 6 caractères → expression ; sinon → mot.</li>
+        <li><b>Lecture par l'IA</b> (texte collé, lecture complète) : l'IA indique elle-même « mot » ou « expression ».</li>
+        <li><b>Une expression écrite d'un bloc</b> (<span class="hanzi">做生理人</span>) est découpée en mots du lexique, le plus long d'abord :
+          <span class="hanzi">做生理 人</span> / zo4sen1li1 ngin2. Un caractère sans mot connu reste seul.</li>
+        <li><b>Un mot</b> est toujours enregistré sans espace.</li>
+      </ol>
+      Les mots inconnus d'une expression importée ne sont pas ajoutés d'office : ouvrez-la dans la Saisie (✎) pour les proposer avec elle.
+      Dans l'aperçu, les deux onglets « Mots » et « Expressions » séparent ce qui a été reconnu ; ce qui n'est pas demandé est écarté.</div></details>
+  </div>
+
   <p class="imp-note">✨ Après chaque lecture, l'IA vérifie automatiquement que le français est en français et l'anglais en anglais (une petite requête).</p>
 
   <section class="vt-import">
     <div class="vt-import-body pt-3">
+      <div class="imp-paste">
+        <label for="import-paste" class="text-sm font-semibold text-gray-700">📋 Coller un texte <span class="imp-ai">IA</span></label>
+        <textarea id="import-paste" rows="5" placeholder="Collez ici un texte en caractères chinois (avec lectures et sens si possible)…"></textarea>
+        <div class="imp-paste-bar">
+          <input id="import-paste-name" type="text" maxlength="200" placeholder="Source (ex. page web, livre…)" aria-label="Source du texte">
+          <button type="button" id="import-paste-go" class="saisie-btn saisie-btn-ai">🤖 Analyser avec l'IA</button>
+          <span id="import-paste-count" class="text-xs text-gray-500"></span>
+        </div>
+      </div>
+      <p class="imp-or">— ou un fichier —</p>
       <form id="import-form">
         <label class="sr-only" for="import-file">Document à importer</label>
         <input id="import-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.docx,.pdf" required>

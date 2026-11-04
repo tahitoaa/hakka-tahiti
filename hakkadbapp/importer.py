@@ -266,6 +266,7 @@ You read an excerpt of a document and list the Hakka vocabulary entries it gives
 - french: the French meaning given by the document; if the document gives the meaning in another language only, translate it to French and set translated to true. "" if the document gives no meaning.
 - english: the English meaning if the document gives one, else "".
 - location: the location in brackets of the line it comes from.
+- type: "mot" for a word (one unit of meaning, even of several characters: 屋家, 番书), "expression" for a phrase or sentence made of several words (读番书, 今晡日落大水).
 Only list entries the document actually gives; do not add words from your own knowledge. Skip sentences that are not vocabulary entries, names of people and places."""
 
 
@@ -273,23 +274,32 @@ def _extract_schema():
     return {"type": "object", "properties": {"entries": {"type": "array", "items": {
         "type": "object",
         "properties": {f: {"type": "string"} for f in ("hanzi", "pinyin", "french", "english", "location")}
-        | {"translated": {"type": "boolean"}},
-        "required": ["hanzi", "pinyin", "french", "english", "location", "translated"],
+        | {"translated": {"type": "boolean"}, "type": {"type": "string", "enum": ["mot", "expression"]}},
+        "required": ["hanzi", "pinyin", "french", "english", "location", "translated", "type"],
         "additionalProperties": False}}},
         "required": ["entries"], "additionalProperties": False}
 
 
-def extract_chunk(chunk):
-    data = _call(EXTRACT_SYSTEM, chunk, _extract_schema(), max_tokens=8000)
+WANT_PROMPTS = {
+    "words": "\nList only words (type « mot »): skip expressions and sentences.",
+    "expressions": "\nList only expressions (type « expression »): phrases or sentences of several words; skip single words.",
+}
+
+
+def extract_chunk(chunk, want="all"):
+    """`want`: "all", "words" or "expressions" -- what the editor chose to import."""
+    data = _call(EXTRACT_SYSTEM + WANT_PROMPTS.get(want, ""), chunk, _extract_schema(), max_tokens=8000)
+    plain = _norm("".join(chunk.split()))
     out = []
     for e in data.get("entries", []):
         hanzi = " ".join(str(e.get("hanzi", "")).split())
         # Only characters really in this excerpt: nothing invented.
-        if not hanzi or not HAN_RE.search(hanzi) or "".join(hanzi.split()) not in "".join(chunk.split()):
+        # (compared simplified: the AI may answer 番书 for 番書)
+        if not hanzi or not HAN_RE.search(hanzi) or _norm("".join(hanzi.split())) not in plain:
             continue
         out.append({"hanzi": hanzi, "pinyin": e.get("pinyin", ""), "french": e.get("french", ""),
                     "english": e.get("english", ""), "themes": "", "location": e.get("location", ""),
-                    "translated": bool(e.get("translated"))})
+                    "translated": bool(e.get("translated")), "type": e.get("type", "")})
     return out
 
 
@@ -577,6 +587,28 @@ def api_analyse(request):
 
 @require_POST
 @editor_required
+def api_paste(request):
+    """POST {text, name}: a text pasted in the page, to be read by the AI
+    (api_extract, chunk by chunk). Only the lines with Chinese characters
+    the lexicon doesn't fully know are sent (text_chunks)."""
+    payload = _json(request) or {}
+    text = payload.get("text") if isinstance(payload.get("text"), str) else ""
+    name = " ".join(str(payload.get("name") or "").split())[:200] or "Texte collé"
+    if not HAN_RE.search(text):
+        return JsonResponse({"error": "Collez un texte qui contient des caractères chinois."}, status=400)
+    if len(text) > MAX_TEXT_CHARS * 2:
+        return JsonResponse({"error": f"Texte trop long ({len(text)} caractères, {MAX_TEXT_CHARS * 2} au plus)."}, status=400)
+    if not ai_enabled():
+        return JsonResponse({"error": "L'IA n'est pas configurée sur ce serveur."}, status=503)
+    doc = ImportedDocument.objects.create(filename=name, kind=ImportedDocument.KIND_TEXT, text=text, uploaded_by=request.user)
+    chunks = text_chunks(text)
+    return JsonResponse({"ok": True, "document": doc.id, "filename": doc.filename, "kind": "text", "pasted": True,
+                         "candidates": [], "templates": {}, "shortlist": 0, "chunks": len(chunks),
+                         "chars": sum(len(c) for c in chunks), "truncated": len(text) > MAX_TEXT_CHARS, "ai_enabled": True})
+
+
+@require_POST
+@editor_required
 def api_columns(request, document_id):
     """POST {columns: {field: column index}, header: bool}: the table read
     with the columns the editor chose (no AI)."""
@@ -635,7 +667,7 @@ def api_define(request):
 @require_POST
 @editor_required
 def api_extract(request, document_id):
-    """POST {chunk: n}: the AI reads chunk n of an imported text."""
+    """POST {chunk: n, want: "all" | "words" | "expressions"}: the AI reads chunk n of an imported text."""
     payload = _json(request) or {}
     doc = ImportedDocument.objects.filter(id=document_id, kind=ImportedDocument.KIND_TEXT).first()
     if not doc:
@@ -645,7 +677,8 @@ def api_extract(request, document_id):
     if not isinstance(n, int) or not 0 <= n < len(chunks):
         return JsonResponse({"error": "Partie invalide."}, status=400)
     try:
-        return JsonResponse({"ok": True, "candidates": check_candidates(extract_chunk(chunks[n]))})
+        want = payload.get("want") if payload.get("want") in ("all", "words", "expressions") else "all"
+        return JsonResponse({"ok": True, "candidates": check_candidates(extract_chunk(chunks[n], want))})
     except AssistantError as err:
         return JsonResponse({"error": str(err)}, status=503)
 

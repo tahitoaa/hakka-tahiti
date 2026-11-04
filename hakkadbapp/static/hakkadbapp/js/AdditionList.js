@@ -1085,6 +1085,14 @@ class DocumentImport {
         this.result = $('import-result');
         this.reset();
         this.form.addEventListener('submit', (event) => { event.preventDefault(); this.analyse(); });
+        // 📋 A pasted text, read by the AI.
+        this.paste = $('import-paste');
+        $('import-paste-go')?.addEventListener('click', (event) => this.analysePaste(event.currentTarget));
+        this.paste?.addEventListener('input', () => {
+            const han = (this.paste.value.match(/\p{Script=Han}/gu) || []).length;
+            const count = $('import-paste-count');
+            if (count) count.textContent = this.paste.value.trim() ? `${this.paste.value.length} signes, ${han} caractères chinois` : '';
+        });
         this.result.addEventListener('change', (event) => {
             const box = event.target.closest('[data-pick]');
             if (box) { this.entries[Number(box.dataset.pick)].picked = box.checked; this.renderSummary(); }
@@ -1132,9 +1140,17 @@ class DocumentImport {
         return data;
     }
 
+    /** « Importer : mots et expressions / mots / expressions » (page Importer). */
+    static want() {
+        return document.querySelector('input[name="import-want"]:checked')?.value || 'all';
+    }
+
     add(candidates) {
         const seen = new Set(this.entries.map((e) => e.hanzi.replace(/\s+/g, '')));
+        const want = DocumentImport.want();
         candidates.forEach((c) => {
+            // What was not asked for is left out.
+            if ((want === 'words' && c.kind === 'expression') || (want === 'expressions' && c.kind !== 'expression')) return;
             const key = c.hanzi.replace(/\s+/g, '');
             if (c.state === 'new' && seen.has(key)) c.state = 'duplicate';
             seen.add(key);
@@ -1264,21 +1280,44 @@ class DocumentImport {
         });
     }
 
+    /** 📋 A pasted text: saved as a document, then read by the AI part by part. */
+    async analysePaste(button) {
+        const text = this.paste?.value || '';
+        if (!text.trim()) { this.setStatus('Collez d’abord un texte.', true); return; }
+        this.reset();
+        const name = document.getElementById('import-paste-name')?.value.trim() || '';
+        this.sourceName = name;
+        try {
+            this.doc = await this.post('/api/import/texte', { text, name });
+        } catch (err) {
+            this.setStatus(`Échec : ${err.message}`, true);
+            return;
+        }
+        if (!this.doc.chunks) {
+            this.setStatus('Rien de nouveau à lire : chaque ligne en caractères chinois n’a que des mots déjà dans le lexique.');
+            return;
+        }
+        await this.readAllWithAi(button, { confirm: false, mode: 'paste' });
+    }
+
     /** The old way, on demand only: the AI reads the whole text, by parts. */
-    async readAllWithAi(button) {
+    async readAllWithAi(button, { confirm = true, mode = 'ai' } = {}) {
         const data = this.doc;
         if (!data?.chunks) return;
-        if (!window.confirm(`L’IA va lire tout le texte (${data.chunks} partie${data.chunks > 1 ? 's' : ''}) : c’est la lecture la plus coûteuse. Continuer ?`)) return;
-        DocumentImport.showModes('ai');
+        if (confirm && !window.confirm(`L’IA va lire tout le texte (${data.chunks} partie${data.chunks > 1 ? 's' : ''}) : c’est la lecture la plus coûteuse. Continuer ?`)) return;
+        DocumentImport.showModes(mode);
         await AdditionList.whileBusy(button, 'L’IA lit…', async () => {
             try {
                 for (let n = 0; n < data.chunks; n += 1) {
                     this.setStatus(`L’IA lit le texte : partie ${n + 1} sur ${data.chunks}…`);
-                    const part = await this.post(`/api/import/${data.document}/extraire`, { chunk: n });
+                    const part = await this.post(`/api/import/${data.document}/extraire`, { chunk: n, want: DocumentImport.want() });
                     this.add(part.candidates);
                     this.render();
                 }
+                data.readAll = true;   // read once: no « Lire tout le texte » button any more
                 this.setStatus(`Texte lu par l’IA (${data.chunks} partie${data.chunks > 1 ? 's' : ''}) : ${this.entries.length} entrée(s).`);
+                this.render();
+                await this.checkLanguages();
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
@@ -1353,7 +1392,7 @@ class DocumentImport {
             <div class="vt-import-summary"><span data-summary></span>
               <button type="button" class="saisie-btn saisie-btn-lg" data-languages hidden>✨ Vérifier FR / EN</button>
               ${this.toDefine().length ? `<button type="button" class="saisie-btn saisie-btn-lg saisie-btn-ai" data-define>✨ Définir les ${this.toDefine().length} candidats (IA)</button>` : ''}
-              ${this.doc?.kind === 'text' && this.doc.chunks && this.doc.ai_enabled ? `<button type="button" class="saisie-btn saisie-btn-lg saisie-btn-neutral" data-read-all
+              ${this.doc?.kind === 'text' && this.doc.chunks && this.doc.ai_enabled && !this.doc.readAll ? `<button type="button" class="saisie-btn saisie-btn-lg saisie-btn-neutral" data-read-all
                   title="La lecture la plus coûteuse : tout le texte passe par l’IA">Lire tout le texte avec l’IA (${this.doc.chunks} partie${this.doc.chunks > 1 ? 's' : ''})</button>` : ''}
               <button type="button" class="saisie-btn saisie-btn-lg saisie-btn-review" data-propose></button></div>
             <div class="vt-kinds" role="tablist" aria-label="Mots ou expressions">${AdditionList.kindTabs(this.kindTab, {
