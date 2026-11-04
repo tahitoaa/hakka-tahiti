@@ -1,0 +1,63 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+{% include "hakkadbapp/components/addition_list_styles.html" %}
+{% include "hakkadbapp/components/validation_styles.html" %}
+<style>
+  /* A field to tap, edited in place. */
+  .vt-edit { display: inline-block; min-width: 1.5rem; min-height: 1.3rem; padding: 0 0.2rem; border-radius: 0.3rem; cursor: text;
+             border-bottom: 1px dashed #DDD0BD; }
+  .vt-edit:hover, .vt-edit:focus { background: #FBF0E6; outline: none; border-bottom-color: #9B1C1C; }
+  .vt-edit-input { width: 100%; min-width: 6rem; min-height: 1.9rem; padding: 0 0.4rem; border: 2px solid #9B1C1C; border-radius: 0.35rem;
+                   font-size: 0.85rem; background: #fff; }
+  .vt-edit-input.is-hakka { font-size: 1rem; min-width: 7rem; }
+</style>
+
+<div id="drafts-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
+  {% include "hakkadbapp/components/members_tabs.html" %}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="font-display text-xl font-bold text-gray-800">Brouillons
+      <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>Tous les brouillons, quel que soit
+        leur auteur (ceux de l'IA sont dans l'onglet 🤖 IA). Touchez un caractère, un pinyin, un sens ou un thème pour le modifier sur
+        place : Entrée enregistre, Échap annule. Caractères et pinyin s'écrivent comme enregistrés : un espace entre les mots d'une
+        expression, tons en chiffres (<code>ngai2 oi4 wuk5ka1</code>). Pour les suggestions de caractères, ✎ ouvre la Saisie. Cochez
+        ensuite les lignes prêtes et « Proposer à la validation ».</div></details></h2>
+    <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les brouillons"
+           class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
+  </div>
+
+  <div id="vt-facets" class="vt-facets" role="group" aria-label="Filtrer et grouper"></div>
+
+  <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
+    <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
+    <button type="button" data-bulk="review" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
+    <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-delete" disabled>Supprimer</button>
+  </div>
+  <div id="validation-status" class="text-sm min-h-5" role="status"></div>
+
+  <div id="vt-kinds" class="vt-kinds" role="tablist" aria-label="Mots ou expressions"></div>
+  <div class="vt-wrap">
+    <table class="vt-table no-auto-csv">
+      <thead>
+        <tr>
+          <th class="vt-check"><input type="checkbox" id="validation-all" aria-label="Tout sélectionner"></th>
+          <th class="vt-hk">Caractères</th>
+          <th class="vt-hk">Pinyin</th>
+          <th>Français · anglais</th>
+          <th class="vt-type">Thème</th>
+          <th class="vt-who">Par</th>
+          <th class="vt-st">Statut</th>
+          <th class="vt-ia">Remarques</th>
+          <th><span class="sr-only">Modifier</span></th>
+        </tr>
+      </thead>
+      <tbody id="validation-rows">
+        <tr><td colspan="9" class="vt-empty">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <button type="button" id="vt-more" class="saisie-btn saisie-btn-neutral vt-more" hidden>Afficher plus</button>
+</div>
+{{ status_labels|json_script:"saisie-status-labels" }}
+<script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+{% endblock %}

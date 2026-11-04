@@ -59,6 +59,16 @@ class AdditionList {
         const ai = ' <span class="vt-ai-badge">IA</span>';
         const hanzi = AdditionList.platformHanzi(e.hanzi);
         const pinyin = e.pinyin ? esc(AdditionList.platformPinyin(e.pinyin)) : `<i>${esc(opts.rawPinyin || '') || '—'}</i>`;
+        if (opts.editable) {
+            // Brouillons: each field is a cell to tap, edited in place (the stored value: words spaced, tone digits).
+            const cell = (field, shown, cls = '') => `<span class="vt-edit ${cls}" data-edit="${field}" tabindex="0" role="button"
+                title="Modifier">${shown || '<i>—</i>'}</span>`;
+            return `<td class="hanzi vt-hanzi">${cell('hanzi', esc(hanzi))}</td>
+            <td class="vt-pinyin">${cell('pinyin', pinyin)}</td>
+            <td class="vt-french">${cell('french', esc(e.french))}<span class="vt-sub italic" lang="en"> · ${cell('english', esc(e.english))}</span>
+                ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
+            <td class="vt-meta vt-type">${cell('themes', esc(e.themes || ''))}</td>`;
+        }
         return `<td class="hanzi vt-hanzi">${esc(hanzi)}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
                 ? `<small class="vt-sub" title="Forme du document">${esc(opts.docHanzi)}</small>` : ''}</td>
             <td class="vt-pinyin">${pinyin}${opts.warn ? `<div class="vt-warn">⚠ ${esc(opts.warn)}</div>` : ''}</td>
@@ -208,6 +218,8 @@ class AdditionList {
     render() {
         const review = this.additions.filter((a) => a.status === 'review').length;
         document.querySelectorAll('[data-review-count]').forEach((el) => { el.textContent = review; el.hidden = !review; });
+        const drafts = this.additions.filter((a) => a.status === 'draft' && !a.by_ai).length;
+        document.querySelectorAll('[data-draft-count]').forEach((el) => { el.textContent = drafts; el.hidden = !drafts; });
         this.el.filters?.querySelectorAll('[data-filter]').forEach((b) => {
             b.dataset.label ||= b.textContent.trim();
             const count = this.additions.filter((a) => this.matchesFilter(a, b.dataset.filter)).length;
@@ -399,6 +411,20 @@ class ValidationTable extends AdditionList {
             this.render();
         });
         this.el.more?.addEventListener('click', () => { this.limit += ValidationTable.PAGE; this.render(); });
+        this.inlineEdit = !!options.inlineEdit;
+        if (this.inlineEdit) {
+            const open = (span) => this.editInPlace(span);
+            this.el.list.addEventListener('click', (event) => {
+                if (event.target.closest('input')) return;
+                const s = event.target.closest('[data-edit]');
+                if (s) open(s);
+            });
+            this.el.list.addEventListener('keydown', (event) => {
+                if (event.target.closest('input')) return;   // typing in an open field
+                const s = event.target.closest('span[data-edit]');
+                if (s && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(s); }
+            });
+        }
         this.el.list.addEventListener('click', (event) => {
             const btn = event.target.closest('[data-copy]');
             if (!btn) return;
@@ -426,7 +452,7 @@ class ValidationTable extends AdditionList {
         this.el.list.addEventListener('click', (event) => {
             const remark = event.target.closest('[data-remark]');
             if (remark) return this.onRemarkAction(remark);
-            if (event.target.closest('button, a, input, label, textarea, .vt-detail')) return;
+            if (event.target.closest('button, a, input, label, textarea, .vt-detail, [data-edit]')) return;
             const row = event.target.closest('tr[data-id]');
             if (row) this.toggle(Number(row.dataset.id), !this.selected.has(Number(row.dataset.id)));
         });
@@ -478,6 +504,49 @@ class ValidationTable extends AdditionList {
         const box = row?.querySelector('[data-select]');
         if (box) box.checked = on;
         this.renderBar();
+    }
+
+    /** Brouillons: a field turned into an input; Enter (or leaving it) saves,
+     *  Escape cancels. Characters and pinyin are edited as stored (a space
+     *  between the words of an expression, tone digits). */
+    editInPlace(span) {
+        if (span.querySelector('input')) return;
+        const id = Number(span.closest('tr[data-id]')?.dataset.id);
+        const a = this.additions.find((x) => x.id === id);
+        if (!a) return;
+        const field = span.dataset.edit;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = a[field] || '';
+        input.className = `vt-edit-input${['hanzi', 'pinyin'].includes(field) ? ' is-hakka' : ''}`;
+        input.setAttribute('aria-label', field);
+        span.replaceChildren(input);
+        input.focus();
+        input.select();
+        let done = false;
+        const finish = async (save) => {
+            if (done) return;
+            done = true;
+            const value = input.value.trim();
+            if (!save || value === (a[field] || '')) { this.render(); return; }
+            const payload = { [field]: value };
+            // New characters or reading: the text typed in the Saisie no longer applies.
+            if (field === 'hanzi' || field === 'pinyin') payload.input_text = '';
+            try {
+                const data = await AdditionList.request(`${AdditionList.API}${id}`, payload);
+                this.upsert(data.addition);
+                this.flash([id]);
+                this.setStatus('');
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+                this.render();
+            }
+        };
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+            if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
     }
 
     /** The status filter and the search (AdditionList), without the facets. */
@@ -614,7 +683,7 @@ class ValidationTable extends AdditionList {
         const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
-            ${AdditionList.entryCells(a)}
+            ${AdditionList.entryCells(a, { editable: this.inlineEdit })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
@@ -1444,6 +1513,25 @@ class DocumentImport {
         });
     }
 }
+
+/* « Brouillons »: every draft, whoever wrote it (the AI's are on its own
+   page), edited in place, then proposed to Validation or deleted. */
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('drafts-page');
+    if (!root) return;
+    const $ = (id) => document.getElementById(id);
+    const table = new ValidationTable({
+        list: $('validation-rows'), search: $('saisie-search'), filters: null,
+        all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
+        facets: $('vt-facets'), more: $('vt-more'), filter: 'all', inlineEdit: true,
+        scope: (a) => a.status === 'draft' && !a.by_ai,
+        empty: 'Aucun brouillon.',
+        onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
+    });
+    table.saisieUrl = root.dataset.saisieUrl;
+    window.validationTable = table;
+    table.load();
+});
 
 /* « Suggestions IA »: the AI's drafts, generated here, filtered, corrected,
    then proposed to Validation or set aside -- by a person. */

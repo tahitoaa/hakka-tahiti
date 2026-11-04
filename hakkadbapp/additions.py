@@ -177,6 +177,14 @@ def validation(request):
     })
 
 
+def drafts(request):
+    """Every draft, whoever wrote it, to edit in place and propose."""
+    if not is_editor(request.user):
+        return _deny(request)
+    return render(request, "hakkadbapp/drafts.html", {
+        "title": "Brouillons", "page": "drafts", "status_labels": dict(LexiconAddition.STATUS_CHOICES)})
+
+
 def ai_suggestions(request):
     """The AI's suggestions: generated as its drafts, filtered and corrected
     here, then proposed to Validation (or set aside) by a person."""

@@ -78,6 +78,7 @@ urlpatterns = [
     path("importer/", additions.document_import, name="document_import"),
     path("guide-saisie/", additions.input_guide, name="input_guide"),
     path("suggestions-ia/", additions.ai_suggestions, name="ai_suggestions"),
+    path("brouillons/", additions.drafts, name="drafts"),
     path("api/hakkadict", hakkadict.api_lookup, name="hakkadict_lookup"),
     path("api/hakkadict/brouillons", hakkadict.api_drafts, name="hakkadict_drafts"),
     path("corrections-ereo/", platform_corrections.page, name="platform_corrections"),
