@@ -48,6 +48,8 @@
     <button type="button" data-bulk="draft" data-steps="review validated rejected" class="saisie-btn saisie-btn-neutral" disabled>↺ Brouillon</button>
     <button type="button" data-bulk="delete" data-steps="draft rejected" class="saisie-btn saisie-btn-delete" disabled>Supprimer</button>
     <button type="button" data-bulk="ai-review" data-steps="draft review" data-needs-ai hidden class="saisie-btn saisie-btn-ai" disabled>🤖 Relire avec l’IA</button>
+    <button type="button" data-bulk="complete" data-steps="draft review" class="saisie-btn saisie-btn-ai" disabled
+            title="Remplit les champs vides (français, anglais, thème) avec les propositions de l’IA ; l’IA relit d’abord les lignes qui n’en ont pas">✨ Compléter tout</button>
   </div>
   <div id="validation-status" class="text-sm min-h-5" role="status"></div>
 

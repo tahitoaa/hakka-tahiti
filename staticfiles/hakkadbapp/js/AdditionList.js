@@ -757,6 +757,8 @@ class ValidationTable extends AdditionList {
               </div></li>`).join('');
         return `<tr class="vt-detail" data-detail="${a.id}"><td colspan="9">
             <div class="vt-detail-box">
+              ${['french', 'english', 'themes'].some((f) => !String(a[f] || '').trim()) ? `<div class="vt-remark-actions"><button type="button" class="saisie-btn saisie-btn-ai" data-remark="complete"
+                  title="Remplit les champs vides avec les propositions (l’IA relit d’abord si besoin)">✨ Compléter tout</button></div>` : ''}
               ${list ? `<ul class="vt-remarks">${list}</ul>` : '<p class="vt-sub">Aucune remarque en cours.</p>'}
               <form class="vt-comment-form" data-comment-form="${a.id}">
                 <label class="sr-only" for="vt-comment-${a.id}">Votre commentaire</label>
@@ -773,6 +775,7 @@ class ValidationTable extends AdditionList {
         const row = button.closest('[data-id], [data-detail]');
         const id = Number(row.dataset.id || row.dataset.detail);
         const action = button.dataset.remark;
+        if (action === 'complete') return this.complete([id], button);
         if (action === 'expand') {
             if (this.expanded.has(id)) this.expanded.delete(id);
             else this.expanded.add(id);
@@ -822,6 +825,7 @@ class ValidationTable extends AdditionList {
 
     async bulk(action, button) {
         if (action === 'ai-review') return this.aiReview(button);
+        if (action === 'complete') return this.complete([...this.selected], button);
         const ids = [...this.selected];
         if (!ids.length) return;
         if (action === 'delete' && !confirm(`Supprimer ${ids.length} ajout${ids.length > 1 ? 's' : ''} ? C'est définitif.`)) return;
@@ -846,6 +850,40 @@ class ValidationTable extends AdditionList {
                 this.setStatus(`✓ ${labels.done(ids.length)}`);
             } catch (err) {
                 rows.forEach((r) => r.classList.remove('is-busy'));
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
+        this.renderBar();
+    }
+
+    /** « Compléter tout »: the empty fields of these additions filled with the
+     *  remarks' proposals (the AI reads first those that have none), by 10. */
+    async complete(ids, button) {
+        if (!ids.length) return;
+        this.setStatus('');
+        let filled = 0;
+        let incomplete = 0;
+        let aiFailed = false;
+        await AdditionList.whileBusy(button, '✨ Complète…', async () => {
+            try {
+                for (let k = 0; k < ids.length; k += 10) {
+                    if (ids.length > 10) this.setStatus(`✨ ${Math.min(k, ids.length)} sur ${ids.length}…`);
+                    const data = await AdditionList.request('/api/ia/completer', { ids: ids.slice(k, k + 10) });
+                    const byId = new Map(data.additions.map((a) => [a.id, a]));
+                    this.additions = this.additions.map((a) => byId.get(a.id) || a);
+                    const byCid = new Map(data.comments.map((c) => [c.id, c]));
+                    this.comments = [...data.comments.filter((c) => !this.comments.some((x) => x.id === c.id)),
+                        ...this.comments.map((c) => byCid.get(c.id) || c)];
+                    filled += data.filled;
+                    incomplete += data.incomplete;
+                    aiFailed ||= data.ai_failed;
+                }
+                this.render();
+                this.flash(ids);
+                this.setStatus(`✨ ${filled} champ${filled > 1 ? 's' : ''} complété${filled > 1 ? 's' : ''}`
+                    + (incomplete ? ` ; ${incomplete} ligne${incomplete > 1 ? 's' : ''} encore incomplète${incomplete > 1 ? 's' : ''} (voir 💬).` : ' ; tout est complet.')
+                    + (aiFailed ? ' L’IA n’a pas répondu : seules les propositions déjà là ont été appliquées.' : ''));
+            } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
         }, [...this.el.bar.querySelectorAll('[data-bulk]')]);

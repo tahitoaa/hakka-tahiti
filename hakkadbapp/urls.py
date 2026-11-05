@@ -90,6 +90,7 @@ urlpatterns = [
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),
     path("api/ia/relire", assistant.api_review, name="assistant_review"),
+    path("api/ia/completer", assistant.api_complete, name="assistant_complete"),
     path("api/ia/mots", assistant.api_new_words, name="assistant_new_words"),
     path("api/ia/muet", assistant.api_mute, name="assistant_mute"),
     path("api/ia/nuit", assistant.api_nightly, name="assistant_nightly"),

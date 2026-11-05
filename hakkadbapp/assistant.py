@@ -152,7 +152,9 @@ def add_comment(item, kind, text, field="", proposed=""):
                                                 status__in=ReviewComment.PENDING, kind=kind)
     if kind == ReviewComment.KIND_CORRECTION and open_remarks.filter(field=field, proposed_value=proposed).exists():
         return None
-    if kind == ReviewComment.KIND_COMMENT and open_remarks.filter(text=text).exists():
+    if kind == ReviewComment.KIND_COMMENT and field and open_remarks.filter(field=field, proposed_value=proposed).exists():
+        return None
+    if kind == ReviewComment.KIND_COMMENT and not field and open_remarks.filter(field="", text=text).exists():
         return None
     return ReviewComment.objects.create(
         target_type=item["type"], target_id=item["id"], target_label=item["label"], kind=kind, text=text,
@@ -584,6 +586,75 @@ def comment_json(c):
 
 def _error(err, status=503):
     return JsonResponse({"error": str(err)}, status=status)
+
+
+def complete(additions, user, ask_ai=True):
+    """« Compléter tout »: fills the empty fields (français, anglais, thème)
+    of these additions with the proposals of the open remarks; those still
+    empty with no proposal are first read by the AI (when it is on, at most
+    MAX_REVIEW_ITEMS, muted ones left out). Never replaces a filled field.
+    Returns (fields filled, new comments, applied comments)."""
+    def fillable(a):
+        return [f for f in FILL_FIELDS if not (getattr(a, f) or "").strip()]
+
+    def proposals(ids):
+        out = defaultdict(dict)
+        for c in ReviewComment.objects.filter(target_type=ReviewComment.TARGET_ADDITION, target_id__in=ids,
+                                              status__in=ReviewComment.PENDING, field__in=FILL_FIELDS).exclude(
+                proposed_value="").order_by("-created_at"):
+            out[c.target_id].setdefault(c.field, c)
+        return out
+
+    ids = [a.id for a in additions]
+    known = proposals(ids)
+    new, ai_failed = [], False
+    if ask_ai and ai_enabled():
+        muted = muted_ids(ReviewComment.TARGET_ADDITION, ids)
+        to_read = [a.id for a in additions if a.id not in muted
+                   and any(f not in known.get(a.id, {}) for f in fillable(a))][:MAX_REVIEW_ITEMS]
+        if to_read:
+            try:
+                new = review(ReviewComment.TARGET_ADDITION, to_read)
+                known = proposals(ids)
+            except AssistantError as err:   # the proposals already there are still applied
+                logger.warning("assistant: complete, review failed: %s", err)
+                ai_failed = True
+    filled, applied, now = 0, [], timezone.now()
+    with transaction.atomic():
+        for a in additions:
+            changed = []
+            for field in fillable(a):
+                c = known.get(a.id, {}).get(field)
+                if not c:
+                    continue
+                setattr(a, field, c.proposed_value)
+                changed.append(field)
+                c.status, c.resolved_by, c.resolved_at = ReviewComment.STATUS_APPLIED, user, now
+                c.save(update_fields=["status", "resolved_by", "resolved_at"])
+                applied.append(c)
+            if changed:
+                a.updated_by = user
+                a.save(update_fields=changed + ["updated_by", "updated_at"])
+                filled += len(changed)
+    return filled, new, applied, ai_failed
+
+
+@require_POST
+@editor_required
+def api_complete(request):
+    """POST {ids}: « Compléter tout » on these additions (complete())."""
+    payload = _json(request) or {}
+    ids = [i for i in payload.get("ids", []) if isinstance(i, int)][:50]
+    additions = list(LexiconAddition.objects.filter(id__in=ids))
+    if not additions:
+        return JsonResponse({"error": "Aucun ajout."}, status=400)
+    filled, new, applied, ai_failed = complete(additions, request.user)
+    from .additions import _addition_json, missing_fields
+
+    return JsonResponse({"ok": True, "filled": filled, "additions": [_addition_json(a) for a in additions],
+                         "comments": [comment_json(c) for c in new + applied],
+                         "incomplete": sum(1 for a in additions if missing_fields(a)),
+                         "ai_failed": ai_failed})
 
 
 @require_POST
