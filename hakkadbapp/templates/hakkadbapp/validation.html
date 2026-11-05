@@ -7,7 +7,7 @@
 <div id="validation-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
   {% include "hakkadbapp/components/members_tabs.html" %}
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex items-center gap-3"><h2 class="font-display text-xl font-bold text-gray-800">Validation</h2>
+    <div class="flex items-center gap-3"><h2 class="font-display text-xl font-bold text-gray-800">Suivi des ajouts</h2>
       <button type="button" id="vs-open" class="vs-open vs-open-lg" title="Passer les ajouts un par un, en grand">▶ Diaporama</button></div>
     <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les ajouts"
            class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
@@ -19,29 +19,36 @@
   </div>
 
   <div id="additions-panel" role="tabpanel" class="space-y-3">
+  <!-- The journey of an addition: one step at a time (same filter as the old status chips). -->
+  <nav id="saisie-filters" class="st-steps" role="group" aria-label="Étapes">
+    <button type="button" class="st-step st-draft" data-filter="draft" aria-pressed="false" data-label="Brouillons">
+      <span class="st-dot">📝</span><span class="st-name">Brouillons</span><span class="st-n" data-count></span></button>
+    <span class="st-arrow" aria-hidden="true">→</span>
+    <button type="button" class="st-step st-review" data-filter="review" aria-pressed="true" data-label="À valider">
+      <span class="st-dot">↑</span><span class="st-name">À valider</span><span class="st-n" data-count></span></button>
+    <span class="st-arrow" aria-hidden="true">→</span>
+    <button type="button" class="st-step st-validated" data-filter="validated" aria-pressed="false" data-label="Validés">
+      <span class="st-dot">✓</span><span class="st-name">Validés</span><span class="st-n" data-count></span></button>
+    <button type="button" class="st-step st-rejected st-side" data-filter="rejected" aria-pressed="false" data-label="Rejetés">
+      <span class="st-dot">✕</span><span class="st-name">Rejetés</span><span class="st-n" data-count></span></button>
+  </nav>
   <details class="vt-settings" id="vt-settings" open>
   <summary>⚙ Filtres<span id="vt-settings-summary"></span></summary>
   <div class="vt-settings-body">
 
 
-  <div id="saisie-filters" class="flex flex-wrap gap-2 text-sm" role="group" aria-label="Filtrer par statut">
-    {% for value, label in status_choices %}
-    <button type="button" class="saisie-chip px-4 min-h-11 rounded-full border border-gray-300 bg-white" data-filter="{{ value }}" aria-pressed="{% if value == 'review' %}true{% else %}false{% endif %}">{{ label }}</button>
-    {% endfor %}
-    <button type="button" class="saisie-chip px-4 min-h-11 rounded-full border border-gray-300 bg-white" data-filter="all" aria-pressed="false">Tous</button>
-  </div>
   <div id="vt-facets" class="vt-facets" role="group" aria-label="Filtrer et grouper"></div>
   </div>
   </details>
 
   <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
     <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
-    <button type="button" data-bulk="validated" class="saisie-btn saisie-btn-validate" disabled>✓ Valider</button>
-    <button type="button" data-bulk="rejected" class="saisie-btn saisie-btn-reject" disabled>✕ Rejeter</button>
-    <button type="button" data-bulk="review" class="saisie-btn saisie-btn-neutral" disabled>↑ À valider</button>
-    <button type="button" data-bulk="draft" class="saisie-btn saisie-btn-neutral" disabled>↺ Brouillon</button>
-    <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-delete" disabled>Supprimer</button>
-    <button type="button" data-bulk="ai-review" data-needs-ai hidden class="saisie-btn saisie-btn-ai" disabled>🤖 Relire avec l’IA</button>
+    <button type="button" data-bulk="validated" data-steps="review" class="saisie-btn saisie-btn-validate" disabled>✓ Valider</button>
+    <button type="button" data-bulk="rejected" data-steps="review" class="saisie-btn saisie-btn-reject" disabled>✕ Rejeter</button>
+    <button type="button" data-bulk="review" data-steps="draft rejected" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
+    <button type="button" data-bulk="draft" data-steps="review validated rejected" class="saisie-btn saisie-btn-neutral" disabled>↺ Brouillon</button>
+    <button type="button" data-bulk="delete" data-steps="draft rejected" class="saisie-btn saisie-btn-delete" disabled>Supprimer</button>
+    <button type="button" data-bulk="ai-review" data-steps="draft review" data-needs-ai hidden class="saisie-btn saisie-btn-ai" disabled>🤖 Relire avec l’IA</button>
   </div>
   <div id="validation-status" class="text-sm min-h-5" role="status"></div>
 

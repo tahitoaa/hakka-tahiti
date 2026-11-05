@@ -237,8 +237,10 @@ class AdditionList {
         document.querySelectorAll('[data-draft-count]').forEach((el) => { el.textContent = drafts; el.hidden = !drafts; });
         this.el.filters?.querySelectorAll('[data-filter]').forEach((b) => {
             b.dataset.label ||= b.textContent.trim();
-            const count = this.additions.filter((a) => this.matchesFilter(a, b.dataset.filter)).length;
-            b.textContent = `${b.dataset.label} (${count})`;
+            const count = this.additions.filter((a) => (!this.scope || this.scope(a)) && this.matchesFilter(a, b.dataset.filter)).length;
+            const badge = b.querySelector('[data-count]');
+            if (badge) badge.textContent = count;   // a step of the journey: the number in its badge
+            else b.textContent = `${b.dataset.label} (${count})`;
         });
 
         const items = this.visible();
@@ -668,6 +670,12 @@ class ValidationTable extends AdditionList {
         this.el.bar.querySelectorAll('[data-bulk]').forEach((b) => {
             if (b.getAttribute('aria-busy') === 'true') return;
             const action = b.dataset.bulk;
+            // Each step of the journey shows its own actions.
+            if (b.dataset.steps) {
+                const shown = this.filter === 'all' || b.dataset.steps.split(' ').includes(this.filter);
+                if (!shown) { b.hidden = true; return; }
+                if (!b.hasAttribute('data-needs-ai') || this.aiEnabled) b.hidden = false;
+            }
             // Nothing to do when every ticked row already has that status;
             // only drafts and rejected additions can be deleted.
             if (action === 'ai-review') {
@@ -704,7 +712,7 @@ class ValidationTable extends AdditionList {
         const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
-            ${AdditionList.entryCells(a, { editable: this.inlineEdit })}
+            ${AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}</td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
@@ -1713,12 +1721,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const table = new ValidationTable({
         list: $('validation-rows'), search: $('saisie-search'), filters: $('saisie-filters'),
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
-        facets: $('vt-facets'), more: $('vt-more'),
-        filter: 'review', empty: 'Rien à afficher ici.',
+        facets: $('vt-facets'), more: $('vt-more'), inlineEdit: true,
+        // The AI's drafts are sorted on the « Suggestions IA » page.
+        scope: (a) => !(a.by_ai && a.status === 'draft'),
+        // ?etape=brouillons (the old « Brouillons » page) opens that step.
+        filter: ({ brouillons: 'draft', valides: 'validated', rejetes: 'rejected' })[new URLSearchParams(location.search).get('etape')] || 'review',
+        empty: 'Rien à afficher à cette étape.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
     table.saisieUrl = root.dataset.saisieUrl;
     window.validationTable = table;
+    table.el.filters?.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === table.filter)));
     table.load();
     if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
     if (document.getElementById('import-form')) window.documentImport = new DocumentImport(table);

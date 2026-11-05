@@ -366,8 +366,7 @@
             <li><a href="{% url 'transcriptions' %}" class="nav-link{% if page == 'transcriptions' %} is-active{% endif %}">Transcriptions</a></li>
             {% if can_edit %}
             <li><a href="{% url 'saisie' %}" class="nav-link{% if page == 'saisie' %} is-active{% endif %}">Saisie</a></li>
-            <li><a href="{% url 'drafts' %}" class="nav-link{% if page == 'drafts' %} is-active{% endif %}">Brouillons</a></li>
-            <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Validation</a></li>
+            <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Suivi des ajouts</a></li>
             <li><a href="{% url 'ai_suggestions' %}" class="nav-link{% if page == 'ai_suggestions' %} is-active{% endif %}">Suggestions IA</a></li>
             <li><a href="{% url 'document_import' %}" class="nav-link{% if page == 'document_import' %} is-active{% endif %}">Importer</a></li>
             <li><a href="{% url 'platform_corrections' %}" class="nav-link{% if page == 'platform_corrections' %} is-active{% endif %}">Corrections e-reo</a></li>
