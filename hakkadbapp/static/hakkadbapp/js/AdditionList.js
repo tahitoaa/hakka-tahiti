@@ -460,6 +460,14 @@ class ValidationTable extends AdditionList {
                 if (s && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(s); }
             });
         }
+        // « Copier la sélection » (table_copy.js): each addition as its platform line.
+        const table = this.el.list.closest('table');
+        if (table) {
+            table.copyLine = (tr) => {
+                const a = this.additions.find((x) => x.id === Number(tr.dataset.id));
+                return a ? AdditionList.clipboardText(a) : null;
+            };
+        }
         this.el.list.addEventListener('click', (event) => {
             const btn = event.target.closest('[data-copy]');
             if (!btn) return;

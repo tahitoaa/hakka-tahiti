@@ -1,6 +1,6 @@
 /* « 📋 Copier la sélection » above every table of the site (data-no-copy to
-   opt out). What is copied, as tab-separated text (pastes as cells in a
-   spreadsheet), with the header row:
+   opt out). Copied twice over: a numbered list to read in a message (plain
+   text), and a table for a spreadsheet or a document (HTML). What:
    1. the ticked rows (a checked box in the row), else
    2. the rows (or, within one row, the cells) the mouse selection covers, else
    3. the row of the focused cell (keyboard, table_nav.js), else
@@ -48,7 +48,13 @@
         return [rows, null, 'tout'];
     }
 
-    function tsv(table) {
+    const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+    /** The copy, in two forms: `plain` to read in a message (a numbered
+     *  list), `html` a real table (a spreadsheet or a document keeps the
+     *  cells). A table may give its own line per row: table.copyLine(tr)
+     *  (Suivi: the platform line « pinyin hanzi — français — anglais »). */
+    function build(table) {
         const [rows, cells, how] = chosen(table);
         const head = headRow(table);
         // Column indexes kept: the chosen cells, else those with some text in the copied rows.
@@ -58,16 +64,44 @@
             const width = Math.max(0, ...rows.map((r) => r.cells.length));
             cols = [...Array(width).keys()].filter((i) => rows.some((r) => r.cells[i] && text(r.cells[i])));
         }
-        const line = (r) => cols.map((i) => (r.cells[i] ? text(r.cells[i]) : '')).join('\t');
-        const lines = rows.map(line);
-        if (head && (rows.length > 1 || !cells)) lines.unshift(line(head));
-        return { value: lines.join('\n'), count: rows.length, how };
+        const values = (r) => cols.map((i) => (r.cells[i] ? text(r.cells[i]) : ''));
+        const names = head ? values(head) : cols.map(() => '');
+
+        let plain;
+        const own = typeof table.copyLine === 'function' ? rows.map((r) => table.copyLine(r)) : null;
+        if (own && own.every(Boolean)) {
+            plain = rows.length === 1 ? own[0] : own.map((l, k) => `${k + 1}. ${l}`).join('\n');
+        } else if (cols.length <= 6 || cells) {
+            // Few columns: one line per row, « valeur · valeur · … ».
+            const line = (r) => values(r).filter(Boolean).join(' · ');
+            plain = rows.length === 1 ? line(rows[0]) : rows.map((r, k) => `${k + 1}. ${line(r)}`).join('\n');
+        } else {
+            // Many columns (Dictionnaire des caractères): a block per row, « Colonne : valeur ».
+            plain = rows.map((r, k) => {
+                const v = values(r);
+                const [first, ...rest] = v.map((x, i) => [names[i], x]).filter(([, x]) => x);
+                const title = `${rows.length > 1 ? `${k + 1}. ` : ''}${first ? first[1] : ''}`;
+                return [title, ...rest.map(([n, x]) => `   ${n ? `${n} : ` : ''}${x}`)].join('\n');
+            }).join('\n\n');
+        }
+        const html = `<table>${head ? `<thead><tr>${names.map((n) => `<th>${esc(n)}</th>`).join('')}</tr></thead>` : ''}<tbody>${
+            rows.map((r) => `<tr>${values(r).map((x) => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        return { plain, html, count: rows.length, how };
     }
 
-    async function write(value) {
-        try { await navigator.clipboard.writeText(value); return true; } catch (e) { /* older browsers, http */ }
+    async function write({ plain, html }) {
+        try {
+            if (window.ClipboardItem && navigator.clipboard?.write) {
+                await navigator.clipboard.write([new ClipboardItem({
+                    'text/plain': new Blob([plain], { type: 'text/plain' }),
+                    'text/html': new Blob([html], { type: 'text/html' }),
+                })]);
+                return true;
+            }
+        } catch (e) { /* plain text below */ }
+        try { await navigator.clipboard.writeText(plain); return true; } catch (e) { /* older browsers, http */ }
         const area = document.createElement('textarea');
-        area.value = value;
+        area.value = plain;
         area.style.position = 'fixed';
         area.style.opacity = '0';
         document.body.appendChild(area);
@@ -85,14 +119,15 @@
             button.type = 'button';
             button.className = 'tc-copy';
             button.textContent = '📋 Copier la sélection';
-            button.title = 'Lignes cochées, ou sélectionnées à la souris, sinon tout le tableau (colonnes séparées par des tabulations)';
+            button.title = 'Lignes cochées, ou sélectionnées à la souris, sinon tout le tableau : une liste lisible dans un message, un tableau dans un tableur';
             // Keep the mouse selection: the button must not take it away.
             button.addEventListener('mousedown', (e) => e.preventDefault());
             button.addEventListener('click', async () => {
-                const { value, count, how } = tsv(table);
+                const copy = build(table);
+                const { count, how } = copy;
                 if (!count) { button.textContent = 'Rien à copier'; }
                 else {
-                    const ok = await write(value);
+                    const ok = await write(copy);
                     const what = how === 'tout' ? `tout le tableau (${count} ligne${count > 1 ? 's' : ''})`
                         : `${count} ligne${count > 1 ? 's' : ''} ${how}${count > 1 ? 's' : ''}`;
                     button.textContent = ok ? `✓ Copié : ${what}` : 'Copie impossible';
