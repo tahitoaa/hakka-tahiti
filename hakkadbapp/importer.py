@@ -49,8 +49,10 @@ HEADER_WORDS = {
     "lang": ("langue du sens", "langue"),
     "remark": ("remarque", "remarques", "note", "notes", "commentaire", "commentaires", "observations"),
     "type": ("type", "nature"),
+    # Where this row comes from (« Guide Wen Fa »): the addition's Source, else the file's.
+    "origin": ("source", "origine", "provenance"),
 }
-EXTRA_FIELDS = ("page", "source_sense", "remark", "type")
+EXTRA_FIELDS = ("page", "source_sense", "remark", "type", "origin")
 
 
 def _header_field(name):
@@ -218,7 +220,7 @@ def table_candidates(rows, layout=None):
     return out, False
 
 
-MAPPABLE = ("hanzi", "pinyin", "french", "english", "themes", "type", "page", "source_sense", "remark")
+MAPPABLE = ("hanzi", "pinyin", "french", "english", "themes", "type", "page", "source_sense", "remark", "origin")
 
 
 def _mapping_reply(doc, rows):
@@ -772,7 +774,7 @@ def api_propose(request, document_id):
     clean = []
     for e in entries:
         fields = ("hanzi", "document_hanzi", "pinyin", "french", "english", "themes", "location", "source_sense",
-                  "remark", "type")
+                  "remark", "type", "origin")
         if not isinstance(e, dict) or not all(isinstance(e.get(k, ""), str) for k in fields):
             return JsonResponse({"error": "Entrée mal formée."}, status=400)
         ai_fields = e.get("ai_fields") if isinstance(e.get("ai_fields"), list) else []
@@ -785,7 +787,8 @@ def api_propose(request, document_id):
             skipped += 1
             continue
         where = f" ({c['location']})" if c["location"] else ""
-        notes = [f"Importé de « {doc.filename} »{where} par {request.user.username} ; source : {source}."]
+        row_source = " ".join(c.get("origin", "").split())[:200] or source
+        notes = [f"Importé de « {doc.filename} »{where} par {request.user.username} ; source : {row_source}."]
         if c["document_hanzi"] != c["hanzi"]:
             notes.append(f"Forme du document : {c['document_hanzi']}.")
         doc_reading = " ".join(c["pinyin"].split())
@@ -805,5 +808,6 @@ def api_propose(request, document_id):
         created.append(LexiconAddition.objects.create(
             kind=c["kind"], status=LexiconAddition.STATUS_REVIEW, hanzi=c["hanzi"], pinyin=c["reading"],
             french=c["french"].strip(), english=c["english"].strip(), themes=c["themes"].strip(),
-            observations=" ".join(notes), source=source, created_by=request.user, updated_by=request.user))
+            observations=" ".join(notes), source=row_source,
+            created_by=request.user, updated_by=request.user))
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created], "skipped": skipped})

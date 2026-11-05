@@ -1332,7 +1332,7 @@ class DocumentImport {
         const esc = AdditionList.escapeHtml;
         const FIELDS = [['', '— ignorer —'], ['hanzi', 'Caractères'], ['pinyin', 'Lecture'], ['french', 'Français'],
             ['english', 'Anglais'], ['themes', 'Thème'], ['type', 'Type (mot / expression)'], ['page', 'Page'],
-            ['source_sense', 'Sens (autre langue)'], ['remark', 'Remarque']];
+            ['source_sense', 'Sens (autre langue)'], ['remark', 'Remarque'], ['origin', 'Source (par ligne)']];
         const key = `import-columns:${DocumentImport.sourceName(data.filename || '')}:${data.width}`;
         let saved = null;
         try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { saved = null; }
@@ -1537,7 +1537,7 @@ class DocumentImport {
         const entries = this.entries.filter((e) => e.picked).map((e) => ({
             hanzi: e.hanzi, document_hanzi: e.document_hanzi || '', pinyin: e.pinyin || e.reading || '', french: e.french || '', english: e.english || '',
             themes: e.themes || '', location: e.location || '', translated: !!e.translated, ai_fields: e.ai_fields || [],
-            source_sense: e.source_sense || '', remark: e.remark || '', type: e.type || '',
+            source_sense: e.source_sense || '', remark: e.remark || '', type: e.type || '', origin: e.origin || '',
         }));
         if (!entries.length || !this.doc) return;
         await AdditionList.whileBusy(button, 'Envoi…', async () => {
