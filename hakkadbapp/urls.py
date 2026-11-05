@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
-from . import additions, ai, assistant, hakkadict, importer, platform_corrections, recordings, sources
+from . import additions, ai, assistant, hakkadict, importer, platform_corrections, recordings, rey, sources
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -80,6 +80,8 @@ urlpatterns = [
     path("suggestions-ia/", additions.ai_suggestions, name="ai_suggestions"),
     path("brouillons/", additions.drafts, name="drafts"),
     path("api/hakkadict", hakkadict.api_lookup, name="hakkadict_lookup"),
+    path("api/rey", rey.api_search, name="rey_search"),
+    path("api/rey/page/<int:image>", rey.api_page, name="rey_page"),
     path("api/hakkadict/brouillons", hakkadict.api_drafts, name="hakkadict_drafts"),
     path("corrections-ereo/", platform_corrections.page, name="platform_corrections"),
     path("api/corrections-ereo", platform_corrections.api, name="api_platform_corrections"),

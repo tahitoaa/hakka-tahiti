@@ -487,3 +487,20 @@ class SourceLookup(models.Model):
 
     def __str__(self):
         return f"{self.query} ({self.created_at:%d/%m/%Y})"
+
+
+class ReyPage(models.Model):
+    """One page of Charles Rey's Dictionnaire chinois-français, dialecte
+    hac-ka (1926), read by the AI once (rey.py): its entries, kept so the
+    page is never paid for twice. `image`: the scan's number (kf_<image>.png)."""
+    image = models.IntegerField(unique=True)
+    page = models.IntegerField(default=0)
+    entries = models.JSONField(default=list)
+    read_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["image"]
+
+    def __str__(self):
+        return f"Rey p. {self.page} (kf_{self.image})"

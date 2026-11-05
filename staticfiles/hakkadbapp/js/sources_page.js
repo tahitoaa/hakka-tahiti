@@ -323,6 +323,26 @@
     });
 
     // ---- what each source is (a click on its column header) ------------------------------------
+    /** ℹ️ Sources tab: every source of the table, in full (same data as the column headers' dialog). */
+    function renderSourcesTab() {
+        const box = $('sx-sources-list');
+        if (!box || !data?.sources) return;
+        const rules = data.rules || {};
+        box.innerHTML = data.sources.map((s) => {
+            const r = rules[s.id];
+            return `<article class="sx-src-card">
+              <h3>${esc(s.short)} <small>${esc(s.sub)}</small>${s.scan ? ' <span class="sx-src-tag">transcrit d’un scan</span>' : ''}</h3>
+              <p class="sx-src-full">${esc(s.full)}</p>
+              <dl><dt>Origine</dt><dd>${esc(s.origin)}</dd>
+                ${s.romanization ? `<dt>Notation</dt><dd>${esc(s.romanization)}</dd>` : ''}
+                <dt>Caractères</dt><dd>${(s.chars || 0).toLocaleString('fr-FR')}</dd>
+                ${r ? `<dt>Vers le Wenfa</dt><dd>appris sur ${r.pairs} caractères · syllabe entière juste ${r.accuracy.all} %
+                  (initiale ${r.accuracy.initial} %, finale ${r.accuracy.final} %, ton ${r.accuracy.tone} %)</dd>` : ''}
+                ${s.scan ? `<dt>Lectures douteuses</dt><dd>⚠ ${(s.doubtful || 0).toLocaleString('fr-FR')} ne concordent avec aucune autre source hakka</dd>` : ''}</dl>
+            </article>`;
+        }).join('');
+    }
+
     function showSource(id) {
         const s = (data?.sources || []).find((x) => x.id === id);
         const box = $('sx-source');
@@ -356,6 +376,7 @@
         sourceButtons();
         renderTable();
         renderRules();
+        renderSourcesTab();
         showTab();
     }).catch(() => {
         if ($('sx-rows')) $('sx-rows').innerHTML = '<tr><td class="sx-none py-6">Impossible de charger les sources : rechargez la page.</td></tr>';

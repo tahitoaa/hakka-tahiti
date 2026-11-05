@@ -106,6 +106,26 @@
   .sx-graph .col-title { font: 700 11px system-ui, sans-serif; fill: #6E655C; text-transform: uppercase; letter-spacing: 0.05em; }
   .sx-detail { min-height: 1.5rem; font-size: 0.85rem; color: #544D45; }
   .sx-legend { font-size: 0.75rem; color: var(--sx-muted); }
+  /* ℹ️ Sources */
+  .sx-src-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 0.6rem; }
+  .sx-src-card { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.7rem 0.85rem; font-size: 0.85rem; color: #3A3430; }
+  .sx-src-card h3 { font-weight: 700; font-size: 1rem; } .sx-src-card h3 small { color: #8C8478; font-weight: 500; }
+  .sx-src-card dl { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.25rem 0.5rem; margin-top: 0.35rem; }
+  .sx-src-card dt { color: #8C8478; font-size: 0.75rem; } .sx-src-card dd { margin: 0; }
+  .sx-src-tag { display: inline-block; padding: 0 0.4rem; border-radius: 9999px; background: #fff7ed; color: #9a3412; font-size: 0.65rem; font-weight: 700; vertical-align: middle; }
+  /* Rey / hakkadictionary lookups */
+  .lk-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+  .lk-chips small { opacity: 0.7; }
+  .lk-pages { display: grid; gap: 0.5rem; }
+  .lk-page { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.7rem; padding: 0.5rem 0.65rem; }
+  .lk-page-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .lk-page-head b { font-size: 1rem; margin-right: 0.3rem; }
+  .lk-ai { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+  .lk-read { font-size: 0.78rem; font-weight: 700; color: #065f46; }
+  .lk-scan { display: block; max-width: 100%; margin-top: 0.5rem; border: 1px solid var(--sx-line); border-radius: 0.4rem; }
+  .lk-page-body:not(:empty) { margin-top: 0.5rem; }
+  .lk-entries tr.lk-head td { background: #FBF0E6; font-weight: 700; }
+  .hd-entry { font-size: 0.85rem; } .hd-entry b { color: var(--sx-red); }
 </style>
 
 <div class="sx-root w-full max-w-screen-xl mx-auto mt-2 space-y-3">
@@ -117,6 +137,9 @@
     <a href="#lectures" role="tab" data-sxtab="lectures" class="sx-tab-main">📖 Caractères</a>
     <a href="#correspondances" role="tab" data-sxtab="correspondances">🔀 Correspondances</a>
     <a href="#regles" role="tab" data-sxtab="regles">Règles détaillées</a>
+    <a href="#rey" role="tab" data-sxtab="rey">📕 Rey 1926</a>
+    <a href="#hakkadictionary" role="tab" data-sxtab="hakkadictionary">🔎 hakkadictionary.com</a>
+    <a href="#sources" role="tab" data-sxtab="sources">ℹ️ Sources</a>
   </nav>
   <p class="text-sm text-gray-700" data-sxpanel-note="lectures">Lectures de chaque caractère dans le lexique, 5 sources hakka (avec leurs pages), en cantonais et en mandarin.
     Hors lexique : lecture Wenfa déduite des <a class="underline font-semibold" href="#correspondances">correspondances</a>.</p>
@@ -172,10 +195,70 @@
     <div class="sx-rules" id="sx-rules"></div>
   </section>
 
+
+  <!-- 4. Rey's Hakka-French dictionary (1926), by syllable -->
+  <section data-sxpanel="rey" class="space-y-3" hidden>
+    {% if can_edit %}
+    <div class="sx-tools">
+      <label class="sr-only" for="rey-q">Syllabe</label>
+      <input id="rey-q" type="search" placeholder="Syllabe : yok, yo, zhung, ngin…" autocapitalize="off" spellcheck="false">
+      <button type="button" id="rey-go" class="sx-chip">Chercher</button>
+      <details class="help-tip"><summary aria-label="Aide">ⓘ</summary><div>Charles Rey, <i>Dictionnaire chinois-français, dialecte hac-ka</i>
+        (1926), d'après l'index de <a class="underline" href="https://daylightstar.wordpress.com/2024/01/31/dictionnaire-chinoise-francais-dialecte-hac-ka-2/" target="_blank" rel="noopener">daylightstar</a>
+        et les scans de l'Academia Sinica. Rey écrit en romanisation française : <b>-c</b> final = -k (yoc = yok), tch = zh, ts' = c,
+        gn = ng(i), ou = u ; tapez comme vous voulez, l'orthographe de Rey est essayée. Sans IA : les pages de la syllabe et leurs scans.
+        « ✨ Lire les caractères » : l'IA relève les caractères, lectures et sens de la page, une seule fois (gardé pour tous).</div></details>
+    </div>
+    <p class="sx-count" id="rey-status" role="status"></p>
+    <div id="rey-result"></div>
+    {% else %}<p class="text-sm text-gray-600">Connectez-vous pour chercher dans le dictionnaire de Rey.</p>{% endif %}
+  </section>
+
+  <!-- 5. hakkadictionary.com, by character -->
+  <section data-sxpanel="hakkadictionary" class="space-y-3" hidden>
+    {% if can_edit %}
+    <div class="sx-tools">
+      <label class="sr-only" for="hdx-q">Caractère</label>
+      <input id="hdx-q" type="search" maxlength="2" placeholder="Un caractère : 番, 話…" class="hanzi" style="max-width:12rem">
+      <button type="button" id="hdx-go" class="sx-chip">Chercher</button>
+      <span class="sx-legend">客家話大辭典 (Bao'an) : lectures, sens et mots parlés cités — sans IA.</span>
+    </div>
+    <div id="hdx-result" class="space-y-2"></div>
+    {% else %}<p class="text-sm text-gray-600">Connectez-vous pour chercher sur hakkadictionary.com.</p>{% endif %}
+  </section>
+
+  <!-- 6. Every source, in full -->
+  <section data-sxpanel="sources" class="space-y-3" hidden>
+    <p class="text-sm text-gray-700">D'où viennent les lectures et les sens de ce dictionnaire, et comment ils ont été obtenus.
+      « Vers le Wenfa » : la part des caractères dont la lecture Wenfa est retrouvée par les correspondances apprises.</p>
+    <div class="sx-src-grid" id="sx-sources-list"><p class="sx-none">Chargement…</p></div>
+    <h3 class="font-bold text-gray-800 pt-2">Consultés à la demande</h3>
+    <div class="sx-src-grid">
+      <article class="sx-src-card">
+        <h3>Rey <small>1926</small> <span class="sx-src-tag">scans</span></h3>
+        <p class="sx-src-full">Charles Rey, <i>Dictionnaire chinois-français, dialecte hac-ka</i>, 1926 (édition augmentée de celle de 1901).</p>
+        <dl><dt>Origine</dt><dd>Index des syllabes de <a class="underline" href="https://daylightstar.wordpress.com/2024/01/31/dictionnaire-chinoise-francais-dialecte-hac-ka-2/" target="_blank" rel="noopener">daylightstar.wordpress.com</a>
+          (1 411 pages, 707 syllabes) ; scans de l'Academia Sinica (minhakka2.ling.sinica.edu.tw). Une page n'est lue par l'IA que sur demande,
+          une fois ; ses caractères sont gardés.</dd>
+          <dt>Notation</dt><dd>Romanisation française : -c final = -k, tch = zh, ts' = c, gn = ng(i), ou = u ; tons par accents
+          (ˉ ˆ ` ́ ˘ ̑), les 5ᵉ et 6ᵉ tons inversés par rapport à la tradition.</dd>
+          <dt>Onglet</dt><dd>📕 Rey 1926</dd></dl>
+      </article>
+      <article class="sx-src-card">
+        <h3>hakkadictionary.com <small>客家話大辭典</small></h3>
+        <p class="sx-src-full">客家話大辭典（寶安腔）, 陳志明 — version en ligne.</p>
+        <dl><dt>Origine</dt><dd>Interrogé directement par le site (sans IA) : lectures, sens en chinois et mots cités. Seuls les mots parlés 〈…〉
+          sont repris, pas les mots littéraires 〔…〕. Les caractères rares affichés en image par le site sont écartés.</dd>
+          <dt>Notation</dt><dd>Romanisation du dictionnaire, accent de Bao'an (tons 1, 2, 3, 5, 7, 8).</dd>
+          <dt>Onglet</dt><dd>🔎 hakkadictionary.com · suggestions : 🤖 IA</dd></dl>
+      </article>
+    </div>
+  </section>
 </div>
 <dialog class="sx-source" id="sx-source" aria-label="Source">
   <div data-src-body></div>
   <footer><button type="button" class="sx-chip" data-src-close>Fermer</button></footer>
 </dialog>
+<script src="{% static 'hakkadbapp/js/dict_lookups.js' %}" defer></script>
 <script src="{% static 'hakkadbapp/js/sources_page.js' %}" data-url="{% url 'api_sources_table' %}" data-hanzi-url="{% url 'hanzi' '__H__' %}"></script>
 {% endblock %}
