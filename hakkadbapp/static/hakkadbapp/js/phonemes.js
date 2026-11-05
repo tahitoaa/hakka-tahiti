@@ -118,15 +118,13 @@
                 else if (state.mode === 'chars') content = `<span class="hanzi">${chars.map(hanziBlock).join('')}</span>`;
                 else content = escapeHtml(show(initial, final));
                 const selected = state.selected === syllable ? ' is-selected' : '';
-                return `<td class="${selected}" data-step="${step(chars.length)}" style="background:var(--ph-seq-${step(chars.length)})">`
+                return `<td class="${chars.length ? 'is-filled' : 'is-empty'}${selected}">`
                     + `<button type="button" data-syllable="${escapeHtml(syllable)}" data-row="${row}" data-col="${col}" `
                     + `aria-label="${escapeHtml(show(initial, final))} : ${chars.length} caractère${chars.length > 1 ? 's' : ''}">${content}</button></td>`;
             }).join('')}</tr>`).join('');
         table.innerHTML = head + `<tbody>${body}</tbody>`;
 
-        $('ph-legend').innerHTML = 'Caractères par syllabe :'
-            + STEPS.map((s, i) => `<span><i style="background:var(--ph-seq-${i + 1})"></i>${s.label}</span>`).join('')
-            + '<span><i style="background:var(--ph-empty);border:1px solid var(--ph-grid)"></i>absente</span>';
+        $('ph-legend').innerHTML = 'Case vide : syllabe absente du lexique. « Nombre » affiche le nombre de caractères de chaque syllabe.';
     }
 
     /** Crosshair: light up the row and column headers of the hovered cell. */
