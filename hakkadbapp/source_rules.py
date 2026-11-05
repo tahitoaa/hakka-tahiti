@@ -23,6 +23,7 @@ learning pairs themselves (how often the three parts are all right).
 Shown as a three-stage automaton (transducer): q0 --initial--> q1 --final-->
 q2 --tone--> q3, each stage a set of weighted transitions "source : Wenfa"."""
 import json
+import re
 import unicodedata
 from collections import Counter, defaultdict
 
@@ -41,6 +42,8 @@ BOOK_INITIALS = {
     "hme": "ch'y ch' ch k'w k'y kw' k' kw ky k ts'z ts'y ts' tsz tsy ts t'sz t's t'y t' ty t p'y p' py p "
            "sh sy sz s ny ng n my m ly l hy h y w f",
     "sht": "tsj' ts' tsj ts kj' kjy kj k' kw k t' t p' p hy h ly l j m w v f s ʔ ŋj ŋ n",
+    # Rey's French romanization: tch = zh, ch = sh, ts' = c, gn = ng(i), y = i.
+    "rey": "tch' tch ts' ts tj ch gn ng k' k p' p t' t m n l s h f v y",
 }
 # The Hakka sources, in column order. "file": data/<file> (build_dict_index);
 # "scan": transcribed from a scan or a manuscript, so misreadings are possible.
@@ -50,10 +53,12 @@ SOURCES = [
     {"id": "chappell", "label": "Chappell & Lamarre", "system": None, "file": "chappell_lamarre_prons.json", "scan": False},
     {"id": "hme", "label": "Hakka Made Easy", "system": None, "file": "hakka_made_easy_prons.json", "scan": True},
     {"id": "sht", "label": "Sung Him Tong", "system": None, "file": "sung_him_tong_prons.json", "scan": True},
+    # Filled as the pages of Rey's dictionary are read (rey.py, ReyPage in the database).
+    {"id": "rey", "label": "Rey 1926", "system": None, "db": True, "scan": True},
     {"id": "cantonese", "label": "Cantonais", "system": None},
     {"id": "mandarin", "label": "Mandarin", "system": None},
 ]
-HAKKA = [s for s in SOURCES if s.get("file")]
+HAKKA = [s for s in SOURCES if s.get("file") or s.get("db")]
 _cache = {}
 
 
@@ -150,9 +155,51 @@ def lexicon_readings():
     return out
 
 
+# Rey's tone marks -> his tone numbers (macron 1, circumflex 2, grave 3, acute 4,
+# breve 5 = yangru, inverted breve 6 = yinru).
+REY_TONES = {"\u0304": "1", "\u0302": "2", "\u0300": "3", "\u0301": "4", "\u0306": "5", "\u0311": "6"}
+
+
+def rey_syllable(reading):
+    """« Yŏc » -> ("yoc", "5"): the syllable without its tone mark, and the tone."""
+    word = unicodedata.normalize("NFD", (reading or "").strip().lower().split()[0] if (reading or "").strip() else "")
+    tone = next((REY_TONES[c] for c in word if c in REY_TONES), "")
+    base = unicodedata.normalize("NFC", "".join(c for c in word if c not in REY_TONES and c != "\u0307"))
+    base = re.sub(r"[^a-zàâäéèêëïîôöùûüç'’*]", "", base).replace("’", "'")
+    return base, tone
+
+
+def _load_rey():
+    """{simplified char: [(syllable, tone, pages, low)]} from the pages of Rey's
+    dictionary read so far (ReyPage): the head characters and their reading."""
+    from .models import ReyPage
+
+    out = defaultdict(list)
+    for row in ReyPage.objects.only("page", "entries"):
+        for e in row.entries or []:
+            if e.get("kind") != "caractère":
+                continue
+            syllable, tone = rey_syllable(e.get("reading", ""))
+            if not syllable:
+                continue
+            # A head may give variants side by side (藥 葯): each its own character.
+            heads = re.findall(r"[\u3400-\u9fff]", e.get("hanzi", ""))
+            simplified = convert_all(ps._t2s, heads)     # (the whole cache: only these heads are read)
+            for char in dict.fromkeys(simplified[h] for h in heads):
+                known = next((r for r in out[char] if r[:2] == (syllable, tone)), None)
+                if known:
+                    if row.page not in known[2]:
+                        known[2].append(row.page)
+                    continue
+                out[char].append((syllable, tone, [row.page], False))
+    return dict(out)
+
+
 def _load_index(source):
     """{simplified char: [(syllable, tone, pages, low)]} from one Hakka index
     (data/<file>, rows [trad, syllable, tone, simp?], "pages", "low")."""
+    if source.get("db"):
+        return _load_rey()
     path = ps.DATA_DIR / source["file"]
     if not path.exists():
         return {}
@@ -313,6 +360,13 @@ SOURCE_INFO = [
      "full": "Sung Him Tong, Phonologie du dialecte hakka de Sai Kung (Hong Kong) : lexique et répertoire de syllabes",
      "origin": "Manuscrit transcrit visuellement page par page. Pages : pages du PDF. Des erreurs de lecture restent possibles.",
      "romanization": "API du livre (' = aspiration, j = palatalisation, ŋ) ; tons 1 陰平, 2 陽平, 3 上, 4 去, 5 陰入, 6 陽入",
+     "scan": True},
+    {"id": "rey", "short": "Rey", "sub": "1926",
+     "full": "Charles Rey, Dictionnaire chinois-français, dialecte hac-ka (1926)",
+     "origin": "Pages lues par l'IA à la demande (onglet 📕 Rey 1926), une fois, puis gardées : la colonne se remplit au fil des "
+               "lectures. Seuls les caractères de tête de chaque entrée. Pages : pages du dictionnaire.",
+     "romanization": "Romanisation française : -c final = -k, tch = zh, ch = sh, ts' = c, gn = ng(i) ; tons 1 ˉ, 2 ˆ, 3 `, 4 ´, "
+                     "5 ˘ (yangru), 6 ̑ (yinru)",
      "scan": True},
     {"id": "cantonese", "short": "Cantonais", "sub": "Unihan",
      "full": "Unicode Unihan Database, champ kCantonese", "origin": "Base de données du consortium Unicode.",
