@@ -22,6 +22,24 @@ class AdditionList {
         return match ? decodeURIComponent(match[1]) : '';
     }
 
+    /** « Appliquer » of a remark on an addition: copies its proposed value,
+     *  or (a plain comment) marks it taken into account. `attr`: data-remark
+     *  (table) or data-vs-remark (slideshow). */
+    static applyButton(c, attr) {
+        return c.has_proposal
+            ? `<button type="button" class="saisie-btn saisie-btn-validate" ${attr}="apply" data-cid="${c.id}"
+                 title="Remplace le ${AdditionList.escapeHtml(c.field_label)} par la valeur proposée">✓ Appliquer</button>`
+            : `<button type="button" class="saisie-btn saisie-btn-validate" ${attr}="apply" data-cid="${c.id}"
+                 title="Vous avez corrigé l’ajout vous-même : la remarque est close">✓ Appliqué</button>`;
+    }
+
+    /** What « Appliquer » did, for the status line. */
+    static appliedMessage(comment) {
+        return comment && comment.field && comment.proposed_value
+            ? `✓ ${comment.field_label[0].toUpperCase()}${comment.field_label.slice(1)} remplacé par la proposition.`
+            : '✓ Remarque prise en compte.';
+    }
+
     static escapeHtml(text) {
         return String(text ?? '').replace(/[&<>"']/g, (c) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -729,12 +747,12 @@ class ValidationTable extends AdditionList {
         const esc = AdditionList.escapeHtml;
         const list = remarks.map((c) => `<li class="vt-remark vt-remark-${c.kind}">
               <div class="vt-remark-head">${c.by_ai ? '🤖 IA' : esc(c.author)} ·
-                ${c.kind === 'correction' ? `correction du ${esc(c.field_label)}` : 'commentaire'}</div>
-              ${c.kind === 'correction' ? `<div class="vt-diff"><del>${esc(c.current_value) || '<i>vide</i>'}</del>
+                ${c.kind === 'correction' ? `correction du ${esc(c.field_label)}` : c.has_proposal ? `commentaire · suggestion pour le ${esc(c.field_label)}` : 'commentaire'}</div>
+              ${c.has_proposal ? `<div class="vt-diff"><del>${esc(c.current_value) || '<i>vide</i>'}</del>
                   <span aria-hidden="true">→</span> <ins>${esc(c.proposed_value)}</ins></div>` : ''}
               <div>${esc(c.text)}</div>
               <div class="vt-remark-actions">
-                ${c.applicable ? `<button type="button" class="saisie-btn saisie-btn-validate" data-remark="apply" data-cid="${c.id}">Appliquer</button>` : ''}
+                ${c.applicable ? AdditionList.applyButton(c, 'data-remark') : ''}
                 <button type="button" class="saisie-btn saisie-btn-neutral" data-remark="dismiss" data-cid="${c.id}">Écarter</button>
               </div></li>`).join('');
         return `<tr class="vt-detail" data-detail="${a.id}"><td colspan="9">
@@ -772,7 +790,7 @@ class ValidationTable extends AdditionList {
                     const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}/${button.dataset.cid}`, { action });
                     this.comments = this.comments.map((c) => (c.id === data.comment.id ? data.comment : c));
                     if (data.addition) this.additions = this.additions.map((a) => (a.id === data.addition.id ? data.addition : a));
-                    this.setStatus(action === 'apply' ? '✓ Correction appliquée.' : 'Remarque écartée.');
+                    this.setStatus(action === 'apply' ? AdditionList.appliedMessage(data.comment) : 'Remarque écartée.');
                 }
                 this.render();
                 this.flash([id]);
@@ -984,10 +1002,10 @@ class ValidationShow {
                 <div class="vs-edit-actions"><button type="button" class="saisie-btn saisie-btn-validate" data-vs="send-comment">Envoyer</button>
                   <button type="button" class="saisie-btn saisie-btn-neutral" data-vs="cancel">Annuler</button></div></div>` : ''}
             ${remarks.length ? `<ul class="vs-remarks">${remarks.map((c) => `<li>
-                <b>${c.by_ai ? '🤖 IA' : esc(c.author)}</b> ${c.kind === 'correction'
+                <b>${c.by_ai ? '🤖 IA' : esc(c.author)}</b> ${c.has_proposal
                     ? `· ${esc(c.field_label)} : <del>${esc(c.current_value) || 'vide'}</del> → <ins>${esc(c.proposed_value)}</ins>` : ''}
                 <div>${esc(c.text)}</div>
-                <span class="vs-remark-actions">${c.applicable ? `<button type="button" class="saisie-btn saisie-btn-validate" data-vs-remark="apply" data-cid="${c.id}">Appliquer</button>` : ''}
+                <span class="vs-remark-actions">${c.applicable ? AdditionList.applyButton(c, 'data-vs-remark') : ''}
                   <button type="button" class="saisie-btn saisie-btn-neutral" data-vs-remark="dismiss" data-cid="${c.id}">Écarter</button></span></li>`).join('')}</ul>` : ''}
             <p class="vs-message" role="status">${esc(message)}</p>`;
         this.dialog.querySelector('[data-vs-nav="-1"]').disabled = this.pos === 0;
@@ -1085,7 +1103,7 @@ class ValidationShow {
             const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}/${button.dataset.cid}`, { action: button.dataset.vsRemark });
             this.table.comments = this.table.comments.map((c) => (c.id === data.comment.id ? data.comment : c));
             if (data.addition) this.replace(data.addition); else this.table.render();
-            this.render(button.dataset.vsRemark === 'apply' ? '✓ Correction appliquée' : 'Remarque écartée');
+            this.render(button.dataset.vsRemark === 'apply' ? AdditionList.appliedMessage(data.comment) : 'Remarque écartée');
         });
     }
 }

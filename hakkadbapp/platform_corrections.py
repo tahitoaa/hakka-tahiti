@@ -76,7 +76,7 @@ def corrections(steps=None):
             "author": "IA" if r.author and r.author.username == "ia" else (r.author.username if r.author else ""),
             "created_at": r.created_at.isoformat(),
         }
-        if r.kind == ReviewComment.KIND_CORRECTION:
+        if r.kind == ReviewComment.KIND_CORRECTION or (r.field and r.proposed_value):
             field, label = PLATFORM_FIELDS.get(r.field, (r.field, r.field))
             on_platform = tr.get(field, r.current_value) if tr else r.current_value
             item.update({

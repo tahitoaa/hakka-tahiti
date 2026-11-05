@@ -30,6 +30,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from . import pinyin_rules
 from .ai import MODEL, HAN_RE, ai_enabled, _client
 from .models import (AITarget, Expression, LexiconAddition, Pronunciation, ReviewComment, SharedTranscript, Word,
                      t2s)
@@ -141,7 +142,12 @@ def add_comment(item, kind, text, field="", proposed=""):
         if proposed == current.strip():
             return None
     else:
-        kind, field, proposed = ReviewComment.KIND_COMMENT, "", ""
+        # A comment with a suggested text for one field: « Appliquer » copies it.
+        kind = ReviewComment.KIND_COMMENT
+        if field in REVIEW_FIELDS[item["type"]] and proposed and proposed != item["fields"].get(field, "").strip():
+            current = item["fields"].get(field, "")
+        else:
+            field, proposed = "", ""
     open_remarks = ReviewComment.objects.filter(target_type=item["type"], target_id=item["id"],
                                                 status__in=ReviewComment.PENDING, kind=kind)
     if kind == ReviewComment.KIND_CORRECTION and open_remarks.filter(field=field, proposed_value=proposed).exists():
@@ -230,7 +236,7 @@ def _call(system, user_message, schema, max_tokens=4000):
 
 CONTEXT = ("You assist the editors of a lexicon of the Hakka spoken by the Chinese community of Tahiti "
            "(French Polynesia). Readings use the Wenfa romanization with tone digits. Editors are French "
-           "speakers; write every comment in French, short and concrete.")
+           "speakers; write every comment in French, short and concrete.\n\n" + pinyin_rules.RULES)
 
 
 def _themes():
@@ -245,8 +251,10 @@ REVIEW_SYSTEM = CONTEXT + """
 
 You review entries and leave remarks. Two kinds:
 - "correction": a fix of one field's text that needs no judgment on the meaning: spelling, accents, punctuation, typography, capitalisation, spacing, the lexicon's style (short, lowercase, no final period, close meanings separated by commas). proposed_value is the whole corrected field.
-- "comment": anything else worth an editor's attention: a translation that seems wrong or incomplete, a French/English mismatch, a missing translation, a theme that doesn't fit, a likely duplicate of another entry given. Never rewrite the meaning as a correction; say it in a comment.
-Only remark on real problems: no remark at all is the right answer for a correct entry. Never remark on the hanzi or the reading. Refer to entries by their "ref"."""
+- "comment": anything else worth an editor's attention: a translation that seems wrong or incomplete, a French/English mismatch, a missing translation, a theme that doesn't fit, a likely duplicate of another entry given. Never rewrite the meaning as a correction; say it in a comment. When the comment is about one field and you can suggest a better text for it, give that field and the whole suggested text in field / proposed_value (the editor may apply it or not); otherwise field "none" and proposed_value "".
+Only remark on real problems: no remark at all is the right answer for a correct entry. Never remark on the hanzi or the reading. Refer to entries by their "ref".
+
+Missing fields: each entry lists in "missing" its empty fields. For EVERY field listed there, always write one remark of kind "comment" with that field and, in proposed_value, the text to fill it with: a translation in the lexicon's style (french, english), drawn from the other fields, the characters and the readings; for themes, one or two theme names from the list, separated by ", ". Its text says in French what the proposal rests on. Only when nothing at all allows a proposal, leave proposed_value empty and say why."""
 
 
 def _review_schema():
@@ -269,6 +277,14 @@ def _review_schema():
     }
 
 
+# The fields the review always offers to fill when empty (« Appliquer »).
+FILL_FIELDS = ("french", "english", "themes")
+
+
+def _missing(item):
+    return [f for f in FILL_FIELDS if f in item["fields"] and not (item["fields"][f] or "").strip()]
+
+
 def review(target_type, ids):
     """Reads these items (muted ones left out) and writes its remarks.
     Returns the new comments."""
@@ -277,9 +293,10 @@ def review(target_type, ids):
     if not items:
         return []
     refs = {f"{item['type']}-{item['id']}": item for item in items}
+    themes = _themes()
     entries = [{"ref": ref, "kind": item["kind"], "hanzi": item["hanzi"], "reading": item["pinyin"],
-                **item["fields"]} for ref, item in refs.items()]
-    data = _call(REVIEW_SYSTEM + "\n\nThemes in use: " + json.dumps(_themes(), ensure_ascii=False),
+                **item["fields"], "missing": _missing(item)} for ref, item in refs.items()]
+    data = _call(REVIEW_SYSTEM + "\n\nThemes in use: " + json.dumps(themes, ensure_ascii=False),
                  "Entries to review:\n" + json.dumps(entries, ensure_ascii=False), _review_schema())
     created = []
     with transaction.atomic():
@@ -287,8 +304,12 @@ def review(target_type, ids):
             item = refs.get(remark.get("ref"))
             if not item:
                 continue
-            comment = add_comment(item, remark.get("kind"), remark.get("text", ""),
-                                  remark.get("field", ""), remark.get("proposed_value", ""))
+            proposed = remark.get("proposed_value", "")
+            if remark.get("field") == "themes":
+                # Only themes of the list.
+                known = {t.lower(): t for t in themes}
+                proposed = ", ".join(dict.fromkeys(known[x.strip().lower()] for x in proposed.split(",") if x.strip().lower() in known))
+            comment = add_comment(item, remark.get("kind"), remark.get("text", ""), remark.get("field", ""), proposed)
             if comment:
                 created.append(comment)
         _mark_reviewed(items)
@@ -397,6 +418,9 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=
         if not all(HAN_RE.fullmatch(c) for c in hanzi) or not _valid_reading(
                 hanzi, w.get("reading", ""), readings, (candidate or {}).get("pinned_reading", "")):
             logger.info("assistant: %s dropped (reading %r not from the lexicon)", hanzi, w.get("reading"))
+            continue
+        if pinyin_rules.violations(w.get("reading", "")):
+            logger.info("assistant: %s dropped (reading %r against the rules)", hanzi, w.get("reading"))
             continue
         note = f"Suggestion de l'IA ({origin}). {w.get('note', '')}".strip()
         addition = suggest_new_word(hanzi, w["reading"].replace(" ", "").lower(), w.get("french", ""),
@@ -551,7 +575,10 @@ def comment_json(c):
         "current_value": c.current_value, "proposed_value": c.proposed_value, "status": c.status,
         "author": c.author.username if c.author else "", "by_ai": bool(c.author and c.author.username == AI_USERNAME),
         "created_at": c.created_at.isoformat(),
-        "applicable": c.target_type == ReviewComment.TARGET_ADDITION and c.kind == ReviewComment.KIND_CORRECTION,
+        # Additions: « Appliquer » copies the proposed value (a correction, or a
+        # comment's suggestion), or marks a plain comment as taken into account.
+        "applicable": c.target_type == ReviewComment.TARGET_ADDITION,
+        "has_proposal": bool(c.field and c.proposed_value),
     }
 
 
@@ -666,16 +693,19 @@ def api_comment_action(request, comment_id):
         return JsonResponse({"error": "Cette remarque est déjà traitée."}, status=409)
     addition = None
     if action == "apply":
-        if comment.target_type != ReviewComment.TARGET_ADDITION or comment.kind != ReviewComment.KIND_CORRECTION:
-            return JsonResponse({"error": "Seule une correction d'un ajout s'applique ici."}, status=400)
+        if comment.target_type != ReviewComment.TARGET_ADDITION:
+            return JsonResponse({"error": "Le lexique se corrige sur e-reo (étape Corrections e-reo)."}, status=400)
         addition = LexiconAddition.objects.filter(id=comment.target_id).first()
         if not addition:
             return JsonResponse({"error": "L'ajout n'existe plus."}, status=404)
-        if getattr(addition, comment.field).strip() != comment.current_value.strip():
-            return JsonResponse({"error": "Le champ a changé depuis la remarque : vérifiez-le à la main."}, status=409)
-        setattr(addition, comment.field, comment.proposed_value)
-        addition.updated_by = request.user
-        addition.save(update_fields=[comment.field, "updated_by", "updated_at"])
+        if comment.field and comment.proposed_value:
+            # The proposed value replaces the field (a correction or a comment's suggestion).
+            if getattr(addition, comment.field).strip() != comment.current_value.strip():
+                return JsonResponse({"error": "Le champ a changé depuis la remarque : vérifiez-le à la main."}, status=409)
+            setattr(addition, comment.field, comment.proposed_value)
+            addition.updated_by = request.user
+            addition.save(update_fields=[comment.field, "updated_by", "updated_at"])
+        # else a plain comment: taken into account (the editor fixed it by hand).
         comment.status = ReviewComment.STATUS_APPLIED
     elif action in ("dismiss", "done"):
         comment.status = ReviewComment.STATUS_DISMISSED if action == "dismiss" else ReviewComment.STATUS_APPLIED

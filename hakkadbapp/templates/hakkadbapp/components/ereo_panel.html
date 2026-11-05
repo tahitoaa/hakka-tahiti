@@ -74,7 +74,7 @@
         <span class="pc-meta">{{ i.entry_type }}</span>
         {% if i.seems_done and i.status != 'fait' %}<span class="pc-badge pc-badge-done">✓ semble corrigé</span>{% endif %}
       </div>
-      {% if i.kind == 'correction' %}
+      {% if i.proposed_value %}
       <dl class="pc-diff"><dt>{{ i.field_label }}</dt><dd><del>{{ i.current_value|default:"(vide)" }}</del> → <ins>{{ i.proposed_value }}</ins></dd></dl>
       {% endif %}
       <p class="pc-why">{{ i.explanation }}</p>

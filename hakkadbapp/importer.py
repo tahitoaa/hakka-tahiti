@@ -30,7 +30,7 @@ from .ai import HAN_RE, ai_enabled
 from .assistant import AssistantError, CONTEXT, _call, _norm, char_readings, known_words
 from .models import ImportedDocument, LexiconAddition
 from .permissions import editor_required
-from . import import_rules
+from . import import_rules, pinyin_rules
 
 MAX_FILE_BYTES = 4 * 1024 * 1024     # Vercel refuses larger request bodies
 MAX_TEXT_CHARS = 50_000              # text sent to the AI, per document at most
@@ -516,6 +516,9 @@ def check_candidates(candidates):
         elif c["kind"] == LexiconAddition.KIND_WORD:
             c["hanzi"] = "".join(c["hanzi"].split())
         c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings, deduced, rules)
+        broken = pinyin_rules.violations(c["reading"])
+        if broken:
+            c["reading_note"] = "; ".join(filter(None, [c["reading_note"], "lecture contraire aux règles : " + " ; ".join(broken)]))
         c["romanization"] = f"{rules.label} ({rules.rate} %)" if rules and rules.source else ""
         c["state"] = ("duplicate" if key in seen else "known" if key in known_lexicon
                       else additions.get(key, "new"))

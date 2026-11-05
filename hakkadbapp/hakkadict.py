@@ -19,6 +19,7 @@ import urllib.request
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
+from . import pinyin_rules
 from . import romanization
 from .assistant import AssistantError, _norm, ai_user, char_readings, known_words
 from .importer import Deduced, _stored_options, check_languages
@@ -215,6 +216,9 @@ def api_drafts(request):
             notes.append(w["note"][:1].upper() + w["note"][1:] + ".")
         if not w["pinyin"]:
             notes.append("Lecture à compléter.")
+        broken = pinyin_rules.violations(w["pinyin"])
+        if broken:
+            notes.append("Lecture contraire aux règles : " + " ; ".join(broken) + ".")
         created.append(LexiconAddition.objects.create(
             kind=LexiconAddition.KIND_WORD, status=LexiconAddition.STATUS_DRAFT, hanzi=w["hanzi"], pinyin=w["pinyin"],
             french=french[:300], english=english[:300], observations=" ".join(notes)[:1000], source=SOURCE,

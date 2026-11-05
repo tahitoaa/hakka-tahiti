@@ -539,6 +539,16 @@ document.addEventListener("DOMContentLoaded", attachExportButtons);
   .src-open-btn:hover { border-color: var(--color-brand, #9B1C1C); color: var(--color-brand, #9B1C1C); }
 </style>
 <script src="{% static 'hakkadbapp/js/Sources.js' %}"></script>
+<!-- Arrows and Tab between the cells of every table (table_nav.js). -->
+<script src="{% static 'hakkadbapp/js/table_nav.js' %}"></script>
+<!-- « 📋 Copier la sélection » above every table (table_copy.js). -->
+<script src="{% static 'hakkadbapp/js/table_copy.js' %}"></script>
+<style>
+  .tc-copy { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.85rem; margin: 0.15rem 0.4rem 0.3rem 0; padding: 0.1rem 0.6rem;
+             border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; color: #544D45; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+  .tc-copy:hover { border-color: var(--color-brand, #9B1C1C); color: var(--color-brand, #9B1C1C); }
+</style>
+<style>td:focus-visible, th:focus-visible { outline: 2px solid #c9a227; outline-offset: -2px; }</style>
 {% endif %}
 </body>
 </html>
