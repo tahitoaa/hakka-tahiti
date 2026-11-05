@@ -1094,13 +1094,11 @@ def hanzi_by_pinyin(request, syllable):
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
 
 def pronunciation_comparison(request):
-    """Every character of every source (lexicon, Bao'an, McIver, Mandarin),
-    the correspondence rules from each source to Wenfa, and those rules as
-    an automaton -- all drawn by sources_page.js from api_sources_table."""
-    return render(request, "hakkadbapp/pronunciation_comparison.html", {
-        "page": "pronunciation_comparison",
-        "title": "Lectures comparées",
-    })
+    """« Lectures comparées » is now a tab of the Dictionnaire des caractères
+    (correspondences, rules): old links land there."""
+    from django.shortcuts import redirect
+
+    return redirect(reverse("character_dictionary") + "#correspondances")
 
 
 def character_dictionary(request):

@@ -35,6 +35,7 @@
         const name = TABS.includes(hash) ? hash : TABS[0];
         document.querySelectorAll('[data-sxtab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.sxtab === name)));
         document.querySelectorAll('[data-sxpanel]').forEach((p) => { p.hidden = p.dataset.sxpanel !== name; });
+        document.querySelectorAll('[data-sxpanel-note]').forEach((p) => { p.hidden = p.dataset.sxpanelNote !== name; });
         if (data && name === 'correspondances') drawAutomaton();
     }
     document.querySelectorAll('[data-sxtab]').forEach((t) => t.addEventListener('click', (e) => {
