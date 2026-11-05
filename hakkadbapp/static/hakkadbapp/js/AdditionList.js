@@ -893,6 +893,7 @@ class ValidationShow {
         this.pos = 0;
         this.lockedUntil = 0;
         this.editing = false;
+        this.commenting = false;
         this.busy = false;
         document.getElementById('vs-open').addEventListener('click', () => this.open());
         this.dialog.addEventListener('click', (e) => this.onClick(e));
@@ -920,6 +921,7 @@ class ValidationShow {
         if (!this.ids.length) { this.table.setStatus('Aucun ajout à afficher avec ce filtre.', true); return; }
         this.pos = Math.max(0, startId === null ? 0 : this.ids.indexOf(startId));
         this.editing = false;
+        this.commenting = false;
         this.render();
         if (!this.dialog.open) this.dialog.showModal();
     }
@@ -937,6 +939,7 @@ class ValidationShow {
         if (next === this.pos) return;
         this.pos = next;
         this.editing = false;
+        this.commenting = false;
         this.card.classList.add('is-changing');
         setTimeout(() => { this.render(); this.card.classList.remove('is-changing'); }, 120);
     }
@@ -968,6 +971,10 @@ class ValidationShow {
             : `<div class="vs-french">${esc(a.french) || '<i>sans traduction</i>'}</div>
                ${a.english ? `<div class="vs-english" lang="en">${esc(a.english)}</div>` : ''}
                ${a.observations ? `<div class="vs-obs">${esc(a.observations)}</div>` : ''}`}
+            ${this.commenting ? `<div class="vs-edit vs-comment">
+                <label class="vs-field"><span>Commentaire</span><textarea data-vs-comment rows="3" placeholder="Votre remarque sur cet ajout…"></textarea></label>
+                <div class="vs-edit-actions"><button type="button" class="saisie-btn saisie-btn-validate" data-vs="send-comment">Envoyer</button>
+                  <button type="button" class="saisie-btn saisie-btn-neutral" data-vs="cancel">Annuler</button></div></div>` : ''}
             ${remarks.length ? `<ul class="vs-remarks">${remarks.map((c) => `<li>
                 <b>${c.by_ai ? '🤖 IA' : esc(c.author)}</b> ${c.kind === 'correction'
                     ? `· ${esc(c.field_label)} : <del>${esc(c.current_value) || 'vide'}</del> → <ins>${esc(c.proposed_value)}</ins>` : ''}
@@ -981,14 +988,17 @@ class ValidationShow {
         const decided = (s) => ['validated', 'rejected'].includes(s);
         this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
             if (decided(b.dataset.vsStatus)) b.hidden = !decider;
-            b.disabled = this.editing || b.dataset.vsStatus === a.status || (!decider && decided(a.status))
+            b.disabled = this.editing || this.commenting || b.dataset.vsStatus === a.status || (!decider && decided(a.status))
                 || (b.dataset.vsStatus === 'validated' && AdditionList.missing(a).length > 0);
             if (b.dataset.vsStatus === 'validated') {
                 b.title = AdditionList.missing(a).length ? `Incomplet : ${AdditionList.missing(a).join(', ')}` : '';
             }
         });
-        this.dialog.querySelector('[data-vs="edit"]').disabled = this.editing;
+        this.dialog.querySelector('[data-vs="edit"]').disabled = this.editing || this.commenting;
+        const commentBtn = this.dialog.querySelector('[data-vs="comment"]');
+        if (commentBtn) commentBtn.disabled = this.editing || this.commenting;
         if (this.editing) this.card.querySelector('[data-vs-field="french"]')?.focus();
+        if (this.commenting) this.card.querySelector('[data-vs-comment]')?.focus();
     }
 
     async onClick(e) {
@@ -997,12 +1007,14 @@ class ValidationShow {
         if (!b || e.detail > 1) return;                       // the 2nd click of a double click
         if (b.dataset.vsNav) { this.move(Number(b.dataset.vsNav)); return; }
         if (b.dataset.vs === 'edit') { this.editing = true; this.render(); return; }
-        if (b.dataset.vs === 'cancel') { this.editing = false; this.render(); return; }
+        if (b.dataset.vs === 'cancel') { this.editing = false; this.commenting = false; this.render(); return; }
+        if (b.dataset.vs === 'comment') { this.commenting = true; this.editing = false; this.render(); return; }
         if (this.locked()) return;
         const a = this.current();
         if (!a) return;
         if (b.dataset.vsStatus) return this.decide(a, b.dataset.vsStatus, b);
         if (b.dataset.vs === 'save') return this.save(a, b);
+        if (b.dataset.vs === 'send-comment') return this.comment(a, b);
         if (b.dataset.vsRemark) return this.remark(a, b);
     }
 
@@ -1041,8 +1053,22 @@ class ValidationShow {
         await this.run(button, 'Enregistrement…', async () => {
             const data = await AdditionList.request(`${AdditionList.API}${a.id}`, values);
             this.editing = false;
+        this.commenting = false;
             this.replace(data.addition);
             this.render('✓ Correction enregistrée');
+        });
+    }
+
+    /** 💬 A person's comment on this addition (as the table's 💬). */
+    async comment(a, button) {
+        const text = this.card.querySelector('[data-vs-comment]')?.value.trim();
+        if (!text) return;
+        await this.run(button, 'Envoi…', async () => {
+            const data = await AdditionList.request(ValidationTable.COMMENTS_API, { target_type: 'addition', target_id: a.id, text });
+            this.table.comments.unshift(data.comment);
+            this.commenting = false;
+            this.table.render();
+            this.render('✓ Commentaire ajouté');
         });
     }
 
