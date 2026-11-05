@@ -13,7 +13,7 @@ low. The server reads the documents itself, without the AI:
 Every candidate is then checked by the server: already in the lexicon,
 already proposed or rejected, reading converted to Wenfa and checked
 against the lexicon. The editor ticks what to keep in a preview, and the
-words are proposed "À valider". The extracted text is kept
+words become drafts (Brouillons of Suivi). The extracted text is kept
 (ImportedDocument) as a source for later lookups; the file is not."""
 import csv
 import io
@@ -764,7 +764,7 @@ def api_languages(request):
 def api_propose(request, document_id):
     """POST {entries: [{hanzi, reading, french, english, themes, location,
     reading_note, translated, ai_fields, source_sense, remark, type}], source}: the ticked entries become additions
-    "À valider", checked again here (the browser is not trusted)."""
+    Brouillons (drafts), checked again here (the browser is not trusted)."""
     from .additions import _addition_json
 
     doc = ImportedDocument.objects.filter(id=document_id).first()
@@ -809,7 +809,7 @@ def api_propose(request, document_id):
         if c["reading_note"]:
             notes.append(c["reading_note"].capitalize() + ".")
         created.append(LexiconAddition.objects.create(
-            kind=c["kind"], status=LexiconAddition.STATUS_REVIEW, hanzi=c["hanzi"], pinyin=c["reading"],
+            kind=c["kind"], status=LexiconAddition.STATUS_DRAFT, hanzi=c["hanzi"], pinyin=c["reading"],
             french=c["french"].strip(), english=c["english"].strip(), themes=c["themes"].strip(),
             observations=" ".join(notes), source=row_source,
             created_by=request.user, updated_by=request.user))

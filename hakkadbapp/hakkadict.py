@@ -220,7 +220,7 @@ def api_drafts(request):
         if broken:
             notes.append("Lecture contraire aux règles : " + " ; ".join(broken) + ".")
         created.append(LexiconAddition.objects.create(
-            kind=LexiconAddition.KIND_WORD, status=LexiconAddition.STATUS_DRAFT, hanzi=w["hanzi"], pinyin=w["pinyin"],
+            kind=LexiconAddition.KIND_WORD, status=LexiconAddition.STATUS_DRAFT, ai_pending=True, hanzi=w["hanzi"], pinyin=w["pinyin"],
             french=french[:300], english=english[:300], observations=" ".join(notes)[:1000], source=SOURCE,
             created_by=ai, updated_by=ai))
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created], "skipped": len(words) - len(created)})

@@ -301,6 +301,9 @@ class LexiconAddition(models.Model):
     # The Saisie text exactly as typed (生(sen1) 人...), given back as is when
     # the addition is reopened; empty for imports and AI suggestions.
     input_text = models.TextField(blank=True, default="")
+    # Made by the AI, not sorted yet: shown on « Suggestions IA » only; kept
+    # (« → Brouillons ») it joins the Brouillons step of Suivi.
+    ai_pending = models.BooleanField(default=False)
     platform_id = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
 
     created_by = models.ForeignKey(

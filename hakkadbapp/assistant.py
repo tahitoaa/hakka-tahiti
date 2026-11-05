@@ -162,14 +162,14 @@ def add_comment(item, kind, text, field="", proposed=""):
 
 
 def suggest_new_word(hanzi, pinyin, french, english="", themes="", observations="", status=None):
-    """A new word by the assistant, "À valider" (or `status`: a draft for
-    the « Suggestions IA » page, proposed by a person) -- unless the lexicon
-    or the additions already have it, or an editor already rejected it."""
+    """A new word by the assistant: a draft to sort on « Suggestions IA »
+    (ai_pending), never « À valider » at once -- unless the lexicon or the
+    additions already have it, or an editor already rejected it."""
     hanzi, pinyin = "".join(hanzi.split()), "".join(pinyin.split())
     if not hanzi or not french.strip() or hanzi in known_words():
         return None
     return LexiconAddition.objects.create(
-        kind=LexiconAddition.KIND_WORD, status=status or LexiconAddition.STATUS_REVIEW, hanzi=hanzi, pinyin=pinyin,
+        kind=LexiconAddition.KIND_WORD, status=LexiconAddition.STATUS_DRAFT, ai_pending=True, hanzi=hanzi, pinyin=pinyin,
         french=french.strip()[:300], english=english.strip()[:300], themes=themes[:200],
         observations=observations.strip()[:1000], created_by=ai_user(), updated_by=ai_user())
 
@@ -526,7 +526,7 @@ def suggest_expressions(limit=MAX_NEW_WORDS, theme=None, status=None):
             continue
         known.add(key)
         created.append(LexiconAddition.objects.create(
-            kind=LexiconAddition.KIND_EXPRESSION, status=status or LexiconAddition.STATUS_REVIEW, hanzi=hanzi,
+            kind=LexiconAddition.KIND_EXPRESSION, status=LexiconAddition.STATUS_DRAFT, ai_pending=True, hanzi=hanzi,
             pinyin=" ".join(p for _h, p in parts), french=e["french"].strip()[:300],
             english=str(e.get("english", "")).strip()[:300],
             themes=", ".join(t for t in e.get("themes", []) if t in themes)[:200],

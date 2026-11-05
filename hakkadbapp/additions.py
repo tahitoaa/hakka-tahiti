@@ -44,6 +44,7 @@ def _addition_json(a):
         "platform_id": a.platform_id,
         "created_by": a.created_by.username if a.created_by else "",
         "by_ai": bool(a.created_by and a.created_by.username == AI_USERNAME),
+        "ai_pending": a.ai_pending,
         "updated_by": a.updated_by.username if a.updated_by else "",
         "created_at": a.created_at.isoformat(),
         "updated_at": a.updated_at.isoformat(),
@@ -91,6 +92,7 @@ def _apply_payload(addition, payload):
         if payload["status"] not in STATUSES:
             return "Statut invalide."
         addition.status = payload["status"]
+        addition.ai_pending = False
     for field in EDITABLE_FIELDS:
         if field in payload:
             value = payload[field]
@@ -333,6 +335,7 @@ def additions_bulk(request):
     with transaction.atomic():
         for addition in additions:
             addition.status = status
+            addition.ai_pending = False      # sorted by a person (« Suggestions IA » → Brouillons)
             addition.updated_by = request.user
-            addition.save(update_fields=["status", "updated_by", "updated_at"])
+            addition.save(update_fields=["status", "ai_pending", "updated_by", "updated_at"])
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})

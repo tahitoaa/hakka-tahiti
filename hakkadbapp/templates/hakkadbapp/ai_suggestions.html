@@ -23,7 +23,7 @@
     <h2 class="font-display text-xl font-bold text-gray-800">Suggestions de l'IA
       <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>L'IA propose des mots absents du lexique
         (repérés dans les expressions et les transcriptions) ou des expressions faites de mots du lexique. Ses suggestions restent ici
-        en brouillon : cochez celles qui conviennent, corrigez-les (✎ ou ▶ diaporama), puis « Proposer à la validation ». « Écarter »
+        en brouillon : cochez celles qui conviennent, corrigez-les (✎ ou ▶ diaporama), puis « 📝 Garder » : elles passent dans Suivi › Brouillons. « Écarter »
         supprime les autres. L'IA ne propose jamais rien elle-même.</div></details></h2>
     <button type="button" id="vs-open" class="vs-open vs-open-lg" title="Passer les suggestions une par une, en grand">▶ Diaporama</button></div>
     <input id="saisie-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans les suggestions"
@@ -59,7 +59,7 @@
 
   <div id="validation-bar" class="vt-bar" role="toolbar" aria-label="Actions sur la sélection">
     <span id="validation-count" class="vt-count" aria-live="polite">Cochez des lignes</span>
-    <button type="button" data-bulk="review" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
+    <button type="button" data-bulk="draft" class="saisie-btn saisie-btn-review" disabled title="Gardées : elles passent dans Suivi › Brouillons">📝 Garder (→ Brouillons)</button>
     <button type="button" data-bulk="delete" class="saisie-btn saisie-btn-delete" disabled>🗑 Écarter</button>
   </div>
   <div id="validation-status" class="text-sm min-h-5" role="status"></div>
@@ -93,7 +93,7 @@
     <button type="button" class="vs-close" data-vs="close" aria-label="Fermer le diaporama">✕</button></div>
   <div class="vs-card" id="vs-card"></div>
   <div class="vs-actions">
-    <button type="button" class="saisie-btn-review" data-vs-status="review">↑ Proposer</button>
+    <button type="button" class="saisie-btn-review" data-vs-status="draft">📝 Garder (→ Brouillons)</button>
     <button type="button" class="saisie-btn-neutral" data-vs="edit">✎ Corriger</button>
     <button type="button" class="saisie-btn-neutral" data-vs="comment">💬 Commenter</button>
   </div>

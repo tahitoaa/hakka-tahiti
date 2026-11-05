@@ -251,7 +251,7 @@ class AdditionList {
     render() {
         const review = this.additions.filter((a) => a.status === 'review').length;
         document.querySelectorAll('[data-review-count]').forEach((el) => { el.textContent = review; el.hidden = !review; });
-        const drafts = this.additions.filter((a) => a.status === 'draft' && !a.by_ai).length;
+        const drafts = this.additions.filter((a) => a.status === 'draft' && !a.ai_pending).length;
         document.querySelectorAll('[data-draft-count]').forEach((el) => { el.textContent = drafts; el.hidden = !drafts; });
         this.el.filters?.querySelectorAll('[data-filter]').forEach((b) => {
             b.dataset.label ||= b.textContent.trim();
@@ -712,7 +712,8 @@ class ValidationTable extends AdditionList {
             if (action === 'validated') b.title = '';
             b.disabled = !n || (action === 'delete'
                 ? chosen.some((a) => !['draft', 'rejected'].includes(a.status)) || (!decider && chosen.some((a) => decided(a.status)))
-                : chosen.every((a) => a.status === action) || (!decider && (decided(action) || chosen.some((a) => decided(a.status)))));
+                // (an AI draft still to sort: « Garder » moves it to Brouillons)
+                : chosen.every((a) => a.status === action && !(action === 'draft' && a.ai_pending)) || (!decider && (decided(action) || chosen.some((a) => decided(a.status)))));
         });
     }
 
@@ -1052,7 +1053,7 @@ class ValidationShow {
         const decided = (s) => ['validated', 'rejected'].includes(s);
         this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
             if (decided(b.dataset.vsStatus)) b.hidden = !decider;
-            b.disabled = this.editing || this.commenting || b.dataset.vsStatus === a.status || (!decider && decided(a.status))
+            b.disabled = this.editing || this.commenting || (b.dataset.vsStatus === a.status && !(a.status === 'draft' && a.ai_pending)) || (!decider && decided(a.status))
                 || (b.dataset.vsStatus === 'validated' && AdditionList.missing(a).length > 0);
             if (b.dataset.vsStatus === 'validated') {
                 b.title = AdditionList.missing(a).length ? `Incomplet : ${AdditionList.missing(a).join(', ')}` : '';
@@ -1416,7 +1417,7 @@ class DocumentImport {
         summary.innerHTML = Object.entries(counts).map(([state, n]) =>
             `<span class="vt-state vt-state-${state}">${n} ${DocumentImport.STATES[state] || state}</span>`).join(' ');
         const picked = this.entries.filter((e) => e.picked).length;
-        button.textContent = `↑ Proposer ${picked} mot${picked > 1 ? 's' : ''} à la validation`;
+        button.textContent = `📝 Ajouter ${picked} mot${picked > 1 ? 's' : ''} aux brouillons`;
         button.disabled = !picked;
         const check = this.result.querySelector('[data-languages]');
         if (check) check.hidden = !this.toCheck().length;
@@ -1513,10 +1514,10 @@ class DocumentImport {
                 }
                 const n = data.additions.length;
                 const origin = data.additions[0]?.source || source;
-                this.setStatus(`✓ ${n} mot${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} à la validation${data.skipped ? ` (${data.skipped} ignoré${data.skipped > 1 ? 's' : ''} : déjà connus)` : ''}.`);
+                this.setStatus(`✓ ${n} mot${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} aux brouillons${data.skipped ? ` (${data.skipped} ignoré${data.skipped > 1 ? 's' : ''} : déjà connus)` : ''}.`);
                 if (!this.table && n) {
-                    const url = `${this.validationUrl}?origine=${encodeURIComponent(origin)}`;
-                    this.status.insertAdjacentHTML('beforeend', ` <a class="underline font-semibold" href="${AdditionList.escapeHtml(url)}">Voir dans Validation →</a>`);
+                    const url = `${this.validationUrl}?etape=brouillons&origine=${encodeURIComponent(origin)}`;
+                    this.status.insertAdjacentHTML('beforeend', ` <a class="underline font-semibold" href="${AdditionList.escapeHtml(url)}">Voir dans Suivi › Brouillons →</a>`);
                 }
                 this.reset();
                 this.form.reset();
@@ -1537,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
         list: $('validation-rows'), search: $('saisie-search'), filters: null,
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
         facets: $('vt-facets'), more: $('vt-more'), filter: 'all', inlineEdit: true,
-        scope: (a) => a.status === 'draft' && !a.by_ai,
+        scope: (a) => a.status === 'draft' && !a.ai_pending,
         empty: 'Aucun brouillon.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
@@ -1556,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         list: $('validation-rows'), search: $('saisie-search'), filters: null,
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
         facets: $('vt-facets'), more: $('vt-more'), filter: 'all',
-        scope: (a) => a.by_ai && a.status === 'draft',
+        scope: (a) => a.ai_pending && a.status === 'draft',
         empty: 'Aucune suggestion en attente : générez-en ci-dessus.',
         onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
     });
@@ -1677,7 +1678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         all: $('validation-all'), bar: $('validation-bar'), count: $('validation-count'), status: $('validation-status'),
         facets: $('vt-facets'), more: $('vt-more'), inlineEdit: true,
         // The AI's drafts are sorted on the « Suggestions IA » page.
-        scope: (a) => !(a.by_ai && a.status === 'draft'),
+        scope: (a) => !(a.ai_pending && a.status === 'draft'),
         // ?etape=brouillons (the old « Brouillons » page) opens that step.
         filter: ({ brouillons: 'draft', valides: 'validated', rejetes: 'rejected' })[new URLSearchParams(location.search).get('etape')] || 'review',
         empty: 'Rien à afficher à cette étape.',
