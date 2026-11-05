@@ -13,13 +13,7 @@
            class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-gold">
   </div>
 
-  <div class="vt-tabs" role="tablist" aria-label="Que relire">
-    <button type="button" role="tab" data-vtab="additions" aria-selected="true" aria-controls="additions-panel">Ajouts</button>
-    <button type="button" role="tab" data-vtab="lexicon" aria-selected="false" aria-controls="lexicon-panel">Remarques sur le lexique<span id="lexicon-count"></span></button>
-  </div>
-
-  <div id="additions-panel" role="tabpanel" class="space-y-3">
-  <!-- The journey of an addition: one step at a time (same filter as the old status chips). -->
+  <!-- The journey of an addition: one step at a time; then, once in the lexicon, the corrections to do on e-reo. -->
   <nav id="saisie-filters" class="st-steps" role="group" aria-label="Étapes">
     <button type="button" class="st-step st-draft" data-filter="draft" aria-pressed="false" data-label="Brouillons">
       <span class="st-dot">📝</span><span class="st-name">Brouillons</span><span class="st-n" data-count></span></button>
@@ -29,9 +23,14 @@
     <span class="st-arrow" aria-hidden="true">→</span>
     <button type="button" class="st-step st-validated" data-filter="validated" aria-pressed="false" data-label="Validés">
       <span class="st-dot">✓</span><span class="st-name">Validés</span><span class="st-n" data-count></span></button>
+    <span class="st-arrow" aria-hidden="true">→</span>
+    <button type="button" class="st-step st-ereo" data-ereo-step aria-pressed="false" title="Remarques sur les entrées déjà dans le lexique : à corriger sur la plateforme e-reo">
+      <span class="st-dot">🛠</span><span class="st-name">Corrections e-reo</span><span class="st-n" data-ereo-count>{{ ereo_count }}</span></button>
     <button type="button" class="st-step st-rejected st-side" data-filter="rejected" aria-pressed="false" data-label="Rejetés">
       <span class="st-dot">✕</span><span class="st-name">Rejetés</span><span class="st-n" data-count></span></button>
   </nav>
+
+  <div id="additions-panel" class="space-y-3">
   <details class="vt-settings" id="vt-settings" open>
   <summary>⚙ Filtres<span id="vt-settings-summary"></span></summary>
   <div class="vt-settings-body">
@@ -83,16 +82,7 @@
     Valider et rejeter : membres du groupe « Validateurs ».</div></details>
   </div>
 
-  <section id="lexicon-panel" role="tabpanel" class="vt-lexicon" hidden>
-    <div class="vt-ai-tools" data-needs-ai hidden>
-      <b>🤖 Faire relire par l'IA</b>
-      <button type="button" class="saisie-btn saisie-btn-ai" data-lex="review" data-type="word">10 mots du lexique</button>
-      <button type="button" class="saisie-btn saisie-btn-ai" data-lex="review" data-type="expression">10 expressions</button>
-    </div>
-    <p class="text-xs text-gray-500">Le lexique se corrige sur la plateforme : la liste à faire est dans <a href="{% url 'platform_corrections' %}" class="underline font-semibold">🛠 Corrections e-reo</a>.</p>
-    <div id="lexicon-status" class="text-sm min-h-5" role="status"></div>
-    <ul data-lex-list><li class="vt-sub">Chargement…</li></ul>
-  </section>
+  <section id="ereo-panel" aria-label="Corrections e-reo" hidden></section>
 </div>
 
 <dialog class="vs-dialog" id="vs-dialog" aria-labelledby="vs-count">
@@ -113,4 +103,5 @@
 </dialog>
 {{ status_labels|json_script:"saisie-status-labels" }}
 <script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/ereo_corrections.js' %}"></script>
 {% endblock %}

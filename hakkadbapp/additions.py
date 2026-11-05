@@ -190,9 +190,12 @@ def validation(request):
     editing goes back to the Saisie form)."""
     if not is_editor(request.user):
         return _deny(request)
+    from .platform_corrections import open_count
+
     return render(request, "hakkadbapp/validation.html", {
-        "title": "Validation",
+        "title": "Suivi des ajouts",
         "page": "validation",
+        "ereo_count": open_count(),
         # Drafts live on the Saisie page.
         "status_choices": [c for c in LexiconAddition.STATUS_CHOICES if c[0] != LexiconAddition.STATUS_DRAFT],
         "status_labels": dict(LexiconAddition.STATUS_CHOICES),

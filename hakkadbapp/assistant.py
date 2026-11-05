@@ -143,7 +143,7 @@ def add_comment(item, kind, text, field="", proposed=""):
     else:
         kind, field, proposed = ReviewComment.KIND_COMMENT, "", ""
     open_remarks = ReviewComment.objects.filter(target_type=item["type"], target_id=item["id"],
-                                                status=ReviewComment.STATUS_OPEN, kind=kind)
+                                                status__in=ReviewComment.PENDING, kind=kind)
     if kind == ReviewComment.KIND_CORRECTION and open_remarks.filter(field=field, proposed_value=proposed).exists():
         return None
     if kind == ReviewComment.KIND_COMMENT and open_remarks.filter(text=text).exists():
@@ -632,8 +632,8 @@ def api_comments(request):
     types = ([ReviewComment.TARGET_WORD, ReviewComment.TARGET_EXPRESSION] if request.GET.get("scope") == "lexicon"
              else [ReviewComment.TARGET_ADDITION])
     comments = ReviewComment.objects.filter(target_type__in=types).select_related("author")
-    open_ = list(comments.filter(status=ReviewComment.STATUS_OPEN))
-    resolved = list(comments.exclude(status=ReviewComment.STATUS_OPEN)[:100])
+    open_ = list(comments.filter(status__in=ReviewComment.PENDING))
+    resolved = list(comments.exclude(status__in=ReviewComment.PENDING)[:100])
     muted = [{"target_type": t, "target_id": i} for t, i in
              AITarget.objects.filter(target_type__in=types, muted=True).values_list("target_type", "target_id")]
     return JsonResponse({"comments": [comment_json(c) for c in open_ + resolved], "muted": muted,
@@ -643,16 +643,26 @@ def api_comments(request):
 @require_POST
 @editor_required
 def api_comment_action(request, comment_id):
-    """POST {action: "apply" | "dismiss" | "done"}. "apply" copies a
-    correction into the addition (an editor's change, recorded as theirs);
-    "done" closes a lexicon remark once fixed on the platform."""
+    """POST {action: "apply" | "dismiss" | "done" | "todo" | "wait"}. "apply"
+    copies a correction into the addition (an editor's change, recorded as
+    theirs); "done" closes a lexicon remark once fixed on the platform.
+    Lexicon remarks also move between steps: "todo" (approved, to do on
+    e-reo) and "wait" (back to « en attente »), from any status."""
     payload = _json(request) or {}
     action = payload.get("action")
     try:
         comment = ReviewComment.objects.select_related("author").get(id=comment_id)
     except ReviewComment.DoesNotExist:
         return JsonResponse({"error": "Remarque introuvable."}, status=404)
-    if comment.status != ReviewComment.STATUS_OPEN:
+    lexicon = comment.target_type != ReviewComment.TARGET_ADDITION
+    if action in ("todo", "wait"):
+        if not lexicon:
+            return JsonResponse({"error": "Réservé aux remarques sur le lexique."}, status=400)
+        comment.status = ReviewComment.STATUS_TODO if action == "todo" else ReviewComment.STATUS_OPEN
+        comment.resolved_by = comment.resolved_at = None
+        comment.save(update_fields=["status", "resolved_by", "resolved_at"])
+        return JsonResponse({"ok": True, "comment": comment_json(comment), "addition": None})
+    if comment.status not in ReviewComment.PENDING or (comment.status == ReviewComment.STATUS_TODO and action == "apply"):
         return JsonResponse({"error": "Cette remarque est déjà traitée."}, status=409)
     addition = None
     if action == "apply":

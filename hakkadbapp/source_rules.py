@@ -171,27 +171,33 @@ def rey_syllable(reading):
 
 def _load_rey():
     """{simplified char: [(syllable, tone, pages, low)]} from the pages of Rey's
-    dictionary read so far (ReyPage): the head characters and their reading."""
+    dictionary read so far (ReyPage): the head characters and every character
+    of the words and expressions quoted, one syllable each (rey.align).
+    low: seen once while the character has a reading seen more often."""
     from .models import ReyPage
+    from .rey import align
 
+    seen = defaultdict(dict)         # trad char -> {(base, tone): [pages, count, from a head]}
+    carry, last = None, None
+    for row in ReyPage.objects.only("page", "entries").order_by("page"):
+        aligned, head = align(row.entries or [], carry if last is not None and row.page == last + 1 else None)
+        carry, last = head, row.page
+        for e, chars in zip(row.entries or [], aligned):
+            for char, _token, base, tone in chars or []:
+                r = seen[char].setdefault((base, tone), [[], 0, False])
+                if row.page not in r[0]:
+                    r[0].append(row.page)
+                r[1] += 1
+                r[2] = r[2] or e.get("kind") == "caractère"
+    simplified = convert_all(ps._t2s, list(seen))    # (the whole cache: only these chars are read)
     out = defaultdict(list)
-    for row in ReyPage.objects.only("page", "entries"):
-        for e in row.entries or []:
-            if e.get("kind") != "caractère":
+    for trad, readings in seen.items():
+        top = max(n for _p, n, _h in readings.values())
+        for (base, tone), (pages, n, from_head) in sorted(readings.items(), key=lambda kv: (not kv[1][2], -kv[1][1])):
+            char = simplified.get(trad, trad)
+            if any(r[:2] == (base, tone) for r in out[char]):
                 continue
-            syllable, tone = rey_syllable(e.get("reading", ""))
-            if not syllable:
-                continue
-            # A head may give variants side by side (藥 葯): each its own character.
-            heads = re.findall(r"[\u3400-\u9fff]", e.get("hanzi", ""))
-            simplified = convert_all(ps._t2s, heads)     # (the whole cache: only these heads are read)
-            for char in dict.fromkeys(simplified[h] for h in heads):
-                known = next((r for r in out[char] if r[:2] == (syllable, tone)), None)
-                if known:
-                    if row.page not in known[2]:
-                        known[2].append(row.page)
-                    continue
-                out[char].append((syllable, tone, [row.page], False))
+            out[char].append((base, tone, sorted(pages), n == 1 and not from_head and top > 1))
     return dict(out)
 
 
@@ -364,7 +370,8 @@ SOURCE_INFO = [
     {"id": "rey", "short": "Rey", "sub": "1926",
      "full": "Charles Rey, Dictionnaire chinois-français, dialecte hac-ka (1926)",
      "origin": "Pages lues par l'IA à la demande (onglet 📕 Rey 1926), une fois, puis gardées : la colonne se remplit au fil des "
-               "lectures. Seuls les caractères de tête de chaque entrée. Pages : pages du dictionnaire.",
+               "lectures. Caractères de tête et chaque caractère des mots et expressions cités (une syllabe par caractère ; "
+               "un mot dont les syllabes ne s'alignent pas est ignoré). Pages : pages du dictionnaire.",
      "romanization": "Romanisation française : -c final = -k, tch = zh, ch = sh, ts' = c, gn = ng(i) ; tons 1 ˉ, 2 ˆ, 3 `, 4 ´, "
                      "5 ˘ (yangru), 6 ̑ (yinru)",
      "scan": True},

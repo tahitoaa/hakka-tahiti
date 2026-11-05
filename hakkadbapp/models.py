@@ -373,7 +373,11 @@ class ReviewComment(models.Model):
     STATUS_OPEN = "open"
     STATUS_APPLIED = "applied"
     STATUS_DISMISSED = "dismissed"
-    STATUS_CHOICES = [(STATUS_OPEN, "À traiter"), (STATUS_APPLIED, "Appliquée"), (STATUS_DISMISSED, "Écartée")]
+    # A lexicon remark approved, to be done on the e-reo platform (by hand or an AI agent).
+    STATUS_TODO = "todo"
+    STATUS_CHOICES = [(STATUS_OPEN, "À traiter"), (STATUS_TODO, "À faire (e-reo)"), (STATUS_APPLIED, "Appliquée"),
+                      (STATUS_DISMISSED, "Écartée")]
+    PENDING = (STATUS_OPEN, STATUS_TODO)
 
     target_type = models.CharField(max_length=12, choices=TARGET_CHOICES)
     target_id = models.IntegerField()

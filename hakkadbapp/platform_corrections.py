@@ -7,15 +7,20 @@ editor) -- corrections (one field, current -> proposed value) and comments
 Each item says where (the entry's platform id and its « target » line, as
 on the platform), what (the platform field: primary = French, secondary =
 English) and the platform's value at the last import (Traces.platform_data),
-so a person -- or an AI agent reading the JSON -- can do it. Marked « Corrigé »
-on the site once done there (assistant.api_comment_action "done")."""
+so a person -- or an AI agent reading the JSON -- can do it. Marked « Fait »
+on the site once done there (assistant.api_comment_action "done").
+
+Shown as the last step of the Suivi page (after « Validés »): its own steps
+En attente (open) -> À faire (todo) -> Fait (applied), or Rejetée (dismissed)."""
 import time
 
 from django.contrib.auth.views import redirect_to_login
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 
-from .models import Expression, ReviewComment, Traces, Word
+from .ai import ai_enabled
+from .models import AITarget, Expression, ReviewComment, Traces, Word
 from .permissions import is_editor
 
 # The lexicon's fields, as named on the platform (translations.<name>).
@@ -36,15 +41,22 @@ def _platform_snapshot():
     return data
 
 
-def corrections():
-    """The open remarks on lexicon entries, oldest first, ready to act on."""
+# The steps of a remark, as shown on the page and in the JSON (?statut=).
+STEPS = {ReviewComment.STATUS_OPEN: "attente", ReviewComment.STATUS_TODO: "todo",
+         ReviewComment.STATUS_APPLIED: "fait", ReviewComment.STATUS_DISMISSED: "rejete"}
+
+
+def corrections(steps=None):
+    """The remarks on lexicon entries (all steps, or `steps`), oldest first."""
     snap = _platform_snapshot()
+    statuses = [s for s, step in STEPS.items() if not steps or step in steps]
     remarks = list(ReviewComment.objects.filter(
         target_type__in=[ReviewComment.TARGET_WORD, ReviewComment.TARGET_EXPRESSION],
-        status=ReviewComment.STATUS_OPEN).select_related("author").order_by("created_at"))
+        status__in=statuses).select_related("author").order_by("created_at"))
     ids = {t: [r.target_id for r in remarks if r.target_type == t] for t in ("word", "expression")}
     platform_ids = {"word": dict(Word.objects.filter(id__in=ids["word"]).values_list("id", "platform_id")),
                     "expression": dict(Expression.objects.filter(id__in=ids["expression"]).values_list("id", "platform_id"))}
+    muted = set(AITarget.objects.filter(muted=True, target_type__in=["word", "expression"]).values_list("target_type", "target_id"))
     out = []
     for r in remarks:
         pid = platform_ids[r.target_type].get(r.target_id)
@@ -52,6 +64,9 @@ def corrections():
         tr = payload.get("translations") or {}
         item = {
             "id": r.id,
+            "status": STEPS[r.status],
+            "target_type": r.target_type, "target_id": r.target_id,
+            "muted": (r.target_type, r.target_id) in muted,
             "entry_type": "mot" if r.target_type == "word" else "expression",
             "platform_id": pid or "",
             "target": tr.get("target", ""),
@@ -80,29 +95,48 @@ def corrections():
     return out, snap["date"]
 
 
+def open_count():
+    """The remarks still to deal with (en attente + à faire), for the Suivi step."""
+    return ReviewComment.objects.filter(target_type__in=[ReviewComment.TARGET_WORD, ReviewComment.TARGET_EXPRESSION],
+                                        status__in=ReviewComment.PENDING).count()
+
+
 def page(request):
+    """The step « Corrections e-reo » of the Suivi page: ?fragment=1 is the
+    panel loaded into it; the old address opens that step."""
     if not request.user.is_authenticated:
         return redirect_to_login(request.get_full_path())
+    if request.GET.get("fragment") != "1":
+        statut = request.GET.get("statut")
+        return redirect(reverse("validation") + "?etape=ereo" + (f"&statut={statut}" if statut in STEPS.values() else ""))
     if not is_editor(request.user):
-        return render(request, "hakkadbapp/platform_corrections.html", {"title": "Corrections e-reo", "denied": True})
+        return JsonResponse({"error": "Connexion requise."}, status=403)
     items, snapshot_date = corrections()
-    return render(request, "hakkadbapp/platform_corrections.html", {
-        "title": "Corrections e-reo", "page": "platform_corrections", "items": items,
-        "snapshot_date": snapshot_date, "corrections_count": sum(1 for i in items if i["kind"] == "correction"),
+    counts = {step: sum(1 for i in items if i["status"] == step) for step in STEPS.values()}
+    start = request.GET.get("statut")
+    if start not in counts:
+        start = "attente" if counts["attente"] else "todo"
+    return render(request, "hakkadbapp/components/ereo_panel.html", {
+        "items": items, "snapshot_date": snapshot_date, "counts": counts, "start": start, "ai_enabled": ai_enabled(),
     })
 
 
 def api(request):
-    """GET: the same list as JSON, for an agent working on the platform.
-    Each item: id, entry_type, platform_id, target, kind (correction |
-    précision), platform_field, current_value, proposed_value, explanation,
-    instruction, seems_done. Once done: POST /api/commentaires/<id>
-    {"action": "done"}."""
+    """GET: the same list as JSON, for an agent working on the platform:
+    by default the « À faire » items (?statut=todo, or attente, fait, rejete,
+    tous). Each item: id, status, entry_type, platform_id, target, kind
+    (correction | précision), platform_field, current_value, proposed_value,
+    explanation, instruction, seems_done. Once done: POST
+    /api/commentaires/<id> {"action": "done"}."""
     if not is_editor(request.user):
         return JsonResponse({"error": "Connexion requise."}, status=403)
-    items, snapshot_date = corrections()
+    wanted = request.GET.get("statut", "todo")
+    steps = None if wanted == "tous" else [s for s in wanted.split(",") if s in STEPS.values()] or ["todo"]
+    items, snapshot_date = corrections(steps)
     return JsonResponse({
         "about": "Corrections à faire à la main sur la plateforme e-reo, pour des entrées déjà dans le lexique. "
-                 "Une fois faite sur e-reo : POST /api/commentaires/<id> {\"action\": \"done\"} (ou \"dismiss\" pour l'écarter).",
-        "platform_snapshot": snapshot_date, "count": len(items), "items": items,
+                 "Statuts : attente (à examiner), todo (approuvée, à faire sur e-reo), fait, rejete. "
+                 "Une fois faite sur e-reo : POST /api/commentaires/<id> {\"action\": \"done\"}. "
+                 "Autres actions : \"todo\", \"wait\" (remettre en attente), \"dismiss\" (rejeter).",
+        "statut": steps or "tous", "platform_snapshot": snapshot_date, "count": len(items), "items": items,
     }, json_dumps_params={"ensure_ascii": False, "indent": 1})

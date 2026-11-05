@@ -366,6 +366,9 @@
     // ---- load -----------------------------------------------------------------------------------
     fetch(URL).then((r) => r.json()).then((payload) => {
         data = payload;
+        // The other tabs (dict_lookups.js: pinyin -> character) read the same rows.
+        window.sxData = payload;
+        document.dispatchEvent(new CustomEvent('sx-data'));
         data.hay = data.rows.map((r) => fold([...r.slice(0, 7), ...Object.values(r[7]).flat(2)].join(' ')));
         loadPrefs();
         renderColumnChooser();

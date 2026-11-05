@@ -510,7 +510,7 @@ class ValidationTable extends AdditionList {
     }
 
     openRemarks(id) {
-        return this.comments.filter((c) => c.target_id === id && c.status === 'open');
+        return this.comments.filter((c) => c.target_id === id && ['open', 'todo'].includes(c.status));
     }
 
     toggle(id, on) {
@@ -1090,108 +1090,6 @@ class ValidationShow {
     }
 }
 
-/* The "Lexique" tab of the Validation page: the AI's remarks on lexicon
-   words and expressions. The lexicon is edited on the platform: an editor
-   fixes it there, then marks the remark done -- or dismisses it, or mutes
-   the AI on that item. */
-class LexiconRemarks {
-    constructor(root, status) {
-        this.root = root;
-        this.status = status;
-        this.list = root.querySelector('[data-lex-list]');
-        this.comments = [];
-        this.muted = new Set();
-        root.addEventListener('click', (event) => {
-            const btn = event.target.closest('[data-lex]');
-            if (btn) this.action(btn);
-        });
-    }
-
-    key(type, id) { return `${type}:${id}`; }
-
-    async load() {
-        try {
-            const data = await AdditionList.request(`${ValidationTable.COMMENTS_API}?scope=lexicon`);
-            this.comments = data.comments.filter((c) => c.status === 'open');
-            this.muted = new Set(data.muted.map((m) => this.key(m.target_type, m.target_id)));
-        } catch (err) {
-            this.list.innerHTML = `<li class="vt-sub">Échec du chargement : ${AdditionList.escapeHtml(err.message)}</li>`;
-            return;
-        }
-        this.render();
-    }
-
-    render() {
-        const esc = AdditionList.escapeHtml;
-        const count = document.getElementById('lexicon-count');
-        if (count) count.textContent = this.comments.length ? ` (${this.comments.length})` : '';
-        if (!this.comments.length) {
-            this.list.innerHTML = '<li class="vt-sub">Aucune remarque en cours sur le lexique.</li>';
-            return;
-        }
-        this.list.innerHTML = this.comments.map((c) => {
-            const muted = this.muted.has(this.key(c.target_type, c.target_id));
-            const [hanzi, ...rest] = c.target_label.split(' · ');
-            return `<li class="vt-remark vt-remark-${c.kind}" data-cid="${c.id}">
-              <div class="vt-remark-head"><span class="hanzi">${esc(hanzi)}</span> ${esc(rest.join(' · '))} ·
-                ${c.target_type === 'word' ? 'mot' : 'expression'} · ${c.by_ai ? '🤖 IA' : esc(c.author)}</div>
-              ${c.kind === 'correction' ? `<div class="vt-diff"><b>${esc(c.field_label)}</b> : <del>${esc(c.current_value) || '<i>vide</i>'}</del>
-                  <span aria-hidden="true">→</span> <ins>${esc(c.proposed_value)}</ins></div>` : ''}
-              <div>${esc(c.text)}</div>
-              <div class="vt-remark-actions">
-                <button type="button" class="saisie-btn saisie-btn-validate" data-lex="done" data-cid="${c.id}">✓ Corrigé sur la plateforme</button>
-                <button type="button" class="saisie-btn saisie-btn-neutral" data-lex="dismiss" data-cid="${c.id}">Écarter</button>
-                <button type="button" class="saisie-btn saisie-btn-neutral" data-lex="mute" data-cid="${c.id}" data-muted="${muted}">
-                  ${muted ? '🔔 Réactiver l’IA' : `🔕 Couper l’IA sur ${c.target_type === 'word' ? 'ce mot' : 'cette expression'}`}</button>
-              </div></li>`;
-        }).join('');
-    }
-
-    setStatus(message, isError = false) {
-        this.status.textContent = message;
-        this.status.className = `text-sm ${isError ? 'text-red-700' : 'text-green-700'}`;
-    }
-
-    async action(button) {
-        const action = button.dataset.lex;
-        if (action === 'review') return this.review(button);
-        const comment = this.comments.find((c) => c.id === Number(button.dataset.cid));
-        if (!comment) return;
-        await AdditionList.whileBusy(button, '…', async () => {
-            try {
-                if (action === 'mute') {
-                    const muted = button.dataset.muted !== 'true';
-                    await AdditionList.request('/api/ia/muet', { target_type: comment.target_type, target_id: comment.target_id, muted });
-                    const key = this.key(comment.target_type, comment.target_id);
-                    if (muted) this.muted.add(key); else this.muted.delete(key);
-                } else {
-                    await AdditionList.request(`${ValidationTable.COMMENTS_API}/${comment.id}`, { action });
-                    this.comments = this.comments.filter((c) => c.id !== comment.id);
-                }
-                this.render();
-            } catch (err) {
-                this.setStatus(`Échec : ${err.message}`, true);
-            }
-        });
-    }
-
-    /** The AI reads the next lexicon words (or expressions) it hasn't read yet. */
-    async review(button) {
-        await AdditionList.whileBusy(button, 'L’IA relit…', async () => {
-            try {
-                const data = await AdditionList.request('/api/ia/relire', { target_type: button.dataset.type, next: true });
-                this.comments = [...data.comments, ...this.comments];
-                this.render();
-                const n = data.comments.length;
-                this.setStatus(data.message || (n ? `🤖 ${n} nouvelle${n > 1 ? 's' : ''} remarque${n > 1 ? 's' : ''}.`
-                    : '🤖 L’IA n’a rien à redire sur ces éléments.'));
-            } catch (err) {
-                this.setStatus(`Échec : ${err.message}`, true);
-            }
-        });
-    }
-}
-
 /* Import of a text document (importer.py), on the Validation page: the
    server reads the file, the AI reads a free text chunk by chunk, every
    entry is checked, and the editor ticks what to propose "À valider". */
@@ -1738,14 +1636,28 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-new-words]').forEach((btn) =>
         btn.addEventListener('click', () => table.aiNewWords(btn.dataset.newWords, btn)));
 
-    const lexicon = new LexiconRemarks($('lexicon-panel'), $('lexicon-status'));
-    lexicon.load();
-    // Two tabs: the additions table, the remarks on the lexicon.
-    const tabs = [...document.querySelectorAll('[data-vtab]')];
-    const show = (name) => {
-        tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.vtab === name)));
-        $('additions-panel').hidden = name !== 'additions';
-        $('lexicon-panel').hidden = name !== 'lexicon';
+    // The last step, « Corrections e-reo »: the remarks on entries already in the lexicon (ereo_corrections.js).
+    const ereoStep = document.querySelector('[data-ereo-step]');
+    const ereoCount = (n) => { const c = ereoStep.querySelector('[data-ereo-count]'); if (c) c.textContent = n; };
+    const showEreo = (on) => {
+        $('additions-panel').hidden = on;
+        $('ereo-panel').hidden = !on;
+        ereoStep.setAttribute('aria-pressed', String(on));
+        if (on) {
+            table.el.filters.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+            EreoCorrections.show($('ereo-panel'), ereoCount);
+        } else {
+            const url = new URL(location.href);
+            if (url.searchParams.get('etape') === 'ereo') {
+                url.searchParams.delete('etape');
+                url.searchParams.delete('statut');
+                try { history.replaceState(null, '', url); } catch (e) { /* ignore */ }
+            }
+        }
     };
-    tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.vtab)));
+    if (ereoStep && typeof EreoCorrections !== 'undefined') {
+        ereoStep.addEventListener('click', () => showEreo(true));
+        table.el.filters.addEventListener('click', (e) => { if (e.target.closest('[data-filter]')) showEreo(false); });
+        if (new URLSearchParams(location.search).get('etape') === 'ereo') showEreo(true);
+    }
 });

@@ -1,0 +1,96 @@
+{# « 🛠 Corrections e-reo », the last step of the Suivi page: the remarks on entries already in the lexicon,   #}
+{# to be done on the e-reo platform. Loaded into the page on demand (platform_corrections.page ?fragment=1). #}
+<style>
+  .pc-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .pc-list { display: grid; gap: 0.5rem; }
+  .pc-item { background: #fff; border: 1px solid #E8DFD2; border-left: 5px solid #a78bfa; border-radius: 0.7rem; padding: 0.6rem 0.75rem;
+             display: grid; gap: 0.3rem; }
+  .pc-item.is-comment { border-left-color: #d9c27a; }
+  .pc-item[data-status="fait"], .pc-item[data-status="rejete"] { opacity: 0.7; }
+  .pc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.6rem; }
+  .pc-target { font-size: 1.05rem; font-weight: 700; color: #261F1C; }
+  .pc-meta { font-size: 0.72rem; color: #8C8478; }
+  .pc-pid { font-family: ui-monospace, monospace; font-size: 0.68rem; color: #8C8478; user-select: all; }
+  .pc-diff { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.5rem; font-size: 0.88rem; align-items: baseline; }
+  .pc-diff dt { color: #6E655C; font-size: 0.75rem; }
+  .pc-diff del { color: #991b1b; background: #fee2e2; text-decoration: line-through; padding: 0 0.2rem; border-radius: 0.2rem; }
+  .pc-diff ins { color: #065f46; background: #d1fae5; text-decoration: none; padding: 0 0.2rem; border-radius: 0.2rem; font-weight: 600; }
+  .pc-why { font-size: 0.85rem; color: #3A3430; }
+  .pc-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .pc-actions .saisie-btn { min-height: 2rem; padding: 0.15rem 0.6rem; font-size: 0.8rem; }
+  .pc-badge { display: inline-block; padding: 0 0.45rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; }
+  .pc-badge-correction { background: #ede9fe; color: #5b21b6; }
+  .pc-badge-comment { background: #fdf6e3; color: #8a6d1f; }
+  .pc-badge-done { background: #d1fae5; color: #065f46; }
+  .pc-note { font-size: 0.8rem; color: #6E655C; background: #FAF7F2; border: 1px dashed #E8DFD2; border-radius: 0.6rem; padding: 0.4rem 0.6rem; }
+  /* The remark's own steps, smaller than the journey above. */
+  .pc-sub.st-steps { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .pc-sub .st-step { min-height: 2.3rem; padding: 0.2rem 0.7rem 0.2rem 0.3rem; font-size: 0.82rem; flex-direction: row; border-radius: 9999px; }
+  .pc-sub .st-dot { width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
+  .pc-sub .st-side { margin-left: auto; }
+  .st-wait .st-dot { background: #F0EBE3; } .st-todo .st-dot { background: #fef3c7; color: #92400e; }
+  .st-done .st-dot { background: #d1fae5; color: #065f46; }
+  .st-step[aria-pressed="true"].st-wait { border-color: #8C8478; background: #F0EBE3; }
+  .st-step[aria-pressed="true"].st-todo { border-color: #f59e0b; background: #fef3c7; color: #92400e; }
+  .st-step[aria-pressed="true"].st-done { border-color: #10b981; background: #d1fae5; color: #065f46; }
+  @media (max-width: 640px) { .pc-sub .st-arrow { display: none; } .pc-sub .st-side { margin-left: 0; } }
+</style>
+
+<div class="space-y-3" data-ereo-root data-start="{{ start }}">
+  <p class="pc-note">Remarques sur des entrées <b>déjà dans le lexique</b> (après « Validés ») : elles se corrigent <b>directement sur
+    la plateforme e-reo</b>. Chaque remarque : <b>🕓 En attente</b> (à examiner) → <b>📌 À faire</b> (approuvée, prête pour e-reo,
+    plus tard par un agent IA) → <b>✓ Fait</b> ; ou <b>✕ Rejetée</b>.
+    {% if snapshot_date %}<span class="pc-meta">Valeurs e-reo du {{ snapshot_date|slice:":10" }}.</span>{% endif %}</p>
+
+  <nav class="st-steps pc-sub" role="group" aria-label="Étapes d'une remarque" data-pc-steps>
+    <button type="button" class="st-step st-wait" data-step="attente" aria-pressed="false">
+      <span class="st-dot">🕓</span><span class="st-name">En attente</span><span class="st-n" data-count>{{ counts.attente }}</span></button>
+    <span class="st-arrow" aria-hidden="true">→</span>
+    <button type="button" class="st-step st-todo" data-step="todo" aria-pressed="false">
+      <span class="st-dot">📌</span><span class="st-name">À faire</span><span class="st-n" data-count>{{ counts.todo }}</span></button>
+    <span class="st-arrow" aria-hidden="true">→</span>
+    <button type="button" class="st-step st-done" data-step="fait" aria-pressed="false">
+      <span class="st-dot">✓</span><span class="st-name">Fait sur e-reo</span><span class="st-n" data-count>{{ counts.fait }}</span></button>
+    <button type="button" class="st-step st-rejected st-side" data-step="rejete" aria-pressed="false">
+      <span class="st-dot">✕</span><span class="st-name">Rejetées</span><span class="st-n" data-count>{{ counts.rejete }}</span></button>
+  </nav>
+
+  <div class="pc-tools">
+    {% if ai_enabled %}<b class="text-sm">🤖 Faire relire par l'IA :</b>
+    <button type="button" class="saisie-btn saisie-btn-ai" data-pc-review="word">10 mots du lexique</button>
+    <button type="button" class="saisie-btn saisie-btn-ai" data-pc-review="expression">10 expressions</button>{% endif %}
+    <button type="button" class="saisie-btn saisie-btn-neutral" data-pc-copy>📋 Copier cette liste</button>
+    <a class="saisie-btn saisie-btn-neutral" href="{% url 'api_platform_corrections' %}?statut=todo" target="_blank" rel="noopener">{ } JSON « À faire » (agent)</a>
+    <span class="text-sm" role="status" data-pc-status></span>
+  </div>
+
+  <div class="pc-list" data-pc-list>
+    {% for i in items %}
+    <article class="pc-item {% if i.kind != 'correction' %}is-comment{% endif %}" data-id="{{ i.id }}" data-status="{{ i.status }}"
+             data-instruction="{{ i.instruction }}" data-target-type="{{ i.target_type }}" data-target-id="{{ i.target_id }}">
+      <div class="pc-head">
+        <span class="pc-badge {% if i.kind == 'correction' %}pc-badge-correction{% else %}pc-badge-comment{% endif %}">{{ i.kind|capfirst }}</span>
+        <span class="pc-target">{% if i.target %}{{ i.target }}{% else %}{{ i.label }}{% endif %}</span>
+        <span class="pc-meta">{{ i.entry_type }}</span>
+        {% if i.seems_done and i.status != 'fait' %}<span class="pc-badge pc-badge-done">✓ semble corrigé</span>{% endif %}
+      </div>
+      {% if i.kind == 'correction' %}
+      <dl class="pc-diff"><dt>{{ i.field_label }}</dt><dd><del>{{ i.current_value|default:"(vide)" }}</del> → <ins>{{ i.proposed_value }}</ins></dd></dl>
+      {% endif %}
+      <p class="pc-why">{{ i.explanation }}</p>
+      <div class="pc-head"><span class="pc-meta">par {{ i.author }} · {{ i.created_at|slice:":10" }}</span>
+        {% if i.platform_id %}<span class="pc-pid" title="Identifiant e-reo">{{ i.platform_id }}</span>{% endif %}</div>
+      <div class="pc-actions">
+        <button type="button" class="saisie-btn saisie-btn-review" data-pc="todo" data-on="attente">📌 À faire</button>
+        <button type="button" class="saisie-btn saisie-btn-validate" data-pc="done" data-on="todo attente">✓ Fait sur e-reo</button>
+        <button type="button" class="saisie-btn saisie-btn-neutral" data-pc="wait" data-on="todo fait rejete">↺ Remettre en attente</button>
+        <button type="button" class="saisie-btn saisie-btn-reject" data-pc="dismiss" data-on="attente todo">✕ Rejeter</button>
+        <button type="button" class="saisie-btn saisie-btn-neutral" data-pc="mute" data-on="attente todo fait rejete" data-muted="{{ i.muted|yesno:'true,false' }}">
+          {% if i.muted %}🔔 Réactiver l’IA{% else %}🔕 Couper l’IA ici{% endif %}</button>
+        <button type="button" class="saisie-btn saisie-btn-neutral" data-pc="copy" data-on="attente todo fait rejete" title="Copier la consigne">📋</button>
+      </div>
+    </article>
+    {% endfor %}
+    <p class="text-sm text-gray-500" data-pc-empty hidden>Rien à cette étape.</p>
+  </div>
+</div>

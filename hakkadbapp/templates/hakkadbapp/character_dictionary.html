@@ -116,6 +116,12 @@
   /* Rey / hakkadictionary lookups */
   .lk-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
   .lk-chips small { opacity: 0.7; }
+  .hdx-cand { display: inline-flex; align-items: baseline; gap: 0.3rem; }
+  .hdx-cand .hanzi { font-size: 1.2rem; color: #261F1C; }
+  .hdx-cand[aria-selected="true"] { border-color: #9B1C1C; background: #FBF0E6; }
+  .hdx-chosen { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1rem; padding: 0.4rem 0.7rem; background: #FAF7F2;
+                border: 1px solid #E8DFD2; border-radius: 0.6rem; font-size: 0.85rem; color: #6E655C; }
+  .hdx-chosen .hanzi { font-size: 1.6rem; color: #9B1C1C; }
   .lk-pages { display: grid; gap: 0.5rem; }
   .lk-page { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.7rem; padding: 0.5rem 0.65rem; }
   .lk-page-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
@@ -125,6 +131,9 @@
   .lk-scan { display: block; max-width: 100%; margin-top: 0.5rem; border: 1px solid var(--sx-line); border-radius: 0.4rem; }
   .lk-page-body:not(:empty) { margin-top: 0.5rem; }
   .lk-entries tr.lk-head td { background: #FBF0E6; font-weight: 700; }
+  .lk-align { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.72rem; font-weight: 400; color: #6E655C; }
+  .lk-align .hanzi { font-size: 0.85rem; color: #9B1C1C; text-decoration: none; }
+  .lk-noalign { color: #b45309; }
   .hd-entry { font-size: 0.85rem; } .hd-entry b { color: var(--sx-red); }
 </style>
 
@@ -218,11 +227,14 @@
   <section data-sxpanel="hakkadictionary" class="space-y-3" hidden>
     {% if can_edit %}
     <div class="sx-tools">
-      <label class="sr-only" for="hdx-q">Caractère</label>
-      <input id="hdx-q" type="search" maxlength="2" placeholder="Un caractère : 番, 話…" class="hanzi" style="max-width:12rem">
+      <label class="sr-only" for="hdx-q">Caractère, ou sa lecture en pinyin</label>
+      <input id="hdx-q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="12"
+             placeholder="Pinyin (fan, fan1) ou caractère" style="max-width:14rem">
       <button type="button" id="hdx-go" class="sx-chip">Chercher</button>
       <span class="sx-legend">客家話大辭典 (Bao'an) : lectures, sens et mots parlés cités — sans IA.</span>
     </div>
+    <div id="hdx-pick" class="lk-chips" role="listbox" aria-label="Caractères possibles"></div>
+    <p id="hdx-chosen" class="hdx-chosen" hidden></p>
     <div id="hdx-result" class="space-y-2"></div>
     {% else %}<p class="text-sm text-gray-600">Connectez-vous pour chercher sur hakkadictionary.com.</p>{% endif %}
   </section>
@@ -239,7 +251,7 @@
         <p class="sx-src-full">Charles Rey, <i>Dictionnaire chinois-français, dialecte hac-ka</i>, 1926 (édition augmentée de celle de 1901).</p>
         <dl><dt>Origine</dt><dd>Index des syllabes de <a class="underline" href="https://daylightstar.wordpress.com/2024/01/31/dictionnaire-chinoise-francais-dialecte-hac-ka-2/" target="_blank" rel="noopener">daylightstar.wordpress.com</a>
           (1 411 pages, 707 syllabes) ; scans de l'Academia Sinica (minhakka2.ling.sinica.edu.tw). Une page n'est lue par l'IA que sur demande,
-          une fois ; ses caractères sont gardés en base et forment la colonne « Rey 1926 » du tableau.</dd>
+          une fois ; ses caractères (têtes d'entrée et chaque caractère des mots cités) sont gardés en base et forment la colonne « Rey 1926 » du tableau.</dd>
           <dt>Notation</dt><dd>Romanisation française : -c final = -k, tch = zh, ts' = c, gn = ng(i), ou = u ; tons par accents
           (ˉ ˆ ` ́ ˘ ̑), les 5ᵉ et 6ᵉ tons inversés par rapport à la tradition.</dd>
           <dt>Onglet</dt><dd>📕 Rey 1926</dd></dl>
