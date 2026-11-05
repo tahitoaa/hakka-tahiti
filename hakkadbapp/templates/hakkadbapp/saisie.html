@@ -46,6 +46,20 @@
   .saisie-kind-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; padding: 0.4rem 0.6rem;
                          border-radius: 0.5rem; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-size: 0.85rem; }
   .saisie-kind-warning button { padding: 0.2rem 0.6rem; border-radius: 0.4rem; background: #9a3412; color: #fff; font-weight: 700; font-size: 0.8rem; }
+  /* « Garder en brouillon » is the quiet choice, « Proposer » the main one. */
+  #saisie-form .saisie-btn-save { background: #fff; color: #9B1C1C; border: 2px solid #9B1C1C; }
+  #saisie-form .saisie-btn-save:hover:not(:disabled) { background: #FBF0E6; filter: none; }
+  /* Phones: the buttons stay at the bottom of the screen, big enough for a thumb. */
+  @media (max-width: 640px) {
+    .saisie-actions-bar { position: sticky; bottom: 0; z-index: 20; display: grid !important; grid-template-columns: 1fr 1fr auto; gap: 0.4rem;
+                          margin: 0 -1rem -1rem; padding: 0.55rem 0.75rem calc(0.55rem + env(safe-area-inset-bottom));
+                          background: rgb(255 255 255 / .96); border-top: 1px solid #E8DFD2; box-shadow: 0 -4px 12px rgb(0 0 0 / .08); }
+    .saisie-actions-bar .saisie-btn { min-height: 3rem; padding: 0.3rem 0.5rem; font-size: 0.9rem; line-height: 1.15; }
+    .saisie-actions-bar #saisie-copy { font-size: 0; padding: 0 0.8rem; }
+    .saisie-actions-bar #saisie-copy::before { content: "📋"; font-size: 1.2rem; }
+    .saisie-actions-bar #saisie-cancel { grid-column: 1 / -1; min-height: 2.4rem; }
+    .saisie-ambig button { min-height: 2.6rem; min-width: 3.8rem; font-size: 0.95rem; }
+  }
   @media (max-width: 640px) { .saisie-new-word { grid-template-columns: 1fr 1fr; } .saisie-new-word > label { grid-column: 1 / -1; } }
   /* AI suggestions: a proposal to accept, never saved on its own. */
   .saisie-ai { border: 1px dashed #c4b5fd; background: #faf7ff; border-radius: 0.75rem; padding: 0.75rem; display: grid; gap: 0.6rem; }
@@ -130,7 +144,7 @@
         <input id="saisie-french" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
       </div>
       <div>
-        <label for="saisie-english" class="block text-sm font-semibold text-gray-700 mb-1">Anglais <span class="font-normal text-gray-500">(facultatif)</span></label>
+        <label for="saisie-english" class="block text-sm font-semibold text-gray-700 mb-1">Anglais <span class="font-normal text-gray-500">(obligatoire pour valider)</span></label>
         <input id="saisie-english" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
       </div>
       <div>
@@ -152,7 +166,7 @@
     </div>
     <div id="saisie-status" class="text-sm" role="status"></div>
 
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap gap-2 saisie-actions-bar" id="saisie-actions">
       <button type="submit" data-status="draft" class="saisie-btn saisie-btn-lg saisie-btn-save"
               title="Garder pour plus tard : visible seulement dans vos brouillons ci-dessous">
         💾 Garder en brouillon

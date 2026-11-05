@@ -41,6 +41,12 @@ class LexiconAdditionAdmin(admin.ModelAdmin):
                 message = status_change_refused(request.user, old, data.get("status", old))
                 if message:
                     raise ValidationError(message)
+                if data.get("status") == "validated" and old != "validated":
+                    from .additions import REQUIRED_FIELDS
+
+                    missing = [label for field, label in REQUIRED_FIELDS if not (data.get(field) or "").strip()]
+                    if missing:
+                        raise ValidationError(f"Incomplet, impossible de valider : il manque {', '.join(missing)}.")
                 return data
 
         return CheckedForm

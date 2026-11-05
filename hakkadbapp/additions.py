@@ -4,6 +4,7 @@ the drafts stay), then move what was proposed through review ->
 validated/rejected on "Validation". Kept out of views.py on purpose:
 it's a self-contained feature with its own small JSON API."""
 import json
+import re
 
 from django.contrib.auth.views import redirect_to_login
 from django.db import transaction
@@ -56,6 +57,27 @@ def _known_themes():
         for category in model.objects.exclude(category=None).values_list("category", flat=True).distinct():
             names.update(n.strip() for n in category.split(",") if n.strip())
     return sorted(names, key=str.lower)
+
+
+# What an addition needs before it can be validated (« Validé »).
+REQUIRED_FIELDS = (("hanzi", "caractères"), ("pinyin", "pinyin"), ("french", "français"), ("english", "anglais"))
+
+
+def missing_fields(addition):
+    """The labels of the required fields still empty (or a pinyin still
+    unsure: « / » between readings, « ? » for an unknown one)."""
+    out = [label for field, label in REQUIRED_FIELDS if not (getattr(addition, field) or "").strip()]
+    if "pinyin" not in [f for f, _ in REQUIRED_FIELDS if not (getattr(addition, f) or "").strip()] and re.search(r"[/?]", addition.pinyin):
+        out.append("pinyin sûr")
+    return out
+
+
+def incomplete_refused(addition, status):
+    if status == LexiconAddition.STATUS_VALIDATED:
+        missing = missing_fields(addition)
+        if missing:
+            return f"Incomplet, impossible de valider « {addition.hanzi} » : il manque {', '.join(missing)}."
+    return None
 
 
 def _apply_payload(addition, payload):
@@ -252,6 +274,9 @@ def addition_update(request, addition_id):
     message = status_change_refused(request.user, old_status, addition.status)
     if message:
         return JsonResponse({"error": message}, status=403)
+    message = incomplete_refused(addition, addition.status) if addition.status != old_status else None
+    if message:
+        return JsonResponse({"error": message}, status=400)
     addition.updated_by = request.user
     words, message = _save_with_new_words(request, addition, payload)
     if message:
@@ -298,6 +323,10 @@ def additions_bulk(request):
     refused = next((m for m in (status_change_refused(request.user, a.status, status) for a in additions) if m), None)
     if refused:
         return JsonResponse({"error": refused}, status=403)
+    incomplete = [a for a in additions if incomplete_refused(a, status)]
+    if incomplete:
+        names = ", ".join(f"{a.hanzi} ({', '.join(missing_fields(a))})" for a in incomplete[:5])
+        return JsonResponse({"error": f"Incomplet, impossible de valider : {names}{'…' if len(incomplete) > 5 else ''}."}, status=400)
     with transaction.atomic():
         for addition in additions:
             addition.status = status

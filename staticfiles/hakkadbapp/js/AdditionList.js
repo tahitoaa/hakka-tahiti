@@ -54,6 +54,20 @@ class AdditionList {
      *  characters run together), as the lexicon's own entries.
      *  `opts`: docHanzi (the document's form), rawPinyin (shown when there is
      *  no reading yet), warn, aiFrench / aiEnglish (badges). */
+    /** The required fields still missing (same rule as additions.missing_fields). */
+    static missing(e) {
+        const out = [['hanzi', 'caractères'], ['pinyin', 'pinyin'], ['french', 'français'], ['english', 'anglais']]
+            .filter(([f]) => !String(e[f] || '').trim()).map(([, label]) => label);
+        if (e.pinyin && /[/?]/.test(e.pinyin)) out.push('pinyin sûr');
+        return out;
+    }
+
+    /** « ⚠ Incomplet » with what is missing, or ''. */
+    static incompleteBadge(e) {
+        const missing = AdditionList.missing(e);
+        return missing.length ? `<span class="vt-incomplete" title="À compléter avant de valider : ${AdditionList.escapeHtml(missing.join(', '))}">⚠ Incomplet</span>` : '';
+    }
+
     static entryCells(e, opts = {}) {
         const esc = AdditionList.escapeHtml;
         const ai = ' <span class="vt-ai-badge">IA</span>';
@@ -63,17 +77,18 @@ class AdditionList {
             // Brouillons: each field is a cell to tap, edited in place (the stored value: words spaced, tone digits).
             const cell = (field, shown, cls = '') => `<span class="vt-edit ${cls}" data-edit="${field}" tabindex="0" role="button"
                 title="Modifier">${shown || '<i>—</i>'}</span>`;
-            return `<td class="hanzi vt-hanzi">${cell('hanzi', esc(hanzi))}</td>
-            <td class="vt-pinyin">${cell('pinyin', pinyin)}</td>
-            <td class="vt-french">${cell('french', esc(e.french))}<span class="vt-sub italic" lang="en"> · ${cell('english', esc(e.english))}</span>
+            const miss = (f) => (!String(e[f] || '').trim() || (f === 'pinyin' && /[/?]/.test(e.pinyin || '')) ? ' is-missing' : '');
+            return `<td class="hanzi vt-hanzi">${cell('hanzi', esc(hanzi), miss('hanzi'))}</td>
+            <td class="vt-pinyin">${cell('pinyin', pinyin, miss('pinyin'))}</td>
+            <td class="vt-french">${cell('french', esc(e.french), miss('french'))}<span class="vt-sub italic" lang="en"> · ${cell('english', esc(e.english), miss('english'))}</span>
                 ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${cell('themes', esc(e.themes || ''))}</td>`;
         }
         return `<td class="hanzi vt-hanzi">${esc(hanzi)}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
                 ? `<small class="vt-sub" title="Forme du document">${esc(opts.docHanzi)}</small>` : ''}</td>
             <td class="vt-pinyin">${pinyin}${opts.warn ? `<div class="vt-warn">⚠ ${esc(opts.warn)}</div>` : ''}</td>
-            <td class="vt-french">${esc(e.french) || '<i>—</i>'}${opts.aiFrench ? ai : ''}${e.english
-                ? `<span class="vt-sub italic" lang="en"> · ${esc(e.english)}${opts.aiEnglish ? ai : ''}</span>` : ''}
+            <td class="vt-french">${esc(e.french) || '<span class="vt-missing-tag">français ?</span>'}${opts.aiFrench ? ai : ''}${e.english
+                ? `<span class="vt-sub italic" lang="en"> · ${esc(e.english)}${opts.aiEnglish ? ai : ''}</span>` : (opts.import ? '' : ' <span class="vt-missing-tag">anglais ?</span>')}
                 ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${esc(e.themes || '')}</td>`;
     }
@@ -663,6 +678,12 @@ class ValidationTable extends AdditionList {
             const decider = AdditionList.canValidate();
             const decided = (s) => ['validated', 'rejected'].includes(s);
             if (decided(action)) b.hidden = !decider;
+            if (action === 'validated' && chosen.some((a) => AdditionList.missing(a).length)) {
+                b.disabled = true;
+                b.title = 'Des lignes cochées sont incomplètes (⚠) : complétez-les avant de valider.';
+                return;
+            }
+            if (action === 'validated') b.title = '';
             b.disabled = !n || (action === 'delete'
                 ? chosen.some((a) => !['draft', 'rejected'].includes(a.status)) || (!decider && chosen.some((a) => decided(a.status)))
                 : chosen.every((a) => a.status === action) || (!decider && (decided(action) || chosen.some((a) => decided(a.status)))));
@@ -685,7 +706,7 @@ class ValidationTable extends AdditionList {
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
             ${AdditionList.entryCells(a, { editable: this.inlineEdit })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
-            <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span></td>
+            <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}</td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
             <td class="vt-actions"><button type="button" data-copy="${a.id}" class="saisie-btn saisie-btn-neutral"
@@ -933,7 +954,7 @@ class ValidationShow {
         const field = (name, label, value) => `<label class="vs-field"><span>${label}</span>
             <input type="text" data-vs-field="${name}" value="${esc(value)}"></label>`;
         this.card.innerHTML = `
-            <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>
+            <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}
               <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
               <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span></div>
             <div class="hanzi vs-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</div>
@@ -960,7 +981,11 @@ class ValidationShow {
         const decided = (s) => ['validated', 'rejected'].includes(s);
         this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
             if (decided(b.dataset.vsStatus)) b.hidden = !decider;
-            b.disabled = this.editing || b.dataset.vsStatus === a.status || (!decider && decided(a.status));
+            b.disabled = this.editing || b.dataset.vsStatus === a.status || (!decider && decided(a.status))
+                || (b.dataset.vsStatus === 'validated' && AdditionList.missing(a).length > 0);
+            if (b.dataset.vsStatus === 'validated') {
+                b.title = AdditionList.missing(a).length ? `Incomplet : ${AdditionList.missing(a).join(', ')}` : '';
+            }
         });
         this.dialog.querySelector('[data-vs="edit"]').disabled = this.editing;
         if (this.editing) this.card.querySelector('[data-vs-field="french"]')?.focus();
@@ -1474,7 +1499,7 @@ class DocumentImport {
                 <td class="vt-check"><input type="checkbox" data-pick="${i}" ${e.picked ? 'checked' : ''} ${e.state === 'new' ? '' : 'disabled'}
                     aria-label="Proposer ${esc(e.hanzi)}"></td>
                 ${AdditionList.entryCells({ hanzi: e.hanzi, pinyin: e.reading, french: e.french, english: e.english,
-                    kind: e.kind, themes: e.themes }, { docHanzi: e.document_hanzi, rawPinyin: e.pinyin, warn: e.reading_note,
+                    kind: e.kind, themes: e.themes }, { import: true, docHanzi: e.document_hanzi, rawPinyin: e.pinyin, warn: e.reading_note,
                     aiFrench: e.translated || e.ai_fields?.includes('french'), aiEnglish: e.ai_fields?.includes('english') })}
                 <td class="vt-meta vt-who"${e.remark || e.source_sense ? ` title="${esc([e.source_sense, e.remark].filter(Boolean).join(' — '))}"` : ''}>${esc(e.location)}</td>
                 <td class="vt-st"><span class="vt-state vt-state-${esc(e.state)}">${esc(DocumentImport.STATES[e.state] || e.state)}</span></td>

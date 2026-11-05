@@ -1,6 +1,12 @@
 {# Styles of the addition list (AdditionList.js), shared by the Saisie and Validation pages. #}
 <style>
   /* Status badges, the same colours on every page (Saisie, Validation, IA, Import). */
+  /* Incomplete: what must be filled before validating. */
+  .vt-incomplete { display: inline-block; margin-left: 0.25rem; padding: 0.02rem 0.45rem; border-radius: 9999px; background: #ffedd5; color: #9a3412;
+                   font-size: 0.66rem; font-weight: 700; white-space: nowrap; border: 1px solid #fdba74; }
+  .vt-missing-tag { display: inline-block; padding: 0 0.3rem; border-radius: 0.25rem; background: #fff7ed; color: #c2410c; font-size: 0.72rem;
+                    border: 1px dashed #fdba74; font-style: normal; }
+  .vt-edit.is-missing { background: #fff7ed; border-bottom: 1px dashed #f97316; min-width: 3rem; }
   .vt-status { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
   .vt-status-draft { background: #F0EBE3; color: #544D45; }
   .vt-status-review { background: #fef3c7; color: #92400e; }
