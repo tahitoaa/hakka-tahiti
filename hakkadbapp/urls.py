@@ -88,6 +88,7 @@ urlpatterns = [
     path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
+    path("api/ajouts/source", additions.additions_rename_source, name="additions_rename_source"),
     path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),
     path("api/ia/relire", assistant.api_review, name="assistant_review"),
     path("api/ia/completer", assistant.api_complete, name="assistant_complete"),

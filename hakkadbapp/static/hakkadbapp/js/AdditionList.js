@@ -389,6 +389,7 @@ class ValidationTable extends AdditionList {
         review: { busy: 'Proposition…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''} à la validation.` },
         draft: { busy: 'Retour en brouillon…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} renvoyé${n > 1 ? 's' : ''} en brouillon.` },
         delete: { busy: 'Suppression…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}.` },
+        'toggle-kind': { busy: 'Bascule…', done: (n) => `${n} ajout${n > 1 ? 's' : ''} basculé${n > 1 ? 's' : ''} : ${n > 1 ? 'ils sont' : 'il est'} dans l’autre onglet (Mots / Expressions).` },
     };
     static MAX_AI_REVIEW = 12;
     static PAGE = 100;
@@ -440,6 +441,7 @@ class ValidationTable extends AdditionList {
             this.render();
         });
         this.el.facets?.addEventListener('click', (event) => {
+            if (event.target.closest('[data-source-rename]')) { this.renameSource(); return; }
             if (!event.target.closest('[data-facets-reset]')) return;
             this.facets = {};
             this.groupBy = '';
@@ -608,6 +610,31 @@ class ValidationTable extends AdditionList {
         return this.el.kinds ? all.filter((a) => a.kind === this.kindTab) : all;
     }
 
+    /** The source chosen in the « Origine » filter, when it is a real one. */
+    renamableSource() {
+        const chosen = this.facets?.origin;
+        return chosen && this.additions.some((a) => a.source === chosen) ? chosen : '';
+    }
+
+    /** Renames the chosen source everywhere (every status, every author). */
+    async renameSource() {
+        const old = this.renamableSource();
+        if (!old) return;
+        const name = prompt(`Nouveau nom de la source « ${old} » :`, old);
+        if (name === null || !name.trim() || name.trim() === old) return;
+        try {
+            const data = await AdditionList.request(`${AdditionList.API}source`, { old, new: name });
+            const byId = new Map(data.additions.map((a) => [a.id, a]));
+            this.additions = this.additions.map((a) => byId.get(a.id) || a);
+            this.facets.origin = data.additions[0]?.source || '';
+            this.render();
+            const n = data.additions.length;
+            this.setStatus(`✓ « ${old} » renommée « ${this.facets.origin} » (${n} ajout${n > 1 ? 's' : ''}).`);
+        } catch (err) {
+            this.setStatus(`Échec : ${err.message}`, true);
+        }
+    }
+
     /** Filter selects with counts (within the status and the search), and « Grouper par ». */
     renderFacets() {
         if (!this.el.facets) return;
@@ -633,6 +660,8 @@ class ValidationTable extends AdditionList {
             summary.textContent = ` · ${[status, ...Object.values(this.facets).filter(Boolean)].filter(Boolean).join(' · ')}`;
         }
         this.el.facets.innerHTML = selects + group
+            + (this.renamableSource() ? `<button type="button" class="vt-facets-rename" data-source-rename
+                title="Renommer cette source sur tous les ajouts qui la portent">✎ Renommer « ${esc(this.renamableSource())} »</button>` : '')
             + (active ? '<button type="button" class="vt-facets-reset" data-facets-reset>✕ Effacer</button>' : '');
     }
 
@@ -844,7 +873,7 @@ class ValidationTable extends AdditionList {
         this.setStatus('');
         await AdditionList.whileBusy(button, labels.busy, async () => {
             try {
-                const payload = action === 'delete' ? { ids, action } : { ids, status: action };
+                const payload = ['delete', 'toggle-kind'].includes(action) ? { ids, action } : { ids, status: action };
                 const data = await AdditionList.request(`${AdditionList.API}lot`, payload);
                 if (action === 'delete') {
                     const gone = new Set(data.deleted);

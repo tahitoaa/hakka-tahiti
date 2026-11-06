@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from .ai import ai_enabled
 from .text_to_words import REVERSE_PUNCT_MAP, _PUNCT_ONLY_TOKEN_RE, normalize_punctuation
 from .models import Expression, LexiconAddition, Word
-from .permissions import AI_USERNAME, editor_required, is_editor, status_change_refused
+from .permissions import AI_USERNAME, editor_required, is_editor, is_validator, status_change_refused
 
 EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source", "input_text")
 KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
@@ -300,12 +300,73 @@ def addition_delete(request, addition_id):
 MAX_BULK = 500
 
 
+SYLLABLE_RE = re.compile(r"[^\s\d⁰¹²³⁴⁵⁶⁷⁸]+[\d⁰¹²³⁴⁵⁶⁷⁸]")
+HAN_CHAR_RE = re.compile(r"[\u3400-\u9fff\U00020000-\U0002ffff]")
+
+
+def toggle_kind(addition, known):
+    """Word <-> expression, in place; returns an error message or None.
+    An expression becomes one word (no spaces); a word becomes an expression
+    split into the lexicon's words (`known`), its pinyin split the same way
+    when it has one syllable per character. The text typed in the Saisie no
+    longer applies."""
+    from .importer import segment
+
+    if addition.kind == LexiconAddition.KIND_EXPRESSION:
+        joined = "".join(addition.hanzi.split())
+        if not all(HAN_CHAR_RE.fullmatch(c) for c in joined):
+            return f"« {addition.hanzi} » contient de la ponctuation ou d'autres signes : un mot ne peut pas en avoir."
+        addition.kind = LexiconAddition.KIND_WORD
+        addition.hanzi, addition.pinyin = joined, "".join(addition.pinyin.split())
+    else:
+        addition.kind = LexiconAddition.KIND_EXPRESSION
+        hanzi = "".join(addition.hanzi.split())
+        addition.hanzi = segment(hanzi, known)
+        syllables = SYLLABLE_RE.findall(addition.pinyin)
+        if len(syllables) == len(hanzi) and "".join(syllables) == "".join(addition.pinyin.split()):
+            parts, at = [], 0
+            for token in addition.hanzi.split():
+                parts.append("".join(syllables[at:at + len(token)]))
+                at += len(token)
+            addition.pinyin = " ".join(parts)
+    addition.input_text = ""
+    return None
+
+
+@require_POST
+@editor_required
+def additions_rename_source(request):
+    """POST {old, new}: the source renamed on every addition that has it
+    (and in the import notes that name it). A name already used merges."""
+    payload, error = _read_json(request)
+    if error:
+        return error
+    old = payload.get("old") if isinstance(payload, dict) else None
+    new = payload.get("new") if isinstance(payload, dict) else None
+    if not isinstance(old, str) or not isinstance(new, str) or not old.strip():
+        return JsonResponse({"error": "Demande invalide."}, status=400)
+    new = " ".join(new.split())[:200]
+    if not new:
+        return JsonResponse({"error": "Le nouveau nom est vide."}, status=400)
+    additions = list(LexiconAddition.objects.filter(source=old).select_related("created_by", "updated_by"))
+    if not additions:
+        return JsonResponse({"error": "Cette source n'existe plus : rechargez la page."}, status=404)
+    with transaction.atomic():
+        for a in additions:
+            a.source = new
+            a.observations = a.observations.replace(f"source : {old}.", f"source : {new}.")
+            a.updated_by = request.user
+            a.save(update_fields=["source", "observations", "updated_by", "updated_at"])
+    return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})
+
+
 @require_POST
 @editor_required
 def additions_bulk(request):
     """The rows ticked on the Validation page, all or nothing:
     {"ids": [...], "status": "validated"} changes their status,
-    {"ids": [...], "action": "delete"} deletes them."""
+    {"ids": [...], "action": "delete"} deletes them,
+    {"ids": [...], "action": "toggle-kind"} turns words into expressions and back."""
     payload, error = _read_json(request)
     if error:
         return error
@@ -321,6 +382,23 @@ def additions_bulk(request):
         with transaction.atomic():
             LexiconAddition.objects.filter(id__in=ids).delete()
         return JsonResponse({"ok": True, "deleted": sorted(set(ids))})
+
+    if payload.get("action") == "toggle-kind":
+        from .assistant import known_words
+
+        decided = (LexiconAddition.STATUS_VALIDATED, LexiconAddition.STATUS_REJECTED)
+        if not is_validator(request.user) and any(a.status in decided for a in additions):
+            return JsonResponse({"error": "Seuls les validateurs peuvent modifier un ajout validé ou rejeté."}, status=403)
+        known = known_words(include_additions=False)
+        with transaction.atomic():
+            for addition in additions:
+                message = toggle_kind(addition, known)
+                if message:
+                    transaction.set_rollback(True)
+                    return JsonResponse({"error": message}, status=400)
+                addition.updated_by = request.user
+                addition.save(update_fields=["kind", "hanzi", "pinyin", "input_text", "updated_by", "updated_at"])
+        return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})
 
     status = payload.get("status")
     if status not in STATUSES:

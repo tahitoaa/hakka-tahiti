@@ -46,6 +46,8 @@
     <button type="button" data-bulk="rejected" data-steps="review" class="saisie-btn saisie-btn-reject" disabled>✕ Rejeter</button>
     <button type="button" data-bulk="review" data-steps="draft rejected" class="saisie-btn saisie-btn-review" disabled>↑ Proposer à la validation</button>
     <button type="button" data-bulk="draft" data-steps="review validated rejected" class="saisie-btn saisie-btn-neutral" disabled>↺ Brouillon</button>
+    <button type="button" data-bulk="toggle-kind" data-steps="draft review validated rejected" class="saisie-btn saisie-btn-neutral" disabled
+            title="Un mot devient une expression (découpée selon les mots du lexique), une expression devient un mot (sans espaces)">⇄ Mot / Expression</button>
     <button type="button" data-bulk="delete" data-steps="draft rejected" class="saisie-btn saisie-btn-delete" disabled>Supprimer</button>
     <button type="button" data-bulk="ai-review" data-steps="draft review" data-needs-ai hidden class="saisie-btn saisie-btn-ai" disabled>🤖 Relire avec l’IA</button>
     <button type="button" data-bulk="complete" data-steps="draft review" class="saisie-btn saisie-btn-ai" disabled
