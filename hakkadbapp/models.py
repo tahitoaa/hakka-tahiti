@@ -413,8 +413,12 @@ class ReviewComment(models.Model):
 class AITarget(models.Model):
     """What the AI assistant knows of one item: muted by an editor (the AI
     never comments on it again), and when it last reviewed it (the nightly
-    run skips what it already read, unless the item changed since)."""
-    target_type = models.CharField(max_length=12, choices=ReviewComment.TARGET_CHOICES)
+    run skips what it already read, unless the item changed since).
+    "reading": a character's reading (Pronunciation id) the « Lectures
+    surprenantes » check already read (surprising_readings.py)."""
+    TARGET_READING = "reading"
+    TARGET_CHOICES = ReviewComment.TARGET_CHOICES + [(TARGET_READING, "Lecture d'un caractère")]
+    target_type = models.CharField(max_length=12, choices=TARGET_CHOICES)
     target_id = models.IntegerField()
     muted = models.BooleanField(default=False)
     muted_by = models.ForeignKey(

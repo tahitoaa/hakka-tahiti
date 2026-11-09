@@ -155,6 +155,18 @@
     Hors lexique : lecture Wenfa déduite des <a class="underline font-semibold" href="#correspondances">correspondances</a>.</p>
   <!-- 3. Every character of every source -->
   <section data-sxpanel="lectures" class="space-y-2">
+    {% if user.is_authenticated %}
+    <!-- ✨ Lectures surprenantes (surprising_readings.py): signed-in users only -->
+    <div class="sx-surprise">
+      <div class="sx-tools">
+        <button type="button" id="sx-surprise-go" class="sx-chip sx-surprise-btn">✨ Lectures surprenantes</button>
+        <span class="sx-legend">L'IA relit, 5 par 5, les lectures du lexique qu'aucune source ne confirme et propose des corrections,
+          enregistrées comme remarques à valider (<a class="underline" href="{% url 'search' %}#relecture">Lexique › Relecture</a>).</span>
+      </div>
+      <p class="sx-count" id="sx-surprise-status" role="status"></p>
+      <div id="sx-surprise-result" class="sx-surprise-list"></div>
+    </div>
+    {% endif %}
     <div class="sx-tools">
       <label class="sr-only" for="sx-search">Rechercher</label>
       <input id="sx-search" type="search" placeholder="Caractère, lecture (ga1, ka¹, jia, jiā) ou sens anglais (house)…" autocapitalize="off" spellcheck="false">
@@ -299,5 +311,61 @@
   <footer><button type="button" class="sx-chip" data-src-close>Fermer</button></footer>
 </dialog>
 <script src="{% static 'hakkadbapp/js/dict_lookups.js' %}" defer></script>
+{% if user.is_authenticated %}
+<style>
+  .sx-surprise { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.6rem 0.8rem; }
+  .sx-surprise-btn { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; font-weight: 600; }
+  .sx-surprise-list { display: grid; gap: 0.5rem; margin-top: 0.4rem; }
+  .sx-surprise-list:empty { display: none; }
+  .sx-sp { border: 1px solid var(--sx-line); border-left: 4px solid #DDD0BD; border-radius: 0.6rem; padding: 0.45rem 0.7rem; font-size: 0.9rem; }
+  .sx-sp.is-erreur { border-left-color: #9B1C1C; } .sx-sp.is-variante { border-left-color: #0f766e; } .sx-sp.is-incertain { border-left-color: #b45309; }
+  .sx-sp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; }
+  .sx-sp-head .hanzi { font-size: 1.5rem; color: var(--sx-ink); }
+  .sx-sp-verdict { padding: 0 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; background: #F6EFE4; }
+  .is-erreur .sx-sp-verdict { background: #fee2e2; color: #9B1C1C; } .is-variante .sx-sp-verdict { background: #ccfbf1; color: #0f766e; }
+  .is-incertain .sx-sp-verdict { background: #fef3c7; color: #92400e; }
+  .sx-sp p { margin: 0.25rem 0; color: #3A3430; }
+  .sx-sp ul { margin: 0.2rem 0 0; padding-left: 1.1rem; list-style: disc; }
+  .sx-sp details { font-size: 0.8rem; color: var(--sx-muted); }
+</style>
+<script>
+  (function () {
+    const go = document.getElementById('sx-surprise-go');
+    const status = document.getElementById('sx-surprise-status');
+    const out = document.getElementById('sx-surprise-result');
+    const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const LABELS = { erreur: 'erreur probable', variante: 'variante plausible', incertain: 'à vérifier' };
+    const csrf = () => (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+    const card = (f) => `<article class="sx-sp is-${esc(f.verdict)}">
+        <div class="sx-sp-head"><span class="hanzi">${esc(f.char)}</span>
+          <span>lu <b>${esc(f.reading)}</b> dans le lexique · ${esc(f.votes)} sources : <b>${esc(f.alternative)}</b></span>
+          <span class="sx-sp-verdict">${esc(LABELS[f.verdict] || f.verdict)}</span>
+          ${f.verdict === 'erreur' && f.proposed_reading ? `<span>→ <b>${esc(f.proposed_reading)}</b></span>` : ''}</div>
+        <p>${esc(f.explanation)}</p>
+        ${f.corrections.length ? `<ul>${f.corrections.map((c) => `<li><span class="hanzi">${esc(c.hanzi)}</span> ${esc(c.current)} → <b>${esc(c.proposed)}</b>
+          ${c.comment_id ? '· remarque ajoutée' : '· déjà signalé'}</li>`).join('')}</ul>` : ''}
+        <details><summary>Ce que disent les sources</summary>${Object.entries(f.sources).map(([s, rs]) => `${esc(s)} : ${esc(rs.join(', '))}`).join('<br>')}</details>
+      </article>`;
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      status.textContent = 'L’IA relit les lectures surprenantes… (jusqu’à une demi-minute)';
+      try {
+        const r = await fetch("{% url 'surprising_readings' %}", { method: 'POST', headers: { 'X-CSRFToken': csrf() } });
+        const data = await r.json().catch(() => ({ error: `Erreur ${r.status}` }));
+        if (!r.ok || data.error) throw new Error(data.error || `Erreur ${r.status}`);
+        if (!data.findings.length) { status.textContent = data.message || 'Rien à relire.'; return; }
+        out.insertAdjacentHTML('afterbegin', data.findings.map(card).join(''));
+        const n = data.comments || 0;
+        status.textContent = `${data.findings.length} lecture(s) relue(s), ${n} remarque(s) ajoutée(s). Touchez encore pour les suivantes.`;
+        go.textContent = '✨ Lectures surprenantes suivantes';
+      } catch (err) {
+        status.textContent = `Échec : ${err.message}`;
+      } finally {
+        go.disabled = false;
+      }
+    });
+  })();
+</script>
+{% endif %}
 <script src="{% static 'hakkadbapp/js/sources_page.js' %}" data-url="{% url 'api_sources_table' %}" data-hanzi-url="{% url 'hanzi' '__H__' %}"></script>
 {% endblock %}
