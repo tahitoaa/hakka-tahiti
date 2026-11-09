@@ -1,4 +1,4 @@
-/* Dictionnaire des caractères: the two lookups in other dictionaries.
+/* Dictionnaires: the two lookups in other dictionaries.
    - 📕 Rey 1926 (rey.py): a syllable -> Rey's pages (scans), each page read
      by the AI on request, once (kept).
    - 🔎 hakkadictionary.com (hakkadict.py): a character -> its readings,

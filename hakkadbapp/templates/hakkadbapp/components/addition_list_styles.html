@@ -1,5 +1,15 @@
 {# Styles of the addition list (AdditionList.js), shared by the Saisie and Validation pages. #}
 <style>
+  /* « Demander à l'IA » (Saisie, Suivi): the request, the answer, its proposal. */
+  .ai-ask-row { display: flex; gap: 0.4rem; }
+  .ai-ask-row input, .vt-ask-form input { flex: 1; min-width: 0; min-height: 2.5rem; padding: 0 0.6rem; border: 1px solid #c4b5fd; border-radius: 0.5rem; background: #fff; }
+  .ai-ask-result:empty { display: none; }
+  .ai-ask-result { display: grid; gap: 0.4rem; font-size: 0.9rem; }
+  .ai-ask-answer { margin: 0; color: #3A3430; }
+  .ai-ask-proposal { display: grid; gap: 0.25rem; padding: 0.5rem 0.7rem; border: 1px solid #c4b5fd; border-radius: 0.6rem; background: #faf7ff; }
+  .ai-ask-proposal .hanzi { font-size: 1.25rem; color: #261F1C; }
+  .ai-ask-proposal button { justify-self: start; }
+  .ai-ask-notes { font-size: 0.78rem; color: #92400e; }
   /* Status badges, the same colours on every page (Saisie, Validation, IA, Import). */
   /* Incomplete: what must be filled before validating. */
   .vt-incomplete { display: inline-block; margin-left: 0.25rem; padding: 0.02rem 0.45rem; border-radius: 9999px; background: #ffedd5; color: #9a3412;

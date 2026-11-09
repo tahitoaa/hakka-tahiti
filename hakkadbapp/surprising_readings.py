@@ -1,4 +1,4 @@
-"""« Lectures surprenantes » (Dictionnaire des caractères): readings of the
+"""« Lectures surprenantes » (Dictionnaires): readings of the
 lexicon that no Hakka source supports while several sources agree on
 another one -- found without the AI (source_rules: each source's readings
 read in Wenfa through the correspondences learnt from the lexicon), then

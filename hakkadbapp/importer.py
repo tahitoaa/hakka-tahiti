@@ -324,7 +324,7 @@ _DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸", "012345678")
 
 class Deduced:
     """{simplified char: (Wenfa reading, source, confidence)} for characters
-    the lexicon doesn't have: the reading the Dictionnaire des caractères
+    the lexicon doesn't have: the reading the Dictionnaires
     deduces from the Hakka dictionaries through the learnt correspondences
     (source_rules). Computed only when a character needs it."""
 

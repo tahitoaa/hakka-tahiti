@@ -1140,7 +1140,7 @@ def hanzi_by_pinyin(request, syllable):
     return render(request, "hakkadbapp/hanzi_by_pinyin.html", context)
 
 def pronunciation_comparison(request):
-    """« Lectures comparées » is now a tab of the Dictionnaire des caractères
+    """« Lectures comparées » is now a tab of the Dictionnaires
     (correspondences, rules): old links land there."""
     from django.shortcuts import redirect
 
@@ -1152,7 +1152,7 @@ def character_dictionary(request):
     data as Lectures comparées)."""
     return render(request, "hakkadbapp/character_dictionary.html", {
         "page": "character_dictionary",
-        "title": "Dictionnaire des caractères",
+        "title": "Dictionnaires",
     })
 
 

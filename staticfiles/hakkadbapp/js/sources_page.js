@@ -27,7 +27,7 @@
 
     // ---- tabs ---------------------------------------------------------------------------------
     // The panels this page has (Lectures comparées: correspondances, règles;
-    // Dictionnaire des caractères: the table only).
+    // Dictionnaires: the table only).
     const TABS = [...document.querySelectorAll('[data-sxpanel]')].map((p) => p.dataset.sxpanel);
     const OLD = { automate: 'correspondances' }; // earlier links keep working
     function showTab() {

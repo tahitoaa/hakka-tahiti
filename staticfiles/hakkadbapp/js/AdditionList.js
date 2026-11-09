@@ -337,6 +337,18 @@ class AdditionList {
         try { sessionStorage.setItem(AdditionList.REVIEW_KEY, JSON.stringify({ ids, back, label })); } catch (e) { /* private mode */ }
     }
 
+    /** « Demander à l'IA »: its answer and, when it made one, its new version
+     *  of the entry with « Utiliser » (`attr` on that button). */
+    static askedHtml(data, attr) {
+        const esc = AdditionList.escapeHtml;
+        const p = data.proposal;
+        return `<p class="ai-ask-answer">🤖 ${esc(data.answer || '')}</p>${p ? `<div class="ai-ask-proposal">
+              <div><span class="hanzi">${esc(AdditionList.platformHanzi(p.hanzi))}</span> <span>${esc(AdditionList.platformPinyin(p.pinyin))}</span></div>
+              <div>${esc(p.french)}${p.english ? ` <i lang="en">· ${esc(p.english)}</i>` : ''}</div>
+              ${p.notes?.length ? `<ul class="ai-ask-notes">${p.notes.map((n) => `<li>⚠ ${esc(n)}</li>`).join('')}</ul>` : ''}
+              <button type="button" class="saisie-btn saisie-btn-validate" ${attr}>Utiliser</button></div>` : ''}`;
+    }
+
     static canValidate() {
         return typeof document !== 'undefined' && document.body?.dataset?.canValidate === '1';
     }
@@ -519,6 +531,17 @@ class ValidationTable extends AdditionList {
             this.render();
         });
         this.selected = new Set();
+        this.asked = new Map();      // « Demander à l'IA »: addition id -> its answer
+        this.el.list.addEventListener('submit', (event) => {
+            const form = event.target.closest('[data-ask-form]');
+            if (!form) return;
+            event.preventDefault();
+            this.askAbout(Number(form.dataset.askForm), form);
+        });
+        this.el.list.addEventListener('click', (event) => {
+            const use = event.target.closest('[data-ask-use]');
+            if (use) this.useAsked(Number(use.dataset.askUse), use);
+        });
         this.comments = [];          // remarks on additions (open + recently resolved)
         this.muted = new Set();      // addition ids the AI must leave alone
         this.expanded = new Set();   // rows showing their remarks
@@ -951,6 +974,12 @@ class ValidationTable extends AdditionList {
               ${['french', 'english', 'themes'].some((f) => !String(a[f] || '').trim()) ? `<div class="vt-remark-actions"><button type="button" class="saisie-btn saisie-btn-ai" data-remark="complete"
                   title="Remplit les champs vides avec les propositions (l’IA relit d’abord si besoin)">✨ Compléter tout</button></div>` : ''}
               ${list ? `<ul class="vt-remarks">${list}</ul>` : '<p class="vt-sub">Aucune remarque en cours.</p>'}
+              ${this.aiEnabled ? `<form class="vt-comment-form vt-ask-form" data-ask-form="${a.id}">
+                <label class="sr-only" for="vt-ask-${a.id}">Demander à l'IA</label>
+                <input id="vt-ask-${a.id}" type="text" maxlength="500" placeholder="Demander à l’IA… ex. complète la phrase pour la rendre illustrative">
+                <button type="submit" class="saisie-btn saisie-btn-ai">💬 Demander</button>
+              </form>
+              <div class="ai-ask-result" data-ask-result="${a.id}">${this.asked?.has(a.id) ? AdditionList.askedHtml(this.asked.get(a.id), `data-ask-use="${a.id}"`) : ''}</div>` : ''}
               <form class="vt-comment-form" data-comment-form="${a.id}">
                 <label class="sr-only" for="vt-comment-${a.id}">Votre commentaire</label>
                 <input id="vt-comment-${a.id}" type="text" placeholder="Ajouter un commentaire…" maxlength="1000">
@@ -1048,6 +1077,44 @@ class ValidationTable extends AdditionList {
             }
         }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
         this.renderBar();
+    }
+
+    /** « Demander à l'IA » on one row: the answer shown under it. */
+    async askAbout(id, form) {
+        const a = this.additions.find((x) => x.id === id);
+        const input = form.querySelector('input');
+        const instruction = input.value.trim();
+        if (!a || !instruction) { input.focus(); return; }
+        await AdditionList.whileBusy(form.querySelector('button'), 'L’IA réfléchit…', async () => {
+            try {
+                const data = await AdditionList.request('/api/ia/demander', { instruction, entry: {
+                    kind: a.kind, hanzi: a.hanzi, pinyin: a.pinyin, french: a.french, english: a.english, themes: a.themes } });
+                this.asked.set(id, data);
+                const box = this.el.list.querySelector(`[data-ask-result="${id}"]`);
+                if (box) box.innerHTML = AdditionList.askedHtml(data, `data-ask-use="${id}"`);
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    }
+
+    /** « Utiliser »: the row replaced by the AI's new version (its Saisie text reset). */
+    async useAsked(id, button) {
+        const p = this.asked.get(id)?.proposal;
+        if (!p) return;
+        await AdditionList.whileBusy(button, 'Enregistrement…', async () => {
+            try {
+                const data = await AdditionList.request(`${AdditionList.API}${id}`, {
+                    kind: p.kind, hanzi: p.hanzi, pinyin: p.pinyin, input_text: '',
+                    ...(p.french ? { french: p.french } : {}), ...(p.english ? { english: p.english } : {}) });
+                this.asked.delete(id);
+                this.upsert(data.addition);
+                this.flash([id]);
+                this.setStatus('✓ Proposition de l’IA reprise : vérifiez la ligne.');
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
     }
 
     /** « Vérifier le pinyin »: the readings of `ids` (the ticked rows, else

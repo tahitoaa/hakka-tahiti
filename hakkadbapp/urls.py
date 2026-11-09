@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
+from . import ask_ai
 from . import additions, ai, assistant, hakkadict, importer, platform_corrections, recordings, rey, sources, surprising_readings
 # urls.py
 from django.urls import path, re_path
@@ -91,6 +92,7 @@ urlpatterns = [
     path("api/lexique-donnees", additions.lexicon_data, name="lexicon_data"),
     path("api/ajouts/source", additions.additions_rename_source, name="additions_rename_source"),
     path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),
+    path("api/ia/demander", ask_ai.api_ask, name="ai_ask"),
     path("api/ia/relire", assistant.api_review, name="assistant_review"),
     path("api/ia/lectures-surprenantes", surprising_readings.api_check, name="surprising_readings"),
     path("api/ia/completer", assistant.api_complete, name="assistant_complete"),

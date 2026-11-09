@@ -76,7 +76,7 @@
             const line = (r) => values(r).filter(Boolean).join(' · ');
             plain = rows.length === 1 ? line(rows[0]) : rows.map((r, k) => `${k + 1}. ${line(r)}`).join('\n');
         } else {
-            // Many columns (Dictionnaire des caractères): a block per row, « Colonne : valeur ».
+            // Many columns (Dictionnaires): a block per row, « Colonne : valeur ».
             plain = rows.map((r, k) => {
                 const v = values(r);
                 const [first, ...rest] = v.map((x, i) => [names[i], x]).filter(([, x]) => x);

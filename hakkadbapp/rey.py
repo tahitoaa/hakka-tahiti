@@ -11,7 +11,7 @@ pages, found by syllable, read by the AI on request.
   with them -- and the result is kept (ReyPage), so a page is paid once.
 - Every head, word and expression read gives its characters' readings
   (align: one syllable per character), the column « Rey 1926 » of the
-  Dictionnaire des caractères (source_rules._load_rey).
+  Dictionnaires (source_rules._load_rey).
 
     GET  /api/rey?q=yok          -> {matches: [{syllable, pages: [{page, image, url, read}]}]}
     GET  /api/rey/page/<image>   -> {entries} if already read
@@ -211,7 +211,7 @@ def read_page(image, user):
     text = "".join(getattr(b, "text", "") for b in response.content)
     entries = [e for e in json.loads(text).get("entries", []) if re.search(r"[㐀-鿿]", e.get("hanzi", ""))]
     row, _ = ReyPage.objects.update_or_create(image=image, defaults={"page": page["page"], "entries": entries, "read_by": user})
-    # Its characters are now a source of the Dictionnaire des caractères (column « Rey 1926 »).
+    # Its characters are now a source of the Dictionnaires (column « Rey 1926 »).
     from . import source_rules
     source_rules._cache.pop("payload", None)
     return row, round(time.time() - started, 1), (response.usage.input_tokens, response.usage.output_tokens)

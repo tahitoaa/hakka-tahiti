@@ -80,7 +80,7 @@
   <!-- 1. The rules as an automaton (correspondences) -->
   <section data-sxpanel="correspondances" class="space-y-3">
     <p class="text-sm text-gray-700">Comment une lecture de chaque source devient une lecture <b>Wenfa</b>, étape par étape.
-      Chercher un caractère : <a class="underline font-semibold" href="{% url 'character_dictionary' %}">Dictionnaire des caractères</a>.</p>
+      Chercher un caractère : <a class="underline font-semibold" href="{% url 'character_dictionary' %}">Dictionnaires</a>.</p>
     <div class="flex flex-wrap gap-1.5 items-center" role="group" aria-label="Source" data-sxsource-group></div>
     <svg class="sx-chain" id="sx-chain" viewBox="0 0 640 90" role="img" aria-label="Automate : initiale, finale, ton"></svg>
     <details class="help-tip"><summary aria-label="Lire le schéma">ⓘ Lire le schéma</summary><div>Un transducteur à trois étapes : chaque syllabe source passe par l'initiale, la finale puis le ton, et chaque étape

@@ -357,7 +357,7 @@ document.getElementById('theme-search').addEventListener('input', function () {
      opening is told to the tabs that load on demand (lex:tab). */
   (function () {
     const TABS = ['mots', 'themes', 'expressions', 'caracteres', 'relecture', 'doublons'];
-    // The dictionaries moved to the Dictionnaire des caractères.
+    // The dictionaries moved to the Dictionnaires.
     if (location.hash === '#dictionnaires') location.replace("{% url 'character_dictionary' %}#rey");
     const VIEWS = { decoupage: ['expressions', 'decoupage'] };
     const tabs = [...document.querySelectorAll('[data-srtab]')];

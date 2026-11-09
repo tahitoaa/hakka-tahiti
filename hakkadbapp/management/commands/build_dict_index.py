@@ -13,7 +13,7 @@ order: dictionary pages for Bao'an and McIver, PDF pages for the books) and
 "low" (indexes of the rows the source marks confidence="low").
 
 Bao'an and McIver feed the converter. The books (Chappell & Lamarre, Hakka
-Made Easy, Sung Him Tong) feed only the Dictionnaire des caractères and the
+Made Easy, Sung Him Tong) feed only the Dictionnaires and the
 correspondences, with their own tone numbers.
 
 Tones are numbered like the Bao'an dictionary (traditional 8-tone order):

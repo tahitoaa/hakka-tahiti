@@ -567,6 +567,15 @@ class SaisieEntry {
             textBtn?.addEventListener('mousedown', (event) => event.preventDefault());
             textBtn?.addEventListener('click', () => this.wrapSelectionAsText());
             this.el.aiBtn?.addEventListener('click', () => this.suggest());
+            // « Demander à l'IA »: a free request on the entry (ask_ai.py).
+            const askInput = document.getElementById('saisie-ask');
+            document.getElementById('saisie-ask-btn')?.addEventListener('click', (event) => this.ask(event.currentTarget));
+            askInput?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') { event.preventDefault(); this.ask(document.getElementById('saisie-ask-btn')); }
+            });
+            document.getElementById('saisie-ask-result')?.addEventListener('click', (event) => {
+                if (event.target.closest('[data-ask-use]')) this.useAsked();
+            });
             this.el.aiResult?.addEventListener('click', (event) => {
                 const btn = event.target.closest('[data-ai-use]');
                 if (btn) this.useSuggestion(btn.dataset.aiUse);
@@ -756,6 +765,43 @@ class SaisieEntry {
                     this.el.aiResult.innerHTML = `<p class="text-sm text-red-700">${escapeHtml(err.message)}</p>`;
                 }
             });
+        }
+
+        /** The request typed beside « Demander », about what the form holds. */
+        async ask(button) {
+            const input = document.getElementById('saisie-ask');
+            const box = document.getElementById('saisie-ask-result');
+            const instruction = input?.value.trim();
+            if (!instruction) { input?.focus(); return; }
+            const v = this.values();
+            this.asked = null;
+            await whileBusy(button, 'L’IA réfléchit…', async () => {
+                try {
+                    const data = await request('/api/ia/demander', { instruction, entry: {
+                        kind: v.kind, hanzi: v.hanzi, pinyin: v.pinyin, french: v.french, english: v.english, themes: v.themes } });
+                    this.asked = data.proposal;
+                    box.innerHTML = AdditionList.askedHtml(data, 'data-ask-use');
+                } catch (err) {
+                    box.innerHTML = `<p class="text-sm text-red-700">${escapeHtml(err.message)}</p>`;
+                }
+            });
+        }
+
+        /** « Utiliser »: the AI's new version in the form (text, kind, French, English), to check before saving. */
+        useAsked() {
+            const p = this.asked;
+            if (!p) return;
+            this.el.text.value = SaisieEntry.textFromStored(p.hanzi, p.pinyin, p.kind, this.dico);
+            this.setKind(p.kind);
+            [['french', p.french], ['english', p.english]].forEach(([field, value]) => {
+                if (!value) return;
+                this.el[field].value = value;
+                this.el[field].classList.add('is-ai');
+            });
+            document.getElementById('saisie-ask-result').innerHTML = '';
+            this.asked = null;
+            this.setStatus('Proposition de l’IA reprise : vérifiez-la avant d’enregistrer.');
+            this.el.text.focus();
         }
 
         renderSuggestion() {

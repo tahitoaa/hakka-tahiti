@@ -172,6 +172,13 @@
         <p>Proposé par l'IA d'après les mots du lexique qui partagent ces caractères. À vérifier : rien n'est enregistré sans vous.</p>
       </div>
       <div id="saisie-ai-result" class="saisie-ai-result" aria-live="polite"></div>
+      <!-- « Demander à l'IA » (ask_ai.py): a free request on this entry; « Utiliser » fills the form. -->
+      <div class="ai-ask-row">
+        <label class="sr-only" for="saisie-ask">Demander à l'IA</label>
+        <input id="saisie-ask" type="text" maxlength="500" placeholder="Demander à l'IA… ex. complète la phrase pour la rendre illustrative">
+        <button type="button" id="saisie-ask-btn" class="saisie-btn saisie-btn-ai">💬 Demander</button>
+      </div>
+      <div id="saisie-ask-result" class="ai-ask-result" aria-live="polite"></div>
     </section>
 
     <div class="grid sm:grid-cols-2 gap-3">
