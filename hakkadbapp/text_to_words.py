@@ -204,6 +204,9 @@ def find_words_by_hanzi_with_disambiguation(token, all_words):
 
 def _tone_to_exponent(py: str) -> str:
     py = (py or "").strip()
+    # "_": tone unknown (ngai_), shown as a raised question mark.
+    if py.endswith("_"):
+        return py[:-1] + "ˀ"
     if py and py[-1].isdigit():
         return py[:-1] + py[-1].translate(_SUPERSCRIPT)
     return py
@@ -420,7 +423,7 @@ def convert_phrase_to_word_data(phrase: str, all_words, all_prons) -> list[dict]
     ]
 
 
-_TONE_MARK_RE = re.compile(r"[\d_⁰¹²³⁴⁵⁶⁷⁸]")
+_TONE_MARK_RE = re.compile(r"[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ]")
 
 
 def is_text_word(token: str) -> bool:

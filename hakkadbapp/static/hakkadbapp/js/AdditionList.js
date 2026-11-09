@@ -47,7 +47,8 @@ class AdditionList {
     }
 
     static superscriptTones(pinyin) {
-        return String(pinyin || '').replace(/[1-8]/g, (d) => '¹²³⁴⁵⁶⁷⁸'[d - 1]);
+        // "_": tone unknown (ngai_), a raised question mark.
+        return String(pinyin || '').replace(/[1-8_]/g, (d) => (d === '_' ? 'ˀ' : '¹²³⁴⁵⁶⁷⁸'[d - 1]));
     }
 
     /** A stored (Wenfa) pinyin as shown, in the "J'affiche en" system. */
@@ -63,7 +64,7 @@ class AdditionList {
     static platformHanzi(hanzi) {
         // A word without characters (ma'a: letters, no tone, no reading --
         // Sentence.isTextWord) stands apart: 我爱食 ma'a tinito.
-        const isText = (t) => /\p{L}/u.test(t) && !/\p{Script=Han}/u.test(t) && !/[\d_⁰¹²³⁴⁵⁶⁷⁸(]/.test(t);
+        const isText = (t) => /\p{L}/u.test(t) && !/\p{Script=Han}/u.test(t) && !/[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ(]/.test(t);
         let out = '';
         let lastText = false;
         String(hanzi || '').trim().split(/\s+/).filter(Boolean).forEach((t) => {

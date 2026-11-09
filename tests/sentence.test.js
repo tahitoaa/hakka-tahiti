@@ -143,6 +143,16 @@ test("a word without characters (Tahitian, French) is copied as written in both 
   assert.equal(new Sentence(dico, "tinito , 食").renderHanziLine(), "tinito，食");
 });
 
+test("\"_\" (tone unknown) shows as a raised question mark in the mixed line", () => {
+  const Sentence = loadSentence();
+  const dico = makeDico([{ simp: "我", trad: "我", pinyin: "ngai1", french: "je" }]);
+  const s = new Sentence(dico, "我 -(oi_) ma");
+  assert.equal(s.renderPinyinLine(), "ngai¹ oiˀ ma", "ma, without tone, is text");
+  assert.equal(s.renderHanziLine(), "我- ma");
+  // A pinned "_" accepts any tone of the word.
+  assert.equal(new Sentence(dico, "我(ngai_)").matches[0][0].isUnknown, undefined);
+});
+
 test("isTextWord: letters without character, tone or reading", () => {
   const Sentence = loadSentence();
   for (const w of ["ma'a", "tinito", "Raiatea", "c'est", "ma'a:nourriture"]) assert.equal(Sentence.isTextWord(w), true, w);

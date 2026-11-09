@@ -5,7 +5,8 @@ Run with: python manage.py test hakkadbapp.test_text_words
 """
 from django.test import SimpleTestCase
 
-from hakkadbapp.text_to_words import is_text_word, join_hanzi, render_expression_from_token_data, split_rendering
+from hakkadbapp.management.commands.import_utils_v2 import split_compact_pinyin_into_syllables
+from hakkadbapp.text_to_words import _tone_to_exponent, is_text_word, join_hanzi, render_expression_from_token_data, split_rendering
 
 
 class TextWordTests(SimpleTestCase):
@@ -27,3 +28,10 @@ class TextWordTests(SimpleTestCase):
         self.assertEqual(split_rendering("ma'a shit⁶ ma'a 食"), ("ma'a shit⁶", "ma'a 食"))
         self.assertEqual(split_rendering("ngai¹ ho³ 我好"), ("ngai¹ ho³", "我好"))
         self.assertEqual(split_rendering("abc"), ("abc", ""))
+        self.assertEqual(split_rendering("ngai¹ oiˀ ma'a 我爱 ma'a"), ("ngai¹ oiˀ ma'a", "我爱 ma'a"))
+
+    def test_unknown_tone_is_a_raised_question_mark(self):
+        self.assertEqual(_tone_to_exponent("ngai_"), "ngaiˀ")
+        self.assertEqual(_tone_to_exponent("ngai2"), "ngai²")
+        self.assertEqual(split_compact_pinyin_into_syllables("ngai_oi4"), ["ngai_", "oi4"])
+        self.assertTrue(is_text_word("ma"), "no tone: text, even when it spells a syllable")

@@ -63,7 +63,8 @@ def clean_hanzi(value) -> str:
 
 
 def split_compact_pinyin_into_syllables(pinyin: str) -> list[str]:
-    return [s for s in re.split(r"(?<=[0-6])", pinyin) if s.strip()]
+    # "_" ends a syllable whose tone is unknown (ngai_oi4).
+    return [s for s in re.split(r"(?<=[0-6_])", pinyin) if s.strip()]
 
 
 def split_pinyin_syllable(pinyin: str) -> tuple[str, str, int] | tuple[None, None, None]:

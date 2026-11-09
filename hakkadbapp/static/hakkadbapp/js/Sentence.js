@@ -45,7 +45,7 @@ class Sentence {
     static isTextWord(token) {
         const core = String(token || '').split(':')[0];
         return /\p{L}/u.test(core) && !/\p{Script=Han}/u.test(core)
-            && !/[\d_⁰¹²³⁴⁵⁶⁷⁸]/.test(core) && !core.includes('(');
+            && !/[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ]/.test(core) && !core.includes('(');
     }
 
     static latinPunct(text) {
@@ -108,7 +108,7 @@ class Sentence {
                 else pending = [];
                 continue;
             }
-            const syllables = m[1].match(/[a-zü][a-zü'’]*[0-8]?/gi) || [];
+            const syllables = m[1].match(/[a-zü][a-zü'’]*[0-8_]?/gi) || [];
             if (pending.length && syllables.length) {
                 const targets = syllables.length < pending.length
                     ? pending.slice(pending.length - syllables.length)
@@ -142,7 +142,8 @@ class Sentence {
         if (syllables.length !== readings.length) return false;
         return readings.every((r, k) => {
             if (!r) return true;
-            const pinned = r.toLowerCase().replace(/’/g, "'");
+            // "_" (tone unknown) accepts any tone, like no tone at all.
+            const pinned = r.toLowerCase().replace(/’/g, "'").replace(/_$/, '');
             const actual = syllables[k].toLowerCase();
             return pinned === actual || (!/\d$/.test(pinned) && actual.replace(/\d$/, '') === pinned);
         });
@@ -258,8 +259,9 @@ class Sentence {
     // Helpers
     // -----------------------------
     superscriptTone(pinyin) {
-        const map = { "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸" };
-        return String(pinyin || '').replace(/[1-8]/g, d => map[d]);
+        // "_": tone unknown (ngai_), shown as a raised question mark.
+        const map = { "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "_": "ˀ" };
+        return String(pinyin || '').replace(/[1-8_]/g, d => map[d]);
     }
 
     renderPinyin(pinyin) {

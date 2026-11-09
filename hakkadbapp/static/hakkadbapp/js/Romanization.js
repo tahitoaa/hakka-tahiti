@@ -127,6 +127,9 @@ var Romanization = (function () {
         return null;
     }
 
+    // A tone left unknown ("_", ngai_) is shown as a raised question mark.
+    var UNKNOWN_TONE = 'ˀ';
+
     var SUPERSCRIPT_DIGITS = { '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6' };
 
     /** Converts a stored pinyin string such as "ba1ba1", "ba¹ba¹" (what
@@ -135,15 +138,16 @@ var Romanization = (function () {
      *  unknown spellings) is left untouched. */
     function fromPinyin(text, systemId) {
         if (!config) return text;
-        // A word with no tone that isn't one syllable either is text written
-        // without characters (ma'a, tinito -- Sentence.isTextWord): kept as
-        // written. A lone toneless syllable (shin, tone unknown) converts.
+        // A word with no tone at all is text written without characters
+        // (ma'a, tinito -- Sentence.isTextWord): kept as written. A syllable
+        // always carries its tone, "_" when unknown (shin_ -> shinˀ).
         return String(text || '').replace(/\S+/g, function (word) {
-            if (!/[\d_¹²³⁴⁵⁶⁷⁸]/.test(word) && /[a-zü]/i.test(word)
-                && !(/^[a-zü]+$/i.test(word) && splitSyllable(word.toLowerCase()))) return word;
-            return word.replace(/([a-zü]+)([1-6¹²³⁴⁵⁶]?)/gi, function (whole, letters, tone) {
+            if (!/[\d_¹²³⁴⁵⁶⁷⁸ˀ]/.test(word) && /[a-zü]/i.test(word)) return word;
+            return word.replace(/([a-zü]+)([1-6¹²³⁴⁵⁶_ˀ]?)/gi, function (whole, letters, tone) {
                 var parts = splitSyllable(letters.toLowerCase());
-                return parts ? convert(parts[0], parts[1], SUPERSCRIPT_DIGITS[tone] || tone, systemId) : whole;
+                if (!parts) return whole;
+                if (tone === '_' || tone === 'ˀ') return convert(parts[0], parts[1], '', systemId) + UNKNOWN_TONE;
+                return convert(parts[0], parts[1], SUPERSCRIPT_DIGITS[tone] || tone, systemId);
             });
         });
     }

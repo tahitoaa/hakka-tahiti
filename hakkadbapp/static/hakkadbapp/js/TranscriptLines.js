@@ -56,7 +56,7 @@ class TranscriptLines {
         const forms = TranscriptLines.charForms(dico);
         if (!TranscriptLines.HAN.test(part) && part !== '-' && !part.startsWith('-(')) {
             const sentence = new Sentence(dico, '');
-            return { pinyin: sentence.displayPinyin(part.replace(/_/g, '')), simp: '', trad: '' };
+            return { pinyin: sentence.displayPinyin(part), simp: '', trad: '' };
         }
         const sentence = new Sentence(dico, part);
         const best = sentence.matches[0]?.[0];

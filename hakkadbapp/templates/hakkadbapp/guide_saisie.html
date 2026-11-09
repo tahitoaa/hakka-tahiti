@@ -58,11 +58,14 @@
 
   <section>
     <h2><span class="n">2</span> Taper le hakka</h2>
-    <p>Tapez chaque syllabe avec son <b>ton en chiffre</b>, puis touchez le bon caractère dans la liste.</p>
+    <p>Tapez chaque syllabe avec son <b>ton en chiffre</b> (ou <code>_</code> s'il est inconnu), puis touchez le bon caractère dans la liste.
+      <b>Le ton est obligatoire</b> : un mot tapé sans ton est gardé comme texte (voir 6).</p>
     <div class="ex"><kbd>wuk5ka1</kbd><span class="arrow">→</span><span class="out"><span class="py">wuk⁵ka¹</span> <span class="hanzi">屋家</span></span>
       <small>Touchez 屋 puis 家 dans la liste (ou Maj + 1, 2… au clavier).</small></div>
     <div class="ex"><kbd>ngai_</kbd><span class="arrow">→</span><span class="out">ngai, tous les tons</span>
-      <small>Ton inconnu ? Tapez <code>_</code> à la place du chiffre.</small></div>
+      <small>Ton inconnu ? Tapez <code>_</code> à la place du chiffre : la liste propose les caractères de tous les tons.</small></div>
+    <div class="ex"><kbd>-(oi_)</kbd><span class="arrow">→</span><span class="out"><span class="py">oiˀ</span> <span class="hanzi">-</span><small class="note">ton encore inconnu</small></span>
+      <small>Si le ton reste inconnu jusqu'au bout, il s'affiche en <b>« ? » en exposant</b> (ˀ) dans le rendu.</small></div>
     <div class="ex"><kbd>ngai2 oi4 wuk5ka1</kbd><span class="arrow">→</span><span class="out"><span class="py">ngai² oi⁴ wuk⁵ka¹</span> <span class="hanzi">我爱屋家</span></span>
       <small>Expression : <b>un espace entre chaque mot</b>, pas entre les syllabes d'un même mot.</small></div>
     <p class="tip">Choisissez d'abord <b>📝 Mot</b> (un seul mot, jamais d'espace) ou <b>💬 Expression</b> (au moins deux mots séparés par des espaces).
@@ -96,6 +99,8 @@
     <p>Un mot tahitien, français ou un nom propre se tape tel quel, <b>sans chiffre de ton</b> : il est recopié dans le pinyin et dans les caractères.</p>
     <div class="ex"><kbd>ngai1 oi4 shit6 ma'a tinito</kbd><span class="arrow">→</span><span class="out"><span class="py">ngai¹ oi⁴ shit⁶ ma'a tinito</span> <span class="hanzi">我爱食 ma'a tinito</span></span>
       <small>Seuls les mots avec un ton (<code>shit6</code>, <code>ngai_</code>) sont à convertir en caractères.</small></div>
+    <div class="ex"><kbd>ma</kbd><span class="arrow">→</span><span class="out"><span class="py">ma</span> <span class="hanzi">ma</span><small class="note">texte, même s'il s'écrit comme une syllabe</small></span>
+      <small>Pour la syllabe hakka <i>ma</i>, tapez son ton : <code>ma2</code>, ou <code>ma_</code> si vous ne le connaissez pas.</small></div>
   </section>
 
   <section>
