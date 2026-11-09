@@ -216,6 +216,9 @@ def api_drafts(request):
             notes.append(w["note"][:1].upper() + w["note"][1:] + ".")
         if not w["pinyin"]:
             notes.append("Lecture à compléter.")
+        w["pinyin"], fixes = pinyin_rules.normalize(w["pinyin"])
+        if fixes:
+            notes.append(pinyin_rules.normalize_note(fixes)[:1].upper() + pinyin_rules.normalize_note(fixes)[1:] + ".")
         broken = pinyin_rules.violations(w["pinyin"])
         if broken:
             notes.append("Lecture contraire aux règles : " + " ; ".join(broken) + ".")

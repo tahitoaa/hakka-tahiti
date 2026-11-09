@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 
 from .ai import ai_enabled
+from . import pinyin_rules
 from .text_to_words import REVERSE_PUNCT_MAP, _PUNCT_ONLY_TOKEN_RE, normalize_punctuation
 from .models import Expression, LexiconAddition, Word
 from .permissions import AI_USERNAME, editor_required, is_editor, is_validator, status_change_refused
@@ -107,6 +108,8 @@ def _apply_payload(addition, payload):
                 # ...and the Latin one (, . ?) in the pinyin, as on the platform.
                 value = " ".join(tok.replace("…", "...").translate(REVERSE_PUNCT_MAP) if _PUNCT_ONLY_TOKEN_RE.match(tok) else tok
                                  for tok in value.split())
+                # Always in Wenfa's pinyin: si1 -> xi1, sit7 -> xit5, zhug5 -> zhuk5 (pinyin_rules).
+                value, _fixes = pinyin_rules.normalize(value)
             else:
                 value = value.strip()
             setattr(addition, field, value)

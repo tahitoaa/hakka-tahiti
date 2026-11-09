@@ -415,6 +415,8 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=
     for w in words:
         hanzi = _norm("".join(str(w.get("hanzi", "")).split()))
         candidate = by_hanzi.get(hanzi)
+        # The AI's reading in Wenfa's pinyin before it is checked (si1 -> xi1, sit7 -> xit5).
+        w["reading"], _fixes = pinyin_rules.normalize(str(w.get("reading", "")))
         if not w.get("keep") or (candidates and not candidate):
             continue
         if not all(HAN_RE.fullmatch(c) for c in hanzi) or not _valid_reading(

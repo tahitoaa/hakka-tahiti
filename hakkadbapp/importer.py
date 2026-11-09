@@ -516,6 +516,10 @@ def check_candidates(candidates):
         elif c["kind"] == LexiconAddition.KIND_WORD:
             c["hanzi"] = "".join(c["hanzi"].split())
         c["reading"], c["reading_note"] = resolve_reading(c["hanzi"], c.get("pinyin", ""), readings, deduced, rules)
+        # In Wenfa's pinyin whatever the document's romanization (si1 -> xi1, sit7 -> xit5).
+        c["reading"], fixes = pinyin_rules.normalize(c["reading"])
+        if fixes:
+            c["reading_note"] = "; ".join(filter(None, [c["reading_note"], pinyin_rules.normalize_note(fixes)]))
         broken = pinyin_rules.violations(c["reading"])
         if broken:
             c["reading_note"] = "; ".join(filter(None, [c["reading_note"], "lecture contraire aux règles : " + " ; ".join(broken)]))
