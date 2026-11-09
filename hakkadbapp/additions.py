@@ -215,8 +215,12 @@ def validation(request):
 def lexicon_data(request):
     """The lexicon's readings and words (components/data.html), alone: the
     Suivi page loads them the first time a hakka is edited there, to read
-    the Saisie text as the Saisie does (SaisieEntry)."""
+    the Saisie text as the Saisie does (SaisieEntry). Editors only, reads
+    included (editor_required lets any GET through)."""
     from django.db.models import Prefetch
+
+    if not is_editor(request.user):
+        return JsonResponse({"error": "Réservé aux éditeurs."}, status=403)
 
     from .models import Pronunciation, WordPronunciation
 
