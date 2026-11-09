@@ -138,17 +138,12 @@ var Romanization = (function () {
      *  unknown spellings) is left untouched. */
     function fromPinyin(text, systemId) {
         if (!config) return text;
-        // A word with no tone at all is text written without characters
-        // (ma'a, tinito -- Sentence.isTextWord): kept as written. A syllable
-        // always carries its tone, "_" when unknown (shin_ -> shinˀ).
-        return String(text || '').replace(/\S+/g, function (word) {
-            if (!/[\d_¹²³⁴⁵⁶⁷⁸ˀ]/.test(word) && /[a-zü]/i.test(word)) return word;
-            return word.replace(/([a-zü]+)([1-6¹²³⁴⁵⁶_ˀ]?)/gi, function (whole, letters, tone) {
-                var parts = splitSyllable(letters.toLowerCase());
-                if (!parts) return whole;
-                if (tone === '_' || tone === 'ˀ') return convert(parts[0], parts[1], '', systemId) + UNKNOWN_TONE;
-                return convert(parts[0], parts[1], SUPERSCRIPT_DIGITS[tone] || tone, systemId);
-            });
+        // "_" (tone unknown, shin_) is shown as a raised question mark.
+        return String(text || '').replace(/([a-zü]+)([1-6¹²³⁴⁵⁶_ˀ]?)/gi, function (whole, letters, tone) {
+            var parts = splitSyllable(letters.toLowerCase());
+            if (!parts) return whole;
+            if (tone === '_' || tone === 'ˀ') return convert(parts[0], parts[1], '', systemId) + UNKNOWN_TONE;
+            return convert(parts[0], parts[1], SUPERSCRIPT_DIGITS[tone] || tone, systemId);
         });
     }
 

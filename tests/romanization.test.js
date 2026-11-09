@@ -88,11 +88,9 @@ test("fromPinyin() re-splits stored strings, leaving what it can't parse", () =>
   assert.equal(R.fromPinyin("xyz1", "b"), "xyz1");
 });
 
-test("fromPinyin(): a word without tone is text (ma'a, ma), \"_\" is an unknown tone", () => {
+test("fromPinyin(): \"_\" is an unknown tone, shown as a raised question mark", () => {
   const R = loadRomanization(MINI);
-  assert.equal(R.fromPinyin("ba1 ma'a tinito", "b"), "pɑ˥ ma'a tinito");
-  assert.equal(R.fromPinyin("ba", "b"), "ba", "no tone: text, even when it spells a syllable");
-  assert.equal(R.fromPinyin("ba_ nga2", "b"), "pɑˀ ŋɑ²", "tone unknown: a raised question mark");
+  assert.equal(R.fromPinyin("ba_ nga2", "b"), "pɑˀ ŋɑ²");
 });
 
 test("fromDataset() uses the per-syllable data-initials/finals/tones, empty initial included", () => {

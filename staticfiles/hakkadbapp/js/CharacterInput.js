@@ -14,14 +14,9 @@ class SyllableInputModel {
     // of other transcription systems count), combining marks, apostrophes
     // (aspiration: k'ak7), then an optional tone digit or "_" (no tone).
     static SYLLABLE_RE = /\*[^*]*\*|\([^()]*\)|:[^\s]+|((?:(?!\p{Script=Han})\p{L})(?:(?!\p{Script=Han})[\p{L}\p{M}'’])*[_0-8]?)/gu;
-    // Same, the tone required (ngai2, ngai_): a word without one (ma'a,
-    // tinito) is text kept as written, not a syllable to convert
-    // (Sentence.isTextWord). Used by the Saisie.
-    static TONED_SYLLABLE_RE = /\*[^*]*\*|\([^()]*\)|:[^\s]+|((?:(?!\p{Script=Han})\p{L})(?:(?!\p{Script=Han})[\p{L}\p{M}'’])*[_0-8])/gu;
 
-    constructor(dico, { toneRequired = false } = {}) {
+    constructor(dico) {
         this.dico = dico;
-        this.syllableRe = toneRequired ? SyllableInputModel.TONED_SYLLABLE_RE : SyllableInputModel.SYLLABLE_RE;
         this.text = '';
         this.syllables = [];
         this.suggestions = [];
@@ -37,7 +32,7 @@ class SyllableInputModel {
         // tones 7/8 = its entering tones. Neither occurs in Wenfa input.
         this.syllables = [];
         this.positions = [];
-        for (const m of text.matchAll(this.syllableRe || SyllableInputModel.SYLLABLE_RE)) {
+        for (const m of text.matchAll(SyllableInputModel.SYLLABLE_RE)) {
             if (!m[1]) continue;
             this.syllables.push(m[1]);
             this.positions.push(m.index);

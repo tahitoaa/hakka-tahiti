@@ -613,7 +613,7 @@ def export_corpus():
     """
     from .models import Expression, Word, WordNote, WordPronunciation
     from django.db.models import Prefetch
-    from .text_to_words import join_hanzi, render_expression_from_token_data
+    from .text_to_words import render_expression_from_token_data
 
     reference_words, reference_expressions = reference_corpora()
     theme_payloads = reference_theme_payloads()
@@ -694,7 +694,7 @@ def export_corpus():
 
         all_theme_ids.update(themes)
         target = render_expression_from_token_data(token_data)
-        hanzi_only = join_hanzi(item["hanzi"] for item in token_data)
+        hanzi_only = "".join(item["hanzi"] for item in token_data).strip()
 
         # The platform's own import almost certainly matches expressions by
         # this "hakka" target string rather than by platform_id (the same

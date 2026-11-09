@@ -423,63 +423,11 @@ def convert_phrase_to_word_data(phrase: str, all_words, all_prons) -> list[dict]
     ]
 
 
-_TONE_MARK_RE = re.compile(r"[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ]")
-
-
-def is_text_word(token: str) -> bool:
-    """A word written without characters -- Tahitian, French, a proper name
-    (ma'a, tinito, Raiatea): letters, no character, no tone digit, no
-    (reading). Copied as written in both halves of the rendering. Same rule
-    as Sentence.isTextWord() in the browser."""
-    core = str(token or "").split(":", 1)[0]
-    return (
-        any(c.isalpha() for c in core)
-        and not any(_is_cjk(c) for c in core)
-        and not _TONE_MARK_RE.search(core)
-        and "(" not in core
-    )
-
-
-def join_hanzi(parts) -> str:
-    """The hanzi half: characters follow each other, a word without
-    characters stands apart -- 我爱食 ma'a tinito."""
-    out = ""
-    last_text = False
-    for part in parts:
-        part = part or ""
-        if not part:
-            continue
-        text = is_text_word(part)
-        if out and (text or last_text) and not _PUNCT_ONLY_TOKEN_RE.match(part):
-            out += " "
-        out += part
-        last_text = text
-    return out.strip()
-
-
 def render_expression_from_token_data(token_data: list[dict]) -> str:
     """
     Build the final rendering string:
       '<pinyin> <hanzi>'
     """
     pinyin = "".join(f"{item['pinyin']} " for item in token_data).translate(REVERSE_PUNCT_MAP).strip()
-    hanzi = join_hanzi(item["hanzi"] for item in token_data)
+    hanzi = "".join(item["hanzi"] for item in token_data).strip()
     return f"{pinyin} {hanzi}".strip()
-
-
-def split_rendering(target: str) -> tuple[str, str]:
-    """'<pinyin> <hanzi>' back into its two halves. The hanzi half starts at
-    the first word holding a character -- or before, at the words without
-    characters it opens with (ma'a 食飯): those appear once in each half, so
-    the split is where both halves carry the same such words."""
-    target = target or ""
-    words = target.split(" ")
-    first_han = next((i for i, w in enumerate(words) if any(_is_cjk(c) for c in w)), None)
-    if first_han is None:
-        idx = target.rfind(" ")
-        return (target, "") if idx == -1 else (target[:idx], target[idx + 1:])
-    texts = lambda ws: [w.rstrip(",.;:?!，。、；：？！…") for w in ws if is_text_word(w)]
-    for start in range(first_han, -1, -1):
-        if texts(words[:start]) == texts(words[start:]):
-            return " ".join(words[:start]), " ".join(words[start:])
-    return " ".join(words[:first_han]), " ".join(words[first_han:])
