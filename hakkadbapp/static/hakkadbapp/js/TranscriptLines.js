@@ -89,13 +89,17 @@ class TranscriptLines {
         };
 
         String(text || '').split('\n').forEach((row) => {
-            row.trim().split(/\s+/).filter(Boolean).forEach((raw) => {
+            // A «…» block is one word, written as is (Sentence.splitWords).
+            Sentence.splitWords(row).forEach((raw) => {
                 const token = raw.replace(/\*/g, '');
                 if (!token) return;
                 const [core, tail] = Sentence.splitPunct(token);
-                if (TranscriptLines.isTextWord(core)) {
-                    add('pinyin', core.replace(/[，。、；：？！]/g, (m) => `${Sentence.latinPunct(m)} `), 'text');
-                    const han = core.replace(/[,;?!]/g, (m) => Sentence.hanPunct(m));
+                const block = Sentence.textBlock(core);
+                if (block !== null || TranscriptLines.isTextWord(core)) {
+                    const text = block !== null ? block : core;
+                    if (!text) { if (tail) punct(tail); return; }
+                    add('pinyin', text.replace(/[，。、；：？！]/g, (m) => `${Sentence.latinPunct(m)} `), 'text');
+                    const han = text.replace(/[,;?!]/g, (m) => Sentence.hanPunct(m));
                     add('simp', han, 'text');
                     add('trad', han, 'text');
                 } else if (core) {

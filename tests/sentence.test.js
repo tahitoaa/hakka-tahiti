@@ -148,3 +148,35 @@ test("render() includes a copy button per field, with the pinyin+hanzi and frenc
   // the attribute rather than breaking the markup.
   assert.match(html, /data-copy-text="tu vas &quot;bien&quot;"/);
 });
+
+test("a «…» block is one word, copied as written in every line", () => {
+  const Sentence = loadSentence();
+  const dico = makeDico([
+    { simp: "我", trad: "我", pinyin: "ngai1", french: "je" },
+    { simp: "爱", trad: "愛", pinyin: "oi4", french: "aimer" },
+    { simp: "食", trad: "食", pinyin: "shit6", french: "manger" },
+  ]);
+  const s = new Sentence(dico, "我 爱 食 «ma'a tinito»");
+  assert.deepEqual([...s.words], ["我", "爱", "食", "«ma'a tinito»"]);
+  assert.equal(s.renderPinyinLine(), "ngai¹ oi⁴ shit⁶ ma'a tinito");
+  assert.equal(s.renderDisplayPinyinLine(), "ngai¹ oi⁴ shit⁶ ma'a tinito");
+  assert.equal(s.renderHanziLine(), "我爱食 ma'a tinito", "characters together, the text apart");
+  assert.equal(s.matches[3][0].isText, true);
+
+  // At the start, in the middle, with punctuation, French spacing, unclosed.
+  assert.equal(new Sentence(dico, "«ma'a» 食 我").renderHanziLine(), "ma'a 食我");
+  assert.equal(new Sentence(dico, "我 «Raiatea» 食").renderHanziLine(), "我 Raiatea 食");
+  assert.equal(new Sentence(dico, "«tinito», 食").renderHanziLine(), "tinito，食");
+  assert.equal(new Sentence(dico, "我 « ma'a »").renderHanziLine(), "我 ma'a");
+  assert.equal(new Sentence(dico, "我 «ma'a ti").renderPinyinLine(), "ngai¹ ma'a ti");
+  // Without guillemets, letters stay syllables to read.
+  assert.equal(new Sentence(dico, "我 ma").matches[1][0].isText, undefined);
+});
+
+test("textBlock / splitWords", () => {
+  const Sentence = loadSentence();
+  assert.deepEqual([...Sentence.splitWords("a «b c», d")], ["a", "«b c»,", "d"]);
+  assert.equal(Sentence.textBlock("«ma'a tinito»"), "ma'a tinito");
+  assert.equal(Sentence.textBlock("«ma'a»,"), "ma'a");
+  assert.equal(Sentence.textBlock("ma'a"), null);
+});

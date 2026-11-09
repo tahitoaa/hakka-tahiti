@@ -136,6 +136,34 @@ test("boxes: characters with their reading, pending syllables, grouped by word",
   assert.deepEqual([...groups], [["[ngai_]"], ["屋:wuk5", "家:ka1"]]);
 });
 
+test("a «…» block is text kept as written, not syllables to convert", () => {
+  const { entry } = load();
+  entry.setText("ngai_ oi4 «ma'a tinito»", "expression");
+  assert.deepEqual([...entry.syllables], ["ngai_", "oi4"]);
+  pickChar(entry, "我");
+  pickChar(entry, "爱");
+  assert.equal(entry.problem(), "");
+  assert.deepEqual([...entry.check().map((c) => `${c.hanzi} ${c.status}`)].slice(2), ["ma'a tinito text"]);
+  assert.deepEqual({ ...entry.values() }, { kind: "expression", hanzi: "我 爱 «ma'a tinito»", pinyin: "ngai1 oi4 «ma'a tinito»" });
+  assert.equal(entry.mixed().hanzi, "我爱 ma'a tinito");
+  // One box for the text, after the characters.
+  assert.deepEqual([...entry.units().map((g) => g.map((u) => u.type).join(","))], ["char", "char", "text"]);
+  // Reopened: the block comes back as written.
+  assert.equal(entry.constructor.textFromStored("我 爱 «ma'a tinito»", "ngai1 oi4 «ma'a tinito»", "expression"),
+    "我(ngai1) 爱(oi4) «ma'a tinito»");
+  // Not in a word.
+  entry.setText("«ma'a»", "word");
+  assert.match(entry.problem(), /expression/);
+});
+
+test("the « Texte » button wraps the selection, or puts the caret between « »", () => {
+  const { context } = load();
+  const wrap = context.SaisieEntry.wrapText;
+  assert.deepEqual({ ...wrap("ngai1 ma'a tinito", 6, 17) }, { text: "ngai1 «ma'a tinito»", caret: 19 });
+  assert.deepEqual({ ...wrap("ngai1", 5, 5) }, { text: "ngai1 «»", caret: 7 });
+  assert.deepEqual({ ...wrap("", 0, 0) }, { text: "«»", caret: 1 });
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);
@@ -146,6 +174,8 @@ test("platform rendering: no spaces, no :sense hint, Chinese punctuation in the 
   const ctx = loadAdditionList();
   assert.equal(ctx.AdditionList.platformHanzi("活到老 , 读到老 ?"), "活到老，读到老？");
   assert.equal(ctx.AdditionList.platformHanzi("我 把:prendre 书"), "我把书");
+  assert.equal(ctx.AdditionList.platformHanzi("我 爱 食 «ma'a tinito»"), "我爱食 ma'a tinito");
+  assert.equal(ctx.AdditionList.platformPinyin("ngai1 oi4 shit6 «ma'a tinito»"), "ngai¹ oi⁴ shit⁶ ma'a tinito");
   assert.equal(ctx.AdditionList.platformPinyin("fat6 dao4 lao3 ， tuk6"), "fat⁶ dao⁴ lao³ , tuk⁶");
 });
 

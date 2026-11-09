@@ -81,6 +81,71 @@ FORWARD_PUNCT_MAP = str.maketrans({
 _PUNCT_ONLY_TOKEN_RE = re.compile(r"^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()\[\]{}'\"]+$")
 
 
+# A «…» block: words written without characters (Tahitian, French, a name),
+# copied as written in both halves of the rendering, without the guillemets.
+# One word whatever spaces it holds. Same rule as Sentence.splitWords() /
+# Sentence.textBlock() in the browser.
+_WORDS_RE = re.compile(r"«[^»]*»?\S*|\S+")
+_TEXT_BLOCK_RE = re.compile(r"^«([^»]*)»?(\S*)$")
+
+
+def split_words(text) -> list[str]:
+    """The words of a phrase, a «…» block being one."""
+    return _WORDS_RE.findall(str(text or ""))
+
+
+def text_block(token):
+    """«ma'a», -> ("ma'a", ","); None for any other word."""
+    match = _TEXT_BLOCK_RE.match(str(token or "").strip())
+    return (match.group(1).strip(), match.group(2)) if match else None
+
+
+def join_hanzi(parts) -> str:
+    """The hanzi half: characters follow each other, a «…» block's text
+    stands apart -- 我爱食 ma'a tinito. `parts`: (hanzi, is_text) pairs."""
+    out = ""
+    last_text = False
+    for part, is_text in parts:
+        if not part:
+            continue
+        if out and (is_text or last_text) and not _PUNCT_ONLY_TOKEN_RE.match(part):
+            out += " "
+        out += part
+        last_text = is_text
+    return out.strip()
+
+
+def split_rendering(target: str) -> tuple[str, str]:
+    """'<pinyin> <hanzi>' back into its two halves. Without a «…» block the
+    hanzi half is the last word; with one, it starts at the first word
+    holding a character -- or before, at the text words it opens with
+    (ma'a 食飯): those appear in both halves, so the split is where the two
+    halves carry the same text words (words with neither a character nor a
+    tone mark)."""
+    target = target or ""
+    words = target.split(" ")
+    first_han = next((i for i, w in enumerate(words) if any(_is_cjk(c) for c in w)), None)
+    if first_han is None:
+        idx = target.rfind(" ")
+        return (target, "") if idx == -1 else (target[:idx], target[idx + 1:])
+
+    def texts(ws):
+        out = []
+        for w in ws:
+            w = w.rstrip(",.;:?!，。、；：？！…")
+            if any(c.isalpha() for c in w) and not any(_is_cjk(c) for c in w) and not _TONE_MARK_RE.search(w):
+                out.append(w)
+        return out
+
+    for start in range(first_han, -1, -1):
+        if texts(words[:start]) == texts(words[start:]):
+            return " ".join(words[:start]), " ".join(words[start:])
+    return " ".join(words[:first_han]), " ".join(words[first_han:])
+
+
+_TONE_MARK_RE = re.compile(r"[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ*]")
+
+
 def normalize_punctuation(excel_format):
     """Canonicalize every punctuation-only token of a Split phrase to its
     full-width form (see _PUNCT_FULLWIDTH_TO_LATIN/FORWARD_PUNCT_MAP above),
@@ -102,7 +167,7 @@ def normalize_punctuation(excel_format):
         # remaining single-character marks.
         return tok.replace("...", "…").translate(FORWARD_PUNCT_MAP)
 
-    return " ".join(normalize_token(tok) for tok in excel_format.split())
+    return " ".join(normalize_token(tok) for tok in split_words(excel_format))
 
 _SUPERSCRIPT = str.maketrans({
     "0": "⁰",
@@ -372,7 +437,7 @@ def collect_tokens_from_df(df):
                 continue
         except Exception:
             pass
-        tokens.extend(str(row.phrase).strip().split())
+        tokens.extend(split_words(row.phrase))
     return tokens
 
 
@@ -391,6 +456,12 @@ def convert_token_to_word_data(token: str, all_words, all_prons) -> dict:
     """
     Convert one token into a normalized structure.
     """
+    block = text_block(token)
+    if block:
+        # «ma'a tinito»: the same text in both halves.
+        text, tail = block
+        return {"word": None, "hanzi": text + tail, "pinyin": f"{text} {tail}".strip(), "matched": False, "text": True}
+
     matches = find_words_by_hanzi_with_disambiguation(token, all_words)
     word = matches[0]
 
@@ -416,7 +487,7 @@ def convert_phrase_to_word_data(phrase: str, all_words, all_prons) -> list[dict]
     """
     Convert one full phrase into ordered token data.
     """
-    tokens = str(phrase).strip().split()
+    tokens = split_words(phrase)
     return [
         convert_token_to_word_data(token, all_words, all_prons)
         for token in tokens
@@ -429,5 +500,5 @@ def render_expression_from_token_data(token_data: list[dict]) -> str:
       '<pinyin> <hanzi>'
     """
     pinyin = "".join(f"{item['pinyin']} " for item in token_data).translate(REVERSE_PUNCT_MAP).strip()
-    hanzi = "".join(item["hanzi"] for item in token_data).strip()
+    hanzi = join_hanzi((item["hanzi"], item.get("text", False)) for item in token_data)
     return f"{pinyin} {hanzi}".strip()

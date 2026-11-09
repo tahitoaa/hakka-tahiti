@@ -386,7 +386,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""} ${(!it.useInExport && !it.exportOk) ? "disabled" : ""}
             aria-label="Utiliser dans l'export">${(it.useInExport && !it.exportOk) ? " &#9888;" : ""}
         </label>` : `<span class="no-match">—</span>`;
-    const platformHanzi = (it.hanziLine || it.text || "").replace(/\s+/g, "");
+    // renderHanziLine() already runs the characters together (a «…» block
+    // stays apart); the raw text is the fallback.
+    const platformHanzi = it.hanziLine || (it.text || "").replace(/\s+/g, "");
     const row = `<tr class="ex-row${it.hasMismatch ? " has-mismatch" : ""}" data-index="${it.index}">
       <td class="hanzi vt-hanzi">${escapeHtml(platformHanzi)}</td>
       <td class="vt-pinyin">${escapeHtml(it.pinyinLine || "")}</td>

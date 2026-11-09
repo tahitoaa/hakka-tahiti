@@ -183,3 +183,8 @@ test("Sentence badges carry data-py so they follow later switches without a re-r
   assert.match(s.renderTokens(), /<span data-py="ba1">pɑ˥<\/span>/);
   assert.equal(s.renderDisplayPinyinLine(), "pɑ˥", "lines meant for copying stay plain text");
 });
+
+test("fromPinyin() keeps a «…» block as written", () => {
+  const R = loadRomanization(MINI);
+  assert.equal(R.fromPinyin("ba1 «ba ma'a»", "b"), "pɑ˥ «ba ma'a»");
+});

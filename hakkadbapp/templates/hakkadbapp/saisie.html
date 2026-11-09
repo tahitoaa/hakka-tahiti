@@ -23,6 +23,15 @@
     display: flex; align-items: center; justify-content: center; width: 2.6rem; height: 2.6rem; font-size: 1.4rem;
     border: 1px solid #a5b4fc; border-radius: 0.375rem; background: #FBF0E6; color: #261F1C;
   }
+  /* «ma'a tinito»: text kept as written, one box. */
+  .saisie-slot.is-text .saisie-text {
+    display: flex; align-items: center; min-height: 2.6rem; padding: 0 0.6rem; font-size: 1rem; font-style: italic;
+    border: 1px dashed #B8A98F; border-radius: 0.375rem; background: #fff; color: #261F1C;
+  }
+  .saisie-text-row { display: flex; gap: 0.4rem; align-items: stretch; }
+  .saisie-text-row input { flex: 1; min-width: 0; }
+  #saisie-text-btn { flex: none; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #FDFAF5;
+                     font-size: 0.875rem; font-weight: 600; color: #4A3F35; }
   .saisie-check-list { display: grid; gap: 0.25rem; font-size: 0.875rem; }
   .saisie-check-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; padding: 0.25rem 0.5rem;
                           border-radius: 0.375rem; border-left: 4px solid #DDD0BD; background: #FDFAF5; }
@@ -109,10 +118,15 @@
         Tapez les syllabes avec leur ton (<code>wuk5ka1</code>, <code>_</code> sans ton : <code>ngai_</code>), dans le système « Je tape en ».
         Expression : un espace entre les mots (<code>ngai_ oi4 wuk5ka1</code>). Chaque caractère choisi remplace sa syllabe ;
         une lecture choisie s'écrit entre parenthèses (<code>生(sen1)</code>). Caractère inconnu : « ? » garde la lecture, <code>-(man4)</code>.
+        Mot sans caractère (tahitien, français, nom propre) : entre guillemets, <code>«ma'a tinito»</code> — le bouton « Texte » les ajoute.
         Le pinyin est enregistré en Wenfa.</div></details></div>
+      <div class="saisie-text-row">
       <input id="saisie-pinyin" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
              placeholder="ex. wuk5ka1"
              class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
+      <button type="button" id="saisie-text-btn" title="Texte sans caractère (tahitien, français…) : met la sélection entre « »"
+              aria-label="Texte sans caractère : entre guillemets">« » Texte</button>
+      </div>
       <div id="saisie-kind-warning" aria-live="polite"></div>
       <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
     </div>

@@ -138,8 +138,10 @@ var Romanization = (function () {
      *  unknown spellings) is left untouched. */
     function fromPinyin(text, systemId) {
         if (!config) return text;
-        // "_" (tone unknown, shin_) is shown as a raised question mark.
-        return String(text || '').replace(/([a-zü]+)([1-6¹²³⁴⁵⁶_ˀ]?)/gi, function (whole, letters, tone) {
+        // "_" (tone unknown, shin_) is shown as a raised question mark; a
+        // «…» block (ma'a, written without characters) is kept as written.
+        return String(text || '').replace(/«[^»]*»?|([a-zü]+)([1-6¹²³⁴⁵⁶_ˀ]?)/gi, function (whole, letters, tone) {
+            if (letters === undefined) return whole;
             var parts = splitSyllable(letters.toLowerCase());
             if (!parts) return whole;
             if (tone === '_' || tone === 'ˀ') return convert(parts[0], parts[1], '', systemId) + UNKNOWN_TONE;

@@ -9,11 +9,11 @@
  *  dictionary matches for each one. Subclasses (HakkaText, TextModel) layer
  *  page-specific fields (pinyin/french/sentences...) on top of this. */
 class SyllableInputModel {
-    // Settled text to skip (*comments*, (pinyin) annotations, :constraints),
+    // Settled text to skip («text as is», *comments*, (pinyin) annotations, :constraints),
     // or a typed syllable: letters of any script but Han (so ε, ɔ, ŋ, ṣ...
     // of other transcription systems count), combining marks, apostrophes
     // (aspiration: k'ak7), then an optional tone digit or "_" (no tone).
-    static SYLLABLE_RE = /\*[^*]*\*|\([^()]*\)|:[^\s]+|((?:(?!\p{Script=Han})\p{L})(?:(?!\p{Script=Han})[\p{L}\p{M}'’])*[_0-8]?)/gu;
+    static SYLLABLE_RE = /«[^»]*»?|\*[^*]*\*|\([^()]*\)|:[^\s]+|((?:(?!\p{Script=Han})\p{L})(?:(?!\p{Script=Han})[\p{L}\p{M}'’])*[_0-8]?)/gu;
 
     constructor(dico) {
         this.dico = dico;

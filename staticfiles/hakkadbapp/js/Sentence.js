@@ -37,6 +37,24 @@ class Sentence {
         return [tail ? text.slice(0, -tail.length) : text, tail];
     }
 
+    /** The words of a text, space-separated -- except a «…» block, one
+     *  word whatever spaces it holds (« ma'a tinito » too). An unclosed «
+     *  runs to the end, while it is being typed. Same rule as
+     *  text_to_words.split_words() on the server. */
+    static WORDS_RE = /«[^»]*»?\S*|\S+/gu;
+
+    static splitWords(text) {
+        return String(text || '').match(Sentence.WORDS_RE) || [];
+    }
+
+    /** The text of a «…» block (Tahitian, French, a name: no character to
+     *  find, written as is in the pinyin and the characters); null for any
+     *  other word. Punctuation after the block (« «ma'a», ») is not in it. */
+    static textBlock(token) {
+        const m = Sentence.splitPunct(String(token || '').trim())[0].match(/^«([^»]*)»?$/);
+        return m ? m[1].trim() : null;
+    }
+
     static latinPunct(text) {
         return [...String(text || '')].map((c) => Sentence.PUNCT_TO_LATIN[c] ?? c).join('');
     }
@@ -60,6 +78,10 @@ class Sentence {
     // -----------------------------
     parseToken(token) {
         if (!token) return { hanzi: '', constraints: null, inline: null, readings: [], raw: token };
+
+        // «ma'a tinito»: written as is, no (reading) nor :sense in it.
+        const block = Sentence.textBlock(token);
+        if (block !== null) return { hanzi: block, constraints: null, inline: null, readings: [], raw: token, text: true };
 
         const parts = token.split(':');
         const base = parts[0];
@@ -186,8 +208,11 @@ class Sentence {
     // Unknown resolution
     // -----------------------------
     resolveUnknownPinyin(token) {
-        const { hanzi, inline, readings } = this.parseToken(Sentence.splitPunct(token)[0]);
+        const { hanzi, inline, readings, text } = this.parseToken(Sentence.splitPunct(token)[0]);
         const pinned = readings.some(Boolean);
+
+        // «ma'a»: read as written.
+        if (text) return hanzi;
 
         // An annotation that isn't attached to any hanzi run is kept whole.
         if (inline && !pinned) return inline;
@@ -210,7 +235,11 @@ class Sentence {
     }
 
     buildUnknownEntry(token) {
-        const { hanzi, raw } = this.parseToken(Sentence.splitPunct(token)[0] || token);
+        const { hanzi, raw, text } = this.parseToken(Sentence.splitPunct(token)[0] || token);
+        if (text) {
+            // «ma'a tinito»: no entry to find, the same text in every line.
+            return { dataset: { simp: hanzi, pinyin: hanzi, french: '', raw: raw || '', text: true }, isUnknown: true, isText: true };
+        }
         return {
             dataset: {
                 simp: hanzi || raw || '?',
@@ -226,9 +255,11 @@ class Sentence {
     // Update
     // -----------------------------
     update(text = '') {
-        this.words = text ? text.trim().split(/\s+/) : [];
+        // A «…» block is one word, its spaces included.
+        this.words = Sentence.splitWords(text);
 
         this.matches = this.words.map(token => {
+            if (Sentence.textBlock(token) !== null) return [this.buildUnknownEntry(token)];
             // The word is looked up without its punctuation (« 好， » is 好).
             const { hanzi, constraints, readings } = this.parseToken(Sentence.splitPunct(token)[0]);
 
@@ -260,6 +291,8 @@ class Sentence {
     displayPinyin(dataOrPinyin) {
         const R = typeof Romanization !== 'undefined' ? Romanization : null;
         const isData = dataOrPinyin && typeof dataOrPinyin === 'object';
+        // «ma'a»: no syllable to convert.
+        if (isData && dataOrPinyin.text) return String(dataOrPinyin.pinyin || '');
         // A dictionary fed from another notation (Dictionary.useSource())
         // can't be converted: Romanization only parses Wenfa syllables.
         if (!R || !R.systems().length) {
@@ -275,7 +308,9 @@ class Sentence {
     displayPinyinHtml(dataOrPinyin) {
         const text = this.displayPinyin(dataOrPinyin);
         const stored = dataOrPinyin && typeof dataOrPinyin === 'object' ? dataOrPinyin.pinyin : dataOrPinyin;
-        const live = typeof Romanization !== 'undefined' && Romanization.systems().length && stored;
+        const isText = !!(dataOrPinyin && typeof dataOrPinyin === 'object' && dataOrPinyin.text);
+        const live = !isText && typeof Romanization !== 'undefined' && Romanization.systems().length && stored;
+        if (isText) return escapeAttr(text);
         return live ? `<span data-py="${escapeAttr(stored)}">${text}</span>` : text;
     }
 
@@ -327,7 +362,8 @@ renderFurigana() {
             const [core, tail] = Sentence.splitPunct(this.words[i]);
             if (!core) return Sentence.latinPunct(tail);
             let line;
-            if (data?.pinyin) line = this.renderPinyin(data.pinyin);
+            if (data?.text) line = data.pinyin;
+            else if (data?.pinyin) line = this.renderPinyin(data.pinyin);
             else {
                 const resolved = this.resolveUnknownPinyin(this.words[i]);
                 line = resolved ? this.renderPinyin(resolved) : '?';
@@ -359,18 +395,30 @@ renderFurigana() {
     // compare this text against a platform/DB value that's always
     // simplified (e.g. the expressions comparison view), where honoring the
     // toggle would make an otherwise-correct match look like a mismatch.
+    // Characters follow each other; a «…» block stands apart, without its
+    // guillemets: 我爱食 ma'a tinito.
     renderHanziLine(forceSimp = false) {
-        return this.matches.map((group, i) => {
+        let line = '';
+        let lastText = false;
+        this.matches.forEach((group, i) => {
             const best = group?.[0];
             const data = best?.dataset || best;
 
             const [core, tail] = Sentence.splitPunct(this.words[i]);
-            if (!core) return Sentence.hanPunct(tail);
-            if (data?.simp) return (forceSimp ? data.simp : pickHanzi(data)) + Sentence.hanPunct(tail);
-
-            const t = this.parseToken(core);
-            return (t.hanzi || t.raw || '?') + Sentence.hanPunct(tail);
-        }).join('');
+            let piece;
+            if (!core) piece = '';
+            else if (data?.simp) piece = forceSimp ? data.simp : pickHanzi(data);
+            else {
+                const t = this.parseToken(core);
+                piece = t.hanzi || t.raw || '?';
+            }
+            const isText = !!data?.text && !!core;
+            if (piece && line && (isText || lastText)) line += ' ';
+            line += piece + Sentence.hanPunct(tail);
+            // Punctuation closes the text: 我 ma'a，食.
+            lastText = piece ? isText && !tail : (tail ? false : lastText);
+        });
+        return line;
     }
 
     renderFrenchLine() {
@@ -409,7 +457,9 @@ renderFurigana() {
         // still ambiguous (several entries, no constraint given), orange =
         // no dictionary entry found at all.
         let colorClass = "bg-[var(--sentence-badge-known-bg)] text-[var(--sentence-badge-known-fg)]";
-        if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
+        // «ma'a»: wanted as is -- neutral, not an error.
+        if (best.isText) colorClass = "bg-[var(--sentence-preview-bg)] text-[var(--sentence-text-primary)] border border-[var(--sentence-preview-border)]";
+        else if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
         else if (isDisambiguated) colorClass = "bg-[var(--sentence-badge-disambig-bg)] text-[var(--sentence-badge-disambig-fg)]";
         else if (extra > 0) colorClass = "bg-[var(--sentence-badge-multi-bg)] text-[var(--sentence-badge-multi-fg)]";
 
@@ -470,7 +520,9 @@ renderFurigana() {
             return `
                 <div id="detail-${index}" onclick="event.stopPropagation()" class="hidden absolute top-full left-0 z-20 mt-0.5 min-w-[10rem] max-w-[16rem] rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow-lg p-2 text-left text-[11px] leading-snug">
                     <div class="hanzi font-semibold text-sm mb-1">${escapeAttr(data.raw || data.simp || '?')}</div>
-                    <div class="italic text-[var(--sentence-text-muted)]">Aucune entrée trouvée dans le dictionnaire.</div>
+                    <div class="italic text-[var(--sentence-text-muted)]">${data.text
+                        ? 'Texte « » : recopié tel quel dans le pinyin et les caractères.'
+                        : 'Aucune entrée trouvée dans le dictionnaire.'}</div>
                 </div>
             `;
         }

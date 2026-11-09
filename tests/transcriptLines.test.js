@@ -88,3 +88,11 @@ test("ambiguous: homographs among the lexicon's words; punctuation and text igno
   assert.equal(found[0].char, "好");
   assert.deepEqual([...found[0].readings].sort(), ["hau4", "ho3"]);
 });
+
+test("a «…» block is copied as written, without its guillemets", () => {
+  const T = load();
+  const d = T.derive(dico, "吾(nga1) 在 «ma'a tinito» 爸爸");
+  assert.equal(d.hanzi, "吾在 ma'a tinito 爸爸");
+  assert.match(d.pinyin, /ma'a tinito/);
+  assert.doesNotMatch(d.pinyin, /«|»/);
+});

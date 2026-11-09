@@ -55,16 +55,40 @@ class AdditionList {
     /** As imported on the platform (e-reo « target »): Wenfa with tone
      *  superscripts, words separated by spaces... */
     static platformPinyin(pinyin) {
-        return AdditionList.superscriptTones(String(pinyin || '').trim().split(/\s+/)
-            .map((t) => (AdditionList.PUNCT_TOKEN.test(t) ? [...t].map((c) => AdditionList.PUNCT_TO_LATIN[c] || c).join('') : t)).join(' '));
+        const latin = (t) => [...t].map((c) => AdditionList.PUNCT_TO_LATIN[c] || c).join('');
+        return AdditionList.words(pinyin).map((t) => {
+            const block = AdditionList.textBlock(t);
+            if (block) return [block[0], block[1] && latin(block[1])].filter(Boolean).join(' ');
+            return AdditionList.superscriptTones(AdditionList.PUNCT_TOKEN.test(t) ? latin(t) : t);
+        }).join(' ');
     }
 
     /** ...and the characters run together, no spaces, no 把:sense hint,
-     *  punctuation in its Chinese form (，。？). */
+     *  punctuation in its Chinese form (，。？). A «…» block (ma'a, written
+     *  without characters) stands apart: 我爱食 ma'a tinito. */
     static platformHanzi(hanzi) {
-        return String(hanzi || '').trim().split(/\s+/)
-            .map((t) => (AdditionList.PUNCT_TOKEN.test(t) ? t.replace(/\.\.\./g, '…').replace(/[,.;:?!()[\]{}]/g, (c) => AdditionList.PUNCT_TO_CHINESE[c]) : t.split(':')[0]))
-            .join('');
+        const chinese = (t) => t.replace(/\.\.\./g, '…').replace(/[,.;:?!()[\]{}]/g, (c) => AdditionList.PUNCT_TO_CHINESE[c]);
+        let out = '';
+        let lastText = false;
+        AdditionList.words(hanzi).forEach((t) => {
+            if (AdditionList.PUNCT_TOKEN.test(t)) { out += chinese(t); lastText = false; return; }
+            const block = AdditionList.textBlock(t);
+            if (out && (block || lastText)) out += ' ';
+            out += block ? block[0] + chinese(block[1]) : t.split(':')[0];
+            lastText = !!block;
+        });
+        return out;
+    }
+
+    /** Space-separated words, a «…» block being one (Sentence.splitWords). */
+    static words(text) {
+        return String(text || '').match(/«[^»]*»?\S*|\S+/gu) || [];
+    }
+
+    /** «ma'a», -> ["ma'a", ","]; null for any other word. */
+    static textBlock(token) {
+        const m = String(token || '').match(/^«([^»]*)»?(\S*)$/u);
+        return m ? [m[1].trim(), m[2]] : null;
     }
 
     /** The four cells every table of entries shares (Validation, Suggestions
@@ -77,7 +101,8 @@ class AdditionList {
     static missing(e) {
         const out = [['hanzi', 'caractères'], ['pinyin', 'pinyin'], ['french', 'français'], ['english', 'anglais']]
             .filter(([f]) => !String(e[f] || '').trim()).map(([, label]) => label);
-        if (e.pinyin && /[/?]/.test(e.pinyin)) out.push('pinyin sûr');
+        // A «…» block is text: its « ? » is no unsure reading.
+        if (e.pinyin && /[/?]/.test(String(e.pinyin).replace(/«[^»]*»?/g, ''))) out.push('pinyin sûr');
         return out;
     }
 

@@ -34,11 +34,9 @@ def to_digit_pinyin(pinyin):
 def split_target(target):
     """target is "<space-separated pinyin words> <concatenated hanzi>" -- the
     hanzi block has no internal spaces, so it's always the trailing token."""
-    target = target or ""
-    idx = target.rfind(" ")
-    if idx == -1:
-        return target, ""
-    return target[:idx], target[idx + 1:]
+    # A «…» block (ma'a) puts spaces in the hanzi half too.
+    from hakkadbapp.text_to_words import split_rendering
+    return split_rendering(target)
 
 
 def theme_names(theme_ids, theme_map):

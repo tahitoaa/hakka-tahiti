@@ -149,11 +149,10 @@ def split_target(target):
     *import time*, which crashes every request in production the moment
     anything in views.py imports it -- this view module is loaded on every
     request/cold start, unlike a management command run standalone by hand."""
-    target = target or ""
-    idx = target.rfind(" ")
-    if idx == -1:
-        return target, ""
-    return target[:idx], target[idx + 1:]
+    # A «…» block (ma'a) puts spaces in the hanzi half too:
+    # text_to_words.split_rendering() finds where it starts.
+    from .text_to_words import split_rendering
+    return split_rendering(target)
 
 # Fields shown in the duplicates "compared fields" table, in display order.
 DUP_FIELDS = ["french", "hakka", "secondary", "theme", "status"]

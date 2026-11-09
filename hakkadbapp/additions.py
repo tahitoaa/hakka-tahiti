@@ -68,7 +68,9 @@ def missing_fields(addition):
     """The labels of the required fields still empty (or a pinyin still
     unsure: « / » between readings, « ? » for an unknown one)."""
     out = [label for field, label in REQUIRED_FIELDS if not (getattr(addition, field) or "").strip()]
-    if "pinyin" not in [f for f, _ in REQUIRED_FIELDS if not (getattr(addition, f) or "").strip()] and re.search(r"[/?]", addition.pinyin):
+    # A «…» block is text: its « ? » is no unsure reading.
+    if "pinyin" not in [f for f, _ in REQUIRED_FIELDS if not (getattr(addition, f) or "").strip()] \
+            and re.search(r"[/?]", re.sub(r"«[^»]*»?", "", addition.pinyin)):
         out.append("pinyin sûr")
     return out
 

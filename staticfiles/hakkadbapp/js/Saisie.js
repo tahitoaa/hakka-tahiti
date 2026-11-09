@@ -14,10 +14,32 @@
 
 /** The form's content, without the page: text, readings, checks. */
 class SaisieEntry {
-    // A pending syllable (group 1, as SyllableInputModel), whitespace
-    // (group 2), any other character (group 3); comments, (pins) and
-    // :constraints are matched and skipped.
-    static UNIT_RE = new RegExp(`${SyllableInputModel.SYLLABLE_RE.source}|(\\s+)|([\\s\\S])`, 'gu');
+    // A «text» block (group 1), a pending syllable (group 2, as
+    // SyllableInputModel), whitespace (group 3), any other character
+    // (group 4); comments, (pins) and :constraints are matched and skipped.
+    static UNIT_RE = new RegExp(`(«[^»]*»?)|${SyllableInputModel.SYLLABLE_RE.source}|(\\s+)|([\\s\\S])`, 'gu');
+
+    /** Space-separated words, a «…» block being one (Sentence.splitWords). */
+    static words(text) {
+        return String(text || '').match(/«[^»]*»?\S*|\S+/gu) || [];
+    }
+
+    static isTextBlock(token) {
+        return /^«[^»]*»?\S*$/u.test(String(token || ''));
+    }
+
+    /** The "Texte" button: the selection put between « » (or « » inserted,
+     *  the caret inside). Returns {text, caret}. */
+    static wrapText(text, start, end) {
+        const before = text.slice(0, start);
+        const inner = text.slice(start, end).trim();
+        const after = text.slice(end);
+        const lead = before && !/\s$/.test(before) ? ' ' : '';
+        const trail = after && !/^\s/.test(after) ? ' ' : '';
+        const out = `${before}${lead}«${inner}»${trail}${after}`;
+        const caret = before.length + lead.length + 1 + inner.length + (inner ? 1 : 0);
+        return { text: out, caret };
+    }
 
     constructor(dico) {
         this.dico = dico;
@@ -39,8 +61,8 @@ class SaisieEntry {
      *  stored reading pinned (屋家(wuk5ka1)), so Sentence reads it as saved. */
     static textFromStored(hanzi, pinyin, kind, dico = null) {
         const plain = (t) => t.split(':')[0].replace(/\([^()]*\)/g, '');
-        const hs = String(hanzi || '').trim().split(/\s+/).filter(Boolean);
-        const ps = String(pinyin || '').trim().split(/\s+/).filter(Boolean);
+        const hs = SaisieEntry.words(hanzi);
+        const ps = SaisieEntry.words(pinyin);
         // With the lexicon: a word's reading is written only when the lexicon
         // can't give it by itself (a character with several readings, none,
         // or another one) -- same rule as picking a suggestion.
@@ -62,7 +84,8 @@ class SaisieEntry {
             return ps.length ? pinned(h, ps.join('')) : h;
         }
         if (ps.length !== hs.length) return hs.join(' ');
-        return hs.map((h, i) => `${pinned(plain(h), ps[i])}${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
+        // A «…» block is stored as written, its own reading.
+        return hs.map((h, i) => SaisieEntry.isTextBlock(h) ? h : `${pinned(plain(h), ps[i])}${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
     }
 
     /** A word is one token whatever spaces were typed; an expression has
@@ -170,6 +193,13 @@ class SaisieEntry {
             const data = best?.dataset || best || {};
             const known = best && !best.isUnknown;
             const pending = [...token.matchAll(SyllableInputModel.SYLLABLE_RE)].some((m) => m[1]);
+            if (best?.isText) {
+                // «ma'a tinito»: stored as typed in both fields.
+                const [core, tail] = Sentence.splitPunct(token);
+                const block = `«${Sentence.textBlock(core)}»`;
+                return { token, hanzi: `${block}${tail}`, plain: Sentence.textBlock(core), text: true,
+                    pinyin: `${block}${Sentence.latinPunct(tail)}`, pending: false, match: null };
+            }
             return {
                 token,
                 hanzi: token.replace(/\([^()]*\)/g, ''),
@@ -205,7 +235,10 @@ class SaisieEntry {
         if (this.syllables.length) {
             return `Il reste à convertir : ${this.syllables.join(', ')} — choisissez les caractères dans les suggestions.`;
         }
-        const tokens = this.tokens();
+        const tokens = this.tokens().filter((t) => !t.text);
+        if (this.kind === 'word' && tokens.length < this.tokens().length) {
+            return 'Un mot s’écrit en caractères : le texte entre « » n’a sa place que dans une expression.';
+        }
         const unknown = tokens.filter((t) => !t.pinyin || t.pinyin.includes('?'));
         if (unknown.length) {
             return `Lecture inconnue pour ${unknown.map((t) => t.plain).join(', ')} : retapez la syllabe et choisissez le caractère, `
@@ -230,6 +263,8 @@ class SaisieEntry {
     check(additions = []) {
         return this.tokens().map((t) => {
             const w = { hanzi: t.plain, pinyin: t.pinyin };
+            // «ma'a»: text written as is, no word to add.
+            if (t.text) return { ...w, pinyin: t.plain, status: 'text' };
             if (t.pending || !t.plain) return { ...w, hanzi: t.token, status: 'incomplete' };
             if (t.match) return { ...w, status: 'known', entry: t.match };
             const proposed = additions.find((a) => a.kind === 'word' && a.status !== 'rejected'
@@ -268,18 +303,23 @@ class SaisieEntry {
             pins = Sentence.pinnedReadings(token.split(':')[0]);
         };
         for (const m of this.text.matchAll(SaisieEntry.UNIT_RE)) {
-            if (m[2] !== undefined) {
+            if (m[3] !== undefined) {
                 if (this.kind !== 'word' && group?.length) group = null;
                 continue;
             }
-            if (m[1] === undefined && m[3] === undefined) continue; // (pin), :constraint, *comment*
-            if (!group) startGroup();
             if (m[1] !== undefined) {
-                group.push({ type: 'syl', index: syl++, syl: m[1] });
-                charIndex += [...m[1]].length;
+                if (!group) startGroup();
+                group.push({ type: 'text', text: Sentence.textBlock(m[1]) });
                 continue;
             }
-            const char = m[3];
+            if (m[2] === undefined && m[4] === undefined) continue; // (pin), :constraint, *comment*
+            if (!group) startGroup();
+            if (m[2] !== undefined) {
+                group.push({ type: 'syl', index: syl++, syl: m[2] });
+                charIndex += [...m[2]].length;
+                continue;
+            }
+            const char = m[4];
             const t = tokens[this.kind === 'word' ? 0 : tokenIndex];
             let reading = pins[charIndex] || '';
             if (!reading && /\p{Script=Han}/u.test(char)) {
@@ -307,6 +347,7 @@ class SaisieEntry {
         reading: 'dans le lexique, autre lecture',
         sense: 'nouveau sens',
         punct: 'ponctuation',
+        text: 'texte, gardé tel quel',
         proposed: 'déjà proposé',
         unknown: 'inconnu du lexique',
         incomplete: 'à compléter',
@@ -424,6 +465,11 @@ class SaisieEntry {
                 this.save(button?.dataset.status || 'draft', button);
             });
             this.el.cancel.addEventListener('click', () => this.resetForm());
+            // « Texte » : the selection (or the caret) between « », for words
+            // written without characters (ma'a tinito).
+            const textBtn = document.getElementById('saisie-text-btn');
+            textBtn?.addEventListener('mousedown', (event) => event.preventDefault());
+            textBtn?.addEventListener('click', () => this.wrapSelectionAsText());
             this.el.aiBtn?.addEventListener('click', () => this.suggest());
             this.el.aiResult?.addEventListener('click', (event) => {
                 const btn = event.target.closest('[data-ai-use]');
@@ -502,6 +548,18 @@ class SaisieEntry {
             }
             box.innerHTML = message ? `<div class="saisie-kind-warning">⚠ ${message}
                 <button type="button" data-switch-kind="${other}">${other === 'word' ? '📝 C’est un mot' : '💬 C’est une expression'}</button></div>` : '';
+        }
+
+        wrapSelectionAsText() {
+            const input = this.el.text;
+            const { text, caret } = SaisieEntry.wrapText(input.value, input.selectionStart ?? input.value.length,
+                input.selectionEnd ?? input.value.length);
+            input.value = text;
+            input.focus();
+            input.setSelectionRange(caret, caret);
+            // Text between « » makes an expression.
+            if (this.kind === 'word') this.setKind('expression');
+            else this.updateText();
         }
 
         /** The model rewrote the text (suggestion picked, character typed). */
@@ -659,7 +717,9 @@ class SaisieEntry {
 
         renderSlots() {
             const groups = this.entry.units();
-            this.el.slots.innerHTML = groups.map((group) => `<span class="saisie-word">${group.map((u) => u.type === 'syl'
+            this.el.slots.innerHTML = groups.map((group) => `<span class="saisie-word">${group.map((u) => u.type === 'text'
+                ? `<span class="saisie-slot is-text" title="Texte gardé tel quel"><span class="saisie-text">${escapeHtml(u.text || '…')}</span><small>texte</small></span>`
+                : u.type === 'syl'
                 ? `<label class="saisie-slot"><input class="hanzi" data-slot="${u.index}" value="" inputmode="text" `
                     + `aria-label="Caractère pour ${escapeHtml(u.syl)}"><small>${escapeHtml(superscriptTones(u.syl))}</small></label>`
                 : u.reading.includes('/')
