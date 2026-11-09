@@ -47,7 +47,8 @@ class AdditionList {
     }
 
     static superscriptTones(pinyin) {
-        return String(pinyin || '').replace(/[1-8]/g, (d) => '¹²³⁴⁵⁶⁷⁸'[d - 1]);
+        // "_": tone unknown (ngai_), a raised question mark.
+        return String(pinyin || '').replace(/[1-8_]/g, (d) => (d === '_' ? 'ˀ' : '¹²³⁴⁵⁶⁷⁸'[d - 1]));
     }
 
     /** A stored (Wenfa) pinyin as shown, in the "J'affiche en" system. */
@@ -61,9 +62,24 @@ class AdditionList {
     /** ...and the characters run together, no spaces, no 把:sense hint,
      *  punctuation in its Chinese form (，。？). */
     static platformHanzi(hanzi) {
-        return String(hanzi || '').trim().split(/\s+/)
-            .map((t) => (AdditionList.PUNCT_TOKEN.test(t) ? t.replace(/\.\.\./g, '…').replace(/[,.;:?!()[\]{}]/g, (c) => AdditionList.PUNCT_TO_CHINESE[c]) : t.split(':')[0]))
-            .join('');
+        // A word without characters (ma'a: letters, no tone, no reading --
+        // Sentence.isTextWord) stands apart: 我爱食 ma'a tinito.
+        const isText = (t) => /\p{L}/u.test(t) && !/\p{Script=Han}/u.test(t) && !/[\d_⁰¹²³⁴⁵⁶⁷⁸ˀ(]/.test(t);
+        let out = '';
+        let lastText = false;
+        String(hanzi || '').trim().split(/\s+/).filter(Boolean).forEach((t) => {
+            if (AdditionList.PUNCT_TOKEN.test(t)) {
+                out += t.replace(/\.\.\./g, '…').replace(/[,.;:?!()[\]{}]/g, (c) => AdditionList.PUNCT_TO_CHINESE[c]);
+                lastText = false;
+                return;
+            }
+            const word = t.split(':')[0];
+            const text = isText(word);
+            if (out && (text || lastText)) out += ' ';
+            out += word;
+            lastText = text;
+        });
+        return out;
     }
 
     /** The four cells every table of entries shares (Validation, Suggestions

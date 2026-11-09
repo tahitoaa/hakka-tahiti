@@ -13,14 +13,15 @@
      text (romanization as typed, then words separated by spaces with
      pinned readings such as 生(sen1), see Sentence.js);
    - each speaker can have child tiers (Symbolic_Association) by role:
-     translation, pinyin, mixed, hanzi (characters only) -- detected from
+     translation, pinyin, mixed, hanzi (simplified characters), trad
+     (traditional characters) -- detected from
      their tier id / linguistic type, or created on first write, named
      after the convention already used in the file ("Annette traduction",
      "Annette Levin Hanzi").
    ========================================================================= */
 
 class EafDocument {
-    static ROLES = ['translation', 'pinyin', 'mixed', 'hanzi'];
+    static ROLES = ['translation', 'pinyin', 'mixed', 'hanzi', 'trad'];
 
     // Default suffix (tier id = "<speaker> <suffix>"), linguistic type and
     // language of each child role.
@@ -29,6 +30,7 @@ class EafDocument {
         translation: { suffix: 'Traduction', type: 'traduction', lang: 'fra' },
         pinyin: { suffix: 'Pinyin', type: 'pinyin', lang: 'hak' },
         mixed: { suffix: 'Mixed', type: 'mixed', lang: 'hak' },
+        trad: { suffix: 'Traditionnel', type: 'traditionnel', lang: 'hak' },
     };
 
     static ROLE_PATTERNS = {
@@ -36,6 +38,7 @@ class EafDocument {
         translation: /tradu|transl|fran[cç]|french|\bfra\b/i,
         pinyin: /pinyin|romani/i,
         mixed: /mixed|mixte/i,
+        trad: /tradition|\btrad\b|繁/i,
     };
 
     /** A new, empty .eaf (segmentation is then done in ELAN), after the
@@ -129,7 +132,8 @@ class EafDocument {
 
     roleOf(tier) {
         const text = `${tier.getAttribute('TIER_ID') || ''} ${tier.getAttribute('LINGUISTIC_TYPE_REF') || ''}`;
-        return EafDocument.ROLES.find((role) => EafDocument.ROLE_PATTERNS[role].test(text)) || null;
+        // « Hanzi traditionnel » is the traditional tier, not the Hanzi (simplified) one.
+        return ['trad', ...EafDocument.ROLES].find((role) => EafDocument.ROLE_PATTERNS[role].test(text)) || null;
     }
 
     /** (Re)builds speakers and segments from the document. */

@@ -17,11 +17,13 @@ class SaisieEntry {
     // A pending syllable (group 1, as SyllableInputModel), whitespace
     // (group 2), any other character (group 3); comments, (pins) and
     // :constraints are matched and skipped.
-    static UNIT_RE = new RegExp(`${SyllableInputModel.SYLLABLE_RE.source}|(\\s+)|([\\s\\S])`, 'gu');
+    // Only a syllable with its tone (ngai2, ngai_) waits for a character: a
+    // word without one (ma'a, tinito) is text kept as written.
+    static UNIT_RE = new RegExp(`${SyllableInputModel.TONED_SYLLABLE_RE.source}|(\\s+)|([\\s\\S])`, 'gu');
 
     constructor(dico) {
         this.dico = dico;
-        this.model = new SyllableInputModel(dico);
+        this.model = new SyllableInputModel(dico, { toneRequired: true });
         this.kind = 'word';
         this.setText('');
     }
@@ -62,7 +64,8 @@ class SaisieEntry {
             return ps.length ? pinned(h, ps.join('')) : h;
         }
         if (ps.length !== hs.length) return hs.join(' ');
-        return hs.map((h, i) => `${pinned(plain(h), ps[i])}${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
+        // A word without characters (ma'a) is stored as written, its own reading.
+        return hs.map((h, i) => Sentence.isTextWord(h) ? h : `${pinned(plain(h), ps[i])}${h.includes(':') ? `:${h.split(':').slice(1).join(':')}` : ''}`).join(' ');
     }
 
     /** A word is one token whatever spaces were typed; an expression has
@@ -169,12 +172,12 @@ class SaisieEntry {
             const best = this.sentence.matches[i]?.[0];
             const data = best?.dataset || best || {};
             const known = best && !best.isUnknown;
-            const pending = [...token.matchAll(SyllableInputModel.SYLLABLE_RE)].some((m) => m[1]);
+            const pending = [...token.matchAll(SyllableInputModel.TONED_SYLLABLE_RE)].some((m) => m[1]);
             return {
                 token,
                 hanzi: token.replace(/\([^()]*\)/g, ''),
                 plain: this.sentence.parseToken(token).hanzi,
-                pinyin: digits(known ? (Sentence.wordSyllables(data).join('') || data.pinyin) : this.sentence.resolveUnknownPinyin(token)),
+                pinyin: `${digits(known ? (Sentence.wordSyllables(data).join('') || data.pinyin) : this.sentence.resolveUnknownPinyin(token))}${Sentence.latinPunct(Sentence.splitPunct(token)[1])}`,
                 pending,
                 match: known ? data : null,
             };
@@ -237,6 +240,8 @@ class SaisieEntry {
             if (proposed) return { ...w, status: 'proposed', addition: proposed };
             // Punctuation (, 。 ? ...) is not a word to add.
             if (SaisieEntry.PUNCT_RE.test(t.plain)) return { ...w, status: 'punct' };
+            // Nor is a word written without characters (ma'a, tinito).
+            if (Sentence.isTextWord(t.plain)) return { ...w, status: 'text' };
             const same = this.sentence.findMatches(t.plain, null, null).map((m) => m.dataset || m);
             // 把:prendre while the lexicon only has 把 « classificateur »: a new sense to add.
             const sense = (this.sentence.parseToken(t.token).constraints || []).join(', ');
@@ -307,6 +312,7 @@ class SaisieEntry {
         reading: 'dans le lexique, autre lecture',
         sense: 'nouveau sens',
         punct: 'ponctuation',
+        text: 'sans caractère, gardé tel quel',
         proposed: 'déjà proposé',
         unknown: 'inconnu du lexique',
         incomplete: 'à compléter',

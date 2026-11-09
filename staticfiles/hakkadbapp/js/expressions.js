@@ -220,6 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // so a later filter/search pass reflects the latest value.
       commentaire: div.dataset.commentaire ?? "",
       excelFormat,
+      platformSplit,
+      platformId,
       useInExport: div.dataset.useInExport === "1",
       // Computed server-side (views.expressions/expression_mesh.
       // compute_export_readiness_map) from the Split's actual token
@@ -294,6 +296,12 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  // The segmentation shown read only: the saved Split, else the platform's,
+  // else the expression's own text (what the owner's editor starts from).
+  function readOnlySplit(it) {
+    return it.excelFormat || it.platformSplit || it.text || "";
+  }
+
   function cardHtml(it) {
     const vercelDecomp = it.vercelTokens.length
       ? it.vercelTokens.map((t) => renderDecompToken(t, it.componentMismatches.some((m) => m.hanzi === t.hanzi))).join("")
@@ -355,9 +363,19 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="split-analysis" data-role="split-analysis"></div>
           </div>
         </div>`
-      : `<div class="diff-field single">
+      // Read only (an editor who isn't the owner, or no platform_id): the
+      // segmentation as it stands, its correspondence recomputed on unfold.
+      : `${it.commentaire ? `<div class="diff-field single">
           <div class="field-name">Commentaire</div>
-          <div class="field-value"><span class="no-match">Pas de platform_id -- relancez <span class="mono">platform_to_vercel --yes</span></span></div>
+          <div class="field-value"><div class="val-box">${escapeHtml(it.commentaire)}</div></div>
+        </div>` : ""}
+        <div class="diff-field single">
+          <div class="field-name">Découpage</div>
+          <div class="field-value">
+            <div class="val-box hanzi mono">${escapeHtml(readOnlySplit(it)) || '<span class="no-match">&mdash;</span>'}</div>
+            <div class="split-analysis" data-role="split-analysis" data-split="${escapeAttr(readOnlySplit(it))}"></div>
+            ${it.platformId ? "" : '<span class="no-match">Pas de platform_id -- relancez <span class="mono">platform_to_vercel --yes</span></span>'}
+          </div>
         </div>`;
 
     // One table row (as on the Validation page) and, under it, its details,
@@ -368,7 +386,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <input type="checkbox" data-role="use-in-export" ${it.useInExport ? "checked" : ""} ${(!it.useInExport && !it.exportOk) ? "disabled" : ""}
             aria-label="Utiliser dans l'export">${(it.useInExport && !it.exportOk) ? " &#9888;" : ""}
         </label>` : `<span class="no-match">—</span>`;
-    const platformHanzi = (it.hanziLine || it.text || "").replace(/\s+/g, "");
+    // renderHanziLine() already runs the characters together (a word without
+    // characters, ma'a, stays apart); the raw text is the fallback.
+    const platformHanzi = it.hanziLine || (it.text || "").replace(/\s+/g, "");
     const row = `<tr class="ex-row${it.hasMismatch ? " has-mismatch" : ""}" data-index="${it.index}">
       <td class="hanzi vt-hanzi">${escapeHtml(platformHanzi)}</td>
       <td class="vt-pinyin">${escapeHtml(it.pinyinLine || "")}</td>
@@ -576,6 +596,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (textarea && analysisEl && !textarea.dataset.analysisRendered) {
           textarea.dataset.analysisRendered = "1";
           analysisEl.innerHTML = renderSplitAnalysis(textarea.value, items[i].french);
+        } else if (!textarea && analysisEl && !analysisEl.dataset.rendered) {
+          analysisEl.dataset.rendered = "1";
+          analysisEl.innerHTML = renderSplitAnalysis(analysisEl.dataset.split || "", items[i].french);
         }
       }
       return;
