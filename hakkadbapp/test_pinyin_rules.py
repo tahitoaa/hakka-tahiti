@@ -64,40 +64,53 @@ class ViolationTests(SimpleTestCase):
 
 
 class CheckPinyinTests(SimpleTestCase):
-    """« Vérifier le pinyin » (Suivi, Brouillons / À valider) on one addition, without the database."""
+    """« Vérifier le pinyin » and the « Lectures à vérifier » panel (Suivi), without the database."""
 
-    def addition(self, pinyin, status="draft"):
+    def addition(self, pinyin, kind="word"):
         from unittest import mock
 
         from hakkadbapp.models import LexiconAddition
 
-        a = LexiconAddition(id=1, hanzi="西", pinyin=pinyin, status=status, observations="Importé.")
+        a = LexiconAddition(id=1, kind=kind, hanzi="西", pinyin=pinyin, status="draft", observations="Importé.")
         a.save = mock.Mock()
         return a
 
-    def test_fixed_and_noted(self):
-        from hakkadbapp.additions import check_pinyin
+    def test_the_report_changes_nothing(self):
+        from hakkadbapp.additions import pinyin_report
 
         a = self.addition("si1")
-        report = check_pinyin(a, True, None)
-        self.assertEqual(a.pinyin, "xi1")
-        self.assertEqual(a.observations, "Importé. Lecture mise en pinyin Wenfa : si1 → xi1.")
-        a.save.assert_called_once()
-        self.assertEqual((report["fixes"], report["pending"], report["problems"]), (["si1 → xi1"], [], []))
-
-    def test_not_allowed_left_pending(self):
-        from hakkadbapp.additions import check_pinyin
-
-        a = self.addition("si1", status="validated")
-        report = check_pinyin(a, False, None)
+        report = pinyin_report(a)
         self.assertEqual(a.pinyin, "si1")
         a.save.assert_not_called()
-        self.assertEqual(report["pending"], ["si1 → xi1"])
-
-    def test_what_is_left_to_look_at(self):
-        from hakkadbapp.additions import check_pinyin
-
-        report = check_pinyin(self.addition("gok3"), True, None)
-        self.assertEqual(report["fixes"], [])
+        self.assertEqual((report["proposed"], report["fixes"], report["proposed_problems"]), ("xi1", ["si1 → xi1"], []))
         self.assertTrue(report["problems"])
-        self.assertEqual(check_pinyin(self.addition(""), True, None)["problems"], ["lecture vide"])
+
+    def test_left_to_an_editor(self):
+        from hakkadbapp.additions import pinyin_report
+
+        report = pinyin_report(self.addition("gok3"))
+        self.assertEqual(report["proposed"], "")
+        self.assertTrue(report["problems"])
+        self.assertEqual(pinyin_report(self.addition(""))["problems"], ["lecture vide"])
+        self.assertEqual(pinyin_report(self.addition("wuk5ka1"))["problems"], [])
+
+    def test_corrected_by_hand(self):
+        from hakkadbapp.additions import set_pinyin
+
+        a = self.addition("gok3")
+        set_pinyin(a, None, "gok 5")
+        self.assertEqual(a.pinyin, "gok5", "a word has no space")
+        self.assertEqual(a.observations, "Importé. Lecture corrigée après vérification : gok3 → gok5.")
+        a.save.assert_called_once()
+        b = self.addition("si1")
+        set_pinyin(b, None, "si1")
+        self.assertEqual(b.pinyin, "xi1", "what is typed is set in Wenfa's pinyin too")
+
+    def test_kept_as_it_is(self):
+        from hakkadbapp.additions import pinyin_report, set_pinyin
+
+        a = self.addition("gok3")
+        set_pinyin(a, None, keep=True)
+        self.assertEqual(a.pinyin, "gok3")
+        report = pinyin_report(a)
+        self.assertEqual((report["kept"], report["problems"], report["proposed"]), (True, [], ""))

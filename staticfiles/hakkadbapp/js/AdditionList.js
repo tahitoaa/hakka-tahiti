@@ -930,42 +930,117 @@ class ValidationTable extends AdditionList {
     }
 
     /** « Vérifier le pinyin »: the readings of `ids` (the ticked rows, else
-     *  the whole table) set in Wenfa's pinyin where the rule leaves no doubt
-     *  (additions.additions_bulk, pinyin_rules), the rest listed under the
-     *  bar; the rows still to look at end up ticked. */
+     *  the whole table) checked against Wenfa's pinyin (additions.pinyin_report);
+     *  nothing changes yet. The problematic ones go to the « Lectures à
+     *  vérifier » panel, to settle one by one, as the AI's suggestions. */
     async checkPinyin(ids, button) {
         if (!ids.length) return;
-        const esc = AdditionList.escapeHtml;
         this.setStatus('');
         await AdditionList.whileBusy(button, '🔤 Vérification…', async () => {
             try {
                 // By 500 (additions_bulk's MAX_BULK).
-                const data = { additions: [], report: [] };
+                const report = [];
                 for (let k = 0; k < ids.length; k += 500) {
                     if (ids.length > 500) this.setStatus(`🔤 ${k} sur ${ids.length}…`);
                     const part = await AdditionList.request(`${AdditionList.API}lot`, { ids: ids.slice(k, k + 500), action: 'check-pinyin' });
-                    data.additions.push(...part.additions);
-                    data.report.push(...part.report);
+                    report.push(...part.report);
                 }
-                const byId = new Map(data.additions.map((a) => [a.id, a]));
-                this.additions = this.additions.map((a) => byId.get(a.id) || a);
-                const fixed = data.report.filter((r) => r.fixes.length);
-                const left = data.report.filter((r) => r.problems.length || r.pending.length);
-                this.selected = new Set(left.map((r) => r.id));
-                this.render();
-                if (fixed.length) this.flash(fixed.map((r) => r.id));
-                const line = (r, list) => `<li><span class="hanzi">${esc(r.hanzi)}</span> ${esc(r.pinyin)} : ${list.map(esc).join(' ; ')}</li>`;
-                this.el.status.className = 'text-sm';
-                this.el.status.innerHTML = `<p>🔤 ${data.report.length} lecture${data.report.length > 1 ? 's' : ''} vérifiée${data.report.length > 1 ? 's' : ''} :
-                    ${fixed.length ? `<b>${fixed.length} corrigée${fixed.length > 1 ? 's' : ''}</b>` : 'aucune à corriger'}${
-                    left.length ? `, <b class="text-red-700">${left.length} à revoir</b> (restées cochées)` : ', toutes conformes au pinyin Wenfa'}.</p>
-                    ${fixed.length ? `<ul class="vt-pinyin-report">${fixed.map((r) => line(r, r.fixes)).join('')}</ul>` : ''}
-                    ${left.length ? `<ul class="vt-pinyin-report is-left">${left.map((r) => line(r, [...r.pending.map((p) => `${p} (réservé aux validateurs)`), ...r.problems])).join('')}</ul>` : ''}`;
+                this.pinyinItems = report.filter((r) => r.proposed || r.problems.length);
+                this.renderPinyinPanel();
+                const n = this.pinyinItems.length;
+                const checked = `🔤 ${report.length} lecture${report.length > 1 ? 's' : ''} vérifiée${report.length > 1 ? 's' : ''}`;
+                this.setStatus(n ? `${checked} : ${n} à voir dans l’encart ci-dessous.` : `${checked} : toutes conformes au pinyin Wenfa.`);
+                if (n) document.getElementById('vt-pinyin-panel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
         }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
         this.renderBar();
+    }
+
+    /** « Lectures à vérifier »: each problematic reading with the proposal
+     *  (« Appliquer »), a field to correct it by hand, « Garder tel quel ». */
+    renderPinyinPanel() {
+        const panel = document.getElementById('vt-pinyin-panel');
+        if (!panel) return;
+        if (!panel.dataset.bound) {
+            panel.dataset.bound = '1';
+            panel.addEventListener('click', (event) => {
+                const b = event.target.closest('[data-vp]');
+                if (b) this.onPinyinAction(b);
+            });
+            panel.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' || !event.target.matches('[data-vp-input]')) return;
+                event.preventDefault();
+                event.target.closest('.vp-item')?.querySelector('[data-vp="save"]')?.click();
+            });
+        }
+        const items = this.pinyinItems || [];
+        panel.hidden = !items.length;
+        if (!items.length) { panel.innerHTML = ''; return; }
+        const esc = AdditionList.escapeHtml;
+        const show = (p) => esc(AdditionList.superscriptTones(p));
+        const safe = items.filter((r) => r.proposed && !r.proposed_problems.length).length;
+        const head = `<div class="vp-head">
+              <b>🔤 Lectures à vérifier</b> <span class="vp-n">${items.length}</span>
+              ${safe ? `<button type="button" class="saisie-btn saisie-btn-validate" data-vp="apply-all"
+                  title="Applique les corrections proposées qui ne laissent plus rien à revoir">✓ Appliquer les ${safe} correction${safe > 1 ? 's' : ''} sûre${safe > 1 ? 's' : ''}</button>` : ''}
+              <button type="button" class="vp-close" data-vp="close" aria-label="Fermer l’encart">✕</button>
+            </div>
+            <p class="vp-sub">Pinyin Wenfa (guide de Wen Fa) : appliquez la proposition, corrigez à la main (Entrée enregistre),
+              ou gardez la lecture telle quelle — elle ne sera plus signalée.</p>`;
+        const item = (r) => `<li class="vp-item" data-vp-id="${r.id}">
+              <div class="vp-reading"><span class="hanzi">${esc(r.hanzi)}</span>
+                ${r.proposed ? `<del>${show(r.pinyin)}</del> <span aria-hidden="true">→</span> <ins>${show(r.proposed)}</ins>`
+                    : `<span class="vp-now">${r.pinyin ? show(r.pinyin) : '<i>lecture vide</i>'}</span>`}</div>
+              <ul class="vp-problems">${(r.proposed ? [...r.fixes, ...r.proposed_problems] : r.problems).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+              <div class="vp-actions">
+                ${r.proposed ? '<button type="button" class="saisie-btn saisie-btn-validate" data-vp="apply">✓ Appliquer</button>' : ''}
+                <input type="text" data-vp-input value="${esc(r.proposed || r.pinyin)}" autocapitalize="off" spellcheck="false"
+                  aria-label="Lecture de ${esc(r.hanzi)}">
+                <button type="button" class="saisie-btn saisie-btn-neutral" data-vp="save">✎ Corriger</button>
+                <button type="button" class="saisie-btn saisie-btn-neutral" data-vp="keep" title="La lecture est juste : elle ne sera plus signalée">Garder tel quel</button>
+              </div></li>`;
+        panel.innerHTML = `${head}<ul class="vp-list">${items.map(item).join('')}</ul>`;
+    }
+
+    /** One item of the panel settled (or all the safe proposals at once). */
+    async onPinyinAction(button) {
+        const action = button.dataset.vp;
+        if (action === 'close') { this.pinyinItems = []; this.renderPinyinPanel(); return; }
+        const item = button.closest('.vp-item');
+        const id = Number(item?.dataset.vpId);
+        let payload;
+        if (action === 'apply-all') {
+            const ids = (this.pinyinItems || []).filter((r) => r.proposed && !r.proposed_problems.length).map((r) => r.id);
+            payload = { ids, action: 'apply-pinyin' };
+        } else if (action === 'apply') payload = { ids: [id], action: 'apply-pinyin' };
+        else if (action === 'keep') payload = { ids: [id], action: 'set-pinyin', keep: true };
+        else if (action === 'save') payload = { ids: [id], action: 'set-pinyin', pinyin: item.querySelector('[data-vp-input]').value };
+        else return;
+        const panel = document.getElementById('vt-pinyin-panel');
+        await AdditionList.whileBusy(button, '…', async () => {
+            try {
+                const data = await AdditionList.request(`${AdditionList.API}lot`, payload);
+                const byId = new Map(data.additions.map((a) => [a.id, a]));
+                this.additions = this.additions.map((a) => byId.get(a.id) || a);
+                const now = new Map(data.report.map((r) => [r.id, r]));
+                // Settled: nothing left (or kept as it is); else it stays, with what is left.
+                this.pinyinItems = (this.pinyinItems || [])
+                    .map((r) => (now.has(r.id) ? now.get(r.id) : r))
+                    .filter((r) => r.proposed || r.problems.length);
+                this.render();
+                this.flash(data.additions.map((a) => a.id));
+                this.renderPinyinPanel();
+                const left = data.report.filter((r) => r.problems.length);
+                const done = data.additions.length > 1 ? `${data.additions.length} lectures corrigées` : 'Lecture corrigée';
+                if (action === 'keep') this.setStatus('✓ Lecture gardée telle quelle : elle ne sera plus signalée.');
+                else if (left.length) this.setStatus(`Enregistré, mais encore à revoir : ${left.map((r) => `${r.hanzi} (${r.problems.join(' ; ')})`).join(', ')}.`, true);
+                else this.setStatus(`✓ ${done}.`);
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        }, panel ? [...panel.querySelectorAll('button')] : []);
     }
 
     /** « Compléter tout »: the empty fields of these additions filled with the

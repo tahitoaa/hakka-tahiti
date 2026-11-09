@@ -365,22 +365,44 @@ def additions_rename_source(request):
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})
 
 
-def check_pinyin(addition, may_fix, user):
-    """« Vérifier le pinyin » for one addition: its reading set in Wenfa's
-    pinyin where the rule leaves no doubt (saved, with a note in the
-    observations) when `may_fix`; returns {id, hanzi, pinyin, fixes (done),
-    pending (not allowed), problems (left to look at)}."""
-    fixed, fixes = pinyin_rules.normalize(addition.pinyin)
-    applied = bool(fixes) and may_fix
-    if applied:
-        note = pinyin_rules.normalize_note(fixes)
-        addition.pinyin = fixed
-        addition.observations = f"{addition.observations.strip()} {note[:1].upper()}{note[1:]}.".strip()
-        addition.updated_by = user
-        addition.save(update_fields=["pinyin", "observations", "updated_by", "updated_at"])
-    return {"id": addition.id, "hanzi": addition.hanzi, "pinyin": addition.pinyin,
-            "fixes": fixes if applied else [], "pending": [] if applied else fixes,
-            "problems": pinyin_rules.violations(addition.pinyin) if addition.pinyin.strip() else ["lecture vide"]}
+# « Garder tel quel » in the « Lectures à vérifier » panel: the reading isn't reported again.
+KEPT_READING = "Lecture gardée telle quelle après vérification : {}."
+
+
+def pinyin_report(addition):
+    """What « Vérifier le pinyin » says of one addition, without changing
+    it: {id, hanzi, pinyin, proposed (Wenfa's pinyin where the rule leaves no
+    doubt, '' if nothing to change), fixes, problems (of the reading as it
+    is), proposed_problems (left after the proposal), kept}. A reading an
+    editor chose to keep as it is counts as checked."""
+    pinyin = addition.pinyin or ""
+    fixed, fixes = pinyin_rules.normalize(pinyin)
+    kept = bool(pinyin.strip()) and KEPT_READING.format(pinyin) in (addition.observations or "")
+    return {"id": addition.id, "hanzi": addition.hanzi, "pinyin": pinyin, "kept": kept,
+            "proposed": fixed if fixes and not kept else "", "fixes": [] if kept else fixes,
+            "problems": [] if kept else (pinyin_rules.violations(pinyin) if pinyin.strip() else ["lecture vide"]),
+            "proposed_problems": pinyin_rules.violations(fixed) if fixes and not kept else []}
+
+
+def set_pinyin(addition, user, pinyin=None, keep=False):
+    """An item of the « Lectures à vérifier » panel settled: `keep` the
+    reading as it is (noted, never reported again), or the reading
+    `pinyin` (set in Wenfa's pinyin, the change noted in the observations)."""
+    old = addition.pinyin or ""
+    if keep:
+        note = KEPT_READING.format(old)
+    else:
+        new, _fixes = pinyin_rules.normalize(" ".join(str(pinyin or "").split()))
+        if addition.kind == LexiconAddition.KIND_WORD:
+            new = "".join(new.split())
+        if new == old:
+            return addition
+        addition.pinyin = new
+        note = f"Lecture corrigée après vérification : {old or '(vide)'} → {new}."
+    addition.observations = f"{(addition.observations or '').strip()} {note}".strip()
+    addition.updated_by = user
+    addition.save(update_fields=["pinyin", "observations", "updated_by", "updated_at"])
+    return addition
 
 
 @require_POST
@@ -409,13 +431,30 @@ def additions_bulk(request):
         return JsonResponse({"ok": True, "deleted": sorted(set(ids))})
 
     if payload.get("action") == "check-pinyin":
-        # Fixed where the rule leaves no doubt (si1 -> xi1, sit7 -> xit5), noted in the
-        # observations; the rest reported. A decided addition only by a validator.
+        # A report only: nothing changes until an editor settles each item.
+        report = [r for r in map(pinyin_report, additions)]
+        return JsonResponse({"ok": True, "report": report})
+
+    if payload.get("action") in ("set-pinyin", "apply-pinyin"):
+        # « Lectures à vérifier »: one reading corrected or kept as it is
+        # ({ids: [id], pinyin} / {ids: [id], keep: true}), or the proposals
+        # of these additions applied ({ids}). A decided addition only by a validator.
         decided = (LexiconAddition.STATUS_VALIDATED, LexiconAddition.STATUS_REJECTED)
-        may_fix = lambda a: a.status not in decided or is_validator(request.user)
+        if not is_validator(request.user) and any(a.status in decided for a in additions):
+            return JsonResponse({"error": "Seuls les validateurs peuvent modifier un ajout validé ou rejeté."}, status=403)
+        if payload["action"] == "set-pinyin":
+            if len(additions) != 1 or not (payload.get("keep") is True or isinstance(payload.get("pinyin"), str)):
+                return JsonResponse({"error": "Demande invalide."}, status=400)
         with transaction.atomic():
-            report = [check_pinyin(a, may_fix(a), request.user) for a in additions]
-        return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions], "report": report})
+            for a in additions:
+                if payload["action"] == "apply-pinyin":
+                    proposed = pinyin_report(a)["proposed"]
+                    if proposed:
+                        set_pinyin(a, request.user, proposed)
+                else:
+                    set_pinyin(a, request.user, payload.get("pinyin"), keep=payload.get("keep") is True)
+        return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions],
+                             "report": [pinyin_report(a) for a in additions]})
 
     if payload.get("action") == "toggle-kind":
         from .assistant import known_words
