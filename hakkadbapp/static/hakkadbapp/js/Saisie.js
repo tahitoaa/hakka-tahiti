@@ -476,6 +476,7 @@ class SaisieEntry {
                 const b = event.target.closest('[data-nav]');
                 if (b) this.go(Number(b.dataset.nav));
             });
+            document.addEventListener('keydown', (event) => this.onKey(event));
             this.suggestionBar = new SuggestionBar(this.el.suggestions, {
                 onSelect: (index) => this.pickSuggestion(index),
                 onUnknown: () => { if (this.entry.unknown(this.active)) this.afterChange(); },
@@ -1118,7 +1119,7 @@ class SaisieEntry {
             // A validator relisting « À valider » validates from here.
             const validate = document.getElementById('saisie-validate');
             if (validate) validate.hidden = !(addition.status === 'review' && AdditionList.canValidate());
-            this.renderReviewNav();
+            this.renderReviewNav();      // (after the validate button: the keys shown follow it)
             this.openedState = this.formState();
             this.el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
             this.el.text.focus();
@@ -1138,10 +1139,42 @@ class SaisieEntry {
             box.hidden = !r;
             if (!r) { box.innerHTML = ''; return; }
             const esc = escapeHtml;
-            box.innerHTML = `<a href="${esc(r.back)}">← Retour au tableau${r.label ? ` (${esc(r.label)})` : ''}</a>
+            box.innerHTML = `<a href="${esc(r.back)}" title="Alt+T">← Retour au tableau${r.label ? ` (${esc(r.label)})` : ''}</a>
                 <span class="rn-pos">${r.index + 1} / ${r.ids.length}</span>
-                <button type="button" data-nav="-1" ${r.index ? '' : 'disabled'} title="Élément précédent">‹ Précédent</button>
-                <button type="button" data-nav="1" ${r.index < r.ids.length - 1 ? '' : 'disabled'} title="Élément suivant">Suivant ›</button>`;
+                <button type="button" data-nav="-1" ${r.index ? '' : 'disabled'} title="Élément précédent (Alt+↑)">‹ Précédent</button>
+                <button type="button" data-nav="1" ${r.index < r.ids.length - 1 ? '' : 'disabled'} title="Élément suivant (Alt+↓)">Suivant ›</button>
+                <span class="rn-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> précédent / suivant ·
+                  <kbd>Ctrl</kbd>+<kbd>S</kbd> enregistrer${document.getElementById('saisie-validate')?.hidden === false
+                    ? ' · <kbd>Alt</kbd>+<kbd>V</kbd> valider' : ''} · <kbd>Alt</kbd>+<kbd>T</kbd> tableau</span>`;
+        }
+
+        /** Keys (computer): Ctrl+S saves (« Enregistrer », the first button),
+         *  Alt+V saves and validates (validators, « À valider »); from Suivi,
+         *  Alt+↓ / Alt+Page↓ next, Alt+↑ / Alt+Page↑ previous, Alt+T back to
+         *  the table. Not Alt+← →: the browser's back and forward. */
+        onKey(event) {
+            if (event.repeat) return;
+            const submit = (button) => {
+                if (!button || button.hidden || button.disabled) return;
+                event.preventDefault();
+                this.el.form.requestSubmit(button);
+            };
+            if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === 'KeyS') {
+                submit(this.el.form.querySelector('button[type="submit"]'));
+                return;
+            }
+            if (!event.altKey || event.ctrlKey || event.metaKey) return;
+            if (event.code === 'KeyV') { submit(document.getElementById('saisie-validate')); return; }
+            const r = this.review();
+            if (!r) return;
+            const step = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1 }[event.key];
+            if (step) { event.preventDefault(); this.go(step); return; }
+            if (event.code === 'KeyT') {
+                event.preventDefault();
+                if (this.openedState && this.formState() !== this.openedState
+                    && !confirm('Les modifications de cet ajout ne sont pas enregistrées : les abandonner ?')) return;
+                window.location.href = r.back;
+            }
         }
 
         /** What the form holds, to tell whether it changed since opened. */
