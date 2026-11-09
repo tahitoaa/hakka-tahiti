@@ -470,6 +470,12 @@ class SaisieEntry {
                 onRemove: (id) => { if (this.editingId === id) this.resetForm(); },
             });
             this.kindButtons = [...this.el.form.querySelectorAll('[data-kind]')];
+            // Opened from Suivi (✎): the rows of that table, to go through.
+            try { this.reviewNav = JSON.parse(sessionStorage.getItem(AdditionList.REVIEW_KEY) || 'null'); } catch (e) { this.reviewNav = null; }
+            document.getElementById('saisie-review-nav')?.addEventListener('click', (event) => {
+                const b = event.target.closest('[data-nav]');
+                if (b) this.go(Number(b.dataset.nav));
+            });
             this.suggestionBar = new SuggestionBar(this.el.suggestions, {
                 onSelect: (index) => this.pickSuggestion(index),
                 onUnknown: () => { if (this.entry.unknown(this.active)) this.afterChange(); },
@@ -1014,6 +1020,18 @@ class SaisieEntry {
                     (data.words || []).forEach((w) => this.list.upsert(w));
                     this.list.upsert(data.addition);
                     this.list.flash([data.addition, ...(data.words || [])].map((a) => a.id));
+                    // Going through a Suivi table: on to its next row, or back to it after the last.
+                    const r = this.review(data.addition.id);
+                    if (r) {
+                        const what = status === 'validated' ? 'Validé' : 'Enregistré';
+                        if (this.go(1, { force: true })) {
+                            this.setStatus(`✓ ${what}. Élément suivant (${r.index + 2} / ${r.ids.length}).`);
+                        } else {
+                            this.setStatus(`✓ ${what}. C’était le dernier : retour au tableau…`);
+                            setTimeout(() => { window.location.href = r.back; }, 700);
+                        }
+                        return;
+                    }
                     const proposed = status === 'review' && this.editingStatus !== 'review';
                     this.resetForm();
                     const added = (data.words || []).length;
@@ -1051,8 +1069,56 @@ class SaisieEntry {
             this.el.themes.value = addition.themes;
             this.el.observations.value = addition.observations;
             this.setStatus('');
+            // A validator relisting « À valider » validates from here.
+            const validate = document.getElementById('saisie-validate');
+            if (validate) validate.hidden = !(addition.status === 'review' && AdditionList.canValidate());
+            this.renderReviewNav();
+            this.openedState = this.formState();
             this.el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
             this.el.text.focus();
+        }
+
+        /** The Suivi rows this addition is one of: {ids, back, label, index}, or null. */
+        review(id = this.editingId) {
+            const nav = this.reviewNav;
+            const index = nav && id ? nav.ids.indexOf(id) : -1;
+            return index >= 0 ? { ...nav, index } : null;
+        }
+
+        renderReviewNav() {
+            const box = document.getElementById('saisie-review-nav');
+            if (!box) return;
+            const r = this.review();
+            box.hidden = !r;
+            if (!r) { box.innerHTML = ''; return; }
+            const esc = escapeHtml;
+            box.innerHTML = `<a href="${esc(r.back)}">← Retour au tableau${r.label ? ` (${esc(r.label)})` : ''}</a>
+                <span class="rn-pos">${r.index + 1} / ${r.ids.length}</span>
+                <button type="button" data-nav="-1" ${r.index ? '' : 'disabled'} title="Élément précédent">‹ Précédent</button>
+                <button type="button" data-nav="1" ${r.index < r.ids.length - 1 ? '' : 'disabled'} title="Élément suivant">Suivant ›</button>`;
+        }
+
+        /** What the form holds, to tell whether it changed since opened. */
+        formState() {
+            return JSON.stringify([this.el.text.value, this.el.french.value, this.el.english.value, this.el.themes.value,
+                this.el.observations.value, this.kind]);
+        }
+
+        /** The previous / next row of the Suivi table (the ones deleted since skipped). */
+        go(delta, { force = false } = {}) {
+            const r = this.review();
+            if (!r) return false;
+            if (!force && this.openedState && this.formState() !== this.openedState
+                && !confirm('Les modifications de cet ajout ne sont pas enregistrées : les abandonner ?')) return false;
+            for (let i = r.index + delta; i >= 0 && i < r.ids.length; i += delta) {
+                const a = this.additions.find((x) => x.id === r.ids[i]);
+                if (a) {
+                    this.edit(a);
+                    window.history.replaceState(null, '', `${window.location.pathname}?modifier=${a.id}`);
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** "Enregistrer" saves with `status`; "proposer" only for a draft. */
@@ -1068,6 +1134,9 @@ class SaisieEntry {
 
         resetForm() {
             this.editingId = null;
+            this.openedState = null;
+            const validate = document.getElementById('saisie-validate');
+            if (validate) validate.hidden = true;
             this.editingStatus = null;
             this.el.title.textContent = 'Nouvel ajout';
             this.el.cancel.hidden = true;
@@ -1078,6 +1147,7 @@ class SaisieEntry {
             this.newWords.clear();
             this.active = 0;
             this.updateText();
+            this.renderReviewNav();
         }
     }
 

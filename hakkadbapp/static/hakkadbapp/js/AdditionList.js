@@ -329,6 +329,14 @@ class AdditionList {
 
     /** Member of « Validateurs » (permissions.is_validator): may validate,
      *  reject, or take an addition out of those statuses. The server checks too. */
+    /** ✎ from Suivi: the rows of the table (in its order) and the way
+     *  back, for the Saisie's « Retour au tableau / ‹ Précédent / Suivant › ». */
+    static REVIEW_KEY = 'hakka-review-nav';
+
+    static rememberReview(ids, back, label) {
+        try { sessionStorage.setItem(AdditionList.REVIEW_KEY, JSON.stringify({ ids, back, label })); } catch (e) { /* private mode */ }
+    }
+
     static canValidate() {
         return typeof document !== 'undefined' && document.body?.dataset?.canValidate === '1';
     }
@@ -1261,11 +1269,9 @@ class ValidationShow {
         this.busy = false;
         document.getElementById('vs-open').addEventListener('click', () => this.open());
         this.dialog.addEventListener('click', (e) => this.onClick(e));
-        this.dialog.addEventListener('keydown', (e) => {
-            if (e.repeat || this.editing || e.target.closest('input, textarea')) return;
-            if (e.key === 'ArrowRight') { e.preventDefault(); this.move(1); }
-            if (e.key === 'ArrowLeft') { e.preventDefault(); this.move(-1); }
-        });
+        // On the whole page while it is open: each card replaces the focused
+        // button, and keys stopped there never reached the dialog.
+        document.addEventListener('keydown', (e) => this.onKey(e));
         let x0 = null;
         this.card.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
         this.card.addEventListener('touchend', (e) => {
@@ -1278,6 +1284,28 @@ class ValidationShow {
 
     current() {
         return this.table.additions.find((a) => a.id === this.ids[this.pos]);
+    }
+
+    /** Keys (computer): ← → (and ↑ ↓, Page↑ Page↓) previous / next, Début / Fin
+     *  first / last, V valider, R rejeter, E corriger, C commenter, B brouillon;
+     *  Échap closes (the dialog's own). Not while typing a correction or a comment. */
+    onKey(e) {
+        if (!this.dialog.open || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (this.editing || this.commenting || e.target.closest?.('input, textarea, select')) return;
+        const step = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1 }[e.key];
+        if (step) { e.preventDefault(); this.move(step); return; }
+        if (e.key === 'Home' || e.key === 'End') {
+            e.preventDefault();
+            this.move(e.key === 'Home' ? -this.pos : this.ids.length - 1 - this.pos);
+            return;
+        }
+        const target = { v: '[data-vs-status="validated"]', r: '[data-vs-status="rejected"]', b: '[data-vs-status="draft"]',
+            e: '[data-vs="edit"]', c: '[data-vs="comment"]' }[e.key.toLowerCase()];
+        const button = target && this.dialog.querySelector(target);
+        if (button && !button.hidden && !button.disabled && button.offsetParent !== null) {
+            e.preventDefault();
+            button.click();
+        }
     }
 
     open(startId = null) {
@@ -1981,7 +2009,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // ?etape=brouillons (the old « Brouillons » page) opens that step.
         filter: ({ brouillons: 'draft', valides: 'validated', rejetes: 'rejected' })[new URLSearchParams(location.search).get('etape')] || 'review',
         empty: 'Rien à afficher à cette étape.',
-        onEdit: (a) => { window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`; },
+        onEdit: (a) => {
+            // The Saisie then goes through this table: its rows, and back to this step.
+            const steps = { draft: 'brouillons', validated: 'valides', rejected: 'rejetes', review: 'a-valider' };
+            const labels = { draft: 'Brouillons', review: 'À valider', validated: 'Validés', rejected: 'Rejetés' };
+            const ids = table.visible().map((x) => x.id);
+            AdditionList.rememberReview(ids.includes(a.id) ? ids : [a.id],
+                `${location.pathname}${steps[table.filter] ? `?etape=${steps[table.filter]}` : ''}`, labels[table.filter] || 'Suivi');
+            window.location.href = `${root.dataset.saisieUrl}?modifier=${a.id}`;
+        },
     });
     table.saisieUrl = root.dataset.saisieUrl;
     window.validationTable = table;

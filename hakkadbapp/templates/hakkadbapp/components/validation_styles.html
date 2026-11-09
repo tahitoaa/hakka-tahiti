@@ -6,6 +6,11 @@
             padding: 0.6rem 0.75rem; background: #fff; border: 1px solid #DDD0BD; border-radius: 0.75rem;
             box-shadow: 0 2px 6px rgb(0 0 0 / .06); }
   .vt-bar .vt-count { font-weight: 600; color: #544D45; margin-right: auto; min-width: 9rem; }
+  /* The slideshow's keys, on a computer only. */
+  .vs-keys { margin: 0.4rem 0 0; text-align: center; font-size: 0.75rem; color: #6E665C; }
+  .vs-keys kbd { display: inline-block; min-width: 1.4em; padding: 0 0.3em; border: 1px solid #DDD0BD; border-bottom-width: 2px;
+                 border-radius: 0.3rem; background: #FDFAF5; font: 600 0.7rem/1.5 ui-monospace, monospace; }
+  @media (hover: none), (max-width: 640px) { .vs-keys { display: none; } }
   /* A draft's hakka edited from its Saisie text (ValidationTable.editText). */
   .vt-text-edit { display: grid; gap: 0.2rem; min-width: min(20rem, 80vw); text-align: left; }
   .vt-text-edit input { width: 100%; }

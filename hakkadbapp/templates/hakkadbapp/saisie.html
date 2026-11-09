@@ -97,6 +97,15 @@
   .saisie-ai-conf-moyenne { background: #fef3c7; color: #92400e; }
   .saisie-ai-conf-basse { background: #fee2e2; color: #991b1b; }
   input.is-ai { background: #f5f0ff; border-color: #a78bfa; }
+  /* Relecture from Suivi: always in reach while going through the table. */
+  .saisie-review-nav { position: sticky; top: 0.25rem; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+                       padding: 0.4rem 0.6rem; background: #fff; border: 1px solid #ECE2D3; border-left: 4px solid #9B1C1C; border-radius: 0.75rem;
+                       box-shadow: 0 2px 8px rgb(0 0 0 / .06); }
+  .saisie-review-nav[hidden] { display: none; }
+  .saisie-review-nav a { font-weight: 600; color: #9B1C1C; }
+  .saisie-review-nav .rn-pos { margin-left: auto; font-size: 0.85rem; color: #6E665C; font-variant-numeric: tabular-nums; }
+  .saisie-review-nav button { min-height: 2.25rem; padding: 0 0.8rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-weight: 600; }
+  .saisie-review-nav button:disabled { opacity: 0.4; }
   @media (max-width: 480px) { .saisie-ai-row { grid-template-columns: minmax(0, 1fr) auto; } .saisie-ai-row b { grid-column: 1 / -1; } }
 </style>
 
@@ -110,6 +119,9 @@
       {% include "hakkadbapp/components/reading_settings.html" %}
     </div>
   </details>
+
+  <!-- Opened from Suivi (✎): back to the table, previous / next of its rows (SaisiePage.renderReviewNav). -->
+  <nav id="saisie-review-nav" class="saisie-review-nav" aria-label="Relecture" hidden></nav>
 
   <!-- 1. Form -->
   <form id="saisie-form" data-validation-url="{% url 'validation' %}" class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5 space-y-4" autocomplete="off">
@@ -199,6 +211,8 @@
               title="Envoyer à la validation (Charles valide ou rejette)">
         ↑ Proposer à la validation
       </button>
+      <button type="submit" data-status="validated" id="saisie-validate" hidden class="saisie-btn saisie-btn-lg saisie-btn-validate"
+              title="Enregistrer les modifications et valider cet ajout">✓ Enregistrer et valider</button>
       <button type="button" id="saisie-copy" class="saisie-btn saisie-btn-lg saisie-btn-neutral" title="Copier dans le presse-papiers">📋 Copier</button>
       <button type="button" id="saisie-cancel" hidden class="saisie-btn saisie-btn-lg saisie-btn-neutral">
         Annuler
