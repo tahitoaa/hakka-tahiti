@@ -10,6 +10,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.db import transaction
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_POST
 
 from .ai import ai_enabled
@@ -207,6 +208,26 @@ def validation(request):
         "status_choices": [c for c in LexiconAddition.STATUS_CHOICES if c[0] != LexiconAddition.STATUS_DRAFT],
         "status_labels": dict(LexiconAddition.STATUS_CHOICES),
     })
+
+
+@gzip_page
+@editor_required
+def lexicon_data(request):
+    """The lexicon's readings and words (components/data.html), alone: the
+    Suivi page loads them the first time a hakka is edited there, to read
+    the Saisie text as the Saisie does (SaisieEntry)."""
+    from django.db.models import Prefetch
+
+    from .models import Pronunciation, WordPronunciation
+
+    word_prons = WordPronunciation.objects.select_related("pronunciation__initial", "pronunciation__final",
+                                                          "pronunciation__tone")
+    response = render(request, "hakkadbapp/components/data.html", {
+        "pronunciations": Pronunciation.objects.select_related("initial", "final", "tone").all(),
+        "words": Word.objects.prefetch_related(Prefetch("wordpronunciation_set", queryset=word_prons)),
+    })
+    response["Cache-Control"] = "private, max-age=300"
+    return response
 
 
 def drafts(request):

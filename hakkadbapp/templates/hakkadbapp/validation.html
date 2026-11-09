@@ -4,7 +4,7 @@
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 {% include "hakkadbapp/components/validation_styles.html" %}
 
-<div id="validation-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
+<div id="validation-page" data-saisie-url="{% url 'saisie' %}" data-lexicon-url="{% url 'lexicon_data' %}" data-js="{% static 'hakkadbapp/js/' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
   {% include "hakkadbapp/components/members_tabs.html" %}
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3"><h2 class="font-display text-xl font-bold text-gray-800">Suivi des ajouts</h2>

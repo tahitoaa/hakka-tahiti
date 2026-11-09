@@ -586,6 +586,8 @@ class ValidationTable extends AdditionList {
         const a = this.additions.find((x) => x.id === id);
         if (!a) return;
         const field = span.dataset.edit;
+        // The characters and the reading are computed from the Saisie text: that is what is edited.
+        if (field === 'hanzi' || field === 'pinyin') { this.editText(span, a); return; }
         const input = document.createElement('input');
         input.type = 'text';
         input.value = a[field] || '';
@@ -618,6 +620,117 @@ class ValidationTable extends AdditionList {
             if (event.key === 'Escape') { event.preventDefault(); finish(false); }
         });
         input.addEventListener('blur', () => finish(true));
+    }
+
+    /** The lexicon and the Saisie's reading of a text (SaisieEntry), loaded
+     *  the first time a hakka is edited here: components/data.html
+     *  (additions.lexicon_data) and the Saisie's scripts. */
+    lexiconEntry() {
+        if (this._entry) return this._entry;
+        const root = document.getElementById('validation-page');
+        const base = root?.dataset.js || '/static/hakkadbapp/js/';
+        const load = (file) => new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = `${base}${file}`;
+            s.onload = resolve;
+            s.onerror = () => reject(new Error(`${file} introuvable`));
+            document.head.append(s);
+        });
+        this._entry = (async () => {
+            const r = await fetch(root?.dataset.lexiconUrl || '/api/lexique-donnees', { credentials: 'same-origin' });
+            if (!r.ok) throw new Error(`lexique indisponible (${r.status})`);
+            const box = document.createElement('div');
+            box.hidden = true;
+            box.innerHTML = await r.text();
+            document.body.append(box);
+            // In the Saisie's order: each needs the ones before it.
+            for (const [name, file] of [['Word', 'Word.js'], ['Sentence', 'Sentence.js'], ['Dictionary', 'Dictionary.js'],
+                ['Pronunciation', 'Pronunciation.js'], ['SyllableInputModel', 'CharacterInput.js'], ['SaisieEntry', 'Saisie.js']]) {
+                // eslint-disable-next-line no-new-func
+                if (!new Function(`return typeof ${name} !== 'undefined'`)()) await load(file);
+            }
+            // eslint-disable-next-line no-new-func
+            const Entry = new Function('return SaisieEntry')();
+            // eslint-disable-next-line no-new-func
+            const Dict = new Function('return Dictionary')();
+            return new Entry(new Dict({ containerId: '#pron-list', itemSelector: 'li' }));
+        })();
+        this._entry.catch(() => { this._entry = null; });
+        return this._entry;
+    }
+
+    /** The hakka of a draft edited as in the Saisie: its text (characters
+     *  with their pinned readings, «text», :sense), the characters and the
+     *  reading recomputed as it is typed; Enter saves all three. */
+    async editText(span, a) {
+        const esc = AdditionList.escapeHtml;
+        const cell = span.closest('td');
+        const box = document.createElement('div');
+        box.className = 'vt-text-edit';
+        box.innerHTML = '<span class="vt-sub">Chargement du lexique…</span>';
+        span.replaceWith(box);
+        let entry;
+        try {
+            entry = await this.lexiconEntry();
+        } catch (err) {
+            this.setStatus(`Échec : ${err.message}`, true);
+            this.render();
+            return;
+        }
+        const text = a.input_text || SaisieEntry.textFromStored(a.hanzi, a.pinyin, a.kind, entry.dico);
+        box.innerHTML = `<label class="vt-sub" for="vt-text-${a.id}">Texte de saisie</label>
+            <input id="vt-text-${a.id}" type="text" class="vt-edit-input is-hakka" value="${esc(text)}" autocapitalize="off" spellcheck="false">
+            <div class="vt-text-out" aria-live="polite"></div>
+            <div class="vt-sub">Entrée enregistre, Échap annule · <a class="underline" href="${esc(this.saisieUrl || '')}?modifier=${a.id}">ouvrir dans la Saisie</a> (suggestions de caractères)</div>`;
+        const input = box.querySelector('input');
+        const out = box.querySelector('.vt-text-out');
+        const show = () => {
+            entry.setText(input.value, a.kind);
+            const v = entry.values();
+            const problem = entry.problem();
+            out.innerHTML = `<span class="hanzi">${esc(AdditionList.platformHanzi(v.hanzi)) || '—'}</span>
+                <span>${esc(AdditionList.platformPinyin(v.pinyin)) || '—'}</span>
+                ${problem ? `<div class="vt-text-problem">⚠ ${esc(problem)}</div>` : ''}`;
+            return { v, problem };
+        };
+        show();
+        input.addEventListener('input', show);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        let done = false;
+        const finish = async (save) => {
+            if (done) return;
+            const { v, problem } = show();
+            const unchanged = input.value.trim() === text.trim();
+            if (save && !unchanged && problem) {
+                // Not saved while something is missing: the field stays open.
+                input.focus();
+                return;
+            }
+            done = true;
+            if (!save || unchanged) { this.render(); return; }
+            try {
+                const data = await AdditionList.request(`${AdditionList.API}${a.id}`,
+                    { input_text: input.value.trim(), hanzi: v.hanzi, pinyin: v.pinyin });
+                this.upsert(data.addition);
+                this.flash([a.id]);
+                this.setStatus('');
+            } catch (err) {
+                this.setStatus(`Échec : ${err.message}`, true);
+                this.render();
+            }
+        };
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+            if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+        });
+        // Leaving the field: saved when complete, else left as it was.
+        input.addEventListener('blur', () => setTimeout(() => {
+            if (done || box.contains(document.activeElement)) return;
+            const { problem } = show();
+            finish(!problem);
+        }, 150));
+        cell?.classList.add('is-editing-text');
     }
 
     /** The status filter and the search (AdditionList), without the facets. */
