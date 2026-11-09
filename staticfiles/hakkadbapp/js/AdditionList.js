@@ -760,7 +760,9 @@ class ValidationTable extends AdditionList {
             // Nothing to do when every ticked row already has that status;
             // only drafts and rejected additions can be deleted.
             if (action === 'check-pinyin') {
-                b.disabled = !n;
+                // Nothing ticked: the whole table (this step, tab and filters).
+                b.disabled = !visible.length;
+                b.textContent = n ? `🔤 Vérifier le pinyin (${n})` : `🔤 Vérifier tout le pinyin (${visible.length})`;
                 return;
             }
             if (action === 'ai-review') {
@@ -894,7 +896,9 @@ class ValidationTable extends AdditionList {
     async bulk(action, button) {
         if (action === 'ai-review') return this.aiReview(button);
         if (action === 'complete') return this.complete([...this.selected], button);
-        if (action === 'check-pinyin') return this.checkPinyin([...this.selected], button);
+        if (action === 'check-pinyin') {
+            return this.checkPinyin(this.selected.size ? [...this.selected] : this.visible().map((a) => a.id), button);
+        }
         const ids = [...this.selected];
         if (!ids.length) return;
         if (action === 'delete' && !confirm(`Supprimer ${ids.length} ajout${ids.length > 1 ? 's' : ''} ? C'est définitif.`)) return;
@@ -925,16 +929,24 @@ class ValidationTable extends AdditionList {
         this.renderBar();
     }
 
-    /** « Vérifier le pinyin »: the readings set in Wenfa's pinyin where the
-     *  rule leaves no doubt (additions.additions_bulk, pinyin_rules), the
-     *  rest listed under the bar; the rows still to look at stay ticked. */
+    /** « Vérifier le pinyin »: the readings of `ids` (the ticked rows, else
+     *  the whole table) set in Wenfa's pinyin where the rule leaves no doubt
+     *  (additions.additions_bulk, pinyin_rules), the rest listed under the
+     *  bar; the rows still to look at end up ticked. */
     async checkPinyin(ids, button) {
         if (!ids.length) return;
         const esc = AdditionList.escapeHtml;
         this.setStatus('');
         await AdditionList.whileBusy(button, '🔤 Vérification…', async () => {
             try {
-                const data = await AdditionList.request(`${AdditionList.API}lot`, { ids, action: 'check-pinyin' });
+                // By 500 (additions_bulk's MAX_BULK).
+                const data = { additions: [], report: [] };
+                for (let k = 0; k < ids.length; k += 500) {
+                    if (ids.length > 500) this.setStatus(`🔤 ${k} sur ${ids.length}…`);
+                    const part = await AdditionList.request(`${AdditionList.API}lot`, { ids: ids.slice(k, k + 500), action: 'check-pinyin' });
+                    data.additions.push(...part.additions);
+                    data.report.push(...part.report);
+                }
                 const byId = new Map(data.additions.map((a) => [a.id, a]));
                 this.additions = this.additions.map((a) => byId.get(a.id) || a);
                 const fixed = data.report.filter((r) => r.fixes.length);
