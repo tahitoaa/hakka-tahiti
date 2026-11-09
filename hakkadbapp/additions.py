@@ -365,13 +365,33 @@ def additions_rename_source(request):
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions]})
 
 
+def check_pinyin(addition, may_fix, user):
+    """« Vérifier le pinyin » for one addition: its reading set in Wenfa's
+    pinyin where the rule leaves no doubt (saved, with a note in the
+    observations) when `may_fix`; returns {id, hanzi, pinyin, fixes (done),
+    pending (not allowed), problems (left to look at)}."""
+    fixed, fixes = pinyin_rules.normalize(addition.pinyin)
+    applied = bool(fixes) and may_fix
+    if applied:
+        note = pinyin_rules.normalize_note(fixes)
+        addition.pinyin = fixed
+        addition.observations = f"{addition.observations.strip()} {note[:1].upper()}{note[1:]}.".strip()
+        addition.updated_by = user
+        addition.save(update_fields=["pinyin", "observations", "updated_by", "updated_at"])
+    return {"id": addition.id, "hanzi": addition.hanzi, "pinyin": addition.pinyin,
+            "fixes": fixes if applied else [], "pending": [] if applied else fixes,
+            "problems": pinyin_rules.violations(addition.pinyin) if addition.pinyin.strip() else ["lecture vide"]}
+
+
 @require_POST
 @editor_required
 def additions_bulk(request):
     """The rows ticked on the Validation page, all or nothing:
     {"ids": [...], "status": "validated"} changes their status,
     {"ids": [...], "action": "delete"} deletes them,
-    {"ids": [...], "action": "toggle-kind"} turns words into expressions and back."""
+    {"ids": [...], "action": "toggle-kind"} turns words into expressions and back,
+    {"ids": [...], "action": "check-pinyin"} sets their readings in Wenfa's
+    pinyin where the rule leaves no doubt and reports the rest."""
     payload, error = _read_json(request)
     if error:
         return error
@@ -387,6 +407,15 @@ def additions_bulk(request):
         with transaction.atomic():
             LexiconAddition.objects.filter(id__in=ids).delete()
         return JsonResponse({"ok": True, "deleted": sorted(set(ids))})
+
+    if payload.get("action") == "check-pinyin":
+        # Fixed where the rule leaves no doubt (si1 -> xi1, sit7 -> xit5), noted in the
+        # observations; the rest reported. A decided addition only by a validator.
+        decided = (LexiconAddition.STATUS_VALIDATED, LexiconAddition.STATUS_REJECTED)
+        may_fix = lambda a: a.status not in decided or is_validator(request.user)
+        with transaction.atomic():
+            report = [check_pinyin(a, may_fix(a), request.user) for a in additions]
+        return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in additions], "report": report})
 
     if payload.get("action") == "toggle-kind":
         from .assistant import known_words

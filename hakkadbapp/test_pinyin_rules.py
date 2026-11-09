@@ -61,3 +61,43 @@ class ViolationTests(SimpleTestCase):
 
     def test_a_correct_reading(self):
         self.assertEqual(violations("ngai2 oi4 shit6 wuk5ka1 xi1 qit5 yao1 wui2 sü1"), [])
+
+
+class CheckPinyinTests(SimpleTestCase):
+    """« Vérifier le pinyin » (Suivi, Brouillons / À valider) on one addition, without the database."""
+
+    def addition(self, pinyin, status="draft"):
+        from unittest import mock
+
+        from hakkadbapp.models import LexiconAddition
+
+        a = LexiconAddition(id=1, hanzi="西", pinyin=pinyin, status=status, observations="Importé.")
+        a.save = mock.Mock()
+        return a
+
+    def test_fixed_and_noted(self):
+        from hakkadbapp.additions import check_pinyin
+
+        a = self.addition("si1")
+        report = check_pinyin(a, True, None)
+        self.assertEqual(a.pinyin, "xi1")
+        self.assertEqual(a.observations, "Importé. Lecture mise en pinyin Wenfa : si1 → xi1.")
+        a.save.assert_called_once()
+        self.assertEqual((report["fixes"], report["pending"], report["problems"]), (["si1 → xi1"], [], []))
+
+    def test_not_allowed_left_pending(self):
+        from hakkadbapp.additions import check_pinyin
+
+        a = self.addition("si1", status="validated")
+        report = check_pinyin(a, False, None)
+        self.assertEqual(a.pinyin, "si1")
+        a.save.assert_not_called()
+        self.assertEqual(report["pending"], ["si1 → xi1"])
+
+    def test_what_is_left_to_look_at(self):
+        from hakkadbapp.additions import check_pinyin
+
+        report = check_pinyin(self.addition("gok3"), True, None)
+        self.assertEqual(report["fixes"], [])
+        self.assertTrue(report["problems"])
+        self.assertEqual(check_pinyin(self.addition(""), True, None)["problems"], ["lecture vide"])

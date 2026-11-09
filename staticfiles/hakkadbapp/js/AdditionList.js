@@ -759,6 +759,10 @@ class ValidationTable extends AdditionList {
             }
             // Nothing to do when every ticked row already has that status;
             // only drafts and rejected additions can be deleted.
+            if (action === 'check-pinyin') {
+                b.disabled = !n;
+                return;
+            }
             if (action === 'ai-review') {
                 b.disabled = !n || n > ValidationTable.MAX_AI_REVIEW || chosen.every((a) => this.muted.has(a.id));
                 b.title = n > ValidationTable.MAX_AI_REVIEW ? `Au plus ${ValidationTable.MAX_AI_REVIEW} lignes à la fois` : '';
@@ -890,6 +894,7 @@ class ValidationTable extends AdditionList {
     async bulk(action, button) {
         if (action === 'ai-review') return this.aiReview(button);
         if (action === 'complete') return this.complete([...this.selected], button);
+        if (action === 'check-pinyin') return this.checkPinyin([...this.selected], button);
         const ids = [...this.selected];
         if (!ids.length) return;
         if (action === 'delete' && !confirm(`Supprimer ${ids.length} ajout${ids.length > 1 ? 's' : ''} ? C'est définitif.`)) return;
@@ -914,6 +919,37 @@ class ValidationTable extends AdditionList {
                 this.setStatus(`✓ ${labels.done(ids.length)}`);
             } catch (err) {
                 rows.forEach((r) => r.classList.remove('is-busy'));
+                this.setStatus(`Échec : ${err.message}`, true);
+            }
+        }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
+        this.renderBar();
+    }
+
+    /** « Vérifier le pinyin »: the readings set in Wenfa's pinyin where the
+     *  rule leaves no doubt (additions.additions_bulk, pinyin_rules), the
+     *  rest listed under the bar; the rows still to look at stay ticked. */
+    async checkPinyin(ids, button) {
+        if (!ids.length) return;
+        const esc = AdditionList.escapeHtml;
+        this.setStatus('');
+        await AdditionList.whileBusy(button, '🔤 Vérification…', async () => {
+            try {
+                const data = await AdditionList.request(`${AdditionList.API}lot`, { ids, action: 'check-pinyin' });
+                const byId = new Map(data.additions.map((a) => [a.id, a]));
+                this.additions = this.additions.map((a) => byId.get(a.id) || a);
+                const fixed = data.report.filter((r) => r.fixes.length);
+                const left = data.report.filter((r) => r.problems.length || r.pending.length);
+                this.selected = new Set(left.map((r) => r.id));
+                this.render();
+                if (fixed.length) this.flash(fixed.map((r) => r.id));
+                const line = (r, list) => `<li><span class="hanzi">${esc(r.hanzi)}</span> ${esc(r.pinyin)} : ${list.map(esc).join(' ; ')}</li>`;
+                this.el.status.className = 'text-sm';
+                this.el.status.innerHTML = `<p>🔤 ${data.report.length} lecture${data.report.length > 1 ? 's' : ''} vérifiée${data.report.length > 1 ? 's' : ''} :
+                    ${fixed.length ? `<b>${fixed.length} corrigée${fixed.length > 1 ? 's' : ''}</b>` : 'aucune à corriger'}${
+                    left.length ? `, <b class="text-red-700">${left.length} à revoir</b> (restées cochées)` : ', toutes conformes au pinyin Wenfa'}.</p>
+                    ${fixed.length ? `<ul class="vt-pinyin-report">${fixed.map((r) => line(r, r.fixes)).join('')}</ul>` : ''}
+                    ${left.length ? `<ul class="vt-pinyin-report is-left">${left.map((r) => line(r, [...r.pending.map((p) => `${p} (réservé aux validateurs)`), ...r.problems])).join('')}</ul>` : ''}`;
+            } catch (err) {
                 this.setStatus(`Échec : ${err.message}`, true);
             }
         }, [...this.el.bar.querySelectorAll('[data-bulk]')]);
