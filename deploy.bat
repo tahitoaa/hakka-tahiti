@@ -36,8 +36,15 @@ if errorlevel 1 (
 )
 
 echo === git commit -a ===
+REM Everything already committed: nothing to commit, go on with the push.
+git diff --quiet HEAD
+if not errorlevel 1 goto nothing_to_commit
 git commit -a -m "%~1"
 if errorlevel 1 exit /b 1
+goto push
+:nothing_to_commit
+echo Nothing to commit: pushing what is already committed.
+:push
 
 echo === git push ===
 git push
