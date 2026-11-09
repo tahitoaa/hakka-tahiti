@@ -136,6 +136,21 @@ test("boxes: characters with their reading, pending syllables, grouped by word",
   assert.deepEqual([...groups], [["[ngai_]"], ["屋:wuk5", "家:ka1"]]);
 });
 
+test("a word without tone (ma'a tinito) is text kept as written, not a syllable to convert", () => {
+  const { entry } = load();
+  entry.setText("ngai_ oi4 ma'a tinito", "expression");
+  assert.deepEqual([...entry.syllables], ["ngai_", "oi4"]);
+  pickChar(entry, "我");
+  pickChar(entry, "爱");
+  assert.equal(entry.problem(), "");
+  assert.deepEqual([...entry.check().map((c) => `${c.hanzi} ${c.status}`)].slice(2), ["ma'a text", "tinito text"]);
+  assert.deepEqual({ ...entry.values() }, { kind: "expression", hanzi: "我 爱 ma'a tinito", pinyin: "ngai1 oi4 ma'a tinito" });
+  assert.equal(entry.mixed().hanzi, "我爱 ma'a tinito");
+  // Reopened: the text words come back as written, no (reading) added.
+  assert.equal(entry.constructor.textFromStored("我 爱 ma'a tinito", "ngai1 oi4 ma'a tinito", "expression"),
+    "我(ngai1) 爱(oi4) ma'a tinito");
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);
@@ -146,6 +161,7 @@ test("platform rendering: no spaces, no :sense hint, Chinese punctuation in the 
   const ctx = loadAdditionList();
   assert.equal(ctx.AdditionList.platformHanzi("活到老 , 读到老 ?"), "活到老，读到老？");
   assert.equal(ctx.AdditionList.platformHanzi("我 把:prendre 书"), "我把书");
+  assert.equal(ctx.AdditionList.platformHanzi("我 爱 食 ma'a tinito"), "我爱食 ma'a tinito");
   assert.equal(ctx.AdditionList.platformPinyin("fat6 dao4 lao3 ， tuk6"), "fat⁶ dao⁴ lao³ , tuk⁶");
 });
 

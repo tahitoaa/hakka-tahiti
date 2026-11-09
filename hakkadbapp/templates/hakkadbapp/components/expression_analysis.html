@@ -1,10 +1,15 @@
-{% extends "hakkadbapp/base.html" %}
 {% load static %}
-{% block content %}
+{% comment %}
+  « Découpage » view of the lexicon browser's Expressions tab (editors):
+  each expression's segmentation and its hanzi <-> pinyin correspondence,
+  recomputed today (expressions.js, Sentence.js), compared with the platform.
+  Only the owner gets the Split editor and the export (data-entry-url, the
+  expression_mesh_* endpoints are owner_required).
+{% endcomment %}
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 {% include "hakkadbapp/components/validation_styles.html" %}
 
-<div id="expr-app" class="w-full max-w-screen-xl mx-auto mt-1 sm:mt-2 space-y-2">
+<div id="expr-app" class="w-full space-y-2">
 <style>
   #expr-app {
     --surface-1:      #fcfcfb;
@@ -284,9 +289,10 @@
 </style>
 
   <div class="ex-head">
-    <h2 class="font-display text-xl font-bold text-gray-800">Expressions
+    <h2 class="font-display text-xl font-bold text-gray-800">Découpage et correspondance
       <details class="help-tip font-sans font-normal"><summary aria-label="Aide">ⓘ</summary><div>
-        Chaque expression du lexique, comparée à la plateforme : <span class="legend-swatch col-vercel">Vercel / base</span> = calculé
+        Le découpage de chaque expression en mots du lexique et sa correspondance hanzi ↔ pinyin, recalculés aujourd'hui
+        (✎ déplie la ligne), comparés à la plateforme : <span class="legend-swatch col-vercel">Vercel / base</span> = calculé
         aujourd'hui, <span class="legend-swatch col-platform">Plateforme</span> = valeur du dernier import (<span class="mono">platform_to_vercel --yes</span>).
         <div class="status-legend">
           <span class="legend-item"><span class="legend-dot cat-components"></span>Composants (manque / en trop)</span>
@@ -295,15 +301,18 @@
           <span class="legend-item"><span class="legend-dot cat-punctuation"></span>Ponctuation seulement</span>
           <span class="legend-item"><span class="legend-dot cat-platform"></span>Pas de plateforme / introuvable</span>
         </div>
-        ✎ déplie la ligne : comparaison détaillée, commentaire et Split. « Export » : le Split remplace les données d'origine dans
+        {% if is_owner %}✎ déplie la ligne : comparaison détaillée, commentaire et Split (modifiable). « Export » : le Split remplace les données d'origine dans
         <span class="mono">ExportCorpus</span> ; ne peut être coché que si le Split se résout entièrement (aucun terme ambigu, aucun « ~ »).
+        {% else %}✎ déplie la ligne : comparaison détaillée et découpage recalculé. Seul le propriétaire du site modifie le Split.{% endif %}
       </div></details></h2>
     <p class="ex-sub" id="expr-overview">{{ expressions_count }} expressions{% if platform_snapshot_timestamp %} · plateforme du {{ platform_snapshot_timestamp|date:"j F Y" }}{% else %} · aucun instantané plateforme{% endif %}</p>
   </div>
 
+  {% if is_owner %}
   <details class="ex-tools"><summary>⚙ Export et synchronisation</summary>
   {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
   </details>
+  {% endif %}
 
   <div class="vt-facets ex-filters" id="expr-controls" role="group" aria-label="Filtrer">
     <label><span>Écart</span><select id="expr-anomaly-filter">
@@ -351,7 +360,7 @@
             data-use-in-export="{% if e.note.use_in_export %}1{% else %}0{% endif %}"
             data-export-ok="{% if e.export_ok %}1{% else %}0{% endif %}"
             data-export-block-reason="{{ e.export_block_reason|default:'' }}"
-            {% if e.platform_id %}
+            {% if e.platform_id and is_owner %}
             data-entry-url="{% url 'expression_mesh_entry' e.id %}"
             data-reset-url="{% url 'expression_mesh_reset' e.id %}"
             {% endif %}
@@ -364,7 +373,5 @@
     <script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
-    <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+    {# Pronunciation.js: already on the lexicon browser (components/caracters_panel.html); expressions.js only uses it on DOMContentLoaded. #}
     <script src="{% static 'hakkadbapp/js/expressions.js' %}"></script>
-    <script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
-{% endblock %}

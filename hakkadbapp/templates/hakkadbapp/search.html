@@ -2,22 +2,102 @@
 {% load static %}
 
 {% block content %}
+{% comment %}
+  Le navigateur du lexique Wenfa (views.search): one page, one tab per tool,
+  addressed by #hash (old links keep working: /doublons -> #doublons,
+  /expressions/ -> #decoupage, /caracters -> #caracteres).
+  Everyone: Mots, Thèmes, Expressions (cards), Caractères, Doublons.
+  Editors (can_edit): Dictionnaires, Relecture, and the Expressions tab's
+  « Découpage » view; editing a Split and the export stay the owner's.
+{% endcomment %}
 {% include "hakkadbapp/components/rosace_card_styles.html" %}
 <style>
   .sr-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid #E8DFD2; }
-  .sr-tabs a { padding: 0.4rem 0.9rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .sr-tabs a { padding: 0.4rem 0.8rem; font-weight: 700; color: #6E655C; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  .sr-tabs a small { font-weight: 500; color: #8C8478; }
   .sr-tabs a[aria-selected="true"] { color: var(--color-brand, #9B1C1C); border-bottom-color: var(--color-brand, #9B1C1C); }
+  .sr-tabs a.is-member { color: #544D45; }
+  .sr-views { display: inline-flex; gap: 0.25rem; padding: 0.2rem; background: #F6EFE4; border-radius: 0.6rem; margin-bottom: 1rem; }
+  .sr-views a { padding: 0.3rem 0.8rem; border-radius: 0.45rem; font-weight: 600; font-size: 0.9rem; color: #6E655C; }
+  .sr-views a[aria-selected="true"] { background: #fff; color: var(--color-brand, #9B1C1C); box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
+  .sr-lead { font-size: 0.9rem; color: #544D45; margin-bottom: 0.75rem; max-width: 70ch; }
+  .sr-input { width: 100%; max-width: 20rem; padding: 0.5rem 1rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+
+  /* Thèmes */
+  .th-list { display: grid; gap: 0.5rem; }
+  .th-theme { background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
+  .th-theme > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; padding: 0.6rem 0.9rem; cursor: pointer; }
+  .th-theme > summary b { font-size: 1.05rem; color: #261F1C; }
+  .th-theme > summary span { font-size: 0.8rem; color: #6E665C; }
+  .th-theme[open] > summary { border-bottom: 1px solid #F0E8DC; }
+  .th-body { display: grid; gap: 1rem; padding: 0.6rem 0.9rem 0.9rem; }
+  @media (min-width: 900px) { .th-body.has-both { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .th-body h3 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6E665C; margin-bottom: 0.25rem; }
+  .th-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .th-table td { padding: 0.25rem 0.4rem; border-top: 1px solid #F6EFE4; vertical-align: top; }
+  .th-table td.hanzi { font-size: 1.15rem; white-space: nowrap; }
+  .th-table td.hanzi a { color: #261F1C; }
+  .th-table td.hanzi a:hover { color: var(--color-brand, #9B1C1C); }
+  .th-table td.th-py { color: #6E665C; white-space: nowrap; }
+
+  /* Relecture */
+  .lr-root .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
+  .lr-root .sx-chip:hover:not(:disabled) { background: #F6EFE4; }
+  .lr-root .sx-chip:disabled { opacity: 0.45; cursor: default; }
+  .lr-search { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .lr-search select, .lr-search input { min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+  .lr-search input { flex: 1 1 18rem; max-width: 32rem; }
+  .lr-note { font-size: 0.85rem; color: #6E665C; }
+  .lr-note:empty { display: none; }
+  .lr-results { display: grid; gap: 0.2rem; max-width: 48rem; }
+  .lr-result { display: grid; grid-template-columns: 6rem minmax(4rem, auto) minmax(4rem, auto) 1fr; gap: 0.75rem; align-items: baseline; text-align: left;
+               padding: 0.35rem 0.6rem; border: 1px solid #ECE2D3; border-radius: 0.5rem; background: #fff; }
+  .lr-result:hover, .lr-result:focus-visible { background: #FBF0E6; border-color: #e8c9b5; }
+  .lr-result .hanzi { font-size: 1.15rem; }
+  .lr-type { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6E665C; }
+  .lr-py { color: #6E665C; font-size: 0.85rem; }
+  .lr-fr { font-size: 0.875rem; color: #3A3430; }
+  .lr-card { background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.75rem 0.9rem; max-width: 48rem; }
+  .lr-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.9rem; }
+  .lr-hanzi { font-size: 1.8rem; color: #261F1C; }
+  .lr-close { margin-left: auto; }
+  .lr-fields { display: grid; grid-template-columns: 6rem 1fr; gap: 0.2rem 0.75rem; margin: 0.5rem 0; font-size: 0.9rem; }
+  .lr-fields dt { color: #6E665C; font-size: 0.8rem; }
+  .lr-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+  .lr-root .lr-ai { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+  .lr-mute { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; color: #544D45; cursor: pointer; }
+  .lr-add { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; max-width: 48rem; margin-top: 0.75rem; }
+  .lr-add textarea { flex: 1 1 20rem; padding: 0.4rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+  .lr-h { font-weight: 700; color: #261F1C; margin-top: 1rem; }
+  .lr-h small { font-weight: 500; color: #6E665C; font-size: 0.8rem; margin-left: 0.4rem; }
+  .lr-remarks { display: grid; gap: 0.5rem; max-width: 48rem; margin-top: 0.4rem; }
+  .lr-remark { background: #fff; border: 1px solid #ECE2D3; border-left: 4px solid #9B1C1C; border-radius: 0.6rem; padding: 0.5rem 0.75rem; font-size: 0.9rem; }
+  .lr-remark.is-closed { border-left-color: #DDD0BD; opacity: 0.75; }
+  .lr-remark-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; font-size: 0.8rem; color: #6E665C; }
+  .lr-remark-head b { color: #261F1C; }
+  .lr-status { padding: 0 0.45rem; border-radius: 9999px; background: #F6EFE4; font-weight: 600; }
+  .lr-status-todo { background: #fef3c7; color: #92400e; }
+  .lr-diff { margin: 0.25rem 0; font-size: 0.85rem; }
+  .lr-diff span { color: #6E665C; margin-right: 0.4rem; }
+  .lr-diff del { color: #9B1C1C; } .lr-diff ins { color: #065f46; text-decoration: none; font-weight: 600; }
+  .lr-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
 </style>
-<div class="max-w-5xl mx-auto px-4 pt-4">
-  <nav class="sr-tabs" role="tablist" aria-label="Rechercher">
-    <a href="#mots" role="tab" data-srtab="mots">Mots</a>
-    <a href="#expressions" role="tab" data-srtab="expressions">Expressions</a>
+
+<div class="max-w-7xl mx-auto px-4 pt-4">
+  <nav class="sr-tabs" role="tablist" aria-label="Lexique Wenfa">
+    <a href="#mots" role="tab" data-srtab="mots">Mots <small>{{ words|length }}</small></a>
+    <a href="#themes" role="tab" data-srtab="themes">Thèmes <small>{{ themes|length }}</small></a>
+    <a href="#expressions" role="tab" data-srtab="expressions">Expressions <small>{{ expressions|length }}</small></a>
     <a href="#caracteres" role="tab" data-srtab="caracteres">Caractères</a>
+    <a href="#dictionnaires" role="tab" data-srtab="dictionnaires" class="is-member" title="Réservé aux éditeurs">📚 Dictionnaires</a>
+    <a href="#relecture" role="tab" data-srtab="relecture" class="is-member" title="Réservé aux éditeurs">✍ Relecture</a>
+    <a href="#doublons" role="tab" data-srtab="doublons">Doublons <small>{{ duplicates_count }}</small></a>
   </nav>
 </div>
-<div class="rosace-cards max-w-5xl mx-auto px-4 py-6 space-y-12">
 
-  <!-- 🟩 Vocabulaire Section -->
+<div class="rosace-cards max-w-7xl mx-auto px-4 py-6">
+
+  <!-- Mots -->
   <section data-srpanel="mots">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
       <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -52,103 +132,206 @@
     </div>
   </section>
 
-  <!-- 🟨 Expressions Section -->
-  <section data-srpanel="expressions" hidden>
+  <!-- Thèmes -->
+  <section data-srpanel="themes" hidden>
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
-        Expressions
-        <span class="text-gray-500 text-base font-normal">(<span id="expr-count">{{ expressions|length }}</span> expressions)</span>
-      </h1>
-      <input
-        type="text"
-        id="expr-search"
-        placeholder="Ex. 客家话样般喊 ou français"
-        class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
-      />
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Thèmes
+        <span class="text-gray-500 text-base font-normal">(<span id="theme-count">{{ themes|length }}</span>)</span></h1>
+      <input type="search" id="theme-search" class="sr-input" placeholder="Filtrer les thèmes" aria-label="Filtrer les thèmes">
     </div>
-
-    <div id="expr-list" class="rosace-expr-list">
-      {% for expr in expressions %}
-        <div class="search-filter-item"
-          data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hanzi:{{ expr.text|default:'' }} rendering:{{ expr.rendering|default:'' }}">
-          {% include "hakkadbapp/components/expression_card.html" with expr=expr %}
+    <div class="th-list" id="theme-list">
+      {% for theme in themes %}
+      <details class="th-theme" data-theme-name="{{ theme.name|lower }}">
+        <summary><b>{{ theme.name }}</b>
+          <span>{{ theme.words|length }} mot{{ theme.words|length|pluralize }} · {{ theme.expressions|length }} expression{{ theme.expressions|length|pluralize }}</span></summary>
+        <div class="th-body{% if theme.words and theme.expressions %} has-both{% endif %}">
+          {% if theme.words %}
+          <div><h3>Mots</h3>
+            <table class="th-table no-auto-csv"><tbody>
+              {% for w in theme.words %}{% with hz=w.char %}
+              <tr><td class="hanzi">{% if hz %}<a href="{% url 'hanzi' hz|first %}">{{ hz }}</a>{% else %}—{% endif %}</td>
+                <td class="th-py">{{ w.pinyin }}</td><td>{{ w.french|default:"" }}</td></tr>
+              {% endwith %}{% endfor %}
+            </tbody></table></div>
+          {% endif %}
+          {% if theme.expressions %}
+          <div><h3>Expressions</h3>
+            <table class="th-table no-auto-csv"><tbody>
+              {% for e in theme.expressions %}
+              <tr><td class="hanzi">{{ e.text|default:""|cut:" " }}</td><td>{{ e.french|default:"" }}</td></tr>
+              {% endfor %}
+            </tbody></table></div>
+          {% endif %}
         </div>
+      </details>
       {% empty %}
-        <p class="text-gray-500 italic px-3 py-2">Aucune expression trouvée.</p>
+      <p class="text-gray-500 italic">Aucun thème.</p>
       {% endfor %}
     </div>
   </section>
 
+  <!-- Expressions: the cards for everyone; for editors, the segmentation check too -->
+  <section data-srpanel="expressions" hidden>
+    {% if can_edit %}
+    <div class="sr-views" role="tablist" aria-label="Vue des expressions">
+      <a href="#expressions" role="tab" data-srview="fiches">Fiches</a>
+      <a href="#decoupage" role="tab" data-srview="decoupage">Découpage et correspondance</a>
+    </div>
+    {% endif %}
+    <div data-srviewpanel="fiches">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">
+          Expressions
+          <span class="text-gray-500 text-base font-normal">(<span id="exprcard-count">{{ expressions|length }}</span> expressions)</span>
+        </h1>
+        <input
+          type="text"
+          id="exprcard-search"
+          placeholder="Ex. 客家话样般喊 ou français"
+          class="w-full sm:w-80 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-gray-500 bg-white"
+        />
+      </div>
 
+      <div id="exprcard-list" class="rosace-expr-list">
+        {% for expr in expressions %}
+          <div class="search-filter-item"
+            data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hanzi:{{ expr.text|default:'' }} rendering:{{ expr.rendering|default:'' }}">
+            {% include "hakkadbapp/components/expression_card.html" with expr=expr %}
+          </div>
+        {% empty %}
+          <p class="text-gray-500 italic px-3 py-2">Aucune expression trouvée.</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% if can_edit %}
+    <div data-srviewpanel="decoupage" hidden>
+      {% include "hakkadbapp/components/expression_analysis.html" %}
+    </div>
+    {% endif %}
+  </section>
 
+  <!-- Dictionnaires (editors) -->
+  <section data-srpanel="dictionnaires" hidden>
+    <p class="sr-lead">Chercher un caractère ou un mot dans les dictionnaires anciens et en ligne.</p>
+    {% include "hakkadbapp/components/dict_lookups.html" %}
+  </section>
+
+  <!-- Relecture (editors) -->
+  <section data-srpanel="relecture" hidden>
+    {% if can_edit %}
+    <p class="sr-lead">Relire un mot ou une expression du lexique : ses remarques, une relecture par l'IA, les vôtres.
+      Une remarque « À faire » se corrige à la main sur e-reo (<a class="underline" href="{% url 'validation' %}?etape=ereo">Suivi › Corrections e-reo</a>).</p>
+    <div id="lex-review" class="lr-root space-y-3">
+      <div class="lr-search">
+        <label class="sr-only" for="lr-type">Type</label>
+        <select id="lr-type" data-lr="type">
+          <option value="">Mots et expressions</option>
+          <option value="word">Mots</option>
+          <option value="expression">Expressions</option>
+        </select>
+        <label class="sr-only" for="lr-q">Chercher un mot ou une expression</label>
+        <input id="lr-q" data-lr="q" type="search" autocomplete="off" placeholder="Chercher : 屋家, vuk ka, maison…">
+      </div>
+      <p class="lr-note" data-lr="status" role="status"></p>
+      <div class="lr-results" data-lr="results"></div>
+      <div data-lr="item" hidden></div>
+    </div>
+    {{ review_items|json_script:"lex-review-items" }}
+    <script src="{% static 'hakkadbapp/js/lexicon_review.js' %}" defer></script>
+    {% else %}
+    <p class="text-sm text-gray-600">
+      {% if user.is_authenticated %}La relecture des mots et des expressions est réservée aux éditeurs.
+      {% else %}<a class="underline" href="{% url 'login' %}?next={{ request.path|urlencode }}%23relecture">Connectez-vous</a> pour relire les mots et les expressions du lexique.{% endif %}
+    </p>
+    {% endif %}
+  </section>
+
+  <!-- Doublons -->
+  <section data-srpanel="doublons" hidden>
+    {% include "hakkadbapp/components/duplicates_panel.html" %}
+  </section>
 </div>
 
-<!-- 🔍 JS Search Script -->
+<!-- Caractères -->
+<div data-srpanel="caracteres" hidden class="px-4 pb-8">
+  {% include "hakkadbapp/components/caracters_panel.html" %}
+</div>
+
+<!-- 🔍 Filters of the Mots, Thèmes and Expressions (cards) tabs -->
 <script>
 function setupSearch({ inputId, itemSelector, containerId, countId }) {
   const searchInput = document.getElementById(inputId);
   const items = document.querySelectorAll(`${containerId} > ${itemSelector}`);
   const countDisplay = document.getElementById(countId);
-
-  searchInput.addEventListener('input', () => {
+  const filter = () => {
     const query = searchInput.value.trim().toLowerCase();
     let visibleCount = 0;
-
     items.forEach(item => {
       const haystack = item.dataset.search?.toLowerCase() || '';
       const match = query.split(/\s+/).every(q => haystack.includes(q));
       item.style.display = match ? '' : 'none';
       if (match) visibleCount++;
     });
-
-    if (countDisplay) {
-      countDisplay.textContent = visibleCount;
-    }
-  });
+    if (countDisplay) countDisplay.textContent = visibleCount;
+  };
+  searchInput.addEventListener('input', filter);
+  return filter;
 }
 
-// Initialize search
-setupSearch({
-  inputId: 'word-search',
-  itemSelector: 'div',
-  containerId: '#word-list',
-  countId: 'word-count'
-});
-
-setupSearch({
-  inputId: 'expr-search',
-  itemSelector: 'div',
-  containerId: '#expr-list',
-  countId: 'expr-count'
-});
-
+setupSearch({ inputId: 'word-search', itemSelector: 'div', containerId: '#word-list', countId: 'word-count' });
+const filterExpressionCards = setupSearch({ inputId: 'exprcard-search', itemSelector: 'div', containerId: '#exprcard-list', countId: 'exprcard-count' });
+// ?q= (the Doublons tab's « Désambiguïser » link): the cards are filtered too.
+(function () {
+  const q = new URLSearchParams(location.search).get('q');
+  if (q) { document.getElementById('exprcard-search').value = q; filterExpressionCards(); }
+})();
 
 document.getElementById('category-select').addEventListener('change', function() {
   const selectedCategory = this.value.toLowerCase();
   const items = document.querySelectorAll('#word-list > div');
-
   items.forEach(item => {
     const category = item.dataset.category?.toLowerCase() || '';
     item.style.display = selectedCategory === '' || category.includes(selectedCategory) ? '' : 'none';
   });
-
-  // Update count
   const visibleCount = Array.from(items).filter(item => item.style.display !== 'none').length;
   document.getElementById('word-count').textContent = visibleCount;
-});</script>
-<div data-srpanel="caracteres" hidden class="px-4 pb-8">
-  {% include "hakkadbapp/components/caracters_panel.html" %}
-</div>
+});
+
+document.getElementById('theme-search').addEventListener('input', function () {
+  const q = this.value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#theme-list > .th-theme').forEach((theme) => {
+    const match = !q || theme.dataset.themeName.includes(q);
+    theme.hidden = !match;
+    if (match) shown++;
+  });
+  document.getElementById('theme-count').textContent = shown;
+});
+</script>
 <script>
-  /* Tabs by #hash: /caracters redirects to #caracteres. */
+  /* Tabs by #hash; #decoupage is the Expressions tab's second view. Each
+     opening tells the tabs that load on demand (lex:tab, see dict_lookups.html). */
   (function () {
+    const TABS = ['mots', 'themes', 'expressions', 'caracteres', 'dictionnaires', 'relecture', 'doublons'];
+    const VIEWS = { decoupage: ['expressions', 'decoupage'] };
     const tabs = [...document.querySelectorAll('[data-srtab]')];
+    const views = [...document.querySelectorAll('[data-srview]')];
     const show = () => {
-      const name = ['mots', 'expressions', 'caracteres'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'mots';
+      const hash = location.hash.slice(1);
+      let [name, view] = VIEWS[hash] || [hash, 'fiches'];
+      if (!TABS.includes(name)) name = 'mots';
+      if (!views.length) view = 'fiches';
       tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.srtab === name)));
       document.querySelectorAll('[data-srpanel]').forEach((p) => { p.hidden = p.dataset.srpanel !== name; });
+      views.forEach((v) => v.setAttribute('aria-selected', String(v.dataset.srview === view)));
+      document.querySelectorAll('[data-srviewpanel]').forEach((p) => { p.hidden = p.dataset.srviewpanel !== view; });
+      document.dispatchEvent(new CustomEvent('lex:tab', { detail: name }));
     };
-    tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', t.getAttribute('href')); show(); }));
+    [...tabs, ...views].forEach((t) => t.addEventListener('click', (e) => {
+      e.preventDefault();
+      history.replaceState(null, '', location.search + t.getAttribute('href'));
+      show();
+    }));
     window.addEventListener('hashchange', show);
     show();
   })();

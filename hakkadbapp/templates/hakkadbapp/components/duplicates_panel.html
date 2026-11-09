@@ -1,8 +1,8 @@
-{% extends "hakkadbapp/base.html" %}
-{% load static %}
-
-{% block content %}
-
+{% comment %}
+  « Doublons » tab of the lexicon browser (search.html): every group of
+  duplicates of the live database, rendered client-side from
+  `duplicates_json` (views._duplicates_payload). Never writes to the database.
+{% endcomment %}
 <div id="dup-app">
 <style>
   #dup-app {
@@ -182,13 +182,11 @@
   <header class="top">
     <div>
       <h1>Doublons du lexique</h1>
-      <p>Base actuelle (Vercel) uniquement &middot; pas de comparaison avec la plateforme e-reo.</p>
-      <a class="back-link hover:underline" href="{% url 'reports' %}">&larr; Retour aux rapports</a>
+      <p>Base actuelle (Vercel) uniquement &middot; pas de comparaison avec la plateforme e-reo.
+        <a class="back-link hover:underline" href="{% url 'reports' %}">Analyse du lexique</a></p>
     </div>
     <button class="theme-toggle" id="dup-theme-toggle" type="button">Thème</button>
   </header>
-
-  {% include "hakkadbapp/components/expression_mesh_toolbar.html" %}
 
   <p class="tip">
     <strong>Astuce :</strong> gardez cette page ouverte à côté de la plateforme e-reo. Copiez le français ou le
@@ -214,7 +212,7 @@
   <div id="dup-content"></div>
 </div>
 
-<script id="dup-data" type="application/json">{{ diff_data_json|safe }}</script>
+<script id="dup-data" type="application/json">{{ duplicates_json|safe }}</script>
 <script>
 (function () {
   "use strict";
@@ -222,7 +220,8 @@
   var DATA = JSON.parse(document.getElementById("dup-data").textContent);
   var SECTION_ORDER = ["words-hakka", "expressions-hakka", "words-french", "expressions-french", "words-english", "expressions-english"];
   var FIELD_LABELS = { french: "Français", hakka: "Hakka", secondary: null, theme: "Thème", status: "Statut" };
-  var EXPRESSIONS_URL = "{% url 'expressions' %}";
+  // The Expressions tab's « Découpage » view, filtered (expressions.js reads ?q=); editors only.
+  var EXPRESSIONS_URL = {% if can_edit %}"{% url 'search' %}"{% else %}""{% endif %};
 
   var app = document.getElementById("dup-app");
   var RESOLVED_KEY = "hakka-dup-resolved-v1";
@@ -432,10 +431,10 @@
     // Expressions page's own search (expressions.js reads ?q= on load)
     // pre-filtered to this hanzi, so every expression that might need a
     // ":gloss" hint added to its Split field shows up right away.
-    if (section.key !== "words-hakka" || !g.used_in_expressions) return "";
+    if (!EXPRESSIONS_URL || section.key !== "words-hakka" || !g.used_in_expressions) return "";
     var hanzi = ((g.entries[0] && g.entries[0].hakka) || "").split(" ")[0];
     if (!hanzi) return "";
-    var url = EXPRESSIONS_URL + "?q=" + encodeURIComponent(hanzi);
+    var url = EXPRESSIONS_URL + "?q=" + encodeURIComponent(hanzi) + "#decoupage";
     return '<a class="chip" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' +
       "&#128279; Désambiguïser dans les expressions</a>";
   }
@@ -594,6 +593,3 @@
   setupTheme();
 })();
 </script>
-<script src="{% static 'hakkadbapp/js/ExpressionMesh.js' %}"></script>
-
-{% endblock %}

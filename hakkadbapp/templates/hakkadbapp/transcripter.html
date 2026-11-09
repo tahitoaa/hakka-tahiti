@@ -9,7 +9,7 @@
   Only annotation values change; the file keeps its ELAN structure
   (EafDocument.js). Logic: transcripter.js.
 {% endcomment %}
-<div id="eaf-app" class="max-w-7xl mx-auto px-3 sm:px-4 py-4">
+<div id="eaf-app" class="mx-auto">
 
   <!-- Files + settings -->
   <section class="eaf-toolbar no-print" aria-label="Fichiers et paramètres">
@@ -25,15 +25,16 @@
         Ouvrez (ou glissez-déposez) le dossier qui contient le fichier ELAN (.eaf) et son enregistrement audio.
       </div>
     </div>
-    <div class="eaf-settings">
-      {% include "hakkadbapp/components/reading_settings.html" %}
-    </div>
+    <!-- Reading settings: same as Saisie and Écrire (moved into the segment editor while one is open). -->
+    <details class="eaf-settings">
+      <summary class="cursor-pointer select-none text-sm font-semibold text-gray-700">⚙ Réglages <span class="settings-brief" data-settings-brief></span></summary>
+      <div id="eaf-settings-home" class="pt-2">
+        {% include "hakkadbapp/components/reading_settings.html" %}
+      </div>
+    </details>
     <div class="eaf-actions">
-      <span id="eaf-progress" class="eaf-progress"></span>
-      <span id="eaf-dirty" class="eaf-dirty" hidden>● non enregistré</span>
       <button id="eaf-pdf" type="button" class="eaf-btn eaf-btn-light" disabled title="Le texte segment par segment (hanzi, pinyin, français), à enregistrer en PDF">PDF</button>
       <button id="eaf-share-open" type="button" class="eaf-btn eaf-btn-light" disabled title="Publier pour le groupe : texte et audio, à écouter sur téléphone">Partager</button>
-      <button id="eaf-save" type="button" class="eaf-btn eaf-btn-save" disabled>Enregistrer</button>
     </div>
   </section>
 
@@ -105,39 +106,62 @@
   <div id="eaf-draft" class="eaf-banner no-print" hidden></div>
   <div id="eaf-messages" class="eaf-banner eaf-banner-warn no-print" hidden></div>
 
-  <!-- Audio + overview of the whole recording -->
+  <!-- Always in view while working: audio, navigation, progress, saving; then the overview of the whole recording -->
   <div id="eaf-audio-bar" class="eaf-audio no-print" hidden>
-    <audio id="eaf-audio" controls preload="metadata" hidden></audio>
+    <div class="eaf-bar">
+      <audio id="eaf-audio" controls preload="metadata" hidden></audio>
+      <span id="eaf-view-range" class="eaf-view-range"></span>
+      <label class="eaf-follow" title="Pendant la lecture depuis la barre audio, garder le segment entendu juste sous l'audio">
+        <input id="eaf-follow" type="checkbox" checked> suivre la lecture</label>
+      <div class="eaf-todo" role="group" aria-label="Segments à compléter">
+        <button id="eaf-todo-prev" type="button" title="Segment à compléter précédent (Alt+Page↑)" aria-label="Segment à compléter précédent">←</button>
+        <span>à compléter</span>
+        <button id="eaf-todo-next" type="button" title="Segment à compléter suivant (Alt+Page↓)" aria-label="Segment à compléter suivant">→</button>
+      </div>
+      <span id="eaf-progress" class="eaf-progress"></span>
+      <span id="eaf-dirty" class="eaf-dirty" hidden>● non enregistré</span>
+      <button id="eaf-save" type="button" class="eaf-btn eaf-btn-save" disabled>Enregistrer</button>
+    </div>
     <div class="eaf-overview">
       <canvas id="eaf-overview" aria-label="Vue d'ensemble de l'enregistrement : cliquez ou glissez pour parcourir la page"></canvas>
       <div id="eaf-overview-tip" class="eaf-overview-tip" hidden></div>
     </div>
-    <div class="eaf-nav">
-      <span id="eaf-view-range"></span>
-      <span class="grow"></span>
-      <label title="Pendant la lecture depuis la barre audio, garder le segment entendu juste sous l'audio">
-        <input id="eaf-follow" type="checkbox" checked> suivre la lecture</label>
-      <button id="eaf-todo-prev" type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" title="Alt+Page↑">◂ à compléter</button>
-      <button id="eaf-todo-next" type="button" class="eaf-btn eaf-btn-light eaf-btn-sm" title="Alt+Page↓">à compléter ▸</button>
-    </div>
   </div>
 
   <!-- Conversation: one column per speaker -->
+  <div class="eaf-split">
   <section id="eaf-board" class="eaf-board" aria-label="Transcription" hidden>
     <div id="eaf-header" class="eaf-row eaf-head"></div>
     <div id="eaf-rows"></div>
   </section>
+  <!-- The whole text of one field, beside the list. -->
+  <aside id="eaf-full" class="eaf-full no-print" aria-label="Texte complet" hidden>
+    <div class="eaf-full-head">
+      <b>Texte complet</b>
+      <div id="eaf-full-fields" class="eaf-full-fields" role="group" aria-label="Champ affiché">
+        <button type="button" data-full="transcript" aria-pressed="false">Transcript</button>
+        <button type="button" data-full="pinyin" aria-pressed="false">Pinyin</button>
+        <button type="button" data-full="mixed" aria-pressed="false">Mixte</button>
+        <button type="button" data-full="hanzi" aria-pressed="true">Simplifié</button>
+        <button type="button" data-full="trad" aria-pressed="false">Traditionnel</button>
+        <button type="button" data-full="translation" aria-pressed="false">Français</button>
+      </div>
+      <button type="button" id="eaf-full-copy" class="eaf-btn eaf-btn-light eaf-btn-sm">📋 Copier</button>
+    </div>
+    <div id="eaf-full-text" class="eaf-full-text"></div>
+  </aside>
+  </div>
 
   <details class="eaf-help no-print">
     <summary>Aide</summary>
     <ul>
       <li><b>Ouvrir un dossier</b> : choisissez le dossier qui contient le <b>.eaf</b> et son <b>audio</b> (l'audio référencé par le fichier, sinon le seul du dossier). <b>Enregistrer</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) écrase le .eaf après avoir copié l'ancienne version dans le sous-dossier <b>sauvegardes/</b> (nom daté). « Rouvrir » reprend le dernier fichier ouvert. Sans cette fonction du navigateur (Chrome, Edge), « Fichiers… » ouvre le .eaf et l'audio, et le .eaf est téléchargé.</li>
-      <li><b>Nouveau fichier</b> : choisissez l'audio (son dossier), puis les participants (nom complet et nom du tier, le prénom par défaut). Le .eaf vide est créé à côté de l'audio, sur le modèle anavevo : pour chaque participant, un tier <i>transcription</i> et ses tiers enfants Traduction, Pinyin, Mixed et Hanzi. Découpez ensuite les segments dans ELAN, puis rouvrez le fichier ici.</li>
+      <li><b>Nouveau fichier</b> : choisissez l'audio (son dossier), puis les participants (nom complet et nom du tier, le prénom par défaut). Le .eaf vide est créé à côté de l'audio, sur le modèle anavevo : pour chaque participant, un tier <i>transcription</i> et ses tiers enfants Traduction, Pinyin, Mixed, Hanzi et Traditionnel. Découpez ensuite les segments dans ELAN, puis rouvrez le fichier ici.</li>
       <li><b>PDF</b> : le texte segment par segment (locuteur, temps, hanzi, pinyin, français) dans un nouvel onglet ; choisissez « Enregistrer au format PDF » dans la fenêtre d'impression. <b>Partager</b> : publie la transcription et une copie compressée de l'audio (MP3, ~18 Mo par heure) sur la page <b>Transcriptions</b>, lisible sur téléphone par les membres connectés. Publiez à nouveau après une séance de travail pour mettre la page à jour (l'audio n'est renvoyé que s'il a changé). Les locuteurs masqués ne sont pas inclus.</li>
       <li>Chaque tier principal du fichier est un locuteur (une colonne).</li>
       <li><b>Lectures</b> : lexique, un dictionnaire ou toutes les sources ; <b>Je tape en</b> et <b>J'affiche en</b> : systèmes de saisie et d'affichage, indépendants de la source (mêmes réglages que la page Écrire).</li>
-      <li>Cliquez un segment pour l'éditer. Vous éditez le <b>Transcript</b>, c'est-à-dire le tier principal du locuteur : la romanisation tapée dans ELAN, que vous convertissez en choisissant les caractères dans les suggestions (mots séparés par des espaces, lectures entre parenthèses : <code>吾(nga1) 爸(ba1)爸(ba1)</code>), et le <b>Français</b> (tier enfant Traduction). Les tiers enfants <b>Pinyin</b> (dans le système « J'affiche en »), <b>Mixte</b> et <b>Hanzi</b> (caractères seuls) sont recalculés automatiquement.</li>
-      <li>Les tiers Traduction, Pinyin, Mixte et Hanzi sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Dans un ancien fichier où le transcript était dans le tier Hanzi (ou un tier Transcript), il est repris dans le tier principal à l'ouverture. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
+      <li>Cliquez un segment pour l'éditer. Vous éditez le <b>Transcript</b>, c'est-à-dire le tier principal du locuteur : la romanisation tapée dans ELAN, que vous convertissez en choisissant les caractères dans les suggestions (mots séparés par des espaces, lectures entre parenthèses : <code>吾(nga1) 爸(ba1)爸(ba1)</code>), et le <b>Français</b> (tier enfant Traduction). Les tiers enfants <b>Pinyin</b> (dans le système « J'affiche en »), <b>Mixte</b>, <b>Hanzi</b> (simplifié) et <b>Traditionnel</b> sont recalculés automatiquement, dès l'ouverture du fichier. Les mots sans caractères (français, noms propres : sans ton) y sont recopiés tels quels. Un caractère à plusieurs lectures propose ses lectures en boutons sous le transcript.</li>
+      <li>Les tiers Traduction, Pinyin, Mixte, Hanzi et Traditionnel sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Dans un ancien fichier où le transcript était dans le tier Hanzi (ou un tier Transcript), il est repris dans le tier principal à l'ouverture. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
       <li><b>Vue d'ensemble</b> (sous l'audio) : une ligne par locuteur, chaque segment pâle s'il est à faire, plein s'il est en hanzi ; le cadre bleu montre la partie de la page à l'écran, le trait rouge la position de lecture. Cliquez ou glissez pour parcourir la page, double-cliquez pour éditer un segment.</li>
       <li>Clavier : <kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> segment suivant/précédent, <kbd>Alt</kbd>+<kbd>Page↓</kbd>/<kbd>Page↑</kbd> segment à compléter suivant/précédent, <kbd>Alt</kbd>+<kbd>Entrée</kbd> réécouter, <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd> choisir une suggestion, <kbd>Échap</kbd> fermer.</li>
       <li>Les modifications non enregistrées sont aussi gardées dans ce navigateur, et proposées à la réouverture du fichier.</li>
@@ -146,11 +170,15 @@
 </div>
 
 <style>
-  .eaf-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; background: #fff;
-                 border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.75rem 1rem; }
-  .eaf-files { display: flex; align-items: center; gap: 0.75rem; flex: 1 1 22rem; min-width: 0; }
-  .eaf-file-info { font-size: 0.8rem; color: #8C8478; min-width: 0; }
-  .eaf-settings { flex: 1 1 26rem; max-width: 36rem; }
+  /* A work surface: the whole width of the window, not the site's reading width. */
+  main:has(> #eaf-app) { max-width: none; padding: 0.5rem; }
+  #eaf-app { max-width: 110rem; }
+  .eaf-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; background: #fff;
+                 border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.4rem 0.75rem; }
+  .eaf-files { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; flex: 1 1 22rem; min-width: 0; }
+  .eaf-file-info { font-size: 0.8rem; color: #6E665C; min-width: 0; flex: 1 1 16rem; }
+  .eaf-settings { flex: 0 1 auto; }
+  .eaf-settings[open] { flex-basis: 100%; order: 1; }
   .eaf-actions { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
   .eaf-progress { font-size: 0.8rem; color: #6E665C; white-space: nowrap; }
   .eaf-btn { display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0.35rem 0.9rem; border-radius: 0.5rem;
@@ -161,7 +189,8 @@
   .eaf-btn-save:hover:not(:disabled) { background: #065f46; }
   .eaf-btn-save:disabled { opacity: 0.45; cursor: default; }
   .eaf-btn-light { background: #fff; color: #544D45; border-color: #DDD0BD; font-weight: 500; }
-  .eaf-btn-light:hover { background: #F6EFE4; }
+  .eaf-btn-light:hover:not(:disabled) { background: #F6EFE4; }
+  .eaf-btn-light:disabled { opacity: 0.45; cursor: default; }
   .eaf-btn-sm { min-height: 1.75rem; padding: 0.15rem 0.6rem; font-size: 0.78rem; }
   .eaf-btn[hidden] { display: none; }
   .eaf-dirty { font-size: 0.8rem; color: #b45309; white-space: nowrap; }
@@ -179,7 +208,7 @@
   .eaf-new-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; margin-bottom: 0.6rem; }
   .eaf-new-head .grow { flex: 1; }
   .eaf-new-grid { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.6rem 0.75rem; align-items: start; }
-  .eaf-new-grid > span { font-size: 0.75rem; color: #8C8478; padding-top: 0.5rem; }
+  .eaf-new-grid > span { font-size: 0.75rem; color: #6E665C; padding-top: 0.5rem; }
   .eaf-new-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
   .eaf-new input[type="text"], .eaf-new select { min-height: 2.25rem; padding: 0.3rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.5rem;
                                                  background: #fff; font-size: 0.9rem; min-width: 0; }
@@ -187,24 +216,40 @@
   .eaf-new-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 0.4rem; margin-bottom: 0.4rem; max-width: 36rem; }
   .eaf-new-preview { font-size: 0.8rem; color: #544D45; padding-top: 0.45rem; display: grid; gap: 0.2rem; overflow-wrap: anywhere; }
   .eaf-new-error { font-size: 0.8rem; color: #b45309; }
-  .eaf-empty { padding: 1rem; font-size: 0.875rem; color: #8C8478; }
+  .eaf-empty { padding: 1rem; font-size: 0.875rem; color: #6E665C; }
 
   .eaf-audio { position: sticky; top: 0; z-index: 20; margin-top: 0.75rem; padding: 0.4rem 0.5rem;
                background: rgb(229 231 235 / 0.95); backdrop-filter: blur(4px); border-radius: 0.5rem; }
-  .eaf-audio audio { display: block; width: 100%; height: 2.25rem; margin-bottom: 0.3rem; }
-  .eaf-audio audio[hidden] { display: none; }
+  .eaf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin-bottom: 0.3rem;
+             font-size: 0.75rem; color: #6E665C; font-variant-numeric: tabular-nums; }
+  .eaf-bar audio { flex: 1 1 18rem; min-width: 0; height: 2rem; }
+  .eaf-bar audio[hidden] { display: none; }
+  .eaf-view-range { white-space: nowrap; }
+  .eaf-follow { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; white-space: nowrap; }
+  .eaf-todo { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+  .eaf-todo button { min-width: 1.75rem; min-height: 1.75rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; color: #544D45; font-size: 0.875rem; }
+  .eaf-todo button:hover { background: #F6EFE4; }
+  .eaf-bar .eaf-btn-save { margin-left: auto; min-height: 2rem; padding: 0.15rem 0.8rem; }
+  @media (max-width: 1099px) { .eaf-bar audio { flex-basis: 100%; } }
   .eaf-overview { position: relative; }
   .eaf-overview canvas { display: block; width: 100%; cursor: pointer; touch-action: none; border-radius: 0.25rem; background: #fff; }
   .eaf-overview-tip { position: absolute; bottom: calc(100% + 4px); max-width: 28rem; padding: 0.2rem 0.5rem; border-radius: 0.35rem;
                       background: #261F1C; color: #fff; font-size: 0.75rem; white-space: nowrap; overflow: hidden;
                       text-overflow: ellipsis; pointer-events: none; z-index: 30; }
   .eaf-overview-tip[hidden] { display: none; }
-  .eaf-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin-top: 0.3rem;
-             font-size: 0.75rem; color: #6E665C; font-variant-numeric: tabular-nums; }
-  .eaf-nav .grow { flex: 1; }
-  .eaf-nav label { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; }
 
   /* No overflow:hidden here: it would stop the column header from sticking. */
+  .eaf-split { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 1100px) { .eaf-split { grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem); } }
+  .eaf-full { margin-top: 0.75rem; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.6rem 0.75rem;
+              position: sticky; top: calc(var(--eaf-bar-h, 0px) + 0.5rem); display: grid; gap: 0.5rem; }
+  .eaf-full-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+  .eaf-full-fields { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+  .eaf-full-fields button { min-height: 1.9rem; padding: 0 0.55rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-size: 0.78rem; color: #544D45; }
+  .eaf-full-fields button[aria-pressed="true"] { background: #9B1C1C; border-color: #9B1C1C; color: #fff; font-weight: 600; }
+  .eaf-full-text { max-height: 70vh; overflow-y: auto; font-size: 0.95rem; line-height: 1.6; overflow-wrap: anywhere; }
+  .eaf-full-text p { margin-bottom: 0.5rem; }
+  .eaf-full-text b { color: #6E655C; font-size: 0.78rem; display: block; }
   .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
   .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #F6EFE4;
              scroll-margin-top: calc(var(--eaf-bar-h, 0px) + 2.75rem); }
@@ -215,11 +260,11 @@
   .eaf-speaker-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
   .eaf-speaker-head label { display: flex; align-items: center; gap: 0.4rem; min-width: 0; cursor: pointer; }
   .eaf-speaker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .eaf-speaker-count { font-weight: 400; color: #8C8478; white-space: nowrap; }
+  .eaf-speaker-count { font-weight: 400; color: #6E665C; white-space: nowrap; }
   .eaf-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--c); flex: none; }
 
-  .eaf-time { padding: 0.45rem 0.4rem; font-size: 0.72rem; color: #8C8478; font-variant-numeric: tabular-nums; }
-  .eaf-time button { color: #9B1C1C; } .eaf-time button:hover { text-decoration: underline; }
+  .eaf-time { padding: 0.25rem 0.4rem; font-size: 0.78rem; color: #6E665C; font-variant-numeric: tabular-nums; }
+  .eaf-time button { color: #9B1C1C; min-height: 1.75rem; } .eaf-time button:hover { text-decoration: underline; }
   .eaf-cell { padding: 0.25rem; min-width: 0; }
   .eaf-seg { display: block; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 0.5rem; cursor: pointer;
              border: 1px solid #ECE2D3; border-left: 4px solid var(--c); background: #fff; min-width: 0; }
@@ -227,9 +272,9 @@
   .eaf-seg.is-active { background: #FBF0E6; border-color: #a5b4fc; border-left-color: var(--c); }
   .eaf-seg.is-playing { box-shadow: 0 0 0 2px #f59e0b; }
   .eaf-seg-main { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
-  .eaf-seg-main.is-todo { color: #B5AA9B; font-style: italic; font-size: 0.875rem; }
-  .eaf-seg-sub { font-size: 0.72rem; color: #8C8478; overflow-wrap: anywhere; }
-  .eaf-seg-state { float: right; margin-left: 0.25rem; font-size: 0.65rem; }
+  .eaf-seg-main.is-todo { color: #6E665C; font-style: italic; font-size: 0.875rem; }
+  .eaf-seg-sub { font-size: 0.8rem; color: #6E665C; overflow-wrap: anywhere; }
+  .eaf-seg-state { float: right; margin-left: 0.25rem; font-size: 1rem; line-height: 1; }
   .eaf-speaker-tag { display: none; font-size: 0.7rem; font-weight: 600; color: var(--c); }
 
   .eaf-editor { grid-column: 1 / -1; margin: 0.25rem 0.5rem 0.75rem; padding: 0.75rem; border-radius: 0.75rem;
@@ -237,7 +282,7 @@
   .eaf-editor-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
   .eaf-editor-head .grow { flex: 1; }
   .eaf-field { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.25rem 0.75rem; align-items: start; margin-top: 0.5rem; }
-  .eaf-field > span { font-size: 0.75rem; color: #8C8478; padding-top: 0.45rem; }
+  .eaf-field > span { font-size: 0.75rem; color: #6E665C; padding-top: 0.45rem; }
   .eaf-field textarea { width: 100%; min-height: 2.4rem; padding: 0.4rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.5rem;
                         background: #fff; font-size: 1rem; resize: vertical; }
   .eaf-field textarea:focus { outline: 2px solid #a5b4fc; outline-offset: 0; }
@@ -245,6 +290,13 @@
   .eaf-derived { font-size: 0.85rem; color: #544D45; padding-top: 0.4rem; overflow-wrap: anywhere; }
   .eaf-derived.hanzi { font-size: 1.05rem; }  .eaf-ime { position: relative; }
   .eaf-preview { margin-top: 0.4rem; }
+  .eaf-ed-settings { font-size: 0.85rem; margin: 0.25rem 0 0.5rem; }
+  .eaf-ed-settings > summary { cursor: pointer; font-weight: 600; color: #544D45; }
+  .eaf-ambig { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin-top: 0.35rem; font-size: 0.8rem; color: #9a3412; }
+  .eaf-ambig-char { display: inline-flex; align-items: center; gap: 0.2rem; }
+  .eaf-ambig-char .hanzi { font-size: 1.1rem; color: #c2410c; }
+  .eaf-ambig button { min-height: 1.9rem; min-width: 2.8rem; padding: 0 0.4rem; border: 1px solid #fdba74; border-radius: 0.4rem; background: #fff7ed; color: #9a3412; font-weight: 600; }
+  .eaf-ambig button:hover { background: #ffedd5; }
 
   .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #6E665C; }
   .eaf-help summary { cursor: pointer; font-size: 0.875rem; color: #544D45; }
@@ -252,6 +304,8 @@
 
   /* Phone: one column, the speaker shown on each segment instead. */
   @media (max-width: 640px) {
+    .eaf-view-range { display: none; }
+    .eaf-bar { gap: 0.25rem 0.5rem; }
     .eaf-row { grid-template-columns: 3.2rem minmax(0, 1fr); }
     .eaf-head { display: none; }
     .eaf-cell:empty { display: none; }
@@ -270,6 +324,7 @@
     <script src="{% static 'hakkadbapp/js/HakkaText.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/EafDocument.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/TranscriptDocument.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/TranscriptLines.js' %}"></script>
     <script>
       window.TRANSCRIPT_SHARE = {
         lookup: "{% url 'api_transcription_lookup' %}",

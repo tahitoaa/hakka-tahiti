@@ -8,7 +8,7 @@
      Sentence.js format (words separated by spaces, pinned readings such
      as 生(sen1));
    - Traduction (French), a child tier.
-   The other child tiers -- Pinyin (in the "J'affiche en" system), Mixed
+   The other child tiers -- Trad (traditional characters), Pinyin (in the "J'affiche en" system), Mixed
    and Hanzi (characters only) -- are derived from the transcript.
    The file itself is an EafDocument: only annotation values change, the
    rest of the ELAN structure is kept as is. "Enregistrer" overwrites the
@@ -41,14 +41,11 @@ function plainHanzi(text) {
     return String(text || '').replace(/\([^()]*\)/g, '');
 }
 
-/** Hanzi, pinyin and mixed lines derived from the transcript, the pinyin
- *  in the system picked in "J'affiche en". The Hanzi line keeps characters
- *  only: syllables not converted yet are left out. */
+/** The (auto) lines of a transcript: pinyin (in the system picked in
+ *  "J'affiche en"), mixed, hanzi (simplified) and trad (traditional). See
+ *  TranscriptLines.js: words without characters are copied as written. */
 function deriveFromTranscript(text) {
-    const sentences = String(text || '').split('\n').filter((l) => l.trim()).map((l) => new Sentence(dico, l));
-    const hanzi = sentences.map((s) => s.renderHanziLine().replace(/[\p{Script=Latin}\d_'’?]+/gu, '')).join(' ').trim();
-    const pinyin = sentences.map((s) => s.renderDisplayPinyinLine()).join(' ').trim();
-    return { hanzi, pinyin, mixed: [pinyin, hanzi].filter(Boolean).join(' ') };
+    return TranscriptLines.derive(dico, text);
 }
 
 const HAN_RE = /\p{Script=Han}/u;
@@ -153,16 +150,18 @@ class SegmentEditor {
               <div class="eaf-editor-head">
                 <span class="eaf-dot"></span><b>${escapeHtml(s.speaker.participant)}</b>
                 <span class="text-gray-500">${formatTime(s.start)} → ${formatTime(s.end)}</span>
-                <button type="button" class="eaf-btn eaf-btn-light" data-act="play" title="Alt+Entrée">▶ Écouter</button>
+                <button type="button" class="eaf-btn eaf-btn-light" data-act="play" title="Alt+Entrée">▶︎ Écouter</button>
                 <span class="grow"></span>
                 <button type="button" class="eaf-btn eaf-btn-light" data-act="prev" title="Alt+↑">↑ Précédent</button>
                 <button type="button" class="eaf-btn eaf-btn-light" data-act="next" title="Alt+↓">↓ Suivant</button>
                 <button type="button" class="eaf-btn eaf-btn-light" data-act="close" title="Échap">✕</button>
               </div>
+              <details class="eaf-ed-settings" data-role="settings"><summary>⚙ Réglages <span class="settings-brief" data-settings-brief></span></summary></details>
               <div class="eaf-field"><span>Transcript<br><small>tier « ${escapeHtml(s.speaker.id)} »</small></span>
                 <div class="eaf-ime">
                   <textarea data-role="transcript" class="hanzi-input" rows="2" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
                   <div data-role="suggestions" class="flex gap-1.5 flex-wrap"></div>
+                  <div data-role="ambiguous" class="eaf-ambig" hidden></div>
                   <div data-role="preview" class="eaf-preview"></div>
                 </div>
               </div>
@@ -170,13 +169,20 @@ class SegmentEditor {
                 <textarea data-role="translation" rows="1"></textarea></label>
               <div class="eaf-field"><span>Pinyin <small>(auto)</small></span><div data-role="pinyin" class="eaf-derived"></div></div>
               <div class="eaf-field"><span>Mixte <small>(auto)</small></span><div data-role="mixed" class="eaf-derived"></div></div>
-              <div class="eaf-field"><span>Hanzi <small>(auto)</small></span><div data-role="hanzi" class="eaf-derived hanzi"></div></div>
+              <div class="eaf-field"><span>Simplifié <small>(auto)</small></span><div data-role="hanzi" class="eaf-derived hanzi"></div></div>
+              <div class="eaf-field"><span>Traditionnel <small>(auto)</small></span><div data-role="trad" class="eaf-derived hanzi"></div></div>
             </div>`;
         const q = (sel) => this.row.querySelector(sel);
+        // Je tape en, J'affiche en, Lectures: the same controls, at hand here.
+        const settings = q('[data-role="settings"]');
+        settings.append(document.querySelector('.reading-settings'));
+        settings.querySelector('[data-settings-brief]').textContent = document.querySelector('.eaf-settings [data-settings-brief]')?.textContent || '';
         this.transcript = q('[data-role="transcript"]');
         this.translation = q('[data-role="translation"]');
         this.preview = q('[data-role="preview"]');
         this.hanziOut = q('[data-role="hanzi"]');
+        this.tradOut = q('[data-role="trad"]');
+        this.ambiguous = q('[data-role="ambiguous"]');
         this.pinyinOut = q('[data-role="pinyin"]');
         this.mixedOut = q('[data-role="mixed"]');
 
@@ -192,6 +198,15 @@ class SegmentEditor {
 
         this.transcript.addEventListener('input', () => { this.touched = true; this.renderIme(); this.commit(); });
         this.translation.addEventListener('input', () => this.app.write(s, 'translation', this.translation.value));
+        // A reading chosen for a character read several ways: pinned in the transcript.
+        this.ambiguous.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin]')) event.preventDefault(); });
+        this.ambiguous.addEventListener('click', (event) => {
+            const b = event.target.closest('[data-pin]');
+            if (!b) return;
+            this.transcript.value = TranscriptLines.pin(this.transcript.value, Number(b.dataset.pin), b.dataset.reading);
+            this.transcript.dispatchEvent(new Event('input'));
+            this.transcript.focus();
+        });
         this.row.addEventListener('click', (event) => {
             const act = event.target.closest('[data-act]')?.dataset.act;
             if (act === 'play') this.app.play(s);
@@ -204,6 +219,7 @@ class SegmentEditor {
 
     showDerived(values) {
         this.hanziOut.textContent = values.hanzi;
+        this.tradOut.textContent = values.trad;
         this.pinyinOut.textContent = values.pinyin;
         this.mixedOut.textContent = values.mixed;
     }
@@ -212,6 +228,17 @@ class SegmentEditor {
         this.model.update({ hanzi: this.transcript.value });
         this.suggestionBar.render(this.model.suggestions);
         this.preview.innerHTML = this.model.sentences.map((x) => x.renderTokens()).join('');
+        this.renderAmbiguous();
+    }
+
+    /** As in Saisie: one button per reading of a character read several ways. */
+    renderAmbiguous() {
+        const found = TranscriptLines.ambiguous(dico, this.transcript.value);
+        const sentence = new Sentence(dico, '');
+        this.ambiguous.hidden = !found.length;
+        this.ambiguous.innerHTML = found.length ? `<span class="eaf-ambig-label">Plusieurs lectures :</span>${found.map((a) =>
+            `<span class="eaf-ambig-char"><span class="hanzi">${escapeHtml(a.char)}</span>${a.readings.map((r) =>
+                `<button type="button" data-pin="${a.pos}" data-reading="${escapeHtml(r)}" aria-label="Lire ${escapeHtml(a.char)} ${escapeHtml(sentence.displayPinyin(r))}">${escapeHtml(sentence.displayPinyin(r))}</button>`).join('')}</span>`).join('')}` : '';
     }
 
     select(index) {
@@ -231,14 +258,15 @@ class SegmentEditor {
         this.app.write(this.segment, 'pinyin', derived.pinyin, { silent: true });
         this.app.write(this.segment, 'mixed', derived.mixed, { silent: true });
         this.app.write(this.segment, 'hanzi', derived.hanzi, { silent: true });
+        this.app.write(this.segment, 'trad', derived.trad, { silent: true });
         this.app.changed(this.segment);
         this.showDerived(derived);
     }
 
-    /** Display system changed: recompute the derived lines if edited. */
+    /** Display system or sources changed: the app has recomputed the lines. */
     refreshDerived() {
         this.renderIme();
-        if (this.touched) this.commit();
+        this.showDerived(this.segment);
     }
 
     focus() {
@@ -819,6 +847,24 @@ class TranscriberApp {
         this.audio.addEventListener('play', () => this.tick());
         $('eaf-save').addEventListener('click', () => this.save());
         document.addEventListener('romanization-change', () => this.refreshDerived());
+        $('eaf-full-fields').addEventListener('click', (event) => {
+            const b = event.target.closest('[data-full]');
+            if (!b) return;
+            this.fullField = b.dataset.full;
+            $('eaf-full-fields').querySelectorAll('[data-full]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+            this.renderFullText();
+        });
+        $('eaf-full-copy').addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            const said = button.textContent;
+            try {
+                await navigator.clipboard.writeText(this.fullParagraphs().map((p) => (p.name ? `${p.name} : ${p.text}` : p.text)).join('\n\n'));
+                button.textContent = '✓ Copié';
+            } catch (err) { button.textContent = 'Copie impossible'; }
+            setTimeout(() => { button.textContent = said; }, 1500);
+        });
+        // Trad. / Simp.: the list shows that form (each has its own tier either way).
+        $('toggle-hanzi')?.addEventListener('click', () => { if (this.eaf) { this.close(); this.render(); } });
         document.addEventListener('romanization-input-change', () => this.editor?.renderIme());
         // "Lectures": lexicon, a dictionary or all sources (shared with Écrire).
         window.readingSources = new ReadingSourceSwitch({
@@ -826,7 +872,7 @@ class TranscriberApp {
             status: $('source-status'),
             summary: $('settings-summary'),
             dico,
-            onChange: () => this.editor?.renderIme(),
+            onChange: () => this.refreshDerived(),
         });
         window.addEventListener('beforeunload', (event) => {
             if (this.dirty) { event.preventDefault(); event.returnValue = ''; }
@@ -974,9 +1020,15 @@ class TranscriberApp {
         this.message('');
         $('eaf-choose').hidden = true;
         const moved = this.migrate();
+        const derived = this.deriveAll().length;
+        const notes = [];
         if (moved) {
-            this.message(`${moved} segment${moved > 1 ? 's' : ''} : le transcript (texte avec espaces et lectures, jusqu'ici dans le tier Hanzi ou Transcript) a été repris dans le tier principal, et le tier Hanzi ne garde que les caractères. Enregistrez pour l'appliquer au fichier (l'ancienne version sera sauvegardée).`);
+            notes.push(`${moved} segment${moved > 1 ? 's' : ''} : le transcript (texte avec espaces et lectures, jusqu'ici dans le tier Hanzi ou Transcript) a été repris dans le tier principal, et le tier Hanzi ne garde que les caractères.`);
         }
+        if (derived) {
+            notes.push(`${derived} segment${derived > 1 ? 's' : ''} : champs (auto) Pinyin, Mixte, Simplifié et Traditionnel recalculés depuis le transcript.`);
+        }
+        if (notes.length) this.message(`${notes.join(' ')} Enregistrez pour l'appliquer au fichier (l'ancienne version sera sauvegardée).`);
         if (!fromDraft) this.offerDraft(fileName);
         else $('eaf-draft').hidden = true;
         this.render();
@@ -987,6 +1039,21 @@ class TranscriberApp {
         requestAnimationFrame(() => this.updateView());
     }
 
+    /** The (auto) fields of every segment with a transcript, computed again
+     *  (reading system and sources in use); a segment with no transcript
+     *  keeps what the file has. Returns the segments that changed. */
+    deriveAll() {
+        const changed = [];
+        this.eaf.segments.forEach((seg) => {
+            if (!seg.transcript?.trim()) return;
+            const derived = deriveFromTranscript(seg.transcript);
+            const roles = ['pinyin', 'mixed', 'hanzi', 'trad'].filter((role) => (seg[role] ?? '') !== derived[role]);
+            roles.forEach((role) => this.write(seg, role, derived[role], { silent: true }));
+            if (roles.length) changed.push(seg);
+        });
+        return changed;
+    }
+
     /** Earlier files kept the transcript in a child tier: "Transcript"
      *  (moved, then removed) or Hanzi, when the speaker tier still holds
      *  the bare romanization (moved; Hanzi keeps the characters). */
@@ -994,7 +1061,7 @@ class TranscriberApp {
         let moved = this.eaf.absorbTranscriptTiers();
         if (moved) this.dirty = true;
         this.eaf.segments.forEach((seg) => {
-            if (!seg.hanzi || HAN_RE.test(seg.transcript)) return;
+            if (!HAN_RE.test(seg.hanzi || '') || HAN_RE.test(seg.transcript)) return;
             const hanzi = deriveFromTranscript(seg.hanzi).hanzi;
             this.write(seg, 'transcript', seg.hanzi, { silent: true });
             if (hanzi !== seg.hanzi) this.write(seg, 'hanzi', hanzi, { silent: true });
@@ -1041,7 +1108,7 @@ class TranscriberApp {
     updateProgress() {
         if (!this.eaf) return;
         const done = this.eaf.segments.filter((s) => segmentState(s) === 'done').length;
-        $('eaf-progress').textContent = `${done} / ${this.eaf.segments.length} segments en hanzi`;
+        $('eaf-progress').textContent = `${done}/${this.eaf.segments.length} en hanzi`;
         $('eaf-dirty').hidden = !this.dirty;
         this.eaf.speakers.forEach((sp) => {
             const el = document.querySelector(`[data-speaker-count="${sp.index}"]`);
@@ -1065,10 +1132,11 @@ class TranscriberApp {
     }
 
     render() {
+        $('eaf-settings-home').append(document.querySelector('.reading-settings'));
         const speakers = this.visibleSpeakers();
         const board = $('eaf-board');
         board.hidden = false;
-        board.style.setProperty('--eaf-cols', `4.2rem repeat(${speakers.length}, minmax(0, 1fr))`);
+        board.style.setProperty('--eaf-cols', `5rem repeat(${speakers.length}, minmax(0, 1fr))`);
 
         $('eaf-header').innerHTML = `<div>Temps</div>` + speakers.map((sp) => `
                 <div class="eaf-speaker-head" style="--c:${speakerColor(sp)}">
@@ -1095,10 +1163,12 @@ class TranscriberApp {
         const columnOf = new Map(speakers.map((sp, i) => [sp.index, i]));
         const html = [];
         this.rowSegs = this.eaf.segments.filter((seg) => columnOf.has(seg.speaker.index));
+        $('eaf-full').hidden = false;
+        this.renderFullText();
         this.rowSegs.forEach((seg) => {
             const cells = speakers.map((sp) => sp === seg.speaker ? `<div class="eaf-cell">${this.cardHtml(seg)}</div>` : '<div class="eaf-cell"></div>');
             html.push(`<div class="eaf-row" data-key="${escapeHtml(seg.key)}">
-                <div class="eaf-time"><button type="button" data-play="${escapeHtml(seg.key)}" title="Écouter">▶ ${formatTime(seg.start)}</button></div>
+                <div class="eaf-time"><button type="button" data-play="${escapeHtml(seg.key)}" title="Écouter">▶︎ ${formatTime(seg.start)}</button></div>
                 ${cells.join('')}</div>`);
         });
         $('eaf-rows').innerHTML = html.join('') || `<div class="eaf-empty">Aucun segment pour l'instant : découpez l'enregistrement dans ELAN
@@ -1118,7 +1188,7 @@ class TranscriberApp {
         const color = speakerColor(seg.speaker);
         const state = segmentState(seg);
         const main = state !== 'empty'
-            ? `<div class="eaf-seg-main hanzi">${escapeHtml(seg.hanzi || plainHanzi(seg.transcript))}</div>`
+            ? `<div class="eaf-seg-main hanzi">${escapeHtml((isShowingTrad() && seg.trad) || seg.hanzi || plainHanzi(seg.transcript))}</div>`
             : `<div class="eaf-seg-main is-todo">${escapeHtml(seg.transcript || '—')}</div>`;
         const sub = [seg.pinyin, seg.translation].filter(Boolean).map((t) => `<div class="eaf-seg-sub">${escapeHtml(t)}</div>`).join('');
         const active = this.editor?.segment === seg ? ' is-active' : '';
@@ -1211,6 +1281,40 @@ class TranscriberApp {
         this.message(delta > 0 ? 'Plus aucun segment à compléter après celui-ci.' : 'Plus aucun segment à compléter avant celui-ci.');
     }
 
+    // ---- the whole text ----------------------------------------------------
+
+    /** One field of the speakers shown, in order: a paragraph per turn of speech. */
+    fullParagraphs() {
+        const field = this.fullField || 'hanzi';
+        const several = this.visibleSpeakers().length > 1;
+        const out = [];
+        (this.rowSegs || []).forEach((seg) => {
+            const value = (seg[field] || '').trim();
+            if (!value) return;
+            const last = out[out.length - 1];
+            if (last && last.speaker === seg.speaker) {
+                // Characters run on, from one segment to the next; anything else is spaced.
+                const han = /[\p{Script=Han}，。、；：？！…]$/u;
+                last.text += ['hanzi', 'trad'].includes(field) && han.test(last.text) && HAN_RE.test(value[0]) ? value : ` ${value}`;
+            }
+            else out.push({ speaker: seg.speaker, name: several ? seg.speaker.participant : '', text: value });
+        });
+        return out;
+    }
+
+    renderFullText() {
+        const paragraphs = this.fullParagraphs();
+        const box = $('eaf-full-text');
+        box.classList.toggle('hanzi', ['hanzi', 'trad'].includes(this.fullField || 'hanzi'));
+        box.innerHTML = paragraphs.map((p) => `<p>${p.name ? `<b>${escapeHtml(p.name)}</b>` : ''}${escapeHtml(p.text)}</p>`).join('')
+            || '<p class="text-gray-500">Ce champ est vide pour l\'instant.</p>';
+    }
+
+    scheduleFullText() {
+        clearTimeout(this.fullTimer);
+        this.fullTimer = setTimeout(() => this.renderFullText(), 250);
+    }
+
     // ---- editing -------------------------------------------------------
 
     open(seg) {
@@ -1230,6 +1334,7 @@ class TranscriberApp {
     close() {
         if (!this.editor) return;
         const seg = this.editor.segment;
+        $('eaf-settings-home').append(document.querySelector('.reading-settings'));
         this.editor.row.remove();
         this.editor = null;
         this.refreshCard(seg);
@@ -1257,22 +1362,19 @@ class TranscriberApp {
         this.refreshCard(seg);
         this.updateProgress();
         this.scheduleDraft();
+        this.scheduleFullText();
     }
 
     refreshDerived() {
         if (!this.eaf) return;
-        // Recompute the lines derived from the transcripts edited in this
-        // session in the newly displayed system (the others keep what the
-        // file has).
-        this.edited.forEach((key) => {
-            const seg = this.eaf.segmentsByKey.get(key);
-            if (!seg?.transcript) return;
-            const derived = deriveFromTranscript(seg.transcript);
-            this.write(seg, 'pinyin', derived.pinyin, { silent: true });
-            this.write(seg, 'mixed', derived.mixed, { silent: true });
-            this.write(seg, 'hanzi', derived.hanzi, { silent: true });
-            this.changed(seg);
-        });
+        // Every (auto) field follows the displayed system and the sources.
+        const changed = this.deriveAll();
+        changed.forEach((seg) => this.refreshCard(seg));
+        if (changed.length) {
+            this.updateProgress();
+            this.scheduleDraft();
+            this.scheduleFullText();
+        }
         this.editor?.refreshDerived();
     }
 

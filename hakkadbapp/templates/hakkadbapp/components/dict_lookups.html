@@ -1,0 +1,133 @@
+{% load static %}
+{% comment %}
+  « Dictionnaires » tab of the lexicon browser (search.html), for editors:
+  - 📕 Rey 1926 (rey.py) and 🔎 hakkadictionary.com (hakkadict.py), driven by
+    dict_lookups.js -- the pinyin -> character picker of hakkadictionary
+    reads the characters table (api_sources_table), loaded the first time
+    this tab is opened;
+  - 🌐 Sources en ligne (sources.py, Sources.js in base.html): what the
+    documents and the web say about a word.
+{% endcomment %}
+<style>
+  .dl-root { --sx-ink: #261F1C; --sx-muted: #6E665C; --sx-line: #E8DFD2; --sx-red: #9B1C1C; }
+  .dl-card { background: #fff; border: 1px solid var(--sx-line); border-radius: 0.75rem; padding: 0.75rem 0.9rem; }
+  .dl-card > h3 { font-weight: 700; font-size: 1.05rem; color: var(--sx-ink); margin-bottom: 0.4rem; }
+  .dl-card > h3 small { font-weight: 500; color: var(--sx-muted); font-size: 0.8rem; }
+  .dl-root .sx-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .dl-root .sx-tools input[type=search] { flex: 1 1 14rem; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; }
+  .dl-root .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
+  .dl-root .sx-chip:disabled { opacity: 0.45; cursor: default; }
+  .dl-root .sx-chip[aria-pressed="true"] { background: var(--sx-red); border-color: var(--sx-red); color: #fff; }
+  .dl-root .sx-count, .dl-root .sx-legend { font-size: 0.8rem; color: var(--sx-muted); }
+  .dl-root .sx-none { color: #B5AA9B; }
+  .dl-root .sx-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--sx-line); border-radius: 0.6rem; background: #fff; }
+  .dl-root .sx-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+  .dl-root .sx-table thead th { position: sticky; top: 0; z-index: 1; background: #F6EFE4; color: #544D45; font-size: 0.68rem; text-transform: uppercase;
+                                padding: 0.35rem; text-align: left; }
+  .dl-root .sx-table td { padding: 0.3rem 0.4rem; border-top: 1px solid #F0E8DC; vertical-align: top; }
+  .dl-root .sx-table .sx-char .hanzi { font-size: 1.25rem; }
+  .dl-root .sx-table td.sx-en { color: #544D45; font-style: italic; font-size: 0.8rem; }
+  .dl-root .lk-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.5rem 0; }
+  .dl-root .lk-chips small { opacity: 0.7; }
+  .dl-root .hdx-cand { display: inline-flex; align-items: baseline; gap: 0.3rem; }
+  .dl-root .hdx-cand .hanzi { font-size: 1.2rem; color: var(--sx-ink); }
+  .dl-root .hdx-cand[aria-selected="true"] { border-color: var(--sx-red); background: #FBF0E6; }
+  .dl-root .hdx-chosen { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1rem; padding: 0.4rem 0.7rem; background: #FAF7F2;
+                         border-radius: 0.5rem; font-size: 0.85rem; }
+  .dl-root .hdx-chosen[hidden] { display: none; }
+  .dl-root .hdx-chosen .hanzi { font-size: 1.6rem; color: var(--sx-red); }
+  .dl-root .lk-pages { display: grid; gap: 0.5rem; }
+  .dl-root .lk-page { border: 1px solid var(--sx-line); border-radius: 0.7rem; padding: 0.5rem 0.65rem; }
+  .dl-root .lk-page-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .dl-root .lk-page-head b { font-size: 1rem; margin-right: 0.3rem; }
+  .dl-root .lk-ai { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+  .dl-root .lk-read { font-size: 0.78rem; font-weight: 700; color: #065f46; }
+  .dl-root .lk-scan { display: block; max-width: 100%; margin-top: 0.5rem; border: 1px solid var(--sx-line); border-radius: 0.4rem; }
+  .dl-root .lk-page-body:not(:empty) { margin-top: 0.5rem; }
+  .dl-root .lk-entries tr.lk-head td { background: #FBF0E6; font-weight: 700; }
+  .dl-root .lk-align { display: flex; flex-wrap: wrap; gap: 0 0.5rem; font-size: 0.72rem; font-weight: 400; color: var(--sx-muted); }
+  .dl-root .lk-align .hanzi { font-size: 0.85rem; color: var(--sx-red); text-decoration: none; }
+  .dl-root .lk-noalign { color: #b45309; }
+  .dl-root .hd-entry { font-size: 0.85rem; } .dl-root .hd-entry b { color: var(--sx-red); }
+</style>
+
+<div class="dl-root space-y-4">
+  {% if can_edit %}
+  <section class="dl-card" aria-labelledby="dl-rey-title">
+    <h3 id="dl-rey-title">📕 Rey 1926 <small>dictionnaire chinois-français, dialecte hac-ka — par syllabe</small></h3>
+    <div class="sx-tools">
+      <label class="sr-only" for="rey-q">Syllabe</label>
+      <input id="rey-q" type="search" placeholder="Syllabe : yok, yo, zhung, ngin…" autocapitalize="off" spellcheck="false">
+      <button type="button" id="rey-go" class="sx-chip">Chercher</button>
+      <details class="help-tip"><summary aria-label="Aide">ⓘ</summary><div>Charles Rey, <i>Dictionnaire chinois-français, dialecte hac-ka</i>
+        (1926), d'après l'index de <a class="underline" href="https://daylightstar.wordpress.com/2024/01/31/dictionnaire-chinoise-francais-dialecte-hac-ka-2/" target="_blank" rel="noopener">daylightstar</a>
+        et les scans de l'Academia Sinica. Rey écrit en romanisation française : <b>-c</b> final = -k (yoc = yok), tch = zh, ts' = c,
+        gn = ng(i), ou = u ; tapez comme vous voulez, l'orthographe de Rey est essayée. Sans IA : les pages de la syllabe et leurs scans.
+        « ✨ Lire les caractères » : l'IA relève les caractères, lectures et sens de la page, une seule fois (gardé pour tous).</div></details>
+    </div>
+    <p class="sx-count" id="rey-status" role="status"></p>
+    <div id="rey-result"></div>
+  </section>
+
+  <section class="dl-card" aria-labelledby="dl-hdx-title">
+    <h3 id="dl-hdx-title">🔎 hakkadictionary.com <small>客家話大辭典 (Bao'an) — par caractère, sans IA</small></h3>
+    <div class="sx-tools">
+      <label class="sr-only" for="hdx-q">Caractère, ou sa lecture en pinyin</label>
+      <input id="hdx-q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="12"
+             placeholder="Pinyin (fan, fan1) ou caractère" style="max-width:16rem">
+      <button type="button" id="hdx-go" class="sx-chip">Chercher</button>
+      <span class="sx-legend">Lectures, sens et mots parlés cités.</span>
+    </div>
+    <div id="hdx-pick" class="lk-chips" role="listbox" aria-label="Caractères possibles"></div>
+    <p id="hdx-chosen" class="hdx-chosen" hidden></p>
+    <div id="hdx-result" class="space-y-2"></div>
+  </section>
+
+  <section class="dl-card" aria-labelledby="dl-web-title">
+    <h3 id="dl-web-title">🌐 Sources en ligne <small>documents importés et recherche sur les sites de référence</small></h3>
+    <div class="sx-tools">
+      <label class="sr-only" for="dl-web-q">Mot ou caractère</label>
+      <input id="dl-web-q" type="search" autocomplete="off" maxlength="20" placeholder="Mot ou caractère : 屋家" style="max-width:16rem">
+      <button type="button" id="dl-web-go" class="sx-chip" disabled>Voir les sources</button>
+      <span class="sx-legend">Les documents d'abord ; une recherche en ligne (IA) seulement sur demande dans le panneau.</span>
+    </div>
+  </section>
+  {% else %}
+  <p class="text-sm text-gray-600">
+    {% if user.is_authenticated %}La recherche dans les dictionnaires (Rey 1926, hakkadictionary.com, sources en ligne) est réservée aux éditeurs.
+    {% else %}<a class="underline" href="{% url 'login' %}?next={{ request.path|urlencode }}%23dictionnaires">Connectez-vous</a> pour chercher dans les dictionnaires
+    (Rey 1926, hakkadictionary.com, sources en ligne).{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+{% if can_edit %}
+<script src="{% static 'hakkadbapp/js/dict_lookups.js' %}" defer></script>
+<script>
+  (function () {
+    // 🌐 The panel of Sources.js opens on any [data-sources] button: this one carries what is typed.
+    const HAN = /[㐀-鿿\u{20000}-\u{2ffff}]/u;
+    const input = document.getElementById('dl-web-q');
+    const go = document.getElementById('dl-web-go');
+    const sync = () => {
+      const q = [...input.value].filter((c) => HAN.test(c)).join('');
+      go.disabled = !q;
+      if (q) go.dataset.sources = q; else delete go.dataset.sources;
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !go.disabled) { e.preventDefault(); go.click(); } });
+
+    // hakkadictionary's pinyin -> character picker reads the characters table
+    // (window.sxData, api_sources_table): loaded once, when the tab is first opened.
+    let loading = false;
+    document.addEventListener('lex:tab', (e) => {
+      if (e.detail !== 'dictionnaires' || loading || window.sxData) return;
+      loading = true;
+      fetch("{% url 'api_sources_table' %}").then((r) => r.json()).then((payload) => {
+        window.sxData = payload;
+        document.dispatchEvent(new CustomEvent('sx-data'));
+      }).catch(() => { loading = false; });
+    });
+  })();
+</script>
+{% endif %}

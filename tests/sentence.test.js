@@ -123,6 +123,32 @@ test("an unknown hanzi (no dictionary entry) still produces a token instead of c
   assert.equal(s.renderHanziLine(), "谜", "falls back to the raw hanzi from the input text");
 });
 
+test("a word without characters (Tahitian, French) is copied as written in both lines", () => {
+  const Sentence = loadSentence();
+  const dico = makeDico([
+    { simp: "我", trad: "我", pinyin: "ngai1", french: "je" },
+    { simp: "爱", trad: "愛", pinyin: "oi4", french: "aimer" },
+    { simp: "食", trad: "食", pinyin: "shit6", french: "manger" },
+  ]);
+  const s = new Sentence(dico, "我 爱 食 ma'a tinito");
+
+  assert.equal(s.renderPinyinLine(), "ngai¹ oi⁴ shit⁶ ma'a tinito");
+  assert.equal(s.renderDisplayPinyinLine(), "ngai¹ oi⁴ shit⁶ ma'a tinito");
+  assert.equal(s.renderHanziLine(), "我爱食 ma'a tinito", "characters together, the text words apart");
+  assert.equal(s.matches[3][0].isText, true);
+
+  // At the start, between characters, with punctuation.
+  assert.equal(new Sentence(dico, "ma'a 食 我").renderHanziLine(), "ma'a 食我");
+  assert.equal(new Sentence(dico, "我 Raiatea 食").renderHanziLine(), "我 Raiatea 食");
+  assert.equal(new Sentence(dico, "tinito , 食").renderHanziLine(), "tinito，食");
+});
+
+test("isTextWord: letters without character, tone or reading", () => {
+  const Sentence = loadSentence();
+  for (const w of ["ma'a", "tinito", "Raiatea", "c'est", "ma'a:nourriture"]) assert.equal(Sentence.isTextWord(w), true, w);
+  for (const w of ["ngai2", "ngai_", "我", "我ma", "-(man4)", "(ngai1)", ",", "-", ""]) assert.equal(Sentence.isTextWord(w), false, w);
+});
+
 test("render() includes a copy button per field, with the pinyin+hanzi and french text in data-copy-text", () => {
   const Sentence = loadSentence();
   const dico = makeDico([

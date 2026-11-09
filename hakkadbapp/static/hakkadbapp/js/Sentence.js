@@ -15,6 +15,47 @@ function pickHanzi(data) {
 }
 
 class Sentence {
+    // One punctuation in the text, either form (, or ，): the Chinese mark in
+    // the hanzi lines, the Latin one in the pinyin lines. Same table as
+    // text_to_words.py (_PUNCT_FULLWIDTH_TO_LATIN) on the server.
+    static PUNCT_TO_LATIN = {
+        '，': ',', '、': ',', '。': '.', '；': ';', '：': ':', '？': '?', '！': '!', '（': '(', '）': ')',
+        '【': '[', '】': ']', '｛': '{', '｝': '}', '‘': "'", '’': "'", '“': '"', '”': '"', '—': '-', '…': '...',
+    };
+    static PUNCT_TO_HAN = {
+        ',': '，', '.': '。', ';': '；', ':': '：', '?': '？', '!': '！', '(': '（', ')': '）',
+        '[': '【', ']': '】', '{': '｛', '}': '｝',
+    };
+    static PUNCT_ONLY = /^[，。、；：？！（）【】｛｝‘’“”—…,.;:?!()[\]{}'"]+$/;
+    static PUNCT_TAIL = /[，。、；：？！…,.;:?!]+$/;
+
+    /** « 好， » -> ["好", "，"]; « ， » -> ["", "，"]; « 好 » -> ["好", ""]. */
+    static splitPunct(token) {
+        const text = String(token || '');
+        if (Sentence.PUNCT_ONLY.test(text)) return ['', text];
+        const tail = text.match(Sentence.PUNCT_TAIL)?.[0] || '';
+        return [tail ? text.slice(0, -tail.length) : text, tail];
+    }
+
+    /** A word written without characters -- Tahitian, French, a proper
+     *  name (ma'a, tinito, Raiatea): letters, no character, no tone digit,
+     *  no (reading). It is copied as written in the pinyin and hanzi lines.
+     *  A syllable still to convert carries its tone (ngai2, ngai_). Same
+     *  rule as text_to_words.is_text_word() on the server. */
+    static isTextWord(token) {
+        const core = String(token || '').split(':')[0];
+        return /\p{L}/u.test(core) && !/\p{Script=Han}/u.test(core)
+            && !/[\d_⁰¹²³⁴⁵⁶⁷⁸]/.test(core) && !core.includes('(');
+    }
+
+    static latinPunct(text) {
+        return [...String(text || '')].map((c) => Sentence.PUNCT_TO_LATIN[c] ?? c).join('');
+    }
+
+    static hanPunct(text) {
+        return [...String(text || '').replace(/\.\.\./g, '…')].map((c) => Sentence.PUNCT_TO_HAN[c] ?? c).join('');
+    }
+
     constructor(dico, text = '', french = '', rendering = '') {
         this.dico = dico;
         this.words = [];
@@ -155,8 +196,11 @@ class Sentence {
     // Unknown resolution
     // -----------------------------
     resolveUnknownPinyin(token) {
-        const { hanzi, inline, readings } = this.parseToken(token);
+        const { hanzi, inline, readings } = this.parseToken(Sentence.splitPunct(token)[0]);
         const pinned = readings.some(Boolean);
+
+        // A word without characters reads as written.
+        if (Sentence.isTextWord(hanzi)) return hanzi;
 
         // An annotation that isn't attached to any hanzi run is kept whole.
         if (inline && !pinned) return inline;
@@ -179,15 +223,18 @@ class Sentence {
     }
 
     buildUnknownEntry(token) {
-        const { hanzi, raw } = this.parseToken(token);
+        const { hanzi, raw } = this.parseToken(Sentence.splitPunct(token)[0] || token);
+        const isText = Sentence.isTextWord(hanzi);
         return {
             dataset: {
                 simp: hanzi || raw || '?',
                 pinyin: this.resolveUnknownPinyin(token),
-                french: '?',
-                raw: raw || ''
+                french: isText ? '' : '?',
+                raw: raw || '',
+                text: isText,
             },
-            isUnknown: true
+            isUnknown: true,
+            isText,
         };
     }
 
@@ -198,7 +245,8 @@ class Sentence {
         this.words = text ? text.trim().split(/\s+/) : [];
 
         this.matches = this.words.map(token => {
-            const { hanzi, constraints, readings } = this.parseToken(token);
+            // The word is looked up without its punctuation (« 好， » is 好).
+            const { hanzi, constraints, readings } = this.parseToken(Sentence.splitPunct(token)[0]);
 
             const matches = this.findMatches(hanzi, constraints, readings);
 
@@ -227,6 +275,8 @@ class Sentence {
     displayPinyin(dataOrPinyin) {
         const R = typeof Romanization !== 'undefined' ? Romanization : null;
         const isData = dataOrPinyin && typeof dataOrPinyin === 'object';
+        // A word without characters (ma'a) is no syllable to convert.
+        if (isData && dataOrPinyin.text) return String(dataOrPinyin.pinyin || '');
         // A dictionary fed from another notation (Dictionary.useSource())
         // can't be converted: Romanization only parses Wenfa syllables.
         if (!R || !R.systems().length) {
@@ -242,7 +292,8 @@ class Sentence {
     displayPinyinHtml(dataOrPinyin) {
         const text = this.displayPinyin(dataOrPinyin);
         const stored = dataOrPinyin && typeof dataOrPinyin === 'object' ? dataOrPinyin.pinyin : dataOrPinyin;
-        const live = typeof Romanization !== 'undefined' && Romanization.systems().length && stored;
+        const isText = !!(dataOrPinyin && typeof dataOrPinyin === 'object' && dataOrPinyin.text);
+        const live = !isText &&typeof Romanization !== 'undefined' && Romanization.systems().length && stored;
         return live ? `<span data-py="${escapeAttr(stored)}">${text}</span>` : text;
     }
 
@@ -253,9 +304,10 @@ renderFurigana() {
                 const data = best?.dataset || best || {};
                 const tokenObj = this.parseToken(this.words?.[i] || '');
 
-                const hanzi = pickHanzi(data) || tokenObj.hanzi || tokenObj.raw || '?';
+                const [punctCore, punctTail] = Sentence.splitPunct(this.words?.[i] || '');
+                const hanzi = punctCore ? (pickHanzi(data) || tokenObj.hanzi || tokenObj.raw || '?') + Sentence.hanPunct(punctTail) : Sentence.hanPunct(punctTail);
 
-                let pinyin = data.pinyin ? this.displayPinyinHtml(data) : '';
+                let pinyin = !punctCore ? Sentence.latinPunct(punctTail) : data.pinyin ? this.displayPinyinHtml(data) : '';
                 if (!pinyin) {
                     const resolved = this.resolveUnknownPinyin(this.words?.[i] || '');
                     pinyin = resolved ? this.displayPinyinHtml(resolved) : '?';
@@ -290,10 +342,15 @@ renderFurigana() {
             const best = group?.[0];
             const data = best?.dataset || best;
 
-            if (data?.pinyin) return this.renderPinyin(data.pinyin);
-
-            const resolved = this.resolveUnknownPinyin(this.words[i]);
-            return resolved ? this.renderPinyin(resolved) : '?';
+            const [core, tail] = Sentence.splitPunct(this.words[i]);
+            if (!core) return Sentence.latinPunct(tail);
+            let line;
+            if (data?.pinyin) line = this.renderPinyin(data.pinyin);
+            else {
+                const resolved = this.resolveUnknownPinyin(this.words[i]);
+                line = resolved ? this.renderPinyin(resolved) : '?';
+            }
+            return tail ? `${line} ${Sentence.latinPunct(tail)}` : line;
         }).join(' ');
     }
 
@@ -304,10 +361,15 @@ renderFurigana() {
             const best = group?.[0];
             const data = best?.dataset || best;
 
-            if (data?.pinyin) return this.displayPinyin(data);
-
-            const resolved = this.resolveUnknownPinyin(this.words[i]);
-            return resolved ? this.displayPinyin(resolved) : '?';
+            const [core, tail] = Sentence.splitPunct(this.words[i]);
+            if (!core) return Sentence.latinPunct(tail);
+            let line;
+            if (data?.pinyin) line = this.displayPinyin(data);
+            else {
+                const resolved = this.resolveUnknownPinyin(this.words[i]);
+                line = resolved ? this.displayPinyin(resolved) : '?';
+            }
+            return tail ? `${line} ${Sentence.latinPunct(tail)}` : line;
         }).join(' ');
     }
 
@@ -315,16 +377,33 @@ renderFurigana() {
     // compare this text against a platform/DB value that's always
     // simplified (e.g. the expressions comparison view), where honoring the
     // toggle would make an otherwise-correct match look like a mismatch.
+    // Characters follow each other; a word without characters (ma'a) stands
+    // apart: 我爱食 ma'a tinito, ma'a 食飯.
     renderHanziLine(forceSimp = false) {
-        return this.matches.map((group, i) => {
+        let line = '';
+        let lastText = false;
+        this.matches.forEach((group, i) => {
             const best = group?.[0];
             const data = best?.dataset || best;
 
-            if (data?.simp) return forceSimp ? data.simp : pickHanzi(data);
-
-            const t = this.parseToken(this.words[i]);
-            return t.hanzi || t.raw || '?';
-        }).join('');
+            const [core, tail] = Sentence.splitPunct(this.words[i]);
+            if (!core) {
+                line += Sentence.hanPunct(tail);
+                lastText = false;
+                return;
+            }
+            const isText = !!data?.text;
+            let piece;
+            if (data?.simp) piece = (forceSimp ? data.simp : pickHanzi(data)) + Sentence.hanPunct(tail);
+            else {
+                const t = this.parseToken(core);
+                piece = (t.hanzi || t.raw || '?') + Sentence.hanPunct(tail);
+            }
+            if (line && (isText || lastText)) line += ' ';
+            line += piece;
+            lastText = isText;
+        });
+        return line;
     }
 
     renderFrenchLine() {
@@ -363,7 +442,9 @@ renderFurigana() {
         // still ambiguous (several entries, no constraint given), orange =
         // no dictionary entry found at all.
         let colorClass = "bg-[var(--sentence-badge-known-bg)] text-[var(--sentence-badge-known-fg)]";
-        if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
+        // A word without characters (ma'a) is wanted as is: neutral, not an error.
+        if (best.isText) colorClass = "bg-[var(--sentence-preview-bg)] text-[var(--sentence-text-primary)] border border-[var(--sentence-preview-border)]";
+        else if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
         else if (isDisambiguated) colorClass = "bg-[var(--sentence-badge-disambig-bg)] text-[var(--sentence-badge-disambig-fg)]";
         else if (extra > 0) colorClass = "bg-[var(--sentence-badge-multi-bg)] text-[var(--sentence-badge-multi-fg)]";
 
@@ -424,7 +505,9 @@ renderFurigana() {
             return `
                 <div id="detail-${index}" onclick="event.stopPropagation()" class="hidden absolute top-full left-0 z-20 mt-0.5 min-w-[10rem] max-w-[16rem] rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow-lg p-2 text-left text-[11px] leading-snug">
                     <div class="hanzi font-semibold text-sm mb-1">${escapeAttr(data.raw || data.simp || '?')}</div>
-                    <div class="italic text-[var(--sentence-text-muted)]">Aucune entrée trouvée dans le dictionnaire.</div>
+                    <div class="italic text-[var(--sentence-text-muted)]">${data.text
+                        ? 'Mot sans caractère : recopié tel quel dans le pinyin et les hanzi.'
+                        : 'Aucune entrée trouvée dans le dictionnaire.'}</div>
                 </div>
             `;
         }
@@ -453,7 +536,11 @@ renderFurigana() {
 
     renderTokens(){
         return `<div class="flex flex-wrap gap-1.5">
-                ${this.matches.map((g, i) => this.renderToken(g, i)).join('')}
+                ${this.matches.map((g, i) => {
+                    const [core, tail] = Sentence.splitPunct(this.words[i]);
+                    return (core || !tail ? this.renderToken(g, i) : '')
+                        + (tail ? `<span class="hanzi self-end">${escapeAttr(Sentence.hanPunct(tail))}</span>` : '');
+                }).join('')}
             </div>`;
     }
 

@@ -35,7 +35,8 @@ from .illustrations import illustration_for
 from . import expression_mesh
 from . import word_notes
 from . import pronunciation_sources
-from .permissions import editor_required, owner_required
+from urllib.parse import urlencode
+from .permissions import editor_required, is_editor, owner_required
 
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
@@ -148,11 +149,10 @@ def split_target(target):
     *import time*, which crashes every request in production the moment
     anything in views.py imports it -- this view module is loaded on every
     request/cold start, unlike a management command run standalone by hand."""
-    target = target or ""
-    idx = target.rfind(" ")
-    if idx == -1:
-        return target, ""
-    return target[:idx], target[idx + 1:]
+    # Words without characters (ma'a) put spaces in the hanzi half too:
+    # text_to_words.split_rendering() finds where it starts.
+    from .text_to_words import split_rendering
+    return split_rendering(target)
 
 # Fields shown in the duplicates "compared fields" table, in display order.
 DUP_FIELDS = ["french", "hakka", "secondary", "theme", "status"]
@@ -725,15 +725,17 @@ def reports(request):
 
 
 def duplicates_view(request):
-    """Dedicated, interactive duplicates page (live DB, no platform diff).
+    """The duplicates are now the « Doublons » tab of the lexicon browser."""
+    return redirect(reverse("search") + "#doublons")
 
-    Data is embedded as JSON and rendered client-side (search/filter/copy/
-    "resolved" state all happen instantly with no round-trip), same
-    architecture as management/commands/corpus_diff_dashboard_template.html.
-    "Resolved" is tracked per-browser in localStorage only -- this page never
-    writes to the database, it's a triage aid while editing happens on the
-    e-reo platform itself.
-    """
+
+def _duplicates_payload():
+    """The « Doublons » tab (components/duplicates_panel.html): every group
+    of duplicates (live DB, no platform diff), as JSON rendered client-side
+    (search/filter/copy/"resolved" state all happen instantly with no
+    round-trip). "Resolved" is tracked per-browser in localStorage only --
+    this tab never writes to the database, it's a triage aid while editing
+    happens on the e-reo platform itself. Returns (payload, group count)."""
     sections = build_duplicate_sections()
     payload = {
         "sections": [
@@ -757,15 +759,48 @@ def duplicates_view(request):
             for section in sections
         ],
     }
-    context = {
-        "title": "Doublons",
-        "diff_data_json": json.dumps(payload, ensure_ascii=False),
-        "duplicates_count": sum(len(s["groups"]) for s in sections),
-    }
-    return render(request, "hakkadbapp/duplicates.html", context)
+    return payload, sum(len(s["groups"]) for s in sections)
+
+
+NO_THEME = "Sans thème"
+
+
+def _theme_names(category):
+    """A word or expression can carry several themes ("Cuisine, Fêtes")."""
+    names = [n.strip() for n in (category or "").split(",") if n.strip()]
+    return names or [NO_THEME]
+
+
+def _themes_overview(words, expressions):
+    """The « Thèmes » tab: each theme with its words and expressions,
+    alphabetical, "Sans thème" last."""
+    themes = defaultdict(lambda: {"words": [], "expressions": []})
+    for word in words:
+        for name in _theme_names(word.category):
+            themes[name]["words"].append(word)
+    for expr in expressions:
+        for name in _theme_names(expr.category):
+            themes[name]["expressions"].append(expr)
+    order = sorted(themes, key=lambda n: (n == NO_THEME, n.lower()))
+    return [{"name": n, "words": themes[n]["words"], "expressions": themes[n]["expressions"]} for n in order]
+
+
+def _review_items(words, expressions):
+    """The « Relecture » tab's list (lexicon_review.js): every word and
+    expression, as compact JSON."""
+    items = [{"type": "word", "id": w.id, "hanzi": w.char(), "pinyin": w.pinyin(),
+              "french": w.french or "", "english": w.english or "", "theme": w.category or ""} for w in words]
+    items += [{"type": "expression", "id": e.id, "hanzi": "".join((e.text or "").split()), "pinyin": "",
+               "french": e.french or "", "english": e.english or "", "theme": e.category or ""} for e in expressions]
+    return items
 
 
 def search(request):
+    """The Wenfa lexicon browser (search.html): one page, one tab per tool.
+    Everyone browses the words, themes, expressions, characters and
+    duplicates; editors also get the dictionaries, the review and the
+    expressions' segmentation check; saving a segmentation and the export
+    stay the owner's (expression_mesh_* endpoints)."""
     # Same word/expression "card" as the hanzi rosace poster (see
     # components/word_card.html / expression_card.html) -- reuses its
     # helpers so both pages render identically and stay in sync.
@@ -774,8 +809,10 @@ def search(request):
     expressions_qs = Expression.objects.all().prefetch_related(
         *(f'expressionword_set__word__{path}' for path in _WORD_PRONUNCIATION_PREFETCH)
     )
-    components_by_hanzi, _snapshot_timestamp = build_expression_platform_components()
+    components_by_hanzi, snapshot_timestamp = build_expression_platform_components()
     expressions = _with_platform_target(_with_segments(expressions_qs), components_by_hanzi)
+    duplicates, duplicates_count = _duplicates_payload()
+    can_edit = is_editor(request.user)
 
     context = {
         'caracters_data': caracters_data(),
@@ -784,10 +821,18 @@ def search(request):
         'finals': Final.objects.all(),
         'words': words,
         'expressions': expressions,
-        'title': "Recherche",
+        'themes': _themes_overview(words, expressions),
+        'duplicates_json': json.dumps(duplicates, ensure_ascii=False),
+        'duplicates_count': duplicates_count,
+        'title': "Lexique Wenfa",
         'page': "search",
         "categories": Word.objects.values_list('category', flat=True).distinct(),
     }
+    if can_edit:
+        context["review_items"] = _review_items(words, expressions)
+        context.update(_expression_analysis(expressions, components_by_hanzi, snapshot_timestamp))
+        # The character suggestions behind the segmentation check (components/data.html).
+        context["pronunciations"] = Pronunciation.objects.select_related('initial', 'final', 'tone').all()
 
     return render(request, "hakkadbapp/search.html", context)
 
@@ -1269,14 +1314,24 @@ def build_expression_platform_components():
     return by_platform_id, snapshot.timestamp
 
 
-@owner_required
 def expressions(request):
-    context = get_all_data()
-    context["title"] = "Expressions"
-    context["page"] = "expressions"
-    components_by_hanzi, snapshot_timestamp = build_expression_platform_components()
-    context["platform_components_json"] = json.dumps(components_by_hanzi, ensure_ascii=False)
-    context["platform_snapshot_timestamp"] = snapshot_timestamp
+    """The Expressions page is now the « Découpage » view of the lexicon
+    browser's Expressions tab (editors; editing stays the owner's).
+    ?q= (the Doublons tab's « Désambiguïser » link) is kept."""
+    query = request.GET.get("q", "")
+    url = reverse("search") + (f"?{urlencode({'q': query})}" if query else "")
+    return redirect(url + "#decoupage")
+
+
+def _expression_analysis(expressions, components_by_hanzi, snapshot_timestamp):
+    """The context of the « Découpage » view (components/expression_analysis.html,
+    expressions.js): each expression compared with the platform, its Split
+    and whether it may be exported. `expressions` are annotated in place."""
+    context = {
+        "platform_components_json": json.dumps(components_by_hanzi, ensure_ascii=False),
+        "platform_snapshot_timestamp": snapshot_timestamp,
+        "expressions_count": len(expressions),
+    }
 
     # The single comparison table (expressions.js) needs each expression's
     # persistent ExpressionNote (commentaire/excel_format/use_in_export) --
@@ -1285,7 +1340,6 @@ def expressions(request):
     # a GET request shouldn't write rows just from being viewed, so an
     # expression with none yet just renders empty/off defaults, and gets
     # its ExpressionNote lazily on first save via expression_mesh_entry.
-    expressions = list(context["expressions"])
     notes_by_id = {
         n.platform_id: n
         for n in ExpressionNote.objects.filter(
@@ -1341,8 +1395,7 @@ def expressions(request):
             reasons.append("un ou plusieurs termes du Split restent ambigus (aucun « :précision »)")
         expr.export_block_reason = " ; ".join(reasons)
 
-    context["expressions"] = expressions
-    return render(request, "hakkadbapp/expressions.html", context)
+    return context
 
 
 # ---------------------------------------------------------------------------
