@@ -22,6 +22,9 @@ const $ = (id) => document.getElementById(id);
 
 const SPEAKER_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
 const DRAFT_KEY = 'hakka-eaf-draft';
+// The views of the page (#eaf-views): annotation, both, the whole text; the last one chosen.
+const VIEWS = ['board', 'both', 'full'];
+const VIEW_KEY = 'hakka-eaf-view';
 const BACKUP_DIR = 'sauvegardes';
 const MEDIA_RE = /\.(wav|mp3|m4a|ogg|oga|flac|webm|mp4|aac)$/i;
 const CAN_WRITE_FILES = 'showDirectoryPicker' in window;
@@ -849,6 +852,28 @@ class TranscriberApp {
             $('eaf-full-fields').querySelectorAll('[data-full]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
             this.renderFullText();
         });
+        // Annotation, both, or the whole text: as last chosen on this device.
+        let savedView = null;
+        try { savedView = localStorage.getItem(VIEW_KEY); } catch (e) { savedView = null; }
+        this.setView(VIEWS.includes(savedView) ? savedView
+            : (window.matchMedia?.('(min-width: 1100px)').matches ? 'both' : 'board'), { remember: false });
+        $('eaf-views').addEventListener('click', (event) => {
+            const b = event.target.closest('[data-view]');
+            if (b) this.setView(b.dataset.view);
+        });
+        // Double click -- or two taps, on a phone -- on a segment of the whole text: edit it there.
+        let lastTap = { seg: null, at: 0 };
+        $('eaf-full-text').addEventListener('click', (event) => {
+            const span = event.target.closest('.eaf-full-seg');
+            if (!span) return;
+            const now = Date.now();
+            if (lastTap.seg === span.dataset.seg && now - lastTap.at < 450) {
+                lastTap = { seg: null, at: 0 };
+                this.editInFullText(span);
+            } else {
+                lastTap = { seg: span.dataset.seg, at: now };
+            }
+        });
         $('eaf-full-copy').addEventListener('click', async (event) => {
             const button = event.currentTarget;
             const said = button.textContent;
@@ -1275,9 +1300,22 @@ class TranscriberApp {
         this.message(delta > 0 ? 'Plus aucun segment à compléter après celui-ci.' : 'Plus aucun segment à compléter avant celui-ci.');
     }
 
+    // ---- the views -----------------------------------------------------------
+
+    /** "board" (the segments to annotate), "both", "full" (the whole text). */
+    setView(view, { remember = true } = {}) {
+        if (!VIEWS.includes(view)) return;
+        $('eaf-split').dataset.view = view;
+        $('eaf-views').querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+        if (remember) { try { localStorage.setItem(VIEW_KEY, view); } catch (e) { /* private mode */ } }
+        if (view !== 'board') this.renderFullText();
+        if (view !== 'full' && this.eaf) this.overview?.draw();
+    }
+
     // ---- the whole text ----------------------------------------------------
 
-    /** One field of the speakers shown, in order: a paragraph per turn of speech. */
+    /** One field of the speakers shown, in order: a paragraph per turn of
+     *  speech, made of its segments ({seg, sep, value}: `sep` goes before). */
     fullParagraphs() {
         const field = this.fullField || 'hanzi';
         const several = this.visibleSpeakers().length > 1;
@@ -1289,18 +1327,23 @@ class TranscriberApp {
             if (last && last.speaker === seg.speaker) {
                 // Characters run on, from one segment to the next; anything else is spaced.
                 const han = /[\p{Script=Han}，。、；：？！…]$/u;
-                last.text += ['hanzi', 'trad'].includes(field) && han.test(last.text) && HAN_RE.test(value[0]) ? value : ` ${value}`;
+                const sep = ['hanzi', 'trad'].includes(field) && han.test(last.text) && HAN_RE.test(value[0]) ? '' : ' ';
+                last.text += sep + value;
+                last.parts.push({ seg, sep, value });
             }
-            else out.push({ speaker: seg.speaker, name: several ? seg.speaker.participant : '', text: value });
+            else out.push({ speaker: seg.speaker, name: several ? seg.speaker.participant : '', text: value, parts: [{ seg, sep: '', value }] });
         });
         return out;
     }
 
     renderFullText() {
+        // Not under the fingers of someone editing a segment there.
+        if (this.fullEditing || !this.eaf) return;
         const paragraphs = this.fullParagraphs();
         const box = $('eaf-full-text');
         box.classList.toggle('hanzi', ['hanzi', 'trad'].includes(this.fullField || 'hanzi'));
-        box.innerHTML = paragraphs.map((p) => `<p>${p.name ? `<b>${escapeHtml(p.name)}</b>` : ''}${escapeHtml(p.text)}</p>`).join('')
+        box.innerHTML = paragraphs.map((p) => `<p>${p.name ? `<b>${escapeHtml(p.name)}</b>` : ''}${p.parts.map((part) => `${part.sep}<span class="eaf-full-seg"
+            data-seg="${this.rowSegs.indexOf(part.seg)}" title="Double-cliquez pour modifier ce segment">${escapeHtml(part.value)}</span>`).join('')}</p>`).join('')
             || '<p class="text-gray-500">Ce champ est vide pour l\'instant.</p>';
     }
 
@@ -1309,12 +1352,72 @@ class TranscriberApp {
         this.fullTimer = setTimeout(() => this.renderFullText(), 250);
     }
 
+    /** A segment of the whole text edited in place (double click or
+     *  double tap): the French there for « Français », else the transcript,
+     *  which every other field is derived from. Enter or leaving the field
+     *  saves, Escape cancels. */
+    editInFullText(span) {
+        const seg = this.rowSegs?.[Number(span.dataset.seg)];
+        if (!seg || this.fullEditing) return;
+        const role = this.fullField === 'translation' ? 'translation' : 'transcript';
+        const input = document.createElement('textarea');
+        input.className = `eaf-full-edit${role === 'transcript' ? ' hanzi-input' : ''}`;
+        input.rows = 1;
+        input.value = seg[role] || '';
+        input.setAttribute('aria-label', role === 'translation' ? 'Français de ce segment' : 'Transcript de ce segment');
+        if (role === 'transcript') { input.autocapitalize = 'off'; input.spellcheck = false; }
+        this.fullEditing = { seg, role, input };
+        span.replaceWith(input);
+        const fit = () => { input.style.height = 'auto'; input.style.height = `${input.scrollHeight + 2}px`; };
+        input.addEventListener('input', fit);
+        fit();
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        let done = false;
+        const finish = (save) => {
+            if (done) return;
+            done = true;
+            this.fullEditing = null;
+            if (save) this.setSegmentText(seg, role, input.value.trim());
+            this.renderFullText();
+        };
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); finish(true); }
+            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
+    }
+
+    /** The transcript (and the lines derived from it) or the French of one
+     *  segment, from outside its editor; the editor, if open on it, follows. */
+    setSegmentText(seg, role, text) {
+        if ((seg[role] ?? '') === text) return;
+        if (role === 'transcript') {
+            const derived = deriveFromTranscript(text);
+            this.write(seg, 'transcript', text, { silent: true });
+            ['pinyin', 'mixed', 'hanzi', 'trad'].forEach((r) => this.write(seg, r, derived[r], { silent: true }));
+        } else {
+            this.write(seg, role, text, { silent: true });
+        }
+        this.changed(seg);
+        if (this.editor?.segment === seg) {
+            this.editor.transcript.value = seg.transcript || '';
+            this.editor.translation.value = seg.translation || '';
+            this.editor.refreshDerived();
+        }
+    }
+
     // ---- editing -------------------------------------------------------
 
     open(seg) {
         if (!seg) return;
+        // A segment opened from the whole text alone: the annotation comes back beside it.
+        if ($('eaf-split').dataset.view === 'full') {
+            this.setView(window.matchMedia?.('(min-width: 1100px)').matches ? 'both' : 'board', { remember: false });
+        }
         this.close();
         this.editor = new SegmentEditor(this, seg);
+        this.lastOpened = seg;
         const row = this.rowOf(seg);
         if (!row) return;
         row.after(this.editor.row);
@@ -1337,7 +1440,8 @@ class TranscriberApp {
     /** Next/previous visible segment. */
     step(delta) {
         if (!this.eaf) return;
-        const i = this.editor ? this.rowSegs.indexOf(this.editor.segment) : -1;
+        const current = this.currentSegment();
+        const i = current ? this.rowSegs.indexOf(current) : -1;
         const target = this.rowSegs[Math.min(this.rowSegs.length - 1, Math.max(0, i + delta))];
         if (target) this.open(target);
     }
@@ -1418,12 +1522,63 @@ class TranscriberApp {
 
     // ---- keyboard ------------------------------------------------------
 
+    /** The segment the keys act on without an open editor: the one being
+     *  heard, else the last one opened. */
+    currentSegment() {
+        return this.editor?.segment || this.playing || this.lastOpened || null;
+    }
+
+    /** Play / pause the recording where it is (Ctrl+Space, Space). */
+    togglePlay() {
+        if (!this.audioUrl) { this.message("Ouvrez l'enregistrement audio pour écouter les segments."); return; }
+        if (this.audio.paused) {
+            // Past the end of a segment heard alone: go on from there.
+            if (this.stopAt != null && this.audio.currentTime >= this.stopAt) this.stopAt = null;
+            this.audio.play().catch(() => {});
+        } else {
+            this.audio.pause();
+        }
+    }
+
+    /** Back or forward in the recording, in seconds (← →). */
+    seek(seconds) {
+        if (!this.audioUrl) return;
+        this.stopAt = null;
+        this.audio.currentTime = Math.max(0, Math.min(this.audio.duration || Infinity, this.audio.currentTime + seconds));
+    }
+
+    /** Keys as in ELAN and Audacity -- see the « Raccourcis clavier » guide
+     *  at the top of the page. With Alt or Ctrl they work while typing; the
+     *  single keys (Space, arrows, Enter) only outside a text field. */
     bindKeyboard() {
         window.addEventListener('keydown', (event) => {
             if (!this.eaf) return;
             if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') { event.preventDefault(); this.save(); return; }
+            if (event.ctrlKey && event.code === 'Space') { event.preventDefault(); this.togglePlay(); return; }
             if (event.key === 'Escape' && this.editor) { this.close(); return; }
+            const target = event.target;
+            const typing = target.closest?.('input, textarea, select, [contenteditable="true"]');
+            if (!event.altKey && !event.ctrlKey && !event.metaKey && !typing) {
+                const onButton = target.closest?.('button, a, summary, [role="button"]');
+                const fast = event.shiftKey ? 10 : 2;
+                if (event.code === 'Space' && !onButton) { event.preventDefault(); this.togglePlay(); }
+                else if (event.key === 'ArrowDown' && !event.shiftKey) { event.preventDefault(); this.step(1); }
+                else if (event.key === 'ArrowUp' && !event.shiftKey) { event.preventDefault(); this.step(-1); }
+                else if (event.key === 'ArrowLeft') { event.preventDefault(); this.seek(-fast); }
+                else if (event.key === 'ArrowRight') { event.preventDefault(); this.seek(fast); }
+                else if (event.key === 'Enter' && !onButton) {
+                    const seg = this.currentSegment() || this.rowSegs?.[0];
+                    if (seg) { event.preventDefault(); this.open(seg); }
+                }
+                return;
+            }
             if (!event.altKey) return;
+            if (event.code === 'KeyV') {
+                // The next view: annotation -> both -> whole text.
+                event.preventDefault();
+                this.setView(VIEWS[(VIEWS.indexOf($('eaf-split').dataset.view) + 1) % VIEWS.length]);
+                return;
+            }
             if (event.key === 'ArrowDown') { event.preventDefault(); this.step(1); }
             else if (event.key === 'ArrowUp') { event.preventDefault(); this.step(-1); }
             else if (event.key === 'PageDown') { event.preventDefault(); this.stepTodo(1); }

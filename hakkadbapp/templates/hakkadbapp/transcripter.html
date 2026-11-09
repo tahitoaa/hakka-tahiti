@@ -11,6 +11,39 @@
 {% endcomment %}
 <div id="eaf-app" class="mx-auto">
 
+  <!-- Keyboard shortcuts (transcripter.js, bindKeyboard), as in ELAN and Audacity -->
+  <details class="eaf-keys no-print">
+    <summary>⌨ Raccourcis clavier</summary>
+    <div class="eaf-keys-grid">
+      <section>
+        <h3>Partout, même en tapant</h3>
+        <dl>
+          <dt><kbd>Alt</kbd>+<kbd>↓</kbd> / <kbd>↑</kbd></dt><dd>segment suivant / précédent</dd>
+          <dt><kbd>Alt</kbd>+<kbd>Page↓</kbd> / <kbd>Page↑</kbd></dt><dd>segment à compléter suivant / précédent</dd>
+          <dt><kbd>Alt</kbd>+<kbd>Entrée</kbd></dt><dd>réécouter le segment</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>Espace</kbd></dt><dd>lecture / pause (comme ELAN)</dd>
+          <dt><kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd></dt><dd>choisir une suggestion</dd>
+          <dt><kbd>Alt</kbd>+<kbd>V</kbd></dt><dd>changer de vue : annotation, les deux, texte complet</dd>
+          <dt><kbd>Échap</kbd></dt><dd>fermer le segment (les touches seules ci-contre redeviennent actives)</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>enregistrer</dd>
+        </dl>
+      </section>
+      <section>
+        <h3>Hors d'un champ de saisie (comme Audacity)</h3>
+        <dl>
+          <dt><kbd>Espace</kbd></dt><dd>lecture / pause</dd>
+          <dt><kbd>↓</kbd> / <kbd>↑</kbd></dt><dd>ouvrir le segment suivant / précédent</dd>
+          <dt><kbd>Entrée</kbd></dt><dd>ouvrir le segment entendu (ou le dernier ouvert)</dd>
+          <dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>reculer / avancer de 2 s (<kbd>Maj</kbd> : 10 s)</dd>
+        </dl>
+        <h3>Texte complet</h3>
+        <dl>
+          <dt>double-clic</dt><dd>modifier le passage sur place ; <kbd>Entrée</kbd> enregistre, <kbd>Échap</kbd> annule</dd>
+        </dl>
+      </section>
+    </div>
+  </details>
+
   <!-- Files + settings -->
   <section class="eaf-toolbar no-print" aria-label="Fichiers et paramètres">
     <div class="eaf-files">
@@ -118,6 +151,11 @@
         <span>à compléter</span>
         <button id="eaf-todo-next" type="button" title="Segment à compléter suivant (Alt+Page↓)" aria-label="Segment à compléter suivant">→</button>
       </div>
+      <div id="eaf-views" class="eaf-views" role="group" aria-label="Vue">
+        <button type="button" data-view="board" aria-pressed="false" title="Les segments, à annoter un par un">✎ Annotation</button>
+        <button type="button" data-view="both" aria-pressed="false" title="Annotation et texte complet ensemble">⫼ Les deux</button>
+        <button type="button" data-view="full" aria-pressed="false" title="Le texte complet seul, modifiable d'un double-clic">¶ Texte complet</button>
+      </div>
       <span id="eaf-progress" class="eaf-progress"></span>
       <span id="eaf-dirty" class="eaf-dirty" hidden>● non enregistré</span>
       <button id="eaf-save" type="button" class="eaf-btn eaf-btn-save" disabled>Enregistrer</button>
@@ -129,7 +167,7 @@
   </div>
 
   <!-- Conversation: one column per speaker -->
-  <div class="eaf-split">
+  <div id="eaf-split" class="eaf-split" data-view="both">
   <section id="eaf-board" class="eaf-board" aria-label="Transcription" hidden>
     <div id="eaf-header" class="eaf-row eaf-head"></div>
     <div id="eaf-rows"></div>
@@ -147,6 +185,7 @@
         <button type="button" data-full="translation" aria-pressed="false">Français</button>
       </div>
       <button type="button" id="eaf-full-copy" class="eaf-btn eaf-btn-light eaf-btn-sm">📋 Copier</button>
+      <small class="text-gray-500">Double-cliquez (ou touchez deux fois) un passage pour le modifier ; Entrée enregistre, Échap annule.</small>
     </div>
     <div id="eaf-full-text" class="eaf-full-text"></div>
   </aside>
@@ -163,7 +202,8 @@
       <li>Cliquez un segment pour l'éditer. Vous éditez le <b>Transcript</b>, c'est-à-dire le tier principal du locuteur : la romanisation tapée dans ELAN, que vous convertissez en choisissant les caractères dans les suggestions (mots séparés par des espaces, lectures entre parenthèses : <code>吾(nga1) 爸(ba1)爸(ba1)</code>), et le <b>Français</b> (tier enfant Traduction). Les tiers enfants <b>Pinyin</b> (dans le système « J'affiche en »), <b>Mixte</b>, <b>Hanzi</b> (simplifié) et <b>Traditionnel</b> sont recalculés automatiquement, dès l'ouverture du fichier. Les mots sans caractères (français, noms propres : sans ton) y sont recopiés tels quels. Un caractère à plusieurs lectures propose ses lectures en boutons sous le transcript.</li>
       <li>Les tiers Traduction, Pinyin, Mixte, Hanzi et Traditionnel sont créés s'ils manquent, en suivant les noms déjà utilisés dans le fichier. Dans un ancien fichier où le transcript était dans le tier Hanzi (ou un tier Transcript), il est repris dans le tier principal à l'ouverture. Le reste du fichier n'est pas modifié ; la segmentation se fait dans ELAN.</li>
       <li><b>Vue d'ensemble</b> (sous l'audio) : une ligne par locuteur, chaque segment pâle s'il est à faire, plein s'il est en hanzi ; le cadre bleu montre la partie de la page à l'écran, le trait rouge la position de lecture. Cliquez ou glissez pour parcourir la page, double-cliquez pour éditer un segment.</li>
-      <li>Clavier : <kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> segment suivant/précédent, <kbd>Alt</kbd>+<kbd>Page↓</kbd>/<kbd>Page↑</kbd> segment à compléter suivant/précédent, <kbd>Alt</kbd>+<kbd>Entrée</kbd> réécouter, <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>9</kbd> choisir une suggestion, <kbd>Échap</kbd> fermer.</li>
+      <li>Clavier : voir « ⌨ Raccourcis clavier » en haut de la page.</li>
+      <li><b>Vues</b> (dans la barre) : ✎ Annotation, ⫼ Les deux ou ¶ Texte complet (<kbd>Alt</kbd>+<kbd>V</kbd>). Dans le texte complet, double-cliquez (ou touchez deux fois) un passage pour le modifier sur place : le français dans la vue Français, sinon le transcript, d'où les autres lignes sont recalculées.</li>
       <li>Les modifications non enregistrées sont aussi gardées dans ce navigateur, et proposées à la réouverture du fichier.</li>
     </ul>
   </details>
@@ -243,6 +283,17 @@
   @media (min-width: 1100px) { .eaf-split { grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem); } }
   .eaf-full { margin-top: 0.75rem; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.6rem 0.75rem;
               position: sticky; top: calc(var(--eaf-bar-h, 0px) + 0.5rem); display: grid; gap: 0.5rem; }
+  /* The views (#eaf-views): annotation, both, the whole text. */
+  .eaf-views { display: inline-flex; gap: 0.15rem; padding: 0.15rem; background: #F6EFE4; border-radius: 0.5rem; }
+  .eaf-views button { min-height: 1.8rem; padding: 0 0.55rem; border-radius: 0.4rem; font-size: 0.8rem; font-weight: 600; color: #6E655C;
+                      white-space: nowrap; touch-action: manipulation; }
+  .eaf-views button[aria-pressed="true"] { background: #fff; color: #9B1C1C; box-shadow: 0 1px 3px rgb(0 0 0 / .1); }
+  .eaf-split[data-view="board"] > .eaf-full, .eaf-split[data-view="full"] > .eaf-board { display: none; }
+  @media (min-width: 1100px) {
+    .eaf-split[data-view="board"], .eaf-split[data-view="full"] { grid-template-columns: minmax(0, 1fr); }
+  }
+  .eaf-split[data-view="full"] > .eaf-full { position: static; }
+  .eaf-split[data-view="full"] .eaf-full-text { max-height: none; font-size: 1.05rem; max-width: 60rem; }
   .eaf-full-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
   .eaf-full-fields { display: flex; flex-wrap: wrap; gap: 0.2rem; }
   .eaf-full-fields button { min-height: 1.9rem; padding: 0 0.55rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-size: 0.78rem; color: #544D45; }
@@ -250,6 +301,11 @@
   .eaf-full-text { max-height: 70vh; overflow-y: auto; font-size: 0.95rem; line-height: 1.6; overflow-wrap: anywhere; }
   .eaf-full-text p { margin-bottom: 0.5rem; }
   .eaf-full-text b { color: #6E655C; font-size: 0.78rem; display: block; }
+  /* A segment: double click (or double tap) edits it in place. */
+  .eaf-full-seg { border-radius: 0.2rem; cursor: text; touch-action: manipulation; }
+  .eaf-full-seg:hover { background: #FBF0E6; box-shadow: 0 0 0 2px #FBF0E6; }
+  .eaf-full-edit { display: block; width: 100%; margin: 0.15rem 0; padding: 0.3rem 0.5rem; border: 1px solid #c9a227; border-radius: 0.4rem;
+                   font: inherit; line-height: 1.5; resize: none; background: #fffdf7; box-shadow: 0 0 0 2px rgb(201 162 39 / .25); }
   .eaf-board { margin-top: 0.75rem; background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; }
   .eaf-row { display: grid; grid-template-columns: var(--eaf-cols); border-top: 1px solid #F6EFE4;
              scroll-margin-top: calc(var(--eaf-bar-h, 0px) + 2.75rem); }
@@ -296,6 +352,16 @@
   .eaf-ambig button { min-height: 1.9rem; min-width: 2.8rem; padding: 0 0.4rem; border: 1px solid #fdba74; border-radius: 0.4rem; background: #fff7ed; color: #9a3412; font-weight: 600; }
   .eaf-ambig button:hover { background: #ffedd5; }
 
+  .eaf-keys { margin-bottom: 0.5rem; font-size: 0.85rem; color: #3A3430; }
+  .eaf-keys > summary { cursor: pointer; font-weight: 600; color: #544D45; width: max-content; }
+  .eaf-keys-grid { display: grid; gap: 0.5rem 1.5rem; margin-top: 0.4rem; padding: 0.6rem 0.8rem; background: #fff; border: 1px solid #ECE2D3;
+                   border-radius: 0.75rem; }
+  @media (min-width: 900px) { .eaf-keys-grid { grid-template-columns: 1fr 1fr; } }
+  .eaf-keys h3 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6E665C; margin: 0.2rem 0; }
+  .eaf-keys dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.75rem; align-items: baseline; }
+  .eaf-keys dt { white-space: nowrap; }
+  .eaf-keys kbd { display: inline-block; min-width: 1.4em; padding: 0 0.3em; border: 1px solid #DDD0BD; border-bottom-width: 2px; border-radius: 0.3rem;
+                  background: #FDFAF5; font: 600 0.75rem/1.5 ui-monospace, monospace; text-align: center; }
   .eaf-help { margin-top: 1rem; font-size: 0.8rem; color: #6E665C; }
   .eaf-help summary { cursor: pointer; font-size: 0.875rem; color: #544D45; }
   .eaf-help ul { list-style: disc; padding-left: 1.25rem; margin-top: 0.4rem; display: grid; gap: 0.3rem; }
