@@ -156,7 +156,6 @@ class SegmentEditor {
                 <button type="button" class="eaf-btn eaf-btn-light" data-act="next" title="Alt+↓">↓ Suivant</button>
                 <button type="button" class="eaf-btn eaf-btn-light" data-act="close" title="Échap">✕</button>
               </div>
-              <details class="eaf-ed-settings" data-role="settings"><summary>⚙ Réglages <span class="settings-brief" data-settings-brief></span></summary></details>
               <div class="eaf-field"><span>Transcript<br><small>tier « ${escapeHtml(s.speaker.id)} »</small></span>
                 <div class="eaf-ime">
                   <textarea data-role="transcript" class="hanzi-input" rows="2" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
@@ -173,10 +172,6 @@ class SegmentEditor {
               <div class="eaf-field"><span>Traditionnel <small>(auto)</small></span><div data-role="trad" class="eaf-derived hanzi"></div></div>
             </div>`;
         const q = (sel) => this.row.querySelector(sel);
-        // Je tape en, J'affiche en, Lectures: the same controls, at hand here.
-        const settings = q('[data-role="settings"]');
-        settings.append(document.querySelector('.reading-settings'));
-        settings.querySelector('[data-settings-brief]').textContent = document.querySelector('.eaf-settings [data-settings-brief]')?.textContent || '';
         this.transcript = q('[data-role="transcript"]');
         this.translation = q('[data-role="translation"]');
         this.preview = q('[data-role="preview"]');
@@ -1132,7 +1127,6 @@ class TranscriberApp {
     }
 
     render() {
-        $('eaf-settings-home').append(document.querySelector('.reading-settings'));
         const speakers = this.visibleSpeakers();
         const board = $('eaf-board');
         board.hidden = false;
@@ -1334,7 +1328,6 @@ class TranscriberApp {
     close() {
         if (!this.editor) return;
         const seg = this.editor.segment;
-        $('eaf-settings-home').append(document.querySelector('.reading-settings'));
         this.editor.row.remove();
         this.editor = null;
         this.refreshCard(seg);
