@@ -50,7 +50,7 @@
   .lx-table td.lx-cat { font-size: 0.78rem; color: #6E665C; }
   .lx-table td.lx-tools { white-space: nowrap; text-align: right; }
   .lx-table td.lx-tools .rosace-copy-btn { width: 1.9rem; height: 1.9rem; }
-  .lx-table td.lx-py .pinyin-word + .pinyin-word { margin-left: 0.3em; }
+  .lx-table td.lx-target { font-size: 1.05rem; white-space: normal; }
   .lx-table tr.lx-panel-row td { padding: 0 0.4rem; border-top: 0; }
   .lx-table .rosace-note-panel, .lx-table .rosace-mesh-panel { margin: 0 0 0.6rem; }
   @media (max-width: 640px) { .lx-table .lx-cat { display: none; } }
@@ -222,25 +222,25 @@
 
       <div class="lx-box">
       <table class="th-table lx-table no-auto-csv">
-        <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th class="lx-cat">Catégorie</th><th><span class="sr-only">Outils</span></th></tr></thead>
+        <thead><tr><th>Hakka <small class="font-normal normal-case">(plateforme)</small></th><th>Français</th><th class="lx-cat">Catégorie</th><th><span class="sr-only">Outils</span></th></tr></thead>
         <tbody id="exprcard-list">
         {% for expr in expressions %}
           <tr class="search-filter-item"
-            data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hanzi:{{ expr.text|default:'' }} rendering:{{ expr.rendering|default:'' }}">
-            <td class="hanzi">{% for seg in expr.segments %}{% if seg.word %}{% for wp in seg.word.wordpronunciation_set.all %}<a href="{% url 'hanzi' wp.pronunciation.simp %}" class="rosace-char-link"><span class="hanzi simp">{{ wp.pronunciation.simp }}</span><span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span></a>{% endfor %}{% else %}<span class="rosace-char-unknown" title="Caractère absent de la base de données">{{ seg.hanzi }}</span>{% endif %}{% empty %}{{ expr.text|default:""|cut:" " }}{% endfor %}</td>
-            <td class="th-py lx-py">{% for seg in expr.segments %}{% if seg.word %}<span class="pinyin-word">{% for wp in seg.word.wordpronunciation_set.all %}{% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}{% endfor %}</span>{% endif %}{% endfor %}</td>
+            data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hakka:{{ expr.platform_target|default:'' }} hanzi:{{ expr.text|default:'' }}">
+            {# The platform's own « hakka » (target) as recorded in its last snapshot: nothing recomputed here. #}
+            <td class="hanzi lx-target">{% if expr.platform_target %}{{ expr.platform_target }}{% else %}<span class="text-gray-400 italic text-sm" title="Pas de platform_id, ou absente du dernier instantané de la plateforme">pas sur la plateforme</span>{% endif %}</td>
             <td>{{ expr.french|default:"" }}</td>
             <td class="lx-cat">{{ expr.category|default:"" }}</td>
             <td class="lx-tools"><button type="button" class="rosace-copy-btn" title="Copier le français"
                 onclick="rosaceCopy('{{ expr.french|escapejs }}', this)">📋</button>{% if expr.platform_target %}
-              <button type="button" class="rosace-copy-btn" title="Copier le format plateforme : {{ expr.platform_target }}"
+              <button type="button" class="rosace-copy-btn" title="Copier le hakka de la plateforme"
                 onclick="rosaceCopy('{{ expr.platform_target|escapejs }}', this)">⧉</button>{% endif %}
               <button type="button" class="rosace-copy-btn" title="Éditer le maillage (liaison mots)" data-mesh-toggle="{{ expr.id }}">🧩</button></td>
           </tr>
-          <tr class="lx-panel-row"><td colspan="5"><div class="rosace-mesh-panel" data-mesh-panel="{{ expr.id }}"
+          <tr class="lx-panel-row"><td colspan="4"><div class="rosace-mesh-panel" data-mesh-panel="{{ expr.id }}"
               data-entry-url="{% url 'expression_mesh_entry' expr.id %}" hidden></div></td></tr>
         {% empty %}
-          <tr><td colspan="5" class="text-gray-500 italic">Aucune expression trouvée.</td></tr>
+          <tr><td colspan="4" class="text-gray-500 italic">Aucune expression trouvée.</td></tr>
         {% endfor %}
         </tbody>
       </table>

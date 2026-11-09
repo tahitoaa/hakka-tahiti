@@ -810,7 +810,8 @@ def search(request):
         *(f'expressionword_set__word__{path}' for path in _WORD_PRONUNCIATION_PREFETCH)
     )
     components_by_hanzi, snapshot_timestamp = build_expression_platform_components()
-    expressions = _with_platform_target(_with_segments(expressions_qs), components_by_hanzi)
+    # The Fiches show the platform's own « hakka » (target) as recorded: no segmentation recomputed.
+    expressions = _with_platform_target(list(expressions_qs), components_by_hanzi)
     duplicates, duplicates_count = _duplicates_payload()
     can_edit = is_editor(request.user)
 
