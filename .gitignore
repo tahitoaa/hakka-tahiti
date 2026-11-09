@@ -6,3 +6,4 @@ __pycache__/
 .vercel
 venv/*
 node_modules/
+.claude/settings.local.json
