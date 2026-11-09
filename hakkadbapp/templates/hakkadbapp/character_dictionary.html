@@ -148,6 +148,7 @@
     <a href="#regles" role="tab" data-sxtab="regles">Règles détaillées</a>
     <a href="#rey" role="tab" data-sxtab="rey">📕 Rey 1926</a>
     <a href="#hakkadictionary" role="tab" data-sxtab="hakkadictionary">🔎 hakkadictionary.com</a>
+    <a href="#en-ligne" role="tab" data-sxtab="en-ligne">🌐 Sources en ligne</a>
     <a href="#sources" role="tab" data-sxtab="sources">ℹ️ Sources</a>
   </nav>
   <p class="text-sm text-gray-700" data-sxpanel-note="lectures">Lectures de chaque caractère dans le lexique, 5 sources hakka (avec leurs pages), en cantonais et en mandarin.
@@ -239,7 +240,33 @@
     {% else %}<p class="text-sm text-gray-600">Connectez-vous pour chercher sur hakkadictionary.com.</p>{% endif %}
   </section>
 
-  <!-- 6. Every source, in full -->
+  <!-- 6. What the imported documents and the web say about a word (Sources.js, in base.html) -->
+  <section data-sxpanel="en-ligne" class="space-y-3" hidden>
+    {% if can_edit %}
+    <div class="sx-tools">
+      <label class="sr-only" for="dl-web-q">Mot ou caractère</label>
+      <input id="dl-web-q" type="search" autocomplete="off" maxlength="20" placeholder="Mot ou caractère : 屋家" style="max-width:14rem">
+      <button type="button" id="dl-web-go" class="sx-chip" disabled>Voir les sources</button>
+      <span class="sx-legend">Les documents importés d'abord ; une recherche en ligne (IA) seulement sur demande dans le panneau.</span>
+    </div>
+    <script>
+      (function () {
+        // The panel of Sources.js opens on any [data-sources] button: this one carries the characters typed.
+        const HAN = /[㐀-鿿\u{20000}-\u{2ffff}]/u;
+        const input = document.getElementById('dl-web-q');
+        const go = document.getElementById('dl-web-go');
+        input.addEventListener('input', () => {
+          const q = [...input.value].filter((c) => HAN.test(c)).join('');
+          go.disabled = !q;
+          if (q) go.dataset.sources = q; else delete go.dataset.sources;
+        });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !go.disabled) { e.preventDefault(); go.click(); } });
+      })();
+    </script>
+    {% else %}<p class="text-sm text-gray-600">Connectez-vous pour chercher un mot dans les sources en ligne.</p>{% endif %}
+  </section>
+
+  <!-- 7. Every source, in full -->
   <section data-sxpanel="sources" class="space-y-3" hidden>
     <p class="text-sm text-gray-700">D'où viennent les lectures et les sens de ce dictionnaire, et comment ils ont été obtenus.
       « Vers le Wenfa » : la part des caractères dont la lecture Wenfa est retrouvée par les correspondances apprises.</p>

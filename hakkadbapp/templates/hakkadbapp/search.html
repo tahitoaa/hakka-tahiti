@@ -7,7 +7,7 @@
   addressed by #hash (old links keep working: /doublons -> #doublons,
   /expressions/ -> #decoupage, /caracters -> #caracteres).
   Everyone: Mots, Thèmes, Expressions (cards), Caractères, Doublons.
-  Editors (can_edit): Dictionnaires, Relecture, and the Expressions tab's
+  Editors (can_edit): Relecture, and the Expressions tab's
   « Découpage » view; editing a Split and the export stay the owner's.
 {% endcomment %}
 {% include "hakkadbapp/components/rosace_card_styles.html" %}
@@ -39,6 +39,21 @@
   .th-table td.hanzi a { color: #261F1C; }
   .th-table td.hanzi a:hover { color: var(--color-brand, #9B1C1C); }
   .th-table td.th-py { color: #6E665C; white-space: nowrap; }
+
+  /* Mots, Expressions: the Thèmes table, one row per entry; its tools in the
+     last column, their panel (comment, maillage) on the row under it. */
+  .lx-box { background: #fff; border: 1px solid #ECE2D3; border-radius: 0.75rem; padding: 0.3rem 0.6rem 0.5rem; overflow-x: auto; }
+  .lx-table thead th { position: sticky; top: 0; background: #fff; text-align: left; font-size: 0.72rem; font-weight: 700;
+                       text-transform: uppercase; letter-spacing: 0.04em; color: #6E665C; padding: 0.4rem; }
+  .lx-table tbody tr.search-filter-item:hover td { background: #FDFAF5; }
+  .lx-table td.hanzi .rosace-char-link { color: #261F1C; }
+  .lx-table td.lx-cat { font-size: 0.78rem; color: #6E665C; }
+  .lx-table td.lx-tools { white-space: nowrap; text-align: right; }
+  .lx-table td.lx-tools .rosace-copy-btn { width: 1.9rem; height: 1.9rem; }
+  .lx-table td.lx-py .pinyin-word + .pinyin-word { margin-left: 0.3em; }
+  .lx-table tr.lx-panel-row td { padding: 0 0.4rem; border-top: 0; }
+  .lx-table .rosace-note-panel, .lx-table .rosace-mesh-panel { margin: 0 0 0.6rem; }
+  @media (max-width: 640px) { .lx-table .lx-cat { display: none; } }
 
   /* Relecture */
   .lr-root .sx-chip { min-height: 2.25rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; }
@@ -89,7 +104,6 @@
     <a href="#themes" role="tab" data-srtab="themes">Thèmes <small>{{ themes|length }}</small></a>
     <a href="#expressions" role="tab" data-srtab="expressions">Expressions <small>{{ expressions|length }}</small></a>
     <a href="#caracteres" role="tab" data-srtab="caracteres">Caractères</a>
-    <a href="#dictionnaires" role="tab" data-srtab="dictionnaires" class="is-member" title="Réservé aux éditeurs">📚 Dictionnaires</a>
     <a href="#relecture" role="tab" data-srtab="relecture" class="is-member" title="Réservé aux éditeurs">✍ Relecture</a>
     <a href="#doublons" role="tab" data-srtab="doublons">Doublons <small>{{ duplicates_count }}</small></a>
   </nav>
@@ -119,16 +133,30 @@
       </select>
     </div>
 
-    <div id="word-list" class="rosace-grid">
+    <div class="lx-box">
+    <table class="th-table lx-table no-auto-csv">
+      <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th class="lx-cat">Catégorie</th><th><span class="sr-only">Outils</span></th></tr></thead>
+      <tbody id="word-list">
       {% for word in words %}
-        <div class="search-filter-item"
-          data-search="mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} en:{{ word.english|default:'' }}"
+        <tr class="search-filter-item"
+          data-search="hanzi:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.simp }}{% endfor %} mand:{{ word.mandarin|default:'' }} fr:{{ word.french|default:'' }} py:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{{ wp.pronunciation.final.final }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %} initial:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial }}{% endfor %} final:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.final.final }}{% endfor %} tone:{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.tone.tone }}{% endfor %} en:{{ word.english|default:'' }}"
           data-category="{{ word.category|default:'' }}">
-          {% include "hakkadbapp/components/word_card.html" with word=word %}
-        </div>
+          <td class="hanzi">{% for wp in word.wordpronunciation_set.all %}<a href="{% url 'hanzi' wp.pronunciation.simp %}" class="rosace-char-link"><span class="hanzi simp">{{ wp.pronunciation.simp }}</span><span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span></a>{% endfor %}</td>
+          <td class="th-py">{% for wp in word.wordpronunciation_set.all %}{% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}{% endfor %}</td>
+          <td>{{ word.french|default:"" }}</td>
+          <td class="lx-cat">{{ word.category|default:"" }}</td>
+          <td class="lx-tools">{% if can_edit %}<button type="button" class="rosace-copy-btn" title="Sources sur ce mot"
+              data-sources="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.simp }}{% endfor %}"
+              data-reading="{% for wp in word.wordpronunciation_set.all %}{{ wp.pronunciation.initial.initial|default:'' }}{{ wp.pronunciation.final.final|default:'' }}{{ wp.pronunciation.tone.tone_number|default:'' }}{% endfor %}">🔎</button>{% endif %}
+            <button type="button" class="rosace-copy-btn" title="Éditer le commentaire" data-note-toggle="{{ word.id }}">💬</button></td>
+        </tr>
+        <tr class="lx-panel-row"><td colspan="5"><div class="rosace-note-panel" data-note-panel="{{ word.id }}"
+            data-entry-url="{% url 'word_note_entry' word.id %}" hidden></div></td></tr>
       {% empty %}
-        <p class="text-gray-500 italic px-3 py-2">Aucun mot trouvé.</p>
+        <tr><td colspan="5" class="text-gray-500 italic">Aucun mot trouvé.</td></tr>
       {% endfor %}
+      </tbody>
+    </table>
     </div>
   </section>
 
@@ -192,15 +220,30 @@
         />
       </div>
 
-      <div id="exprcard-list" class="rosace-expr-list">
+      <div class="lx-box">
+      <table class="th-table lx-table no-auto-csv">
+        <thead><tr><th>Caractères</th><th>Pinyin</th><th>Français</th><th class="lx-cat">Catégorie</th><th><span class="sr-only">Outils</span></th></tr></thead>
+        <tbody id="exprcard-list">
         {% for expr in expressions %}
-          <div class="search-filter-item"
+          <tr class="search-filter-item"
             data-search="fr:{{ expr.french|default:'' }} en:{{ expr.english|default:'' }} hanzi:{{ expr.text|default:'' }} rendering:{{ expr.rendering|default:'' }}">
-            {% include "hakkadbapp/components/expression_card.html" with expr=expr %}
-          </div>
+            <td class="hanzi">{% for seg in expr.segments %}{% if seg.word %}{% for wp in seg.word.wordpronunciation_set.all %}<a href="{% url 'hanzi' wp.pronunciation.simp %}" class="rosace-char-link"><span class="hanzi simp">{{ wp.pronunciation.simp }}</span><span class="hanzi trad hidden">{{ wp.pronunciation.trad }}</span></a>{% endfor %}{% else %}<span class="rosace-char-unknown" title="Caractère absent de la base de données">{{ seg.hanzi }}</span>{% endif %}{% empty %}{{ expr.text|default:""|cut:" " }}{% endfor %}</td>
+            <td class="th-py lx-py">{% for seg in expr.segments %}{% if seg.word %}<span class="pinyin-word">{% for wp in seg.word.wordpronunciation_set.all %}{% include "hakkadbapp/components/pinyin_switch.html" with i=wp.pronunciation.initial.initial f=wp.pronunciation.final.final t=wp.pronunciation.tone.tone_number %}{% endfor %}</span>{% endif %}{% endfor %}</td>
+            <td>{{ expr.french|default:"" }}</td>
+            <td class="lx-cat">{{ expr.category|default:"" }}</td>
+            <td class="lx-tools"><button type="button" class="rosace-copy-btn" title="Copier le français"
+                onclick="rosaceCopy('{{ expr.french|escapejs }}', this)">📋</button>{% if expr.platform_target %}
+              <button type="button" class="rosace-copy-btn" title="Copier le format plateforme : {{ expr.platform_target }}"
+                onclick="rosaceCopy('{{ expr.platform_target|escapejs }}', this)">⧉</button>{% endif %}
+              <button type="button" class="rosace-copy-btn" title="Éditer le maillage (liaison mots)" data-mesh-toggle="{{ expr.id }}">🧩</button></td>
+          </tr>
+          <tr class="lx-panel-row"><td colspan="5"><div class="rosace-mesh-panel" data-mesh-panel="{{ expr.id }}"
+              data-entry-url="{% url 'expression_mesh_entry' expr.id %}" hidden></div></td></tr>
         {% empty %}
-          <p class="text-gray-500 italic px-3 py-2">Aucune expression trouvée.</p>
+          <tr><td colspan="5" class="text-gray-500 italic">Aucune expression trouvée.</td></tr>
         {% endfor %}
+        </tbody>
+      </table>
       </div>
     </div>
     {% if can_edit %}
@@ -208,12 +251,6 @@
       {% include "hakkadbapp/components/expression_analysis.html" %}
     </div>
     {% endif %}
-  </section>
-
-  <!-- Dictionnaires (editors) -->
-  <section data-srpanel="dictionnaires" hidden>
-    <p class="sr-lead">Chercher un caractère ou un mot dans les dictionnaires anciens et en ligne.</p>
-    {% include "hakkadbapp/components/dict_lookups.html" %}
   </section>
 
   <!-- Relecture (editors) -->
@@ -259,6 +296,13 @@
 
 <!-- 🔍 Filters of the Mots, Thèmes and Expressions (cards) tabs -->
 <script>
+// A row and the panel row under it (comment, maillage) show together.
+function showRow(item, shown) {
+  item.style.display = shown ? '' : 'none';
+  const panel = item.nextElementSibling;
+  if (panel?.classList.contains('lx-panel-row')) panel.style.display = shown ? '' : 'none';
+}
+
 function setupSearch({ inputId, itemSelector, containerId, countId }) {
   const searchInput = document.getElementById(inputId);
   const items = document.querySelectorAll(`${containerId} > ${itemSelector}`);
@@ -269,7 +313,7 @@ function setupSearch({ inputId, itemSelector, containerId, countId }) {
     items.forEach(item => {
       const haystack = item.dataset.search?.toLowerCase() || '';
       const match = query.split(/\s+/).every(q => haystack.includes(q));
-      item.style.display = match ? '' : 'none';
+      showRow(item, match);
       if (match) visibleCount++;
     });
     if (countDisplay) countDisplay.textContent = visibleCount;
@@ -278,8 +322,8 @@ function setupSearch({ inputId, itemSelector, containerId, countId }) {
   return filter;
 }
 
-setupSearch({ inputId: 'word-search', itemSelector: 'div', containerId: '#word-list', countId: 'word-count' });
-const filterExpressionCards = setupSearch({ inputId: 'exprcard-search', itemSelector: 'div', containerId: '#exprcard-list', countId: 'exprcard-count' });
+setupSearch({ inputId: 'word-search', itemSelector: 'tr.search-filter-item', containerId: '#word-list', countId: 'word-count' });
+const filterExpressionCards = setupSearch({ inputId: 'exprcard-search', itemSelector: 'tr.search-filter-item', containerId: '#exprcard-list', countId: 'exprcard-count' });
 // ?q= (the Doublons tab's « Désambiguïser » link): the cards are filtered too.
 (function () {
   const q = new URLSearchParams(location.search).get('q');
@@ -288,10 +332,10 @@ const filterExpressionCards = setupSearch({ inputId: 'exprcard-search', itemSele
 
 document.getElementById('category-select').addEventListener('change', function() {
   const selectedCategory = this.value.toLowerCase();
-  const items = document.querySelectorAll('#word-list > div');
+  const items = document.querySelectorAll('#word-list > tr.search-filter-item');
   items.forEach(item => {
     const category = item.dataset.category?.toLowerCase() || '';
-    item.style.display = selectedCategory === '' || category.includes(selectedCategory) ? '' : 'none';
+    showRow(item, selectedCategory === '' || category.includes(selectedCategory));
   });
   const visibleCount = Array.from(items).filter(item => item.style.display !== 'none').length;
   document.getElementById('word-count').textContent = visibleCount;
@@ -310,9 +354,11 @@ document.getElementById('theme-search').addEventListener('input', function () {
 </script>
 <script>
   /* Tabs by #hash; #decoupage is the Expressions tab's second view. Each
-     opening tells the tabs that load on demand (lex:tab, see dict_lookups.html). */
+     opening is told to the tabs that load on demand (lex:tab). */
   (function () {
-    const TABS = ['mots', 'themes', 'expressions', 'caracteres', 'dictionnaires', 'relecture', 'doublons'];
+    const TABS = ['mots', 'themes', 'expressions', 'caracteres', 'relecture', 'doublons'];
+    // The dictionaries moved to the Dictionnaire des caractères.
+    if (location.hash === '#dictionnaires') location.replace("{% url 'character_dictionary' %}#rey");
     const VIEWS = { decoupage: ['expressions', 'decoupage'] };
     const tabs = [...document.querySelectorAll('[data-srtab]')];
     const views = [...document.querySelectorAll('[data-srview]')];

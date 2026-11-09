@@ -158,6 +158,18 @@
      it, so exporting as-is will create a fresh duplicate on the platform
      instead of updating this row. Amber/warning, same vocabulary as the
      rest of the app's --status-warning. */
+  /* One table per group, as the lexicon's Thèmes tab: one row per entry,
+     one column per field; a field the entries disagree on is red. */
+  #dup-app .dup-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #dup-app .dup-table th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+                           color: var(--text-muted); padding: 4px 8px; white-space: nowrap; }
+  #dup-app .dup-table td { padding: 4px 8px; border-top: 1px solid var(--gridline); vertical-align: top; word-break: break-word; }
+  #dup-app .dup-table td.mono { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  #dup-app .dup-table td.hakka { font-size: 15px; }
+  #dup-app .dup-table td.empty { color: var(--text-muted); font-style: italic; }
+  #dup-app .dup-table td.diff { color: var(--status-critical); font-weight: 600; background: var(--status-critical-bg); }
+  #dup-app .dup-table td.split-warn { color: var(--status-warning); font-weight: 600; background: var(--status-warning-bg); }
+  #dup-app .dup-table td .copy-btn, #dup-app .dup-table td button { margin-left: 4px; vertical-align: middle; }
   #dup-app .val-box.split-warn { outline: 1.5px solid var(--status-warning); outline-offset: -1px; color: var(--status-warning); font-weight: 600; background: var(--status-warning-bg); }
   #dup-app .split-warn-badge {
     display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
@@ -371,48 +383,42 @@
       { key: "status", label: "Statut" }
     ];
     var divergent = g.divergent_fields || [];
-    var fields = rows.map(function (row) {
+    // A table: one row per entry, one column per field.
+    var cells = rows.map(function (row) {
       var isDivergent = divergent.indexOf(row.key) !== -1;
-      var boxesHtml;
       if (row.render) {
-        boxesHtml = g.entries.map(function (e) {
-          // split_diff (only ever set on an expression entry, see
-          // views._dup_expression_entry/expression_mesh.compute_split_
-          // platform_diffs) means this entry's own Split field recomputes a
-          // hakka different from what's already on the platform for it --
-          // exporting as-is won't update that platform row, it'll create a
-          // fresh duplicate next to it. Flagged on the ID box since that's
-          // the one cell that's always unique to a single entry, unlike the
-          // other fields which are compared across the whole group.
+        return g.entries.map(function (e) {
+          // split_diff: this entry's Split recomputes a hakka different
+          // from the platform's -- exporting it makes a fresh duplicate.
           var splitWarn = row.key === "id" && e.split_diff;
-          var cls = "val-box mono" + (splitWarn ? " split-warn" : "");
           var title = splitWarn
-            ? ' title="Split ≠ hakka plateforme -- export = doublon : « ' +
+            ? ' title="Split ≠ hakka plateforme -- export = doublon : « ' +
               escapeHtml(e.split_diff.computed) + ' » au lieu de « ' +
               escapeHtml(e.split_diff.platform) + ' »"'
             : "";
-          return '<div class="' + cls + '"' + title + '>' + row.render(e) + "</div>";
-        }).join("");
-      } else {
-        // Character-level red highlighting is only meaningful (and only
-        // asked for) on the Hakka field of Expression duplicates -- words
-        // and the other fields get the coarser whole-box highlight
-        // instead, same as expressions.html's own field comparison.
-        var useCharDiff = section.category === "expressions" && row.key === "hakka";
-        var values = g.entries.map(function (e) { return e[row.key] || ""; });
-        var rendered = useCharDiff ? charDiffSpans(values) : values.map(function (v) { return escapeHtml(v); });
-        boxesHtml = g.entries.map(function (e, idx) {
-          var value = values[idx];
-          if (!value) return '<div class="val-box empty">vide</div>';
-          var inner = row.wrap ? row.wrap(rendered[idx]) : rendered[idx];
-          var boxClass = "val-box" + (isDivergent && !useCharDiff ? " diff" : "");
-          return '<div class="' + boxClass + '">' + inner + (row.copy ? copyButtonHtml(value) : "") + "</div>";
-        }).join("");
+          return '<td class="mono' + (splitWarn ? " split-warn" : "") + '"' + title + ">" + row.render(e) + "</td>";
+        });
       }
-      return '<div class="diff-field"><div class="field-name">' + escapeHtml(row.label) +
-        '</div><div class="field-value">' + boxesHtml + "</div></div>";
-    }).join("");
-    return '<div class="compare-fields">' + fields + "</div>";
+      // Character-level highlighting on the Hakka of expressions only;
+      // elsewhere the whole cell of a divergent field.
+      var useCharDiff = section.category === "expressions" && row.key === "hakka";
+      var values = g.entries.map(function (e) { return e[row.key] || ""; });
+      var rendered = useCharDiff ? charDiffSpans(values) : values.map(function (v) { return escapeHtml(v); });
+      return g.entries.map(function (e, idx) {
+        var value = values[idx];
+        if (!value) return '<td class="empty">vide</td>';
+        var inner = row.wrap ? row.wrap(rendered[idx]) : rendered[idx];
+        var cls = (row.key === "hakka" ? "hakka" : "") + (isDivergent && !useCharDiff ? " diff" : "");
+        return '<td class="' + cls.trim() + '">' + inner + (row.copy ? copyButtonHtml(value) : "") + "</td>";
+      });
+    });
+    return '<table class="dup-table no-auto-csv"><thead><tr>' +
+      rows.map(function (row) { return "<th>" + escapeHtml(row.label || "") + "</th>"; }).join("") +
+      "</tr></thead><tbody>" +
+      g.entries.map(function (e, idx) {
+        return "<tr>" + cells.map(function (col) { return col[idx]; }).join("") + "</tr>";
+      }).join("") +
+      "</tbody></table>";
   }
 
   function disambiguateLinkHtml(section, g) {
