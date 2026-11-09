@@ -164,6 +164,37 @@ test("the « Texte » button wraps the selection, or puts the caret between « �
   assert.deepEqual({ ...wrap("", 0, 0) }, { text: "«»", caret: 1 });
 });
 
+test("cut and join between the boxes, no caret to place", () => {
+  const { entry } = load();
+  // A reading pinned for the whole word is spread, each part keeps its own.
+  entry.setText("屋家(wuk5ka1)", "expression");
+  assert.equal(entry.splitAt([1]), true);
+  assert.equal(entry.text, "屋(wuk5) 家(ka1)");
+  // Joined back from the end of 屋's box to the start of 家's.
+  const [[a], [b]] = entry.units();
+  assert.equal(entry.joinAt(a.end, b.pos), true);
+  assert.equal(entry.text, "屋(wuk5)家(ka1)");
+  // A pending syllable is cut like a character; a :sense stays at the end.
+  entry.setText("我ngai_:moi", "expression");
+  assert.equal(entry.splitAt([1]), true);
+  assert.equal(entry.text, "我 ngai_:moi");
+  // Never inside a word's first box.
+  assert.equal(entry.splitAt([0]), false);
+});
+
+test("Mot -> Expression: cut where the lexicon's words start", () => {
+  const { entry } = load();
+  entry.setText("我爱屋家", "word");
+  const cuts = entry.lexiconCuts();
+  assert.deepEqual([...cuts], [1, 2]);
+  entry.splitAt(cuts);
+  assert.equal(entry.text, "我 爱 屋家");
+  // Nothing to cut: already several words, or syllables still to convert.
+  assert.deepEqual([...entry.lexiconCuts()], []);
+  entry.setText("我ngai_", "word");
+  assert.deepEqual([...entry.lexiconCuts()], []);
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);

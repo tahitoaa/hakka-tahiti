@@ -128,6 +128,83 @@ class SaisieEntry {
         return true;
     }
 
+    /** Spaces put before the characters (or syllables) at text positions
+     *  `positions`, all in one word: it becomes several. A reading pinned
+     *  for several characters (屋家(wuk5ka1)) is first spread one per
+     *  character, so each part keeps its own; a :sense stays at the end. */
+    splitAt(positions) {
+        const ps = [...new Set([].concat(positions))].sort((a, b) => a - b);
+        const text = this.text;
+        if (!ps.length) return false;
+        let start = ps[0];
+        while (start > 0 && !/\s/.test(text[start - 1])) start -= 1;
+        let end = ps[0];
+        while (end < text.length && !/\s/.test(text[end])) end += 1;
+        if (ps.some((p) => p <= start || p >= end)) return false;
+        const token = text.slice(start, end);
+        const cut = token.indexOf(':');
+        const base = cut === -1 ? token : token.slice(0, cut);
+        const sense = cut === -1 ? '' : token.slice(cut);
+        // One piece per character, its own reading pinned after it.
+        const pieces = [];
+        let run = [];
+        const isRun = (ch) => ch === '-' || /\p{Script=Han}/u.test(ch);
+        for (const m of base.matchAll(/\(([^()]*)\)|([\s\S])/gu)) {
+            if (m[2] !== undefined) {
+                pieces.push({ at: m.index, text: m[2] });
+                if (isRun(m[2])) run.push(pieces.length - 1);
+                else run = [];
+                continue;
+            }
+            const syllables = m[1].match(/[a-zü][a-zü'’]*[0-8_]?/gi) || [];
+            if (run.length > 1 && syllables.length) {
+                // Fewer syllables than characters pin the last ones (Sentence.pinnedReadings).
+                const targets = syllables.length < run.length ? run.slice(run.length - syllables.length) : run;
+                targets.forEach((idx, k) => { pieces[idx].text += `(${syllables[k]})`; });
+            } else if (pieces.length) {
+                pieces[pieces.length - 1].text += m[0];
+            } else {
+                pieces.push({ at: m.index, text: m[0] });
+            }
+            run = [];
+        }
+        const cuts = new Set(ps.map((p) => p - start));
+        const out = pieces.map((p, i) => `${i && cuts.has(p.at) ? ' ' : ''}${p.text}`).join('') + sense;
+        this.setText(`${text.slice(0, start)}${out}${text.slice(end)}`);
+        return true;
+    }
+
+    /** The spaces between text positions `from` and `to` removed: two
+     *  words become one. */
+    joinAt(from, to) {
+        const mid = this.text.slice(from, to);
+        if (!(from < to) || !/\s/.test(mid)) return false;
+        this.setText(`${this.text.slice(0, from)}${mid.replace(/\s+/g, '')}${this.text.slice(to)}`);
+        return true;
+    }
+
+    /** Where the lexicon's words start in a text of one word, longest
+     *  first: 我爱屋家 -> before 爱 and before 屋. [] when there is nothing
+     *  to cut (several words already, syllables still to convert). */
+    lexiconCuts() {
+        if (!this.sentence || /\s/.test(this.text.trim())) return [];
+        const groups = this.units();
+        if (groups.length !== 1 || groups[0].some((u) => u.type !== 'char')) return [];
+        const units = groups[0];
+        const isWord = (hanzi) => this.sentence.findMatches(hanzi, null, null).length > 0;
+        const cuts = [];
+        let i = 0;
+        while (i < units.length) {
+            let length = 1;
+            for (let n = Math.min(6, units.length - i); n > 1; n -= 1) {
+                if (isWord(units.slice(i, i + n).map((u) => u.char).join(''))) { length = n; break; }
+            }
+            i += length;
+            if (i < units.length) cuts.push(units[i].pos);
+        }
+        return cuts;
+    }
+
     /** No character for a pending syllable: it becomes a placeholder with
      *  its reading pinned, -(man4) (stored notation when the typed syllable
      *  converts to one), which the site reads as « unknown character ». */
@@ -309,13 +386,13 @@ class SaisieEntry {
             }
             if (m[1] !== undefined) {
                 if (!group) startGroup();
-                group.push({ type: 'text', text: Sentence.textBlock(m[1]) });
+                group.push({ type: 'text', text: Sentence.textBlock(m[1]), pos: m.index, end: m.index + m[1].length });
                 continue;
             }
             if (m[2] === undefined && m[4] === undefined) continue; // (pin), :constraint, *comment*
             if (!group) startGroup();
             if (m[2] !== undefined) {
-                group.push({ type: 'syl', index: syl++, syl: m[2] });
+                group.push({ type: 'syl', index: syl++, syl: m[2], pos: m.index, end: m.index + m[2].length });
                 charIndex += [...m[2]].length;
                 continue;
             }
@@ -329,7 +406,7 @@ class SaisieEntry {
             }
             if (/\p{Script=Han}/u.test(char)) hanIndex += 1;
             charIndex += 1;
-            group.push({ type: 'char', char, reading, pos: m.index });
+            group.push({ type: 'char', char, reading, pos: m.index, end: m.index + char.length });
         }
         return groups;
     }
@@ -425,7 +502,7 @@ class SaisieEntry {
             this.el.text.addEventListener('input', () => this.updateText());
             this.el.newWords.addEventListener('input', (event) => this.onNewWordInput(event));
             this.el.newWords.addEventListener('change', (event) => this.onNewWordInput(event));
-            this.kindButtons.forEach((btn) => btn.addEventListener('click', () => this.setKind(btn.dataset.kind)));
+            this.kindButtons.forEach((btn) => btn.addEventListener('click', () => this.switchKind(btn.dataset.kind)));
             this.el.slots.addEventListener('focusin', (event) => {
                 const index = event.target.dataset?.slot;
                 if (index !== undefined) this.setActive(Number(index));
@@ -448,9 +525,22 @@ class SaisieEntry {
                 this.afterChange();
             };
             this.el.slots.addEventListener('input', onSlotInput);
-            // A reading chosen for an ambiguous character.
-            this.el.slots.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin]')) event.preventDefault(); });
+            // A reading chosen for an ambiguous character; a word cut or two
+            // words joined between their boxes (no caret to place on a phone).
+            this.el.slots.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin], [data-split], [data-join-from]')) event.preventDefault(); });
             this.el.slots.addEventListener('click', (event) => {
+                const gap = event.target.closest('[data-split], [data-join-from]');
+                if (gap) {
+                    const done = gap.dataset.split !== undefined
+                        ? this.entry.splitAt([Number(gap.dataset.split)])
+                        : this.entry.joinAt(Number(gap.dataset.joinFrom), Number(gap.dataset.joinTo));
+                    if (!done) return;
+                    this.el.text.value = this.entry.text;
+                    // A word cut in two is an expression.
+                    if (this.kind === 'word') this.setKind('expression');
+                    else this.updateText();
+                    return;
+                }
                 const b = event.target.closest('[data-pin]');
                 if (b && this.entry.pinAt(Number(b.dataset.pin), b.dataset.reading)) {
                     this.el.text.value = this.entry.text;
@@ -480,7 +570,7 @@ class SaisieEntry {
                 input.addEventListener('input', () => input.classList.remove('is-ai')));
             document.getElementById('saisie-kind-warning')?.addEventListener('click', (event) => {
                 const b = event.target.closest('[data-switch-kind]');
-                if (b) this.setKind(b.dataset.switchKind);
+                if (b) this.switchKind(b.dataset.switchKind);
             });
             // 📋 Copy what the form holds (characters, reading, senses, theme).
             document.getElementById('saisie-copy')?.addEventListener('click', (event) =>
@@ -522,6 +612,21 @@ class SaisieEntry {
                 ? ReadingSourceSwitch.inputExample() : '';
             this.el.text.placeholder = example ? `ex. ${example}` : (kind === 'word' ? 'ex. wuk5ka1' : 'ex. ngai2 oi4 wuk5ka1');
             this.updateText();
+        }
+
+        /** A kind button touched. A word becoming an expression is cut
+         *  where the lexicon's words start (我爱屋家 -> 我 爱 屋家); the boxes'
+         *  gaps fix the rest. */
+        switchKind(kind) {
+            if (kind === 'expression' && this.kind === 'word') {
+                this.entry.setText(this.el.text.value, 'word');
+                const cuts = this.entry.lexiconCuts();
+                if (cuts.length && this.entry.splitAt(cuts)) {
+                    this.el.text.value = this.entry.text;
+                    this.setStatus('Découpé d’après le lexique : touchez entre deux cases pour couper, entre deux mots pour recoller.');
+                }
+            }
+            this.setKind(kind);
         }
 
         /** The text field changed (typed, or the sources/system did). */
@@ -717,7 +822,15 @@ class SaisieEntry {
 
         renderSlots() {
             const groups = this.entry.units();
-            this.el.slots.innerHTML = groups.map((group) => `<span class="saisie-word">${group.map((u) => u.type === 'text'
+            const label = (u) => (u.type === 'char' ? u.char : u.type === 'syl' ? u.syl : u.text);
+            // Between two boxes of a word: cut there. Between two words: join them.
+            const splitGap = (prev, u) => (prev.type === 'text' || u.type === 'text' ? ''
+                : `<button type="button" class="saisie-gap" data-split="${u.pos}" title="Couper ici"
+                    aria-label="Couper entre ${escapeHtml(label(prev))} et ${escapeHtml(label(u))}"></button>`);
+            const joinGap = (prev, next) => (!prev?.length || prev.some((u) => u.type === 'text') || next.some((u) => u.type === 'text') ? ''
+                : `<button type="button" class="saisie-gap is-join" data-join-from="${prev[prev.length - 1].end}" data-join-to="${next[0].pos}"
+                    title="Recoller ces deux mots" aria-label="Recoller ${escapeHtml(prev.map(label).join(''))} et ${escapeHtml(next.map(label).join(''))}"></button>`);
+            this.el.slots.innerHTML = groups.map((group, g) => `${joinGap(groups[g - 1], group)}<span class="saisie-word">${group.map((u, k) => (k ? splitGap(group[k - 1], u) : '') + (u.type === 'text'
                 ? `<span class="saisie-slot is-text" title="Texte gardé tel quel"><span class="saisie-text">${escapeHtml(u.text || '…')}</span><small>texte</small></span>`
                 : u.type === 'syl'
                 ? `<label class="saisie-slot"><input class="hanzi" data-slot="${u.index}" value="" inputmode="text" `
@@ -730,7 +843,7 @@ class SaisieEntry {
                             + ` aria-label="Lire ${escapeHtml(u.char)} ${escapeHtml(displayPinyin(r))}">${escapeHtml(displayPinyin(r))}</button>`).join('')
                         + '</span></span>'
                     : `<span class="saisie-slot is-char"><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
-                    + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`).join('')}</span>`).join('')
+                    + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`)).join('')}</span>`).join('')
                 || '<span class="text-sm text-gray-400">Les cases apparaissent quand vous tapez le texte.</span>';
             this.renderSlotStates();
             this.renderSuggestions();

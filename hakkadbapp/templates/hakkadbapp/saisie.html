@@ -28,6 +28,15 @@
     display: flex; align-items: center; min-height: 2.6rem; padding: 0 0.6rem; font-size: 1rem; font-style: italic;
     border: 1px dashed #B8A98F; border-radius: 0.375rem; background: #fff; color: #261F1C;
   }
+  /* Between two boxes: cut the word there; between two words: join them. */
+  .saisie-gap { position: relative; flex: none; width: 0.85rem; align-self: stretch; min-height: 2.6rem; margin: 0 -0.2rem;
+                border: 0; background: transparent; cursor: pointer; touch-action: manipulation; }
+  .saisie-gap::after { content: ''; position: absolute; left: 50%; top: 10%; bottom: 30%; border-left: 2px dotted #C9B99F; }
+  .saisie-gap:hover::after, .saisie-gap:focus-visible::after { border-left: 2px solid var(--color-brand-gold); }
+  .saisie-gap.is-join { width: 1.4rem; margin: 0 -0.35rem; }
+  .saisie-gap.is-join::after { content: '⌒'; border: 0; left: 0; right: 0; top: 0.6rem; bottom: auto; text-align: center;
+                               color: #B8A98F; font-size: 1rem; line-height: 1; }
+  .saisie-gap.is-join:hover::after, .saisie-gap.is-join:focus-visible::after { color: var(--color-brand-gold); border: 0; }
   .saisie-text-row { display: flex; gap: 0.4rem; align-items: stretch; }
   .saisie-text-row input { flex: 1; min-width: 0; }
   #saisie-text-btn { flex: none; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #FDFAF5;
@@ -134,7 +143,8 @@
     <div>
       <div class="text-sm font-semibold text-gray-700 mb-1">Caractères
         <details class="help-tip"><summary aria-label="Aide : caractères">ⓘ</summary><div>Touchez une case vide puis un caractère proposé
-        (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.</div></details></div>
+        (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.
+        Touchez <b>entre deux cases</b> (pointillés) pour couper le mot, le <b>⌒</b> entre deux mots pour les recoller.</div></details></div>
       <div id="saisie-slots" class="flex flex-wrap gap-2 min-h-12 items-end"></div>
     </div>
 
