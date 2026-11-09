@@ -38,6 +38,7 @@
         </dl>
         <h3>Texte complet</h3>
         <dl>
+          <dt>clic</dt><dd>aller à l'annotation du passage et l'écouter</dd>
           <dt>double-clic</dt><dd>modifier le passage sur place ; <kbd>Entrée</kbd> enregistre, <kbd>Échap</kbd> annule</dd>
         </dl>
       </section>
@@ -185,7 +186,7 @@
         <button type="button" data-full="translation" aria-pressed="false">Français</button>
       </div>
       <button type="button" id="eaf-full-copy" class="eaf-btn eaf-btn-light eaf-btn-sm">📋 Copier</button>
-      <small class="text-gray-500">Double-cliquez (ou touchez deux fois) un passage pour le modifier ; Entrée enregistre, Échap annule.</small>
+      <small class="text-gray-500">Un clic : l'annotation et son audio ; double-clic (ou deux touchers) : modifier sur place, Entrée enregistre, Échap annule.</small>
     </div>
     <div id="eaf-full-text" class="eaf-full-text"></div>
   </aside>
@@ -327,6 +328,9 @@
   .eaf-seg:hover { background: #FDFAF5; }
   .eaf-seg.is-active { background: #FBF0E6; border-color: #a5b4fc; border-left-color: var(--c); }
   .eaf-seg.is-playing { box-shadow: 0 0 0 2px #f59e0b; }
+  /* Picked in the whole text (TranscriberApp.locate). */
+  @keyframes eaf-located { from { background: #fde68a; } to { background: transparent; } }
+  .eaf-row.is-located .eaf-seg { animation: eaf-located 1.6s ease-out; box-shadow: 0 0 0 3px #c9a227; }
   .eaf-seg-main { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
   .eaf-seg-main.is-todo { color: #6E665C; font-style: italic; font-size: 0.875rem; }
   .eaf-seg-sub { font-size: 0.8rem; color: #6E665C; overflow-wrap: anywhere; }

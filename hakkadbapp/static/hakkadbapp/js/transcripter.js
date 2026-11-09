@@ -872,6 +872,8 @@ class TranscriberApp {
                 this.editInFullText(span);
             } else {
                 lastTap = { seg: span.dataset.seg, at: now };
+                // One click: its annotation scrolled into view, and heard.
+                this.locate(this.rowSegs?.[Number(span.dataset.seg)]);
             }
         });
         $('eaf-full-copy').addEventListener('click', async (event) => {
@@ -1350,6 +1352,24 @@ class TranscriberApp {
     scheduleFullText() {
         clearTimeout(this.fullTimer);
         this.fullTimer = setTimeout(() => this.renderFullText(), 250);
+    }
+
+    /** A segment picked in the whole text: its annotation brought into
+     *  view and lit for a moment (unless only the whole text is shown),
+     *  its sound played; Enter (outside a field) then opens it. */
+    locate(seg) {
+        if (!seg) return;
+        this.lastOpened = seg;
+        const row = this.rowOf(seg);
+        if (row && $('eaf-split').dataset.view !== 'full') {
+            row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            row.classList.remove('is-located');
+            void row.offsetWidth;          // restart the animation
+            row.classList.add('is-located');
+            clearTimeout(this.locateTimer);
+            this.locateTimer = setTimeout(() => row.classList.remove('is-located'), 1600);
+        }
+        if (this.audioUrl) this.play(seg);
     }
 
     /** A segment of the whole text edited in place (double click or
