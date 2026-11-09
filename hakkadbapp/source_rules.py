@@ -321,17 +321,28 @@ def learn(lexicon):
 
 def predict(rules, source_id, reading):
     """The most likely Wenfa reading for a source reading, and how sure:
-    the share of the learning pairs that agree, part by part (product)."""
+    the share of the learning pairs that agree, part by part (product).
+    The parts are learnt one by one, so the reading is then set in Wenfa's
+    pinyin (Wen Fa's guide, pinyin_rules): the tone among those that fit
+    the final (5 and 6 for -p, -t, -k, else 1 to 4), x/j/q before i and
+    z/c/s elsewhere, y, wui... (« sin1 » -> « xin1 », « jung1 » -> « zung1 »)."""
+    from .pinyin_rules import fix_parts
+
     r = rules[source_id]
     out, confidence = [], 1.0
     for k, part in enumerate(("initial", "final", "tone")):
         counts = r["parts"][part].get(reading[k])
         if not counts:
             return None, 0
+        if part == "tone":
+            final = out[1]
+            stop = len(final) > 1 and final.endswith(("p", "t", "k"))
+            fits = {t: n for t, n in counts.items() if (t in ("5", "6")) == stop}
+            counts = fits or counts
         value, n = max(counts.items(), key=lambda kv: kv[1])
         out.append(value)
-        confidence *= n / sum(counts.values())
-    return tuple(out), round(100 * confidence)
+        confidence *= n / sum(r["parts"][part].get(reading[k]).values())
+    return fix_parts(*out), round(100 * confidence)
 
 
 # ---- the page's data -------------------------------------------------------------------------------

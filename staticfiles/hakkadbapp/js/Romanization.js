@@ -261,6 +261,50 @@ var Romanization = (function () {
         });
     }
 
+    /** A stored candidate set in Wenfa's pinyin (Wen Fa's guide; same
+     *  rules as pinyin_rules.fix_parts on the server): x/j/q before i and
+     *  z/c/s elsewhere, y without initial, wui, w for v, p/t/k for b/d/g,
+     *  tones 5 and 6 only for -p/-t/-k (7 -> 5, 8 -> 6). */
+    function wenfaSpelling(c) {
+        var initial = c.initial || '';
+        var final = c.final || '';
+        if (/[aeiouü][bdg]$/.test(final)) final = final.slice(0, -1) + { b: 'p', d: 't', g: 'k' }[final.slice(-1)];
+        if (initial === 'v') initial = 'w';
+        if (initial === 'w' && final.charAt(0) === 'i') final = 'u' + final;
+        var toX = { s: 'x', z: 'j', zh: 'j', c: 'q', ch: 'q' };
+        var fromX = { j: 'z', q: 'c', x: 's' };
+        if (final.charAt(0) === 'i' && toX[initial]) initial = toX[initial];
+        else if (fromX[initial] && final && final.charAt(0) !== 'i') initial = fromX[initial];
+        if (!initial && final.charAt(0) === 'i') {
+            initial = 'y';
+            if (final.length > 1 && 'aeouü'.indexOf(final.charAt(1)) >= 0) final = final.slice(1);
+        }
+        var tones = c.tones;
+        if (tones) {
+            var stop = final.length > 1 && /[ptk]$/.test(final);
+            var fit = [];
+            tones.forEach(function (t) {
+                var tone = t === '7' ? '5' : t === '8' ? '6' : t;
+                if ((tone === '5' || tone === '6') === stop && fit.indexOf(tone) < 0) fit.push(tone);
+            });
+            if (fit.length) tones = fit;
+        }
+        return { initial: initial, final: final, tones: tones };
+    }
+
+    /** The candidates set in Wenfa's pinyin, the same ones merged. */
+    function wenfaCandidates(list) {
+        var out = [];
+        list.forEach(function (c) {
+            var w = wenfaSpelling(c);
+            var same = out.filter(function (o) { return o.initial === w.initial && o.final === w.final; })[0];
+            if (!same) { out.push(w); return; }
+            if (!same.tones || !w.tones) { same.tones = null; return; }
+            w.tones.forEach(function (t) { if (same.tones.indexOf(t) < 0) same.tones.push(t); });
+        });
+        return out;
+    }
+
     /** One syllable typed in `systemId` ("ts'am1", "ngai_", "pɑ") -> the
      *  stored readings it can stand for: [{initial, final, tones}], where
      *  `tones` is null when no tone was typed (any tone). */
@@ -270,9 +314,9 @@ var Romanization = (function () {
         var letters = m[1];
         var digit = SUPERSCRIPT_TO_DIGIT[m[2]] || m[2];
         var tones = digit && digit !== '_' ? storedTones(digit, systemId) : null;
-        return (reverseIndex(systemId)[foldSpelling(letters)] || []).map(function (pair) {
+        return wenfaCandidates((reverseIndex(systemId)[foldSpelling(letters)] || []).map(function (pair) {
             return { initial: pair[0], final: pair[1], tones: tones };
-        });
+        }));
     }
 
     /** A typed syllable -> stored candidates, whatever system it's typed

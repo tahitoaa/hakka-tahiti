@@ -117,8 +117,19 @@ test("McIver: ng before non-i finals stays ng (ngai2 = 我), ny before i, both t
   assert.equal(Romanization.convert("ng", "in", "2", "mciver"), "nyin²");
 });
 
-test("McIver: attested spellings outside the mapping are typable (chi1 finds Wenfa ji1 and zhi1)", () => {
+test("McIver: attested spellings outside the mapping are typable (chi1 finds Wenfa ji1)", () => {
   const { Romanization } = load();
   const found = Romanization.toStored("chi1", "mciver");
-  assert.ok(has(found, "j", "i", "1") && has(found, "zh", "i", "1"));
+  // Wen Fa's guide: z and zh are written j before i -- no zhi1 in Wenfa's pinyin.
+  assert.ok(has(found, "j", "i", "1") && !has(found, "zh", "i", "1"));
+});
+
+test("source readings come out in Wenfa's pinyin (Wen Fa's guide)", () => {
+  const { Romanization } = load();
+  const spelled = (list) => list.map((c) => `${c.initial}${c.final}${(c.tones || []).join("/")}`);
+  for (const c of Romanization.toStored("sin1", "baoan").concat(Romanization.toStored("tsit7", "baoan"))) {
+    assert.ok(!/^(s|z|zh|c|ch)i/.test(c.initial + c.final), spelled([c]).join());
+    assert.ok(!/^(j|q|x)[^i]/.test(c.initial + c.final), spelled([c]).join());
+    assert.ok(!(c.tones || []).some((t) => t === "7" || t === "8"), spelled([c]).join());
+  }
 });

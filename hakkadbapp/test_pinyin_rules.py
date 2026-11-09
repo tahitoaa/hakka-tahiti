@@ -34,6 +34,18 @@ class NormalizeTests(SimpleTestCase):
         self.assertEqual(self.fixed("bed5"), "bet5")
         self.assertEqual(self.fixed("gong1"), "gong1", "ng is no stop")
 
+    def test_j_q_x_without_i(self):
+        self.assertEqual(self.fixed("jung1 xam1 qan3"), "zung1 sam1 can3")
+        self.assertEqual(self.fixed("ji3 qit5 xin1"), "ji3 qit5 xin1")
+
+    def test_parts(self):
+        from hakkadbapp.pinyin_rules import fix_parts
+
+        self.assertEqual(fix_parts("s", "in", "1"), ("x", "in", "1"))
+        self.assertEqual(fix_parts("", "iao", "1"), ("y", "ao", "1"))
+        self.assertEqual(fix_parts("j", "ung", "1"), ("z", "ung", "1"))
+        self.assertEqual(fix_parts("y", "u", "1"), ("y", "u", "1"), "the lexicon's own split is kept")
+
     def test_y_w_e(self):
         self.assertEqual(self.fixed("iao1 iu1 i1 iam2 in1"), "yao1 yu1 yi1 yam2 yin1")  # 腰 有 衣 盐 因
         self.assertEqual(self.fixed("vun2"), "wun2")

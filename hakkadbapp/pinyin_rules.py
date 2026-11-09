@@ -110,15 +110,30 @@ def _fix(base, tone, baoan):
         initial = "w"
     if initial == "w" and final.startswith("i"):
         final = "u" + final
-    # s, z, c (and zh, ch) before i -> x, j, q.
+    # s, z, c (and zh, ch) before i -> x, j, q; and back: j, q, x without i -> z, c, s.
     if final.startswith("i") and initial in ("s", "z", "zh", "c", "ch"):
         initial = {"s": "x", "z": "j", "zh": "j", "c": "q", "ch": "q"}[initial]
+    elif initial in ("j", "q", "x") and final and not final.startswith("i"):
+        initial = {"j": "z", "q": "c", "x": "s"}[initial]
     # No initial: i is written y (iao -> yao, iu -> yu, i -> yi, in -> yin).
     if not initial and final.startswith("i") and len(final) > 1 and final[1] in "aeouü":
         initial, final = "y", final[1:]
     elif not initial and final.startswith("i"):
         initial = "y"
     return initial + final, tone
+
+
+def fix_parts(initial, final, tone):
+    """A reading as (initial, final, tone) -- the lexicon's own split, y and w
+    being initials -- set right like normalize() does: ("s", "in", "1") ->
+    ("x", "in", "1"), ("", "iao", "1") -> ("y", "ao", "1"). Used on the
+    readings deduced from the dictionaries (source_rules.predict)."""
+    before = f"{initial}{final}".lower()
+    base, tone = _fix(before, str(tone or ""), False)
+    if base == before:
+        return initial, final, tone          # spelling unchanged: the lexicon's split kept (ng2, m2)
+    new_initial, new_final = split(base)
+    return new_initial, new_final, tone
 
 
 def normalize(pinyin):
