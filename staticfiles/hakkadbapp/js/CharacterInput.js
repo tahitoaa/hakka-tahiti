@@ -41,8 +41,8 @@ class SyllableInputModel {
 
         this.syllables.forEach((syl, i) => {
             this.suggestions.push(
-                ...this.lookup(syl).map(({ pron, sources }) => ({
-                    pron, sources, for: i, start: 0, end: 0,
+                ...this.lookup(syl).map(({ pron, sources, doubtful = false }) => ({
+                    pron, sources, doubtful, for: i, start: 0, end: 0,
                 }))
             );
         });
@@ -182,6 +182,9 @@ const SUGGESTION_BAR_CSS = `
 .sugg .sugg-uh { margin-top: 0.15rem; width: 100%; font-size: 0.6rem; line-height: 1.15; color: #6E655C; text-align: center;
                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sugg .sugg-uh b { color: #3730a3; font-weight: 600; }
+/* Doubtful reading (a scan reading no other source agrees with): shown last, ⚠. */
+.sugg.sugg-doubt { background: #FFF7ED; border-color: #FDBA74; }
+.sugg .sugg-warn { position: absolute; top: 1px; right: 3px; font-size: 0.65rem; line-height: 1; color: #C2410C; }
 .sugg.sugg-unknown { border-style: dashed; color: #8C8478; background: #FDFAF5; }
 `;
 
@@ -283,6 +286,10 @@ class SuggestionBar {
                 ? `<span class="sugg-src">${s.sources.map((src) => `<i class="src-bar" data-src="${src}"></i>`).join('')}</span>`
                 : '';
             const sourceTitle = showSources && s.sources?.length ? ` · sources : ${s.sources.join(', ')}` : '';
+            const warn = s.doubtful ? '<span class="sugg-warn" aria-label="lecture douteuse">⚠</span>' : '';
+            const doubtTitle = s.doubtful
+                ? '\n⚠ Lecture douteuse : transcrite d’un scan, elle ne concorde avec aucune autre source hakka (erreur de lecture possible).'
+                : '';
             // Mandarin + meaning (Unihan), when loaded (HanziInfo.js).
             const info = typeof HanziInfo !== 'undefined' ? HanziInfo.text(simp) || HanziInfo.text(trad) : '';
             const infoTitle = info ? `\n${info.replace(/"/g, '&quot;')}` : '';
@@ -290,8 +297,8 @@ class SuggestionBar {
             const mandarin = uh?.mandarin ? `<span class="sugg-man">${escapeSugg(uh.mandarin.split(', ')[0])}</span>` : '';
             const english = uh?.meaning ? `<span class="sugg-en" lang="en">${escapeSugg(uh.meaning.split(/[;,]/)[0].trim())}</span>` : '';
             if (uh) withUnihan = true;
-            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${infoTitle}">`
-                + `<span class="sugg-key">${keyHint}</span>${marks}`
+            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn${s.doubtful ? ' sugg-doubt' : ''}" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${doubtTitle}${infoTitle}">`
+                + `<span class="sugg-key">${keyHint}</span>${warn}${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
                 + `<span class="sugg-py"><span class="sugg-hk">${pinyin}</span>${mandarin}</span>`
                 + english
