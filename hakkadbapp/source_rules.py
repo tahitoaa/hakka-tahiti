@@ -514,4 +514,32 @@ def cached_payload():
     if not payload or time.time() - stamp > 600:
         payload = table_payload()
         _cache["payload"] = (time.time(), payload)
+        _cache.pop("doubtful", None)
     return payload
+
+
+_SUPERSCRIPT_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸"
+
+
+def doubtful_readings():
+    """{source id: ["字|syllable|tone"]}: the doubtful readings (flag "d" of
+    table_payload) of the dictionaries the input pages use (Bao'an, McIver),
+    keyed as their static index writes them (simplified char, syllable,
+    tone), so the suggestions can mark them ⚠ and show them last."""
+    payload = cached_payload()
+    if "doubtful" in _cache:
+        return _cache["doubtful"]
+    wanted = {s["id"] for s in HAKKA if s.get("system")}
+    out = {sid: [] for sid in wanted}
+    for row in payload["rows"]:
+        for sid, readings in row[7].items():
+            if sid not in wanted:
+                continue
+            for text, _pages, flag in readings:
+                if flag != "d":
+                    continue
+                m = re.fullmatch(f"(.*?)([{_SUPERSCRIPT_DIGITS}]*)", text)
+                tone = "".join(str(_SUPERSCRIPT_DIGITS.index(c)) for c in m.group(2))
+                out[sid].append(f"{row[0]}|{m.group(1)}|{tone}")
+    _cache["doubtful"] = out
+    return out

@@ -88,11 +88,14 @@ class Dictionary {
         found.forEach(({ pron, source }) => {
             // simp + trad: 傢 and 家 share the simplified form but are two characters.
             const key = `${pron.simp}|${pron.trad}|${pron.storedKey ? pron.storedKey() : pron.abstractPinyin()}`;
-            if (!merged.has(key)) merged.set(key, { pron, sources: [] });
+            if (!merged.has(key)) merged.set(key, { pron, sources: [], doubtful: true });
             const entry = merged.get(key);
             if (!entry.sources.includes(source)) entry.sources.push(source);
+            // Doubtful only if every source giving it marks it so (never the lexicon).
+            entry.doubtful = entry.doubtful && !!pron.doubtful;
         });
-        return [...merged.values()];
+        // Doubtful readings last (stable sort: the rest keeps its order).
+        return [...merged.values()].sort((a, b) => a.doubtful - b.doubtful);
     }
 
     /** Readings whose own spelling is `syl` (with or without tone). */

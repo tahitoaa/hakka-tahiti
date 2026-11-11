@@ -1166,6 +1166,17 @@ def api_sources_table(request):
     return response
 
 
+@gzip_page
+def api_doubtful_readings(request):
+    """The dictionaries' doubtful readings (source_rules.doubtful_readings),
+    for the input suggestions (ReadingSources.js): marked ⚠, shown last."""
+    from . import source_rules
+
+    response = JsonResponse(source_rules.doubtful_readings(), json_dumps_params={"ensure_ascii": False})
+    response["Cache-Control"] = "public, max-age=600"
+    return response
+
+
 def hanzi_by_tone(request, tone):
     # Filter all relevant pronunciations, prefetch related fields for efficiency
     prons = Pronunciation.objects.filter(tone__tone_number=tone).select_related('initial', 'final', 'tone')

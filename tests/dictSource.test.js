@@ -56,6 +56,15 @@ test("useSources(): lexicon and dictionaries together, words kept, one suggestio
   assert.deepEqual([...found.map((e) => JSON.stringify([e.pron.trad, [...e.sources]]))], [JSON.stringify(["屋", ["L"]])]);
 });
 
+test("doubtful dictionary readings are flagged and come last", () => {
+  const { dico, src } = setup();
+  const doubt = src("家", "ka", 1);
+  doubt.doubtful = true;
+  dico.useSources({ lexicon: false, sources: [{ id: "baoan", short: "B", system: null, prons: [doubt, src("加", "ka", 1)] }] });
+  const found = dico.suggestionsFor("ka", null);
+  assert.equal(JSON.stringify(found.map((e) => [e.pron.trad, e.doubtful])), JSON.stringify([["加", false], ["家", true]]));
+});
+
 test("SourcePronunciation keeps the syllable whole and superscripts tones 7/8", () => {
   const { src } = setup();
   const p = src("客", "k'ak", 7);

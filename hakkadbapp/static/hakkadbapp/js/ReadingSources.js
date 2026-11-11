@@ -94,9 +94,25 @@ class ReadingSourceSwitch {
             label: button.textContent.trim(),
             short: button.dataset.dictShort || button.textContent.trim().charAt(0),
         };
-        ReadingSourceSwitch.loading[id] ??= Dictionary.fetchSourcePronunciations(button.dataset.dictUrl, source)
-            .catch((err) => { delete ReadingSourceSwitch.loading[id]; throw err; });
+        ReadingSourceSwitch.loading[id] ??= Promise.all([
+            Dictionary.fetchSourcePronunciations(button.dataset.dictUrl, source),
+            ReadingSourceSwitch.doubtful(),
+        ]).then(([loaded, doubtful]) => {
+            // Doubtful readings (scan misreadings?): marked ⚠ and shown last.
+            const keys = new Set(doubtful[id] || []);
+            if (keys.size) loaded.prons.forEach((p) => { p.doubtful = keys.has(`${p.simp}|${p.initial}|${p.tone}`); });
+            return loaded;
+        }).catch((err) => { delete ReadingSourceSwitch.loading[id]; throw err; });
         return ReadingSourceSwitch.loading[id].then(({ meta, prons }) => ({ ...source, meta, prons }));
+    }
+
+    /** {source id: ["字|syllable|tone"]}: the dictionaries' doubtful readings
+     *  (source_rules.doubtful_readings), fetched once; none if unavailable. */
+    static doubtful() {
+        ReadingSourceSwitch.doubtfulLoading ??= fetch('/api/doubtful-readings')
+            .then((r) => (r.ok ? r.json() : {}))
+            .catch(() => ({}));
+        return ReadingSourceSwitch.doubtfulLoading;
     }
 
     async set(source) {
