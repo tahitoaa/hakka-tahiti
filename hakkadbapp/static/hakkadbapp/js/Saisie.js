@@ -337,6 +337,20 @@ class SaisieEntry {
     // A token of punctuation only, Latin or Chinese (as text_to_words._PUNCT_ONLY_TOKEN_RE).
     static PUNCT_RE = /^[\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF1F\uFF01\uFF08\uFF09\u3010\u3011\uFF5B\uFF5D\u2018\u2019\u201C\u201D\u2014\u2026,.;:?!()[\]{}'"]+$/;
 
+    /** The senses of a translation, as addition_duplicates.senses() reads
+     *  them: « la maison, le foyer (familial) » -> {maison, foyer}; English
+     *  without to / a / the. */
+    static senses(text, lang = 'fr') {
+        const articles = lang === 'en' ? /^(?:to |a |an |the )/ : /^(?:le |la |les |l'|l’|un |une |des |du |de la |se |s'|s’)/;
+        const out = new Set();
+        String(text || '').toLowerCase().replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+            .split(/[,;/|]| ou | or /).forEach((part) => {
+                const s = part.replace(/…/g, ' ').split(/\s+/).join(' ').trim().replace(/^[ .!?]+|[ .!?]+$/g, '').replace(articles, '');
+                if (s.length > 1) out.add(s);
+            });
+        return out;
+    }
+
     check(additions = []) {
         return this.tokens().map((t) => {
             const w = { hanzi: t.plain, pinyin: t.pinyin };
@@ -584,6 +598,11 @@ class SaisieEntry {
             // A field the AI filled stays tinted until the editor changes it.
             [this.el.french, this.el.english, this.el.themes].forEach((input) =>
                 input.addEventListener('input', () => input.classList.remove('is-ai')));
+            // « Même sens » (renderMeaning) follows the translations as they are typed.
+            [this.el.french, this.el.english].forEach((input) => input.addEventListener('input', () => {
+                clearTimeout(this.meaningTimer);
+                this.meaningTimer = setTimeout(() => this.renderMeaning(), 250);
+            }));
             document.getElementById('saisie-kind-warning')?.addEventListener('click', (event) => {
                 const b = event.target.closest('[data-switch-kind]');
                 if (b) this.switchKind(b.dataset.switchKind);
@@ -870,6 +889,7 @@ class SaisieEntry {
                 inputs[f].classList.add('is-ai');
             });
             this.setStatus('Suggestion reprise : vérifiez-la avant d’enregistrer.');
+            this.renderMeaning();
             inputs[fields[0]]?.focus();
         }
 
@@ -924,9 +944,47 @@ class SaisieEntry {
             };
         }
 
+        /** « Même sens » under the translations: the lexicon words and the
+         *  additions (same kind, not rejected) sharing a French or English
+         *  sense with the entry -- possible duplicates written otherwise
+         *  (same rule as the Suivi's « Doublons », addition_duplicates.py). */
+        renderMeaning() {
+            const el = document.getElementById('saisie-meaning');
+            if (!el) return;
+            const fr = SaisieEntry.senses(this.el.french.value, 'fr');
+            const en = SaisieEntry.senses(this.el.english.value, 'en');
+            if (!fr.size && !en.size) { el.innerHTML = ''; return; }
+            const own = (this.entry.values?.().hanzi || '').replace(/\s+/g, '');
+            // Senses of the lexicon words, read once.
+            this.lexiconSenses ||= this.dico.lexiconWords.map((w) => ({
+                hanzi: w.dataset.simp || '', pinyin: w.dataset.pinyin || '', french: w.dataset.french || '', english: w.dataset.english || '',
+                fr: SaisieEntry.senses(w.dataset.french, 'fr'), en: SaisieEntry.senses(w.dataset.english, 'en'),
+            }));
+            const hits = [];
+            const consider = (item, where) => {
+                if (!item.hanzi || item.hanzi.replace(/\s+/g, '') === own) return;
+                const f = [...(item.fr || SaisieEntry.senses(item.french, 'fr'))].filter((s) => fr.has(s));
+                const e = [...(item.en || SaisieEntry.senses(item.english, 'en'))].filter((s) => en.has(s));
+                if (f.length || e.length) hits.push({ item, where, f, e });
+            };
+            if (this.kind === 'word') this.lexiconSenses.forEach((w) => consider(w, 'Lexique'));
+            (this.additions || []).filter((a) => a.id !== this.editingId && a.status !== 'rejected' && a.kind === this.kind)
+                .forEach((a) => consider(a, `Ajout · ${this.statusLabels[a.status] || a.status}`));
+            if (!hits.length) { el.innerHTML = ''; return; }
+            hits.sort((x, y) => (y.f.length > 0) + (y.e.length > 0) - (x.f.length > 0) - (x.e.length > 0));
+            const shown = hits.slice(0, 6);
+            el.innerHTML = `<div class="saisie-meaning"><b>⧉ Même sens déjà présent</b> — doublon ? (${hits.length})
+                <ul>${shown.map(({ item, where, f, e }) => `<li><span class="saisie-meaning-where">${escapeHtml(where)}</span>
+                  <span class="hanzi">${escapeHtml(AdditionList.platformHanzi(item.hanzi))}</span>
+                  <span>${escapeHtml(superscriptTones(item.pinyin))}</span>
+                  <span>« ${escapeHtml(item.french || '?')} »${item.english ? ` <i lang="en">${escapeHtml(item.english)}</i>` : ''}</span>
+                  <span class="saisie-meaning-why">${[...f, ...e].map((s) => `<mark>${escapeHtml(s)}</mark>`).join(' ')}</span></li>`).join('')}</ul></div>`;
+        }
+
         /** The mixed line (pinyin + hanzi, as Sentence renders it). */
         renderPreview() {
             this.renderCheck();
+            this.renderMeaning();
             const mixed = this.entry.mixed();
             this.el.preview.innerHTML = mixed.hanzi
                 ? `${escapeHtml(mixed.pinyin)} <span class="hanzi">${escapeHtml(mixed.hanzi)}</span>` : '';
@@ -1115,6 +1173,7 @@ class SaisieEntry {
             this.el.english.value = addition.english;
             this.el.themes.value = addition.themes;
             this.el.observations.value = addition.observations;
+            this.renderMeaning();
             this.setStatus('');
             // A validator relisting « À valider » validates from here.
             const validate = document.getElementById('saisie-validate');

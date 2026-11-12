@@ -45,6 +45,12 @@
   .saisie-check-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; padding: 0.25rem 0.5rem;
                           border-radius: 0.375rem; border-left: 4px solid #DDD0BD; background: #FDFAF5; }
   .saisie-check-list .hanzi { font-size: 1.1rem; }
+  .saisie-meaning { font-size: 0.85rem; padding: 0.4rem 0.6rem; border-radius: 0.375rem; background: #FFF7ED; color: #7c2d12; border-left: 4px solid #f97316; }
+  .saisie-meaning ul { display: grid; gap: 0.15rem; margin-top: 0.25rem; }
+  .saisie-meaning li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.6rem; color: #3A3430; }
+  .saisie-meaning .hanzi { font-size: 1.05rem; }
+  .saisie-meaning-where { font-size: 0.72rem; font-weight: 700; color: #8C8478; min-width: 7rem; }
+  .saisie-meaning mark { background: #fef08a; border-radius: 0.2rem; padding: 0 0.15rem; }
   #saisie-check > p { font-size: 0.875rem; padding: 0.4rem 0.6rem; border-radius: 0.375rem; }
   .saisie-check-known { border-left-color: #059669 !important; } p.saisie-check-known { background: #fef3c7; color: #92400e; }
   .saisie-check-reading { border-left-color: #d97706 !important; } p.saisie-check-reading { background: #fef3c7; color: #92400e; }
@@ -194,6 +200,8 @@
         <label for="saisie-english" class="block text-sm font-semibold text-gray-700 mb-1">Anglais <span class="font-normal text-gray-500">(obligatoire pour valider)</span></label>
         <input id="saisie-english" type="text" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">
       </div>
+      <!-- « Même sens » (Saisie.js renderMeaning): lexicon words and additions sharing a sense. -->
+      <div id="saisie-meaning" class="sm:col-span-2" aria-live="polite"></div>
       <div>
         <label for="saisie-themes" class="block text-sm font-semibold text-gray-700 mb-1">Thème <span class="font-normal text-gray-500">(facultatif)</span></label>
         <input id="saisie-themes" type="text" list="saisie-theme-list" class="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-brand-gold">

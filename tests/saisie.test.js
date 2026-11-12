@@ -245,3 +245,12 @@ test("an addition edited: read back with its stored readings pinned", () => {
   assert.equal(entry.values().pinyin, "wuk5ka1");
   assert.equal(entry.check()[0].status, "known");
 });
+
+test("« Même sens »: translations read as the server reads them (addition_duplicates.senses)", () => {
+  const { context } = load();
+  const senses = (t, lang) => [...context.SaisieEntry.senses(t, lang)].sort();
+  assert.deepEqual(senses("la maison, le foyer (familial)", "fr"), ["foyer", "maison"]);
+  assert.deepEqual(senses("to eat; a meal", "en"), ["eat", "meal"]);
+  assert.deepEqual(senses("rouge ou vert", "fr"), ["rouge", "vert"]);
+  assert.deepEqual(senses("", "fr"), []);
+});
