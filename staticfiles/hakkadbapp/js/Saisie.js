@@ -915,11 +915,38 @@ class SaisieEntry {
                         + u.reading.split('/').map((r) => `<button type="button" data-pin="${u.pos}" data-reading="${escapeHtml(r)}"`
                             + ` aria-label="Lire ${escapeHtml(u.char)} ${escapeHtml(displayPinyin(r))}">${escapeHtml(displayPinyin(r))}</button>`).join('')
                         + '</span></span>'
-                    : `<span class="saisie-slot is-char"><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
-                    + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`)).join('')}</span>`).join('')
+                    : (() => {
+                        // New character / new reading: the Suivi's colours (char_review.js).
+                        const state = this.charState(u.char, u.reading);
+                        const title = state === 'new-char' ? 'Caractère absent du lexique'
+                            : state === 'new-reading' ? `Lecture nouvelle — le lexique lit ce caractère : ${this.lexiconReadings(u.char).map(displayPinyin).join(', ')}` : '';
+                        return `<span class="saisie-slot is-char${state ? ` is-${state}` : ''}"${title ? ` title="${escapeHtml(title)}"` : ''}><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
+                            + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`;
+                    })())).join('')}</span>`).join('')
                 || '<span class="text-sm text-gray-400">Les cases apparaissent quand vous tapez le texte.</span>';
+            if (this.el.slots.querySelector('.is-new-char, .is-new-reading')) {
+                this.el.slots.insertAdjacentHTML('beforeend', `<p class="saisie-slot-legend">
+                    <span class="is-new-char">字</span> absent du lexique · <span class="is-new-reading">字</span> lecture que le lexique ne donne pas à ce caractère
+                    ${[...this.el.slots.querySelectorAll('.is-new-reading')].map((s) => `<br>${escapeHtml(s.textContent.trim().slice(0, 1))} : ${escapeHtml(s.title.split('— ')[1] || '')}`).join('')}</p>`);
+            }
             this.renderSlotStates();
             this.renderSuggestions();
+        }
+
+        /** The lexicon's readings of a character (stored notation, tone digits). */
+        lexiconReadings(char) {
+            const key = (p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`);
+            return [...new Set(this.dico.lexiconPronunciations.filter((p) => p.simp === char || p.trad === char).map(key))];
+        }
+
+        /** 'new-char' (absent from the lexicon), 'new-reading' (a reading it
+         *  doesn't give that character) or ''. */
+        charState(char, reading) {
+            if (!/\p{Script=Han}/u.test(char || '')) return '';
+            const known = this.lexiconReadings(char);
+            if (!known.length) return 'new-char';
+            if (!reading || reading.includes('/')) return '';
+            return known.includes(reading) ? '' : 'new-reading';
         }
 
         renderSlotStates() {
