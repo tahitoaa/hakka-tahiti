@@ -4,11 +4,28 @@ hakka (same characters), its pinyin, a sense of its French or a sense of
 its English. Shown in the Suivi table, its slideshow and its « Doublons »
 filter (addition_duplicates.js).
 
-Levels, for an addition: "exact" (same characters and same pinyin as
-something else, or same pinyin, French and English), "strong" (same characters, or same French and same
-English), "weak" (a shared pinyin of two syllables or more, a shared
-sense), "" (nothing found). A one-syllable pinyin alone is not reported:
-homophones are the rule, not a duplicate."""
+No AI: plain normalised comparisons (characters simplified, pinyin without
+spaces or superscripts, senses without articles or brackets).
+
+Each match gets a relation (classify), most serious first:
+  "exact"       same characters, same pinyin (and a sense in common, or no
+                sense to compare): the same entry.
+  "translation" same characters, same pinyin, no sense in common: the same
+                hakka word translated otherwise (French synonym, or another
+                sense of the word).
+  "reading"     same characters, another pinyin: another reading, or a
+                wrong tone.
+  "spelling"    same pinyin, a sense in common, other characters: the same
+                word written otherwise.
+  "synonym"     a French sense in common, other characters and pinyin:
+                a hakka synonym.
+  "homophone"   same pinyin (two syllables or more), other characters and
+                meaning. A one-syllable pinyin alone is not reported:
+                homophones are the rule, not a duplicate.
+  "sense_en"    an English sense in common only.
+Levels (colours): "exact"; "strong" (translation, reading, spelling);
+"weak" (synonym, homophone, sense_en). An addition takes the relation and
+level of its most serious match."""
 import re
 from collections import defaultdict
 
@@ -54,6 +71,29 @@ def senses(text, articles):
         if len(part) > 1:
             out.add(part)
     return out
+
+
+RELATIONS = ("exact", "translation", "reading", "spelling", "synonym", "homophone", "sense_en")
+LEVELS = {"exact": "exact", "translation": "strong", "reading": "strong", "spelling": "strong",
+          "synonym": "weak", "homophone": "weak", "sense_en": "weak"}
+
+
+def classify(a, b, fields):
+    """The relation of b to a (normalised items, see _items) given the fields
+    they share; None when not worth reporting."""
+    same_sense = "french" in fields or "english" in fields
+    comparable = bool((a["_fr"] and b["_fr"]) or (a["_en"] and b["_en"]))
+    if "hakka" in fields:
+        if "pinyin" not in fields and a["_pinyin"] and b["_pinyin"]:
+            return "reading"
+        return "exact" if same_sense or not comparable else "translation"
+    if "pinyin" in fields:
+        if same_sense:
+            return "spelling" if a["_hanzi"] and b["_hanzi"] else "exact"
+        return "homophone" if a["_syllables"] >= 2 else None
+    if "french" in fields:
+        return "synonym"
+    return "sense_en" if "english" in fields else None
 
 
 def _items():
@@ -114,24 +154,21 @@ def report():
             other = items[j]
             if other["type"] == "addition" and other.get("ai_pending") and other["status"] == LexiconAddition.STATUS_DRAFT:
                 continue
-            # One syllable in common and nothing else: a homophone, not a duplicate.
-            if fields == {"pinyin"} and it["_syllables"] < 2:
+            relation = classify(it, other, fields)
+            if not relation:
                 continue
-            # Same pinyin and same meanings: the same word, maybe written with another character.
-            exact = {"hakka", "pinyin"} <= fields or {"pinyin", "french", "english"} <= fields
-            strong = "hakka" in fields or {"french", "english"} <= fields
             matches.append({
                 "type": other["type"], "id": other["id"], "hanzi": other["hanzi"], "pinyin": other["pinyin"],
                 "french": other["french"], "english": other["english"], "status": other.get("status", ""),
                 "fields": [f for f in ("hakka", "pinyin", "french", "english") if f in fields],
-                "level": "exact" if exact else "strong" if strong else "weak",
+                "relation": relation, "level": LEVELS[relation],
             })
         if not matches:
             continue
-        rank = {"exact": 0, "strong": 1, "weak": 2}
-        # A lexicon entry first (the addition may be useless), then by how much matches.
-        matches.sort(key=lambda m: (rank[m["level"]], m["type"] == "addition", -len(m["fields"])))
-        out[it["id"]] = {"level": matches[0]["level"], "count": len(matches), "matches": matches[:MAX_MATCHES]}
+        # Most serious first, a lexicon entry before an addition (the addition may be useless), then by how much matches.
+        matches.sort(key=lambda m: (RELATIONS.index(m["relation"]), m["type"] == "addition", -len(m["fields"])))
+        out[it["id"]] = {"level": matches[0]["level"], "relation": matches[0]["relation"],
+                         "count": len(matches), "matches": matches[:MAX_MATCHES]}
     return out
 
 

@@ -14,6 +14,8 @@
   .hd-entry { font-size: 0.82rem; color: #3A3430; }
   .hd-entry b { color: #9B1C1C; }
   .hd-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  #ai-page [hidden] { display: none !important; }
+  .ai-gen select { max-width: 16rem; }
 </style>
 
 <div id="ai-page" data-saisie-url="{% url 'saisie' %}" class="mt-1 sm:mt-2 w-full max-w-screen-xl mx-auto space-y-2">
@@ -32,24 +34,29 @@
 
   {% if ai_enabled %}
   <div class="ai-gen">
-    <label>Générer <select id="ai-mode">
-      <option value="missing">des mots manquants</option>
-      <option value="expressions">des expressions</option>
+    <label>Source d'inspiration <select id="ai-mode">
+      <option value="missing">Corpus du site (mots manquants)</option>
+      <option value="expressions">Un thème (expressions)</option>
+      <option value="char">Autour d'un caractère (composés)</option>
+      <option value="rey">Pages de Rey déjà lues</option>
+      <option value="hakkadict">hakkadictionary.com (un caractère)</option>
+      <option value="text">Un texte collé</option>
     </select></label>
-    <label id="ai-theme-wrap" hidden>Thème <select id="ai-theme"><option value="">au hasard</option>
+    <label data-src="expressions" hidden>Thème <select id="ai-theme"><option value="">au hasard</option>
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select></label>
-    <label>Nombre <input type="number" id="ai-count" min="1" max="50" value="5" inputmode="numeric"></label>
-    <button type="button" id="ai-generate" class="saisie-btn saisie-btn-ai">🤖 Générer</button>
+    <label data-src="char hakkadict" hidden>Caractère <input id="hd-q" type="text" maxlength="2" placeholder="番" class="hanzi"
+      style="width:3.5rem;text-align:center;font-size:1.2rem" aria-label="Caractère"></label>
+    <label data-src="missing expressions char rey text">Nombre <input type="number" id="ai-count" min="1" max="50" value="5" inputmode="numeric"></label>
+    <button type="button" id="ai-preview" data-src="missing char rey text" class="saisie-btn saisie-btn-neutral"
+      title="Sans IA, gratuit : les mots absents du lexique que cette source donnerait">👁 Aperçu</button>
+    <button type="button" id="ai-generate" data-src="missing expressions char rey text" class="saisie-btn saisie-btn-ai">🤖 Générer</button>
+    <button type="button" id="hd-go" data-src="hakkadict" hidden class="saisie-btn saisie-btn-neutral">📖 Chercher</button>
+    <details class="help-tip"><summary aria-label="Aide">ⓘ</summary><div id="ai-src-help"></div></details>
   </div>
-  <div class="ai-gen" id="hd-panel">
-    <label for="hd-q">📖 Chercher dans <a href="https://www.hakkadictionary.com/zh-tw/hakkadict/" target="_blank" rel="noopener" class="underline">hakkadictionary.com</a></label>
-    <input id="hd-q" type="text" maxlength="2" placeholder="番" class="hanzi" style="width:3.5rem;text-align:center;font-size:1.2rem" aria-label="Caractère à chercher">
-    <button type="button" id="hd-go" class="saisie-btn saisie-btn-neutral">Chercher</button>
-    <details class="help-tip"><summary aria-label="Aide">ⓘ</summary><div>Le site interroge le 客家話大辭典 (Bao'an) pour ce caractère :
-      ses lectures et sens, puis les mots parlés 〈…〉 qu'il cite (les mots littéraires 〔…〕 sont écartés). Le pinyin Wenfa est déduit du
-      lexique (et des lectures que le dictionnaire indique). Cochez les mots utiles : ils deviennent des suggestions ci-dessous,
-      traduites en français et en anglais par l'IA, à vérifier avant de les proposer.</div></details>
-  </div>
+  <textarea id="ai-text" data-src="text" hidden rows="4" maxlength="6000" class="hanzi w-full p-2 border border-gray-300 rounded-md"
+    placeholder="Collez un texte en caractères (hakka) : les mots absents du lexique y sont repérés sans IA."></textarea>
+  <p id="ai-cost" class="vt-sub"></p>
+  <div id="ai-preview-result"></div>
   <div id="hd-result"></div>
   {% else %}
   <p class="text-sm text-red-700">L'IA n'est pas configurée sur ce serveur.</p>

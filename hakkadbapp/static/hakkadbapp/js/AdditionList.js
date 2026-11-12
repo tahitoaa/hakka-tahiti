@@ -951,7 +951,7 @@ class ValidationTable extends AdditionList {
             ${AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}${
-                typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id)}</div>` : ''}${
+                typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id, a.created_by)}</div>` : ''}${
                 typeof Duplicates !== 'undefined' ? Duplicates.badge(a, this.dupOpen?.has(a.id)) : ''}</td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
@@ -1428,7 +1428,7 @@ class ValidationShow {
             <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}
               <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
               <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span>
-              ${typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('addition', a.id) : ''}</div>
+              ${typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('addition', a.id, a.created_by) : ''}</div>
             <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.notes(a) : ''}
@@ -1971,10 +1971,55 @@ document.addEventListener('DOMContentLoaded', () => {
     window.validationTable = table;
     table.load();
     if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
+    // « Source d'inspiration »: one selector; each source shows its own inputs
+    // (data-src) and says what costs AI.
     const mode = $('ai-mode');
-    const syncTheme = () => { $('ai-theme-wrap').hidden = mode.value !== 'expressions'; };
-    mode.addEventListener('change', syncTheme);
-    syncTheme();
+    const SOURCES = {
+        missing: ['Mots vus dans les expressions du lexique et les transcriptions, absents du lexique (repérés sans IA).',
+            '🤖 IA : 1 appel par lot de 10 (choisit la lecture parmi celles du lexique, traduit).'],
+        expressions: ['Expressions faites uniquement de mots du lexique, dans le thème choisi (ou au hasard).',
+            '🤖 IA : 1 appel par lot de 10 (compose et traduit ; caractères et lectures viennent du lexique).'],
+        char: ['Mots contenant ce caractère : d’abord ceux vus dans les données du site (corpus, pages de Rey), puis des composés courants proposés par l’IA. Chaque lecture est vérifiée avec le lexique.',
+            '🤖 IA : 1 appel par lot de 10. Aperçu (données du site seules) gratuit.'],
+        rey: ['Mots des pages du dictionnaire de Rey (1926) déjà lues, absents du lexique (repérés sans IA) ; le sens français de Rey sert de contexte.',
+            '🤖 IA : 1 appel par lot de 10 (lecture Wenfa, traduction). Aperçu gratuit.'],
+        hakkadict: ['Le 客家話大辭典 (hakkadictionary.com) pour ce caractère : ses lectures et sens, puis les mots parlés 〈…〉 qu’il cite (les mots littéraires 〔…〕 sont écartés). Le pinyin Wenfa est déduit du lexique. Cochez les mots utiles.',
+            'Recherche gratuite ; 🤖 IA seulement pour traduire les mots cochés.'],
+        text: ['Les mots d’un texte collé absents du lexique : le texte est découpé avec les mots du lexique (sans IA) ; les caractères restants forment les mots candidats.',
+            '🤖 IA : 1 appel par lot de 10 (lecture, traduction). Aperçu gratuit.'],
+    };
+    const syncSource = () => {
+        root.querySelectorAll('[data-src]').forEach((el) => {
+            el.hidden = !el.dataset.src.split(' ').includes(mode.value);
+        });
+        $('ai-src-help').textContent = SOURCES[mode.value][0];
+        $('ai-cost').textContent = SOURCES[mode.value][1];
+        $('ai-preview-result').innerHTML = '';
+        if (mode.value !== 'hakkadict') { hd.data = null; renderHd(); }
+    };
+    const sourceInput = () => ({ mode: mode.value, theme: $('ai-theme').value, char: $('hd-q').value.trim(), text: $('ai-text').value });
+    const sourceReady = () => {
+        if (['char', 'hakkadict'].includes(mode.value) && !$('hd-q').value.trim()) { $('hd-q').focus(); table.setStatus('Indiquez un caractère.', true); return false; }
+        if (mode.value === 'text' && !$('ai-text').value.trim()) { $('ai-text').focus(); table.setStatus('Collez un texte.', true); return false; }
+        return true;
+    };
+    mode.addEventListener('change', () => { syncSource(); table.setStatus(''); });
+    $('ai-preview').addEventListener('click', async (event) => {
+        if (!sourceReady()) return;
+        await AdditionList.whileBusy(event.currentTarget, 'Recherche…', async () => {
+            try {
+                const data = await AdditionList.request('/api/ia/mots', { ...sourceInput(), preview: true });
+                const n = data.candidates.length;
+                $('ai-preview-result').innerHTML = n
+                    ? `<p class="text-sm">👁 ${n}${n >= 50 ? '+' : ''} mot${n > 1 ? 's' : ''} absent${n > 1 ? 's' : ''} du lexique (sans IA) : <span class="hanzi">${
+                        data.candidates.map((c) => `${esc(c.hanzi)}${c.seen > 1 ? `<small class="vt-sub">×${c.seen}</small>` : ''}`).join(' · ')}</span></p>`
+                    : `<p class="text-sm">👁 Aucun mot absent du lexique dans cette source${mode.value === 'char' ? ' : « Générer » laissera l’IA proposer des composés courants' : ''}.</p>`;
+                table.setStatus('');
+            } catch (err) {
+                table.setStatus(`Échec : ${err.message}`, true);
+            }
+        });
+    });
     // 📖 hakkadictionary.com: a character's words, ticked, become the AI's drafts.
     const hd = { data: null };
     const esc = AdditionList.escapeHtml;
@@ -2016,8 +2061,13 @@ document.addEventListener('DOMContentLoaded', () => {
             renderHd();
         });
     };
+    syncSource();
     $('hd-go')?.addEventListener('click', searchHd);
-    $('hd-q')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchHd(); } });
+    $('hd-q')?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        (mode.value === 'hakkadict' ? $('hd-go') : $('ai-generate')).click();
+    });
     $('hd-result')?.addEventListener('change', (e) => {
         const box = e.target.closest('[data-hd]');
         if (!box || !hd.data) return;
@@ -2045,6 +2095,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('ai-generate').addEventListener('click', async (event) => {
         const button = event.currentTarget;
+        if (!sourceReady()) return;
         const wanted = Math.max(1, Math.min(50, Number($('ai-count').value) || 5));
         const PER_REQUEST = 10;
         table.setStatus('');
@@ -2054,7 +2105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 while (added.length < wanted) {
                     const count = Math.min(PER_REQUEST, wanted - added.length);
                     table.setStatus(`🤖 L’IA cherche : ${added.length} sur ${wanted}…`);
-                    const data = await AdditionList.request('/api/ia/mots', { mode: mode.value, count, theme: $('ai-theme').value, draft: true });
+                    const data = await AdditionList.request('/api/ia/mots', { ...sourceInput(), count, draft: true });
                     data.additions.forEach((a) => table.additions.unshift(a));
                     added.push(...data.additions);
                     table.render();
@@ -2168,6 +2219,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 const id = Number(toggle.dataset.dupToggle);
                 if (table.dupOpen.has(id)) table.dupOpen.delete(id); else table.dupOpen.add(id);
                 table.render();
+                return;
+            }
+            // 🗑 in the list: the addition in too many (confirmed), then the duplicates again.
+            const del = e.target.closest('[data-dup-delete]');
+            if (del) {
+                const id = Number(del.dataset.dupDelete);
+                table.handleAction('delete', id, null, del).then(() => {
+                    if (!table.additions.some((x) => x.id === id)) {
+                        table.dupOpen.delete(id);
+                        Duplicates.refresh(rerender);
+                    }
+                });
+                return;
+            }
+            // ⇄: another addition folded into this one, or this one into the lexicon (corrections e-reo).
+            const merge = e.target.closest('[data-dup-merge]');
+            if (merge) {
+                const id = Number(merge.dataset.dupMerge);
+                const type = merge.dataset.type;
+                const otherId = Number(merge.dataset.id);
+                const a = table.additions.find((x) => x.id === id);
+                const other = type === 'addition' && table.additions.find((x) => x.id === otherId);
+                const label = (x) => `« ${x.hanzi} ${x.pinyin || ''} — ${x.french || '…'} »`;
+                const question = type === 'addition'
+                    ? `Fusionner ${other ? label(other) : 'l’autre ajout'} dans ${label(a)} ?\n\n${label(a)} garde ses caractères, son pinyin et son statut ; les sens, thèmes, sources et observations de l’autre y sont ajoutés, puis l’autre ajout est supprimé.`
+                    : `Fusionner ${label(a)} dans le lexique ?\n\nCe que cet ajout apporte (sens manquants, autre pinyin ou graphie, thèmes, observations) devient des « Corrections e-reo » sur l’entrée du lexique, puis l’ajout est supprimé.`;
+                if (!a || !confirm(question)) return;
+                AdditionList.whileBusy(merge, '…', async () => {
+                    try {
+                        const data = await AdditionList.request(`${AdditionList.API}${id}/fusionner`, { type, id: otherId });
+                        table.additions = table.additions.filter((x) => x.id !== data.removed);
+                        table.dupOpen.delete(data.removed);
+                        table.onRemove(data.removed);
+                        if (data.addition) table.upsert(data.addition);
+                        else { table.render(); Duplicates.refresh(rerender); }
+                        table.setStatus(`⇄ ${data.message}`);
+                    } catch (err) {
+                        alert(`Échec : ${err.message}`);
+                    }
+                });
                 return;
             }
             const edit = e.target.closest('[data-dup-edit]');

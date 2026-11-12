@@ -38,17 +38,20 @@ const Visas = (() => {
     }
 
     /** « 👍 2 👎 1 » for an item, the reader's own visa pressed; the title
-     *  lists who said what. */
-    function html(type, key) {
+     *  lists who said what. `author` (username): on one's own addition the
+     *  visas of the others are shown, but one cannot give one. */
+    function html(type, key, author = '') {
         if (!state) return '';
         const list = state.visas.get(target(type, key)) || [];
         const mine = list.find((v) => v.user === state.me)?.opinion || '';
+        const own = !!author && author === state.me;
         const button = (opinion, icon, label) => {
             const who = list.filter((v) => v.opinion === opinion);
             const title = `${label}${who.length ? ` :\n${who.map((v) => `${v.name}${v.comment ? ` — ${v.comment}` : ''}`).join('\n')}` : ''}`
-                + (mine === opinion ? '\n(cliquez pour retirer votre visa)' : '');
+                + (own ? '\n(votre ajout : le visa est donné par les autres membres)'
+                    : mine === opinion ? '\n(cliquez pour retirer votre visa)' : '');
             return `<button type="button" class="vz-btn vz-${opinion}" data-vz="${opinion}" aria-pressed="${mine === opinion}"
-                title="${esc(title)}">${icon}${who.length ? ` <b>${who.length}</b>` : ''}</button>`;
+                ${own ? 'disabled' : ''} title="${esc(title)}">${icon}${who.length ? ` <b>${who.length}</b>` : ''}</button>`;
         };
         const commented = list.filter((v) => v.comment);
         return `<span class="vz" data-vz-type="${esc(type)}" data-vz-key="${esc(key)}">${button('ok', '👍', 'Visa favorable')}${button('ko', '👎', 'Visa défavorable')}${

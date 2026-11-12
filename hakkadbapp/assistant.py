@@ -32,8 +32,8 @@ from django.views.decorators.http import require_POST
 
 from . import pinyin_rules
 from .ai import MODEL, HAN_RE, ai_enabled, _client
-from .models import (AITarget, Expression, LexiconAddition, Pronunciation, ReviewComment, SharedTranscript, Word,
-                     t2s)
+from .models import (AITarget, Expression, LexiconAddition, Pronunciation, ReviewComment, ReyPage, SharedTranscript,
+                     Word, t2s)
 from .permissions import AI_USERNAME, ASSISTANTS_GROUP, editor_required, is_editor
 
 logger = logging.getLogger(__name__)
@@ -334,26 +334,102 @@ def _tokens(text):
             yield hanzi, "".join(pins).replace(" ", "")
 
 
-def missing_candidates(limit):
-    """Words used in the lexicon's expressions and in the transcriptions,
-    absent from the lexicon and the additions, most frequent first, with
-    where they were seen and each character's readings."""
-    known, readings = known_words(), char_readings()
-    counts, contexts, pins = Counter(), defaultdict(list), {}
+def _corpus_sources():
+    """(maillage text, context) of the lexicon's expressions and the transcriptions."""
     sources = [(e.text, f"expression « {e.text} » : {e.french}") for e in Expression.objects.all()]
     for t in SharedTranscript.objects.all():
         for seg in t.data.get("segments", []):
             sources.append((seg.get("transcript", ""), f"transcription « {seg.get('hanzi', '')} » : {seg.get('translation', '')}"))
-    for text, context in sources:
-        for hanzi, pin in _tokens(text):
-            key = _norm(hanzi)
-            if key in known:
+    return sources
+
+
+def missing_candidates(limit):
+    """Words used in the lexicon's expressions and in the transcriptions,
+    absent from the lexicon and the additions, most frequent first, with
+    where they were seen and each character's readings."""
+    return _rank(((hanzi, pin, context) for text, context in _corpus_sources() for hanzi, pin in _tokens(text)), limit)
+
+
+def rey_candidates(limit):
+    """The words (« mot ») of Rey's pages already read (ReyPage), absent from
+    the lexicon and the additions; Rey's French sense as context. No AI to find them."""
+    return _rank(_rey_rows(), limit)
+
+
+def char_candidates(char, limit):
+    """The words containing `char` seen in the site's data (corpus, Rey's
+    pages read), absent from the lexicon."""
+    key = _norm(char)
+    found = [(h, pin, ctx) for text, ctx in _corpus_sources() for h, pin in _tokens(text) if key in _norm(h)]
+    found += [(h, pin, ctx) for h, pin, ctx in _rey_rows() if key in _norm(h)]
+    return _rank(found, limit)
+
+
+def _rey_rows():
+    for row in ReyPage.objects.only("page", "entries"):
+        for e in row.entries or []:
+            hanzi = "".join(HAN_RE.findall(e.get("hanzi", "")))
+            if e.get("kind") != "caractère" and 2 <= len(hanzi) <= 6:
+                yield hanzi, "", f"Rey 1926 p. {row.page} : « {e.get('hanzi', '')} » {e.get('reading', '')} — {e.get('french', '')}"
+
+
+MAX_TEXT = 6000
+
+
+def segment(text, known, longest=6):
+    """A pasted text's words absent from `known` (simplified words): spaced
+    tokens as they are (pins « 字(ka1) » kept); a run of characters is cut
+    by the longest known word at each place, the characters left between
+    known words joined into one unknown word (up to 4). [(hanzi, pin, sentence)]."""
+    out = []
+    for sentence in re.split(r"[。！？!?\n；;]+", text[:MAX_TEXT]):
+        context = " ".join(sentence.split())[:200]
+        for raw in sentence.split():
+            token = TOKEN_RE.sub("", raw.split(":")[0])
+            if TOKEN_RE.search(raw) and token and all(HAN_RE.fullmatch(c) for c in token):
+                out += [(h, pin, context) for h, pin in _tokens(raw)]
                 continue
-            counts[key] += 1
-            if len(contexts[key]) < 3:
-                contexts[key].append(context[:200])
-            if pin:
-                pins[key] = pin
+            for run in re.findall(r"(?:[㐀-鿿]|[\U00020000-\U0002ffff])+", raw):
+                simp, i, unknown = _norm(run), 0, ""
+                while i < len(run):
+                    size = next((n for n in range(min(longest, len(run) - i), 0, -1) if simp[i:i + n] in known), 0)
+                    if size:
+                        if unknown:
+                            out.append((unknown, "", context))
+                            unknown = ""
+                        i += size
+                    else:
+                        unknown += run[i]
+                        i += 1
+                        if len(unknown) == 4:
+                            out.append((unknown, "", context))
+                            unknown = ""
+                if unknown:
+                    out.append((unknown, "", context))
+    return out
+
+
+def text_candidates(text, limit):
+    """The words of a pasted text absent from the lexicon (segment, no AI)."""
+    return _rank(segment(text, known_words()), limit)
+
+
+def _rank(found, limit):
+    """[(hanzi, pinned reading, context)] -> the candidates: absent from the
+    lexicon and the additions, most frequent first, at most 3 contexts each,
+    with each character's readings (a character the lexicon can't read
+    and no pin: left out, there is no reading to propose)."""
+    known, readings = known_words(), char_readings()
+    counts, contexts, pins = Counter(), defaultdict(list), {}
+    for hanzi, pin, context in found:
+        key = _norm(hanzi)
+        if key in known:
+            continue
+        counts[key] += 1
+        if len(contexts[key]) < 3 and context[:200] not in contexts[key]:
+            contexts[key].append(context[:200])
+        if pin:
+            pins[key] = pin
     out = []
     for key, count in counts.most_common():
         char_options = [sorted(readings.get(c, ())) for c in key]
@@ -408,7 +484,9 @@ def _valid_reading(hanzi, reading, readings, pinned=""):
     return split(reading, list(_norm(hanzi)))
 
 
-def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=None):
+def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=None, strict=True):
+    """`strict`: only the candidates given (else the AI's own words too, their
+    reading still checked against the lexicon's)."""
     readings = char_readings()
     by_hanzi = {c["hanzi"]: c for c in candidates}
     created = []
@@ -417,7 +495,7 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=
         candidate = by_hanzi.get(hanzi)
         # The AI's reading in Wenfa's pinyin before it is checked (si1 -> xi1, sit7 -> xit5).
         w["reading"], _fixes = pinyin_rules.normalize(str(w.get("reading", "")))
-        if not w.get("keep") or (candidates and not candidate):
+        if not w.get("keep") or (strict and candidates and not candidate):
             continue
         if not all(HAN_RE.fullmatch(c) for c in hanzi) or not _valid_reading(
                 hanzi, w.get("reading", ""), readings, (candidate or {}).get("pinned_reading", "")):
@@ -437,15 +515,47 @@ def _create_from(words, candidates, themes, origin, limit=MAX_NEW_WORDS, status=
     return created
 
 
-def suggest_missing(limit=MAX_NEW_WORDS, status=None):
-    candidates = missing_candidates(limit * 2)
+def _from_candidates(candidates, origin, limit, status):
     if not candidates:
         return []
     themes = _themes()
     data = _call(NEW_WORDS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False),
                  "Candidates (words seen in the data, missing from the lexicon):\n"
                  + json.dumps(candidates, ensure_ascii=False), _new_words_schema(themes))
-    return _create_from(data.get("words", []), candidates, themes, "mot repéré dans le corpus", limit, status)
+    return _create_from(data.get("words", []), candidates, themes, origin, limit, status)
+
+
+def suggest_missing(limit=MAX_NEW_WORDS, status=None):
+    return _from_candidates(missing_candidates(limit * 2), "mot repéré dans le corpus", limit, status)
+
+
+def suggest_rey(limit=MAX_NEW_WORDS, status=None):
+    """Words of Rey's pages already read, absent from the lexicon."""
+    return _from_candidates(rey_candidates(limit * 2), "mot relevé dans Rey 1926", limit, status)
+
+
+def suggest_text(text, limit=MAX_NEW_WORDS, status=None):
+    """Words of a pasted text, absent from the lexicon."""
+    return _from_candidates(text_candidates(text, limit * 2), "mot relevé dans un texte collé", limit, status)
+
+
+COMPOUNDS_SYSTEM = CONTEXT + """
+
+You propose new lexicon words containing the character given: first the candidates given (words seen in the site's data), then, to reach the number asked, common spoken Hakka words with that character that you know well (never a rare, literary or Mandarin-only word; when unsure, leave it out). Never propose a word of the lexicon list given. For each: keep (false for a candidate that is not a real Hakka word), reading (one syllable per character, from the readings given when there are; joined without spaces), french and english (lexicon style: lowercase, no final period, close meanings separated by commas), themes (zero to two from the list), note (one sentence in French: « vu dans … » for a candidate, « composé courant proposé par l'IA » otherwise)."""
+
+
+def suggest_compounds(char, limit=MAX_NEW_WORDS, status=None):
+    """Words with `char`: those seen in the data first, then the AI's own
+    (each reading checked against the lexicon's readings, as always)."""
+    key = _norm(char)
+    candidates = char_candidates(char, limit * 2)
+    themes = _themes()
+    present = sorted(h for h in known_words() if key in h and len(h) >= 2)[:80]
+    message = json.dumps({"character": char, "readings_of_the_character": sorted(char_readings().get(key, ())),
+                          "candidates": candidates, "already_in_lexicon": present, "propose": limit}, ensure_ascii=False)
+    data = _call(COMPOUNDS_SYSTEM + "\n\nThemes: " + json.dumps(themes, ensure_ascii=False), message, _new_words_schema(themes))
+    words = [w for w in data.get("words", []) if key in _norm(str(w.get("hanzi", "")))]
+    return _create_from(words, candidates, themes, f"autour de {char}", limit, status, strict=False)
 
 
 EXPRESSIONS_SYSTEM = CONTEXT + """
@@ -690,9 +800,11 @@ def api_review(request):
 @require_POST
 @editor_required
 def api_new_words(request):
-    """POST {mode: "missing" | "expressions", count}: the AI suggests up to
+    """POST {mode, count, theme?, char?, text?}: the AI suggests up to
     `count` words or expressions (1 to MAX_NEW_WORDS_REQUEST; the page asks
-    again for more)."""
+    again for more). The « source d'inspiration »: mode "missing" (the
+    site's corpus), "expressions" (a theme), "char" (around a character),
+    "rey" (Rey's pages read), "text" (a pasted text)."""
     from .additions import _addition_json
 
     payload = _json(request) or {}
@@ -702,9 +814,31 @@ def api_new_words(request):
     # before a person proposes them (the AI itself never proposes them).
     status = LexiconAddition.STATUS_DRAFT if payload.get("draft") is True else None
     theme = payload.get("theme") if isinstance(payload.get("theme"), str) and payload.get("theme") else None
+    mode = payload.get("mode")
+    char = "".join(HAN_RE.findall(str(payload.get("char") or "")))[:1]
+    text = str(payload.get("text") or "")[:MAX_TEXT]
+    if mode == "char" and not char:
+        return JsonResponse({"error": "Indiquez un caractère."}, status=400)
+    if mode == "text" and not HAN_RE.search(text):
+        return JsonResponse({"error": "Collez un texte en caractères chinois."}, status=400)
+    if payload.get("preview") is True:
+        # Free (no AI): the words this source would hand the AI.
+        finders = {"missing": lambda: missing_candidates(50), "rey": lambda: rey_candidates(50),
+                   "text": lambda: text_candidates(text, 50), "char": lambda: char_candidates(char, 50)}
+        if mode not in finders:
+            return JsonResponse({"error": "Pas d'aperçu pour cette source."}, status=400)
+        return JsonResponse({"ok": True, "candidates": [{"hanzi": c["hanzi"], "seen": c["seen"]} for c in finders[mode]()]})
     try:
-        created = (suggest_expressions(count, theme, status) if payload.get("mode") in ("expressions", "compounds")
-                   else suggest_missing(count, status))
+        if mode in ("expressions", "compounds"):
+            created = suggest_expressions(count, theme, status)
+        elif mode == "char":
+            created = suggest_compounds(char, count, status)
+        elif mode == "rey":
+            created = suggest_rey(count, status)
+        elif mode == "text":
+            created = suggest_text(text, count, status)
+        else:
+            created = suggest_missing(count, status)
     except AssistantError as err:
         return _error(err)
     return JsonResponse({"ok": True, "additions": [_addition_json(a) for a in created]})

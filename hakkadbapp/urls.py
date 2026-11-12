@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from . import ask_ai
-from . import addition_duplicates, additions, ai, assistant, char_review, hakkadict, importer, platform_corrections, recordings, rey, sources, surprising_readings, visas
+from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, hakkadict, importer, platform_corrections, recordings, rey, sources, surprising_readings, visas
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -92,6 +92,7 @@ urlpatterns = [
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ajouts/caracteres", char_review.api_characters, name="additions_characters"),
     path("api/ajouts/doublons", addition_duplicates.api_duplicates, name="additions_duplicates"),
+    path("api/ajouts/<int:addition_id>/fusionner", addition_merge.api_merge, name="addition_merge"),
     path("api/visas", visas.api_visas, name="visas"),
     path("api/visas/donner", visas.api_visa, name="visa_give"),
     path("api/lectures/decision", visas.api_reading_decision, name="reading_decision"),

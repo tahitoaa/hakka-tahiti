@@ -59,8 +59,12 @@ def api_visa(request):
     target_type, key = payload.get("target_type"), str(payload.get("target_key") or "")
     opinion, comment = payload.get("opinion") or "", payload.get("comment") or ""
     if target_type == Visa.TARGET_ADDITION:
-        if not key.isdigit() or not LexiconAddition.objects.filter(id=int(key)).exists():
+        addition = LexiconAddition.objects.filter(id=int(key)).first() if key.isdigit() else None
+        if not addition:
             return JsonResponse({"error": "Cet ajout n'existe plus : rechargez la page."}, status=404)
+        # A visa is the opinion of the other members: not on one's own addition (withdrawing stays possible).
+        if opinion and addition.created_by_id == request.user.id:
+            return JsonResponse({"error": "C'est votre ajout : le visa est donné par les autres membres."}, status=403)
     elif target_type != Visa.TARGET_READING or not READING_KEY.match(key):
         return JsonResponse({"error": "Visa invalide."}, status=400)
     if opinion not in ("", Visa.OPINION_OK, Visa.OPINION_KO) or not isinstance(comment, str):
