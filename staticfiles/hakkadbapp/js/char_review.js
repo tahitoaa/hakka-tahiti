@@ -29,7 +29,11 @@ const CharReview = (() => {
     let table = null;
     let box = null;
     let onCount = () => {};
-    const state = { filter: 'todo', search: '', statuses: new Set(STATUSES), limit: PAGE };
+    const state = { filter: 'todo', search: '', statuses: new Set(STATUSES), limit: PAGE, unfolded: new Set() };
+    // A reading given in many additions (个 go⁴: 26) shows its first ones, the rest on demand.
+    const FOLD_AT = 7;
+    const FOLD_SHOW = 5;
+    const folded = (char, reading, list) => list.length >= FOLD_AT && !state.unfolded.has(`${char}|${reading}`);
 
     // ---- data ------------------------------------------------------------
 
@@ -250,7 +254,8 @@ const CharReview = (() => {
                     · ${shown.length} ajout${shown.length > 1 ? 's' : ''}</span>
                   ${decided}${visa}${decide}
                   ${replace ? `<span class="cr-replaces">Corriger : ${replace}</span>` : ''}</div>
-                <ul>${shown.map((a) => additionLine(a, c, reading)).join('')}</ul></section>`;
+                <ul>${(folded(c.char, reading, shown) ? shown.slice(0, FOLD_SHOW) : shown).map((a) => additionLine(a, c, reading)).join('')}</ul>
+                ${folded(c.char, reading, shown) ? `<button type="button" class="cr-unfold" data-cr-unfold>Voir les ${shown.length - FOLD_SHOW} autres ajouts</button>` : ''}</section>`;
         }).join('');
         const unaligned = c.unaligned.filter((a) => state.statuses.has(a.status));
         const loose = unaligned.length ? `<section class="cr-group is-loose"><div class="cr-group-head">
@@ -353,6 +358,11 @@ const CharReview = (() => {
             const cardEl = e.target.closest('[data-cr-char]');
             if (!cardEl) return;
             const char = cardEl.dataset.crChar;
+            if (e.target.closest('[data-cr-unfold]')) {
+                state.unfolded.add(`${char}|${e.target.closest('[data-cr-reading]').dataset.crReading}`);
+                render();
+                return;
+            }
             const dec = e.target.closest('[data-cr-decide]');
             if (dec) { Visas.decide(char, dec.closest('[data-cr-reading]').dataset.crReading, dec.dataset.crDecide, dec); return; }
             const ed = e.target.closest('[data-cr-edit]');
