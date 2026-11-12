@@ -121,6 +121,28 @@
   .cr-add-fr { color: #3A3430; flex: 1 1 10rem; }
   .cr-syl { background: #fde68a; color: inherit; border-radius: 0.2rem; padding: 0 0.1rem; }
   .cr-edit { min-height: 1.9rem; padding: 0 0.55rem; }
+  .cr-badge.is-refused { background: #fee2e2; color: #991b1b; }
+  .cr-badge.is-done { background: #d1fae5; color: #065f46; }
+  .cr-group.is-accepted { border-left-color: #10b981; }
+  .cr-group.is-refused { border-left-color: #dc2626; border-left-width: 4px; }
+  .cr-decision { font-size: 0.75rem; font-weight: 700; padding: 0.05rem 0.5rem; border-radius: 9999px; }
+  .cr-decision.is-accepted { background: #d1fae5; color: #065f46; }
+  .cr-decision.is-refused { background: #fee2e2; color: #991b1b; }
+  .cr-decide { padding: 0.1rem 0.55rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-size: 0.8rem; font-weight: 700; }
+  .cr-decide.is-accept { color: #065f46; } .cr-decide.is-refuse { color: #991b1b; }
+  .cr-decide.is-accept[aria-pressed="true"] { background: #d1fae5; border-color: #10b981; }
+  .cr-decide.is-refuse[aria-pressed="true"] { background: #fee2e2; border-color: #ef4444; }
+  /* Visas (visas.js): 👍 / 👎 per member, the reader's own pressed. */
+  .vz { display: inline-flex; align-items: center; gap: 0.2rem; margin-top: 0.2rem; }
+  .vz-btn { display: inline-flex; align-items: center; gap: 0.15rem; min-height: 1.7rem; padding: 0 0.4rem; border: 1px solid #E8D9C2;
+            border-radius: 9999px; background: #fff; font-size: 0.8rem; line-height: 1; filter: grayscale(0.6); }
+  .vz-btn b { font-size: 0.75rem; color: #3A3430; }
+  .vz-btn:hover { filter: none; background: #F3E8D6; }
+  .vz-btn.vz-ok[aria-pressed="true"] { filter: none; background: #d1fae5; border-color: #10b981; }
+  .vz-btn.vz-ko[aria-pressed="true"] { filter: none; background: #fee2e2; border-color: #ef4444; }
+  .vz-notes { font-size: 0.75rem; color: #6E655C; cursor: help; }
+  .cr-notes { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1rem; margin: 0.2rem 0; font-size: 0.85rem; color: #544D45; }
+  .cr-notes .hanzi { font-size: 1.15rem !important; padding: 0 0.15rem; }
   .vt-ai-count input { width: 3.4rem; min-height: 2rem; padding: 0 0.3rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; text-align: center; }
   .vt-facets { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-size: 0.8rem; }
   .vt-facets label { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.15rem 0 0.55rem; min-height: 2rem;

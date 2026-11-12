@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST
 from .ai import ai_enabled
 from . import pinyin_rules
 from .text_to_words import REVERSE_PUNCT_MAP, _PUNCT_ONLY_TOKEN_RE, normalize_punctuation
-from .models import Expression, LexiconAddition, Word
+from .models import Expression, LexiconAddition, Visa, Word
 from .permissions import AI_USERNAME, editor_required, is_editor, is_validator, status_change_refused
 
 EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source", "input_text")
@@ -324,6 +324,7 @@ def addition_update(request, addition_id):
 @editor_required
 def addition_delete(request, addition_id):
     get_object_or_404(LexiconAddition, id=addition_id).delete()
+    Visa.objects.filter(target_type=Visa.TARGET_ADDITION, target_key=str(addition_id)).delete()
     return JsonResponse({"ok": True})
 
 
@@ -453,6 +454,7 @@ def additions_bulk(request):
     if payload.get("action") == "delete":
         with transaction.atomic():
             LexiconAddition.objects.filter(id__in=ids).delete()
+            Visa.objects.filter(target_type=Visa.TARGET_ADDITION, target_key__in=[str(i) for i in ids]).delete()
         return JsonResponse({"ok": True, "deleted": sorted(set(ids))})
 
     if payload.get("action") == "check-pinyin":

@@ -515,3 +515,53 @@ class ReyPage(models.Model):
 
     def __str__(self):
         return f"Rey p. {self.page} (kf_{self.image})"
+
+
+class Visa(models.Model):
+    """A member's opinion (visa) on an item still to decide: an addition
+    (target_type "addition", target_key its id) or the reading of a
+    character in the additions (target_type "reading", target_key
+    "家|ka1"). Every editor may give one per item, and change or withdraw
+    it; deciding stays with the validators (an addition's status, a
+    reading's ReadingDecision)."""
+    TARGET_ADDITION = "addition"
+    TARGET_READING = "reading"
+    TARGET_CHOICES = [(TARGET_ADDITION, "Ajout"), (TARGET_READING, "Lecture d'un caractère")]
+    OPINION_OK = "ok"
+    OPINION_KO = "ko"
+    OPINION_CHOICES = [(OPINION_OK, "Favorable"), (OPINION_KO, "Défavorable")]
+
+    target_type = models.CharField(max_length=12, choices=TARGET_CHOICES)
+    target_key = models.CharField(max_length=64)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="+", on_delete=models.CASCADE)
+    opinion = models.CharField(max_length=4, choices=OPINION_CHOICES)
+    comment = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["updated_at"]
+        constraints = [models.UniqueConstraint(fields=["target_type", "target_key", "user"], name="one_visa_per_user")]
+
+    def __str__(self):
+        return f"{self.user} {self.opinion} {self.target_type} {self.target_key}"
+
+
+class ReadingDecision(models.Model):
+    """A validator's decision on a reading the additions give a character
+    (« Caractères » step of Suivi): accepted (right, even if the lexicon
+    doesn't have it yet) or refused (to correct in the additions)."""
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REFUSED = "refused"
+    STATUS_CHOICES = [(STATUS_ACCEPTED, "Acceptée"), (STATUS_REFUSED, "Refusée")]
+
+    char = models.CharField(max_length=4)
+    reading = models.CharField(max_length=16)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    decided_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["char", "reading"], name="one_decision_per_reading")]
+
+    def __str__(self):
+        return f"{self.char} {self.reading} {self.status}"

@@ -90,3 +90,18 @@ class SourceLookupAdmin(admin.ModelAdmin):
     list_display = ("query", "reading", "created_by", "created_at")
     search_fields = ("query",)
     readonly_fields = ("query", "reading", "result", "created_by", "created_at")
+
+
+from .models import ReadingDecision, Visa
+
+
+@admin.register(Visa)
+class VisaAdmin(admin.ModelAdmin):
+    list_display = ("target_type", "target_key", "user", "opinion", "comment", "updated_at")
+    list_filter = ("target_type", "opinion", "user")
+
+
+@admin.register(ReadingDecision)
+class ReadingDecisionAdmin(admin.ModelAdmin):
+    list_display = ("char", "reading", "status", "decided_by", "decided_at")
+    list_filter = ("status",)
