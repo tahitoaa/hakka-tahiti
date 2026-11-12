@@ -6,6 +6,13 @@
     <title> {{ title }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- Logo : 客 (hak5, « invité ») or sur rouge, couleurs de la charte. -->
+    <link rel="icon" href="{% static 'hakkadbapp/icons/favicon.ico' %}" sizes="48x48">
+    <link rel="icon" href="{% static 'hakkadbapp/icons/favicon.svg' %}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{% static 'hakkadbapp/icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'hakkadbapp/icons/site.webmanifest' %}">
+    <meta name="theme-color" content="#9B1C1C">
+
     <!-- Transcription systems (hakkadbapp/romanization.json). Server-rendered
          pinyin carries one <span class="rom" data-rom="..."> per system
          (components/pinyin_switch.html); only the one matching

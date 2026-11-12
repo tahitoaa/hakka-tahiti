@@ -5,6 +5,10 @@
       "dest": "/staticfiles/$1"
     },
     {
+      "src": "/favicon.ico",
+      "dest": "/staticfiles/hakkadbapp/icons/favicon.ico"
+    },
+    {
       "src": "/(.*)",
       "dest": "api/index.py"
     }
