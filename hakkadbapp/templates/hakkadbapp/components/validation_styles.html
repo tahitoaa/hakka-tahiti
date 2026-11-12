@@ -141,6 +141,25 @@
   .vz-btn.vz-ok[aria-pressed="true"] { filter: none; background: #d1fae5; border-color: #10b981; }
   .vz-btn.vz-ko[aria-pressed="true"] { filter: none; background: #fee2e2; border-color: #ef4444; }
   .vz-notes { font-size: 0.75rem; color: #6E655C; cursor: help; }
+  /* Possible duplicates (addition_duplicates.js). */
+  .dup-badge { display: inline-block; margin-top: 0.2rem; padding: 0.05rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;
+               border: 1px solid transparent; white-space: nowrap; }
+  .dup-badge.is-exact { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .dup-badge.is-strong { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
+  .dup-badge.is-weak { background: #F0EBE3; color: #544D45; }
+  .dup-badge[aria-expanded="true"] { box-shadow: 0 0 0 2px rgb(0 0 0 / .12); }
+  .vt-dup-row td { background: #FDFAF5; padding-top: 0.2rem; padding-bottom: 0.5rem; }
+  .dup-list { font-size: 0.85rem; text-align: left; }
+  .dup-head { font-size: 0.78rem; color: #6E655C; margin-bottom: 0.2rem; }
+  .dup-item { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.6rem; padding: 0.2rem 0 0.2rem 0.5rem;
+              border-left: 3px solid #E8D9C2; margin-bottom: 0.15rem; }
+  .dup-item.is-exact { border-left-color: #ef4444; } .dup-item.is-strong { border-left-color: #f97316; }
+  .dup-where { font-size: 0.72rem; font-weight: 700; color: #8C8478; min-width: 8.5rem; }
+  .dup-f { color: #544D45; }
+  .dup-f.is-same { background: #fef08a; color: #3A3430; border-radius: 0.2rem; padding: 0 0.15rem; }
+  .dup-item .hanzi { font-size: 1.05rem !important; }
+  .dup-open { min-height: 1.7rem; padding: 0 0.5rem; }
+  .vs-card .dup-list { margin: 0.4rem auto 0; max-width: 40rem; }
   .cr-notes { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1rem; margin: 0.2rem 0; font-size: 0.85rem; color: #544D45; }
   .cr-notes .hanzi { font-size: 1.15rem !important; padding: 0 0.15rem; }
   .vt-ai-count input { width: 3.4rem; min-height: 2rem; padding: 0 0.3rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; text-align: center; }

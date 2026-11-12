@@ -443,7 +443,7 @@ class ValidationTable extends AdditionList {
     static PAGE = 100;
     // Filters beyond the status, and what rows can be grouped by.
     static FACETS = [
-        ['origin', 'Origine'], ['author', 'Auteur'], ['theme', 'Thème'],
+        ['origin', 'Origine'], ['author', 'Auteur'], ['theme', 'Thème'], ['dup', 'Doublons'],
     ];
 
     /** The values of `facet` for an addition (several for the themes). */
@@ -451,6 +451,8 @@ class ValidationTable extends AdditionList {
         if (facet === 'origin') return [a.by_ai ? '🤖 IA' : a.source ? a.source : 'Saisie'];
         if (facet === 'author') return [a.created_by || '—'];
         if (facet === 'kind') return [a.kind === 'word' ? 'Mot' : 'Expression'];
+        // Possible duplicates (addition_duplicates.js).
+        if (facet === 'dup') return [typeof Duplicates !== 'undefined' ? Duplicates.label(a.id) : '…'];
         const themes = (a.themes || '').split(',').map((t) => t.trim()).filter(Boolean);
         return themes.length ? themes : ['Sans thème'];
     }
@@ -949,14 +951,18 @@ class ValidationTable extends AdditionList {
             ${AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}${
-                typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id)}</div>` : ''}</td>
+                typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id)}</div>` : ''}${
+                typeof Duplicates !== 'undefined' ? Duplicates.badge(a, this.dupOpen?.has(a.id)) : ''}</td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
             <td class="vt-actions"><button type="button" data-copy="${a.id}" class="saisie-btn saisie-btn-neutral"
                 aria-label="Copier ${esc(a.hanzi)}" title="Copier dans le presse-papiers">📋</button><button type="button" data-action="edit" class="saisie-btn saisie-btn-neutral"
                 aria-label="Modifier ${esc(a.hanzi)}" title="Modifier">✎</button></td>
         </tr>`;
-        return open ? row + this.renderDetail(a, remarks, muted) : row;
+        // The possible duplicates, under the row when its badge is open.
+        const dups = this.dupOpen?.has(a.id) && typeof Duplicates !== 'undefined' && Duplicates.of(a.id)
+            ? `<tr class="vt-dup-row"><td></td><td colspan="8">${Duplicates.list(a)}</td></tr>` : '';
+        return (open ? row + this.renderDetail(a, remarks, muted) : row) + dups;
     }
 
     /** The remarks under a row: corrections to apply, comments, mute, a comment of one's own. */
@@ -1426,6 +1432,7 @@ class ValidationShow {
             <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.notes(a) : ''}
+            ${typeof Duplicates !== 'undefined' && Duplicates.of(a.id) ? Duplicates.list(a) : ''}
             ${this.editing ? `<div class="vs-edit">
                 <a class="saisie-btn saisie-btn-neutral vs-saisie-link" href="${esc(this.table.saisieUrl || '/saisie/')}?modifier=${a.id}">✎ Corriger les caractères ou le pinyin dans la Saisie</a>
                 ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
@@ -2142,6 +2149,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const step = new URLSearchParams(location.search).get('etape');
     if (step === 'ereo' || step === 'caracteres') showPanel(step);
+
+    // Possible duplicates (addition_duplicates.js): a badge per row, its list
+    // under the row, the slideshow, the « Doublons » filter; fetched again
+    // after an edit.
+    if (typeof Duplicates !== 'undefined') {
+        table.dupOpen = new Set();
+        const rerender = () => {
+            table.render();
+            if (window.validationShow?.dialog?.open) window.validationShow.render();
+        };
+        Promise.all([Duplicates.load(), table.loaded]).then(rerender).catch(() => {});
+        const upsert = table.upsert.bind(table);
+        table.upsert = (addition) => { upsert(addition); Duplicates.refresh(rerender); };
+        document.addEventListener('click', (e) => {
+            const toggle = e.target.closest('[data-dup-toggle]');
+            if (toggle) {
+                const id = Number(toggle.dataset.dupToggle);
+                if (table.dupOpen.has(id)) table.dupOpen.delete(id); else table.dupOpen.add(id);
+                table.render();
+                return;
+            }
+            const edit = e.target.closest('[data-dup-edit]');
+            const other = edit && table.additions.find((x) => x.id === Number(edit.dataset.dupEdit));
+            if (other) table.onEdit(other);
+        });
+    }
 
     // Visas (visas.js): in the table, the slideshow and the « Caractères » cards.
     if (typeof Visas !== 'undefined') {
