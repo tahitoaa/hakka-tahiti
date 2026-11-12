@@ -93,5 +93,14 @@ def editor_required(view):
 def context_processor(request):
     """`can_edit` and `can_validate` in every template (e.g. to show the
     "Saisie" menu entry, the « Valider » buttons)."""
-    return {"can_edit": is_editor(request.user), "can_validate": is_validator(request.user),
-            "is_owner": is_owner(request.user)}
+    can_edit = is_editor(request.user)
+
+    def review_count():
+        # Entries waiting for a validator: the « Ajouts » menu badge. A
+        # callable, so the query only runs when a template shows it.
+        from .models import LexiconAddition
+
+        return LexiconAddition.objects.filter(status=LexiconAddition.STATUS_REVIEW).count() if can_edit else 0
+
+    return {"can_edit": can_edit, "can_validate": is_validator(request.user),
+            "is_owner": is_owner(request.user), "review_count": review_count}

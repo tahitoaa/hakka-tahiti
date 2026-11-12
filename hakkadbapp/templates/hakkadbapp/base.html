@@ -330,6 +330,14 @@
     .nav-link { display: block; padding: 0.6rem 0.75rem; color: rgb(255 255 255 / .9); border-radius: 0.5rem; }
     .nav-link:hover { color: var(--color-brand-gold); }
     .nav-link.is-active { color: var(--color-brand-gold); }
+    .nav-count { display: inline-block; min-width: 1.3rem; margin-left: 0.2rem; padding: 0 0.35rem; border-radius: 9999px;
+                 background: var(--color-brand-gold); color: #7F1D1D; font-size: 0.72rem; font-weight: 700; line-height: 1.3rem; text-align: center; }
+    .nav-user { position: relative; }
+    .nav-user summary { cursor: pointer; list-style: none; color: var(--color-brand-gold); }
+    .nav-user summary::-webkit-details-marker { display: none; }
+    .nav-user-panel { padding: 0.25rem 0; }
+    .nav-user-panel button { width: 100%; padding: 0.5rem 1rem; border-radius: 0.4rem; color: rgb(255 255 255 / .85); font-size: 0.9rem; }
+    .nav-user-panel button:hover { color: var(--color-brand-gold); background: rgb(0 0 0 / .15); }
     .nav-group-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / .55); }
     @media (max-width: 639px) {
       #menu ul { display: flex; flex-direction: column; align-items: center; text-align: center; }
@@ -342,6 +350,10 @@
       .nav-link { padding: 0.45rem 0.1rem; }
       .nav-members { background: rgb(0 0 0 / .16); border-radius: 9999px; padding: 0 0.9rem; }
       .nav-members .nav-link { padding: 0.35rem 0.1rem; }
+      /* On a wide screen the user menu drops below its name. */
+      .nav-user-panel { position: absolute; right: 0; top: 100%; z-index: 40; min-width: 9rem; margin-top: 0.35rem; padding: 0.25rem;
+                        background: #7F1D1D; border-radius: 0.6rem; box-shadow: 0 6px 16px rgb(0 0 0 / .25); }
+      .nav-user-panel button { text-align: left; }
     }
   </style>
   <nav id="menu" class="no-print hidden sm:block border-t border-white/10 sm:border-0" aria-label="Menu principal">
@@ -359,24 +371,35 @@
         </ul>
       </div>
       <div class="nav-members sm:flex sm:items-center sm:gap-x-4">
-        <p class="nav-group-title text-center sm:text-left">🔒 Espace membres</p>
+        <p class="nav-group-title text-center sm:text-left"><span aria-hidden="true">🔒</span><span class="sm:sr-only"> Espace membres</span></p>
         {% if user.is_authenticated %}
-        <ul class="no-print sm:flex sm:flex-wrap sm:gap-x-4 text-sm sm:text-base font-medium">
+        <ul class="no-print sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 text-sm sm:text-base font-medium">
             <li><a href="{% url 'transcriptions' %}" class="nav-link{% if page == 'transcriptions' %} is-active{% endif %}">Transcriptions</a></li>
             {% if can_edit %}
-            <li><a href="{% url 'saisie' %}" class="nav-link{% if page == 'saisie' %} is-active{% endif %}">Saisie</a></li>
-            <li><a href="{% url 'validation' %}" class="nav-link{% if page == 'validation' %} is-active{% endif %}">Suivi des ajouts</a></li>
-            <li><a href="{% url 'ai_suggestions' %}" class="nav-link{% if page == 'ai_suggestions' %} is-active{% endif %}">Suggestions IA</a></li>
-            <li><a href="{% url 'document_import' %}" class="nav-link{% if page == 'document_import' %} is-active{% endif %}">Importer</a></li>
+            {# One entry for the whole word workflow; its tabs (members_tabs.html) lead to the rest. #}
+            <li><a href="{% url 'saisie' %}" title="Saisie, suggestions IA, import, suivi des ajouts, guide"
+                   class="nav-link{% if page == 'saisie' or page == 'validation' or page == 'ai_suggestions' or page == 'document_import' or page == 'guide_saisie' %} is-active{% endif %}">Ajouts{% with n=review_count %}{% if n %} <span class="nav-count" title="{{ n }} entrée{{ n|pluralize }} à valider">{{ n }}</span>{% endif %}{% endwith %}</a></li>
             {% endif %}
             <li><a href="{% url 'recordings' %}" class="nav-link{% if page == 'recordings' %} is-active{% endif %}">À enregistrer</a></li>
-            <!-- Logout must be a POST since Django 5 (LogoutView). -->
             <li>
-              <form method="post" action="{% url 'logout' %}" class="flex items-center justify-center gap-2 py-2 sm:py-1">
-                {% csrf_token %}
-                <span class="text-brand-gold">{{ user.get_short_name|default:user.username }}</span>
-                <button type="submit" class="text-white/80 hover:text-brand-gold underline-offset-2 hover:underline text-sm">Déconnexion</button>
-              </form>
+              <details class="nav-user">
+                <summary class="nav-link">{{ user.get_short_name|default:user.username }} <span aria-hidden="true">▾</span></summary>
+                <div class="nav-user-panel">
+                  <!-- Logout must be a POST since Django 5 (LogoutView). -->
+                  <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">Déconnexion</button>
+                  </form>
+                </div>
+              </details>
+              <script>
+                // The user menu closes on a click elsewhere or on Échap.
+                (function () {
+                  const menu = document.currentScript.previousElementSibling;
+                  document.addEventListener('click', (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+                  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menu.open = false; });
+                })();
+              </script>
             </li>
         </ul>
         {% else %}

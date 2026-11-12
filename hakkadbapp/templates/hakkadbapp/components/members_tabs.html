@@ -1,9 +1,9 @@
 {# The members' word workflow, one tap from each other: Saisie -> Validation, Importer. #}
 <nav class="mt-tabs" aria-label="Ajouts">
   <a href="{% url 'saisie' %}" {% if page == 'saisie' %}aria-current="page"{% endif %}>✎ Saisie</a>
-  <a href="{% url 'ai_suggestions' %}" {% if page == 'ai_suggestions' %}aria-current="page"{% endif %}>🤖 IA</a>
+  <a href="{% url 'ai_suggestions' %}" {% if page == 'ai_suggestions' %}aria-current="page"{% endif %}>🤖 Suggestions IA</a>
   <a href="{% url 'document_import' %}" {% if page == 'document_import' %}aria-current="page"{% endif %}>📄 Importer</a>
-  <a href="{% url 'validation' %}" {% if page == 'validation' %}aria-current="page"{% endif %} title="Brouillons → À valider → Validés → Corrections e-reo">📋 Suivi <span class="mt-count" data-review-count hidden></span></a>
+  <a href="{% url 'validation' %}" {% if page == 'validation' %}aria-current="page"{% endif %} title="Brouillons → À valider → Validés → Corrections e-reo">📋 Suivi {% with n=review_count %}<span class="mt-count" data-review-count{% if not n %} hidden{% endif %}>{{ n|default:'' }}</span>{% endwith %}</a>
   <a href="{% url 'input_guide' %}" {% if page == 'guide_saisie' %}aria-current="page"{% endif %} title="Guide de saisie">❓ Guide</a>
 </nav>
 <style>
