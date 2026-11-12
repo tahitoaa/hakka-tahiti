@@ -26,6 +26,9 @@
     <span class="st-arrow" aria-hidden="true">→</span>
     <button type="button" class="st-step st-ereo" data-ereo-step aria-pressed="false" title="Remarques sur les entrées déjà dans le lexique : à corriger sur la plateforme e-reo">
       <span class="st-dot">🛠</span><span class="st-name">Corrections e-reo</span><span class="st-n" data-ereo-count>{{ ereo_count }}</span></button>
+    <button type="button" class="st-step st-chars st-side" data-chars-step aria-pressed="false"
+            title="Les caractères des ajouts en cours (brouillons, à valider, validés) : leurs lectures comparées au lexique et aux dictionnaires">
+      <span class="st-dot">字</span><span class="st-name">Caractères</span><span class="st-n" data-chars-count>…</span></button>
     <button type="button" class="st-step st-rejected st-side" data-filter="rejected" aria-pressed="false" data-label="Rejetés">
       <span class="st-dot">✕</span><span class="st-name">Rejetés</span><span class="st-n" data-count></span></button>
   </nav>
@@ -91,6 +94,7 @@
   </div>
 
   <section id="ereo-panel" aria-label="Corrections e-reo" hidden></section>
+  <section id="chars-panel" class="space-y-2" aria-label="Caractères des ajouts" hidden></section>
 </div>
 
 <dialog class="vs-dialog" id="vs-dialog" aria-labelledby="vs-count">
@@ -112,6 +116,7 @@
     <kbd>V</kbd> valider · <kbd>R</kbd> rejeter · <kbd>E</kbd> corriger · <kbd>C</kbd> commenter · <kbd>B</kbd> brouillon · <kbd>Échap</kbd> fermer</p>
 </dialog>
 {{ status_labels|json_script:"saisie-status-labels" }}
+<script src="{% static 'hakkadbapp/js/char_review.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/ereo_corrections.js' %}"></script>
 {% endblock %}

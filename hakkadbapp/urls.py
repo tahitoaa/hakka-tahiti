@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from . import ask_ai
-from . import additions, ai, assistant, hakkadict, importer, platform_corrections, recordings, rey, sources, surprising_readings
+from . import additions, ai, assistant, char_review, hakkadict, importer, platform_corrections, recordings, rey, sources, surprising_readings
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -90,6 +90,7 @@ urlpatterns = [
     path("a-enregistrer/", recordings.page, name="recordings"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
+    path("api/ajouts/caracteres", char_review.api_characters, name="additions_characters"),
     path("api/lexique-donnees", additions.lexicon_data, name="lexicon_data"),
     path("api/ajouts/source", additions.additions_rename_source, name="additions_rename_source"),
     path("api/ia/suggestion", ai.suggestion, name="ai_suggestion"),

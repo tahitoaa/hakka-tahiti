@@ -116,19 +116,21 @@ class AdditionList {
         const esc = AdditionList.escapeHtml;
         const ai = ' <span class="vt-ai-badge">IA</span>';
         const hanzi = AdditionList.platformHanzi(e.hanzi);
+        // New characters and new readings coloured, once CharReview has the lexicon (char_review.js).
+        const hanziHtml = typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(e) : esc(hanzi);
         const pinyin = e.pinyin ? esc(AdditionList.platformPinyin(e.pinyin)) : `<i>${esc(opts.rawPinyin || '') || '—'}</i>`;
         if (opts.editable) {
             // Brouillons: each field is a cell to tap, edited in place (the stored value: words spaced, tone digits).
             const cell = (field, shown, cls = '') => `<span class="vt-edit ${cls}" data-edit="${field}" tabindex="0" role="button"
                 title="Modifier">${shown || '<i>—</i>'}</span>`;
             const miss = (f) => (!String(e[f] || '').trim() || (f === 'pinyin' && /[/?]/.test(e.pinyin || '')) ? ' is-missing' : '');
-            return `<td class="hanzi vt-hanzi">${cell('hanzi', esc(hanzi), miss('hanzi'))}</td>
+            return `<td class="hanzi vt-hanzi">${cell('hanzi', hanziHtml, miss('hanzi'))}</td>
             <td class="vt-pinyin">${cell('pinyin', pinyin, miss('pinyin'))}</td>
             <td class="vt-french">${cell('french', esc(e.french), miss('french'))}<span class="vt-sub italic" lang="en"> · ${cell('english', esc(e.english), miss('english'))}</span>
                 ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${cell('themes', esc(e.themes || ''))}</td>`;
         }
-        return `<td class="hanzi vt-hanzi">${esc(hanzi)}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
+        return `<td class="hanzi vt-hanzi">${hanziHtml}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
                 ? `<small class="vt-sub" title="Forme du document">${esc(opts.docHanzi)}</small>` : ''}</td>
             <td class="vt-pinyin">${pinyin}${opts.warn ? `<div class="vt-warn">⚠ ${esc(opts.warn)}</div>` : ''}</td>
             <td class="vt-french">${esc(e.french) || '<span class="vt-missing-tag">français ?</span>'}${opts.aiFrench ? ai : ''}${e.english
@@ -2089,34 +2091,52 @@ document.addEventListener('DOMContentLoaded', () => {
     table.saisieUrl = root.dataset.saisieUrl;
     window.validationTable = table;
     table.el.filters?.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === table.filter)));
-    table.load();
+    table.loaded = table.load();
     if (document.getElementById('vs-dialog')) window.validationShow = new ValidationShow(table);
     if (document.getElementById('import-form')) window.documentImport = new DocumentImport(table);
     document.querySelectorAll('[data-new-words]').forEach((btn) =>
         btn.addEventListener('click', () => table.aiNewWords(btn.dataset.newWords, btn)));
 
-    // The last step, « Corrections e-reo »: the remarks on entries already in the lexicon (ereo_corrections.js).
+    // Two steps beside the journey, each a panel of its own: « Corrections e-reo »,
+    // the remarks on entries already in the lexicon (ereo_corrections.js), and
+    // « Caractères », the readings of the additions' characters (char_review.js).
     const ereoStep = document.querySelector('[data-ereo-step]');
-    const ereoCount = (n) => { const c = ereoStep.querySelector('[data-ereo-count]'); if (c) c.textContent = n; };
-    const showEreo = (on) => {
-        $('additions-panel').hidden = on;
-        $('ereo-panel').hidden = !on;
-        ereoStep.setAttribute('aria-pressed', String(on));
-        if (on) {
-            table.el.filters.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
-            EreoCorrections.show($('ereo-panel'), ereoCount);
-        } else {
+    const charsStep = document.querySelector('[data-chars-step]');
+    const ereoCount = (n) => { const c = ereoStep?.querySelector('[data-ereo-count]'); if (c) c.textContent = n; };
+    const charsCount = (n) => { const c = charsStep?.querySelector('[data-chars-count]'); if (c) c.textContent = n; };
+    const showPanel = (which) => {      // 'ereo', 'caracteres' or null (the additions)
+        $('additions-panel').hidden = !!which;
+        if ($('ereo-panel')) $('ereo-panel').hidden = which !== 'ereo';
+        if ($('chars-panel')) $('chars-panel').hidden = which !== 'caracteres';
+        ereoStep?.setAttribute('aria-pressed', String(which === 'ereo'));
+        charsStep?.setAttribute('aria-pressed', String(which === 'caracteres'));
+        if (which) table.el.filters.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+        if (which === 'ereo') EreoCorrections.show($('ereo-panel'), ereoCount);
+        if (which === 'caracteres') {
+            CharReview.show($('chars-panel'), table, charsCount);
             const url = new URL(location.href);
-            if (url.searchParams.get('etape') === 'ereo') {
-                url.searchParams.delete('etape');
-                url.searchParams.delete('statut');
+            url.searchParams.set('etape', 'caracteres');
+            try { history.replaceState(null, '', url); } catch (e) { /* ignore */ }
+        }
+        if (!which) {
+            const url = new URL(location.href);
+            if (['ereo', 'caracteres'].includes(url.searchParams.get('etape'))) {
+                ['etape', 'statut', 'car'].forEach((k) => url.searchParams.delete(k));
                 try { history.replaceState(null, '', url); } catch (e) { /* ignore */ }
             }
         }
     };
-    if (ereoStep && typeof EreoCorrections !== 'undefined') {
-        ereoStep.addEventListener('click', () => showEreo(true));
-        table.el.filters.addEventListener('click', (e) => { if (e.target.closest('[data-filter]')) showEreo(false); });
-        if (new URLSearchParams(location.search).get('etape') === 'ereo') showEreo(true);
+    table.el.filters.addEventListener('click', (e) => { if (e.target.closest('[data-filter]')) showPanel(null); });
+    if (ereoStep && typeof EreoCorrections !== 'undefined') ereoStep.addEventListener('click', () => showPanel('ereo'));
+    if (charsStep && typeof CharReview !== 'undefined') {
+        charsStep.addEventListener('click', () => showPanel('caracteres'));
+        // The tables' colours (new characters, new readings) and the step's count.
+        Promise.all([CharReview.load(), table.loaded]).then(() => {
+            const render = table.render.bind(table);
+            table.render = () => { render(); charsCount(CharReview.count(table)); };
+            table.render();
+        }).catch(() => {});
     }
+    const step = new URLSearchParams(location.search).get('etape');
+    if (step === 'ereo' || step === 'caracteres') showPanel(step);
 });
