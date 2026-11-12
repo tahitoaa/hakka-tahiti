@@ -41,6 +41,7 @@ PUBLIC = {
     "hanzi_by_tone": {"GET", "POST"},
     "pronunciation_comparison": {"GET", "POST"},  # redirect
     "api_sources_table": {"GET", "POST"},
+    "api_doubtful_readings": {"GET"},  # the dictionaries' doubtful readings, for the public « Écrire » page's suggestions
     "character_dictionary": {"GET", "POST"},
     "pronunciation": {"GET", "POST"},
     "api_convert_text": {"GET", "POST"},

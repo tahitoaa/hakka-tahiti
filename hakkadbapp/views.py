@@ -7,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.gzip import gzip_page
 from django.core.cache import cache
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from .forms import PronunciationForm, WordForm
 from django.db.models import F, Value, CharField
 from django.db.models.functions import Concat
@@ -1166,6 +1166,7 @@ def api_sources_table(request):
     return response
 
 
+@require_GET
 @gzip_page
 def api_doubtful_readings(request):
     """The dictionaries' doubtful readings (source_rules.doubtful_readings),
