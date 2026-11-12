@@ -8,7 +8,8 @@
      the readings the additions give it next to the lexicon's (with words
      that use them) and the dictionaries', each reading with its additions;
      a reading is replaced in all of them in one click, or an addition
-     opened in the Saisie.
+     opened in the Saisie. Each member gives a reading a visa (👍 / 👎,
+     visas.js); a validator accepts or refuses it, which settles it.
    Characters and syllables are paired here, in the browser, so an edit
    shows at once: the Han characters of the hanzi (and □) in order, against
    the syllables of the pinyin («…» text blocks and :sense hints left out);
@@ -17,7 +18,6 @@
 const CharReview = (() => {
     const API = '/api/ajouts/caracteres';
     const STATUSES = ['draft', 'review', 'validated'];
-    const SEEN_KEY = 'hakka-char-review-seen';
     const PAGE = 40;
     const HAN = /^(?:\p{Script=Han}|□)$/u;
     const esc = (t) => AdditionList.escapeHtml(t);
@@ -83,10 +83,32 @@ const CharReview = (() => {
             const kind = p ? classify(p.char, p.reading) : '';
             if (!kind) return esc(c);
             const known = (data.lexicon[c] || []).map(sup).join(', ');
-            const title = kind === 'new-char' ? 'Caractère absent du lexique'
-                : `Lecture nouvelle : ${sup(p.reading)} — lexique : ${known}`;
+            const decision = p.reading ? decisionOf(p.char, p.reading) : null;
+            const title = (kind === 'new-char' ? 'Caractère absent du lexique'
+                : `Lecture nouvelle : ${sup(p.reading)} — lexique : ${known}`)
+                + (decision ? ` — ${decision.status === 'accepted' ? 'acceptée' : 'refusée'} par ${decision.by}` : '');
             return `<span class="cr-${kind}" title="${esc(title)}">${esc(c)}</span>`;
         }).join('');
+    }
+
+    /** The new characters and readings of an addition spelled out (the
+     *  slideshow: no hover on a tablet), or ''. */
+    function notes(e) {
+        if (!data) return '';
+        const seen = new Set();
+        const items = pairs(e.hanzi, e.pinyin).map((p) => {
+            const kind = classify(p.char, p.reading);
+            const key = `${p.char}|${p.reading}`;
+            if (!kind || seen.has(key)) return '';
+            seen.add(key);
+            const decision = p.reading ? decisionOf(p.char, p.reading) : null;
+            const decided = decision ? ` · ${decision.status === 'accepted' ? '✓ acceptée' : '✕ refusée'} par ${esc(decision.by)}` : '';
+            return kind === 'new-char'
+                ? `<li><span class="hanzi cr-new-char">${esc(p.char)}</span>${p.reading ? ` ${esc(sup(p.reading))}` : ''} caractère nouveau${decided}</li>`
+                : `<li><span class="hanzi cr-new-reading">${esc(p.char)}</span> ${esc(sup(p.reading))} lecture nouvelle
+                    (lexique : ${esc((data.lexicon[p.char] || []).map(sup).join(', '))})${decided}</li>`;
+        }).filter(Boolean);
+        return items.length ? `<ul class="cr-notes">${items.join('')}</ul>` : '';
     }
 
     // ---- the « Caractères » step ------------------------------------------
@@ -95,14 +117,9 @@ const CharReview = (() => {
         return STATUSES.includes(a.status) && !(a.ai_pending && a.status === 'draft');
     }
 
-    function seenSet() {
-        try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch (e) { return new Set(); }
-    }
-
-    function setSeen(signature, on) {
-        const seen = seenSet();
-        if (on) seen.add(signature); else seen.delete(signature);
-        try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen])); } catch (e) { /* private mode */ }
+    /** A validator's decision on a reading (visas.js): {status, by} or null. */
+    function decisionOf(char, reading) {
+        return typeof Visas !== 'undefined' ? Visas.decision(char, reading) : null;
     }
 
     /** One entry per character: its readings in the additions (each with
@@ -120,27 +137,31 @@ const CharReview = (() => {
                 if (!list.includes(a)) list.push(a);
             });
         });
-        const seen = seenSet();
         return [...byChar.values()].map((c) => {
             c.newChar = !data.lexicon[c.char];
             c.newReadings = [...c.readings.keys()].filter((r) => classify(c.char, r) === 'new-reading');
             c.mixed = c.readings.size > 1;
-            c.signature = `${c.char}|${[...c.readings.keys()].sort().join(',')}`;
-            c.seen = seen.has(c.signature);
+            // Readings the lexicon doesn't confirm: each waits for a validator's
+            // decision; a refused one still in the additions is to correct.
+            const unconfirmed = [...c.readings.keys()].filter((r) => classify(c.char, r));
+            c.undecided = unconfirmed.filter((r) => !decisionOf(c.char, r));
+            c.refused = [...c.readings.keys()].filter((r) => decisionOf(c.char, r)?.status === 'refused');
             c.count = new Set([...c.readings.values(), c.unaligned].flat().map((a) => a.id)).size;
-            // What to look at first: a known character read otherwise, then
-            // differing readings, then a new character.
-            c.rank = c.newReadings.length ? 0 : c.mixed ? 1 : c.newChar ? 2 : 3;
+            // What to look at first: a refused reading still used, a known
+            // character read otherwise, differing readings, a new character.
+            c.rank = c.refused.length ? 0 : c.newReadings.some((r) => c.undecided.includes(r)) ? 1
+                : c.mixed && c.undecided.length ? 2 : c.undecided.length ? 3 : 4;
             return c;
         });
     }
 
     function toReview(c) {
-        return !c.seen && c.rank < 3;
+        return c.rank < 4;
     }
 
     function matches(c) {
         if (state.filter === 'todo' && !toReview(c)) return false;
+        if (state.filter === 'refused' && !c.refused.length) return false;
         if (state.filter === 'new-reading' && !c.newReadings.length) return false;
         if (state.filter === 'mixed' && !c.mixed) return false;
         if (state.filter === 'new-char' && !c.newChar) return false;
@@ -213,10 +234,21 @@ const CharReview = (() => {
             if (!shown.length) return '';
             const replace = alternatives(c, reading).map((r) => `<button type="button" class="cr-replace" data-cr-replace="${esc(r)}"
                 title="Remplacer ${esc(sup(reading))} par ${esc(sup(r))} pour ${esc(c.char)} dans ces ${shown.length} ajout${shown.length > 1 ? 's' : ''}">→ ${esc(sup(r))}</button>`).join('');
-            return `<section class="cr-group${kind ? ` is-${kind}` : ''}" data-cr-reading="${esc(reading)}">
+            // Visas and the validators' decision, for a reading the lexicon doesn't confirm.
+            const decision = decisionOf(c.char, reading);
+            const decided = decision ? `<span class="cr-decision is-${decision.status}" title="${esc(`le ${new Date(decision.at).toLocaleDateString('fr-FR')}`)}">${
+                decision.status === 'accepted' ? '✓ Acceptée' : '✕ Refusée'} par ${esc(decision.by)}</span>` : '';
+            const visa = kind && typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('reading', `${c.char}|${reading}`) : '';
+            const decide = kind && typeof Visas !== 'undefined' && Visas.canDecide()
+                ? `<button type="button" class="cr-decide is-accept" data-cr-decide="accepted" aria-pressed="${decision?.status === 'accepted'}"
+                     title="La lecture est juste (même si le lexique ne l’a pas encore)">✓ Accepter</button>
+                   <button type="button" class="cr-decide is-refuse" data-cr-decide="refused" aria-pressed="${decision?.status === 'refused'}"
+                     title="La lecture est fausse : à corriger dans ces ajouts">✕ Refuser</button>` : '';
+            return `<section class="cr-group${kind ? ` is-${kind}` : ''}${decision ? ` is-${decision.status}` : ''}" data-cr-reading="${esc(reading)}">
                 <div class="cr-group-head"><span class="cr-chip cr-reading${kind ? ` is-${kind}` : ''}">${esc(sup(reading))}</span>
                   <span class="cr-what">${kind === 'new-reading' ? 'lecture nouvelle' : kind === 'new-char' ? 'caractère nouveau' : 'lecture du lexique'}
                     · ${shown.length} ajout${shown.length > 1 ? 's' : ''}</span>
+                  ${decided}${visa}${decide}
                   ${replace ? `<span class="cr-replaces">Corriger : ${replace}</span>` : ''}</div>
                 <ul>${shown.map((a) => additionLine(a, c, reading)).join('')}</ul></section>`;
         }).join('');
@@ -229,14 +261,14 @@ const CharReview = (() => {
             c.newChar ? '<span class="cr-badge is-new-char">caractère nouveau</span>' : '',
             c.newReadings.length ? `<span class="cr-badge is-new-reading">${c.newReadings.length} lecture${c.newReadings.length > 1 ? 's' : ''} nouvelle${c.newReadings.length > 1 ? 's' : ''}</span>` : '',
             c.mixed ? `<span class="cr-badge is-mixed">${c.readings.size} lectures différentes</span>` : '',
+            c.refused.length ? `<span class="cr-badge is-refused">${c.refused.length} refusée${c.refused.length > 1 ? 's' : ''} à corriger</span>` : '',
+            !toReview(c) && c.readings.size ? '<span class="cr-badge is-done">✓ tranché</span>' : '',
         ].join('');
-        return `<article class="cr-card${c.seen ? ' is-seen' : ''}" data-cr-char="${esc(c.char)}">
+        return `<article class="cr-card${toReview(c) ? '' : ' is-seen'}" data-cr-char="${esc(c.char)}">
             <header class="cr-head">
               <span class="hanzi cr-big">${esc(c.char)}</span>
               <span class="cr-uh">${info.mandarin ? `<b>${esc(info.mandarin)}</b> ` : ''}${esc(info.meaning || '')}</span>
               <span class="cr-badges">${badges}</span>
-              <button type="button" class="saisie-btn ${c.seen ? 'saisie-btn-neutral' : 'saisie-btn-validate'} cr-seen" data-cr-seen
-                title="${c.seen ? 'Remettre dans « À relire »' : 'Lectures vérifiées : sortir de « À relire » (revient si une autre lecture apparaît)'}">${c.seen ? '↺ À relire' : '✓ Relu'}</button>
             </header>
             <div class="cr-compare">
               <div><span class="cr-label">Lexique</span>${lexicon}${examples ? `<ul class="cr-examples">${examples}</ul>` : ''}</div>
@@ -251,10 +283,12 @@ const CharReview = (() => {
         const all = characters();
         onCount(all.filter(toReview).length);
         const counts = {
-            todo: all.filter(toReview).length, 'new-reading': all.filter((c) => c.newReadings.length).length,
+            todo: all.filter(toReview).length, refused: all.filter((c) => c.refused.length).length,
+            'new-reading': all.filter((c) => c.newReadings.length).length,
             mixed: all.filter((c) => c.mixed).length, 'new-char': all.filter((c) => c.newChar).length, all: all.length,
         };
-        const labels = { todo: 'À relire', 'new-reading': 'Lectures nouvelles', mixed: 'Lectures différentes', 'new-char': 'Caractères nouveaux', all: 'Tous' };
+        const labels = { todo: 'À trancher', refused: 'Refusées', 'new-reading': 'Lectures nouvelles', mixed: 'Lectures différentes',
+            'new-char': 'Caractères nouveaux', all: 'Tous' };
         const statusLabels = AdditionList.statusLabels();
         const shown = all.filter(matches).sort((x, y) => x.rank - y.rank || y.count - x.count || x.char.localeCompare(y.char));
         box.querySelector('[data-cr-filters]').innerHTML = Object.entries(labels).map(([k, l]) =>
@@ -319,11 +353,8 @@ const CharReview = (() => {
             const cardEl = e.target.closest('[data-cr-char]');
             if (!cardEl) return;
             const char = cardEl.dataset.crChar;
-            if (e.target.closest('[data-cr-seen]')) {
-                const c = characters().find((x) => x.char === char);
-                if (c) { setSeen(c.signature, !c.seen); render(); }
-                return;
-            }
+            const dec = e.target.closest('[data-cr-decide]');
+            if (dec) { Visas.decide(char, dec.closest('[data-cr-reading]').dataset.crReading, dec.dataset.crDecide, dec); return; }
             const ed = e.target.closest('[data-cr-edit]');
             if (ed) { edit(Number(ed.dataset.crEdit), char); return; }
             const rep = e.target.closest('[data-cr-replace]');
@@ -343,6 +374,7 @@ const CharReview = (() => {
         pairs,
         classify,
         markHanzi,
+        notes,
         ready: () => !!data,
         /** The characters still to review among the additions of `t`. */
         count(t) {
@@ -368,7 +400,8 @@ const CharReview = (() => {
                   </div>
                   <p class="cr-legend"><span class="cr-new-char">字</span> caractère absent du lexique ·
                     <span class="cr-new-reading">字</span> lecture que le lexique ne donne pas à ce caractère
-                    (aussi dans les tableaux du suivi) · « → » remplace la lecture dans tous les ajouts du groupe.</p>
+                    (aussi dans les tableaux du suivi) · « → » remplace la lecture dans tous les ajouts du groupe ·
+                    👍 👎 votre visa sur une lecture, les validateurs l’acceptent ou la refusent.</p>
                   <div data-cr-status-line class="text-sm min-h-5" role="status"></div>
                   <div data-cr-list class="cr-list"><p class="vt-sub">Chargement des lectures…</p></div>
                   <button type="button" data-cr-more class="saisie-btn saisie-btn-neutral vt-more" hidden></button>`;

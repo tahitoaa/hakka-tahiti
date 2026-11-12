@@ -948,7 +948,8 @@ class ValidationTable extends AdditionList {
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
             ${AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' })}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
-            <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}</td>
+            <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}${
+                typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id)}</div>` : ''}</td>
             <td class="vt-ia"><button type="button" class="vt-ia-btn ${remarks.length ? 'has-remarks' : ''}" data-remark="expand"
                 aria-expanded="${open}" aria-label="Remarques sur ${esc(a.hanzi)}">${iaLabel}${muted ? ' 🔕' : ''}</button></td>
             <td class="vt-actions"><button type="button" data-copy="${a.id}" class="saisie-btn saisie-btn-neutral"
@@ -1420,9 +1421,11 @@ class ValidationShow {
         this.card.innerHTML = `
             <div class="vs-meta"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.table.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}
               <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
-              <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span></div>
-            <div class="hanzi vs-hanzi">${esc(AdditionList.platformHanzi(a.hanzi))}</div>
+              <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span>
+              ${typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('addition', a.id) : ''}</div>
+            <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
+            ${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.notes(a) : ''}
             ${this.editing ? `<div class="vs-edit">
                 <a class="saisie-btn saisie-btn-neutral vs-saisie-link" href="${esc(this.table.saisieUrl || '/saisie/')}?modifier=${a.id}">✎ Corriger les caractères ou le pinyin dans la Saisie</a>
                 ${field('french', 'Français', a.french)}${field('english', 'Anglais', a.english)}
@@ -2139,4 +2142,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const step = new URLSearchParams(location.search).get('etape');
     if (step === 'ereo' || step === 'caracteres') showPanel(step);
+
+    // Visas (visas.js): in the table, the slideshow and the « Caractères » cards.
+    if (typeof Visas !== 'undefined') {
+        const refresh = () => {
+            table.render();
+            if (window.validationShow?.dialog?.open) window.validationShow.render();
+            if (typeof CharReview !== 'undefined' && !$('chars-panel')?.hidden) CharReview.render();
+        };
+        document.addEventListener('visas-change', refresh);
+        Promise.all([Visas.load(), table.loaded]).then(refresh).catch(() => {});
+    }
 });
