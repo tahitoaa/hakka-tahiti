@@ -301,6 +301,9 @@ class LexiconAddition(models.Model):
     # The Saisie's list (any other label can be typed: « Autre… »).
     WORD_TYPES = ["emprunt anglais", "emprunt tahitien", "emprunt français", "onomatopée",
                   "caractères phonétiques", "caractères inconnus"]
+    # An onomatopoeia has no translation: its French and English say what it is.
+    ONOMATOPOEIA = "onomatopée"
+    ONOMATOPOEIA_TRANSLATIONS = {"french": "onomatopée", "english": "onomatopoeia"}
 
     STATUS_DRAFT = "draft"
     STATUS_REVIEW = "review"

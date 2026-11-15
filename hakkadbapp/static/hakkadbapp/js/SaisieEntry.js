@@ -20,6 +20,14 @@ class SaisieEntry {
         return (typeof HanziForms !== 'undefined' ? HanziForms.pick(list, char) : list.filter((p) => p.simp === char || p.trad === char));
     }
 
+    /** An onomatopoeia has no translation: its French and English say what
+     *  it is (models.LexiconAddition.ONOMATOPOEIA_TRANSLATIONS). */
+    static ONOMATOPOEIA_TRANSLATIONS = { french: 'onomatopée', english: 'onomatopoeia' };
+
+    static isOnomatopoeia(type) {
+        return String(type || '').trim().toLowerCase() === 'onomatopée';
+    }
+
     /** Space-separated words, a «…» block being one (Sentence.splitWords). */
     static words(text) {
         return String(text || '').match(/«[^»]*»?\S*|\S+/gu) || [];

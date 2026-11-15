@@ -91,6 +91,18 @@ def incomplete_refused(addition, status):
     return None
 
 
+def clean_word_type(value):
+    """Shown « (emprunt anglais) » after the hakka: no parenthesis of its own."""
+    return " ".join(str(value or "").replace("(", " ").replace(")", " ").split())[:60]
+
+
+def lock_translations(addition):
+    """An onomatopoeia: its French and English say so, whatever was typed."""
+    if addition.word_type.lower() == LexiconAddition.ONOMATOPOEIA:
+        for field, value in LexiconAddition.ONOMATOPOEIA_TRANSLATIONS.items():
+            setattr(addition, field, value)
+
+
 def _apply_payload(addition, payload):
     """Copies the known fields from a JSON payload onto `addition`; returns
     an error message, or None when everything is valid."""
@@ -118,8 +130,7 @@ def _apply_payload(addition, payload):
                 # Always in Wenfa's pinyin: si1 -> xi1, sit7 -> xit5, zhug5 -> zhuk5 (pinyin_rules).
                 value, _fixes = pinyin_rules.normalize(value)
             elif field == "word_type":
-                # Shown « (emprunt anglais) » after the hakka: no parenthesis of its own.
-                value = " ".join(value.replace("(", " ").replace(")", " ").split())[:60]
+                value = clean_word_type(value)
             else:
                 value = value.strip()
             setattr(addition, field, value)
@@ -127,6 +138,9 @@ def _apply_payload(addition, payload):
         # A word never contains a space (an expression has one per word).
         addition.hanzi = "".join(addition.hanzi.split())
         addition.pinyin = "".join(addition.pinyin.split())
+        lock_translations(addition)
+    else:
+        addition.word_type = ""          # an expression is no word: no type
     if not addition.hanzi:
         return "Les caractères sont obligatoires."
     if "/" in addition.pinyin:
@@ -153,16 +167,17 @@ def _save_with_new_words(request, addition, payload):
     prepared = []
     for item in new_words:
         if not isinstance(item, dict) or not all(isinstance(item.get(k, ""), str)
-                                                 for k in ("hanzi", "pinyin", "french", "english", "themes")):
+                                                 for k in ("hanzi", "pinyin", "french", "english", "themes", "word_type")):
             return None, "Mot à ajouter mal formé."
         hanzi, pinyin = "".join(item.get("hanzi", "").split()), "".join(item.get("pinyin", "").split())
         if not hanzi:
             return None, "Un mot à ajouter n'a pas de caractères."
-        prepared.append((hanzi, pinyin, item.get("french", "").strip(), item.get("english", "").strip(),
-                         item.get("themes", "").strip()))
-        # Proposed (or validated) with the expression: complete like any addition.
         word = LexiconAddition(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin,
-                               french=prepared[-1][2], english=prepared[-1][3])
+                               french=item.get("french", "").strip(), english=item.get("english", "").strip(),
+                               word_type=clean_word_type(item.get("word_type", "")))
+        lock_translations(word)
+        prepared.append((hanzi, pinyin, word.french, word.english, item.get("themes", "").strip(), word.word_type))
+        # Proposed (or validated) with the expression: complete like any addition.
         message = incomplete_refused(word, addition.status)
         if message and not (LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin)
                             .exclude(status=LexiconAddition.STATUS_REJECTED).exists()):
@@ -171,7 +186,7 @@ def _save_with_new_words(request, addition, payload):
     words = []
     with transaction.atomic():
         addition.save()
-        for hanzi, pinyin, french, english, themes in prepared:
+        for hanzi, pinyin, french, english, themes, word_type in prepared:
             existing = (LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin)
                         .exclude(status=LexiconAddition.STATUS_REJECTED).first())
             if existing:
@@ -179,7 +194,7 @@ def _save_with_new_words(request, addition, payload):
                 continue
             words.append(LexiconAddition.objects.create(
                 kind=LexiconAddition.KIND_WORD, status=addition.status, hanzi=hanzi, pinyin=pinyin, french=french,
-                english=english[:300], themes=(themes or addition.themes)[:200],
+                english=english[:300], themes=(themes or addition.themes)[:200], word_type=word_type,
                 observations=f"Ajouté avec l'expression « {addition.hanzi} ».",
                 created_by=request.user, updated_by=request.user,
             ))

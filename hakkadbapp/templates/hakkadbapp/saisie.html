@@ -23,7 +23,11 @@
   .saisie-check-reading { border-left-color: #d97706 !important; } p.saisie-check-reading { background: #fef3c7; color: #92400e; }
   .saisie-check-proposed { border-left-color: #6366f1 !important; } p.saisie-check-proposed { background: #FBF0E6; color: #9B1C1C; }
   .saisie-check-unknown { border-left-color: #dc2626 !important; } p.saisie-check-unknown { background: #ecfdf5; color: #065f46; }
-  .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1.1fr)); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+  .saisie-new-word { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) repeat(3, minmax(0, 1.1fr)); gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+  .saisie-nw-type { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+  .saisie-nw-type select, .saisie-nw-type input { width: 100%; min-width: 0; }
+  /* An onomatopoeia's French and English: fixed. */
+  input.is-locked { background: #F6EFE4; color: #6E655C; font-style: italic; cursor: not-allowed; }
   /* Mot / Expression: two big choices, and the form's edge in the mode's colour. */
   .saisie-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   .saisie-kind button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; padding: 0.55rem 0.75rem; min-height: 3.25rem;

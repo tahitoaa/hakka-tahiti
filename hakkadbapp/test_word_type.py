@@ -29,3 +29,21 @@ class WordTypeTest(SimpleTestCase):
         self.assertIsNone(_apply_payload(a, {"hanzi": "屋家", "pinyin": "wuk5ka1", "word_type": "  emprunt (anglais)  "}))
         self.assertEqual(a.word_type, "emprunt anglais")
         self.assertIn("onomatopée", LexiconAddition.WORD_TYPES)
+
+
+class OnomatopoeiaTest(SimpleTestCase):
+    """An onomatopoeia: its French and English say so, whatever was typed."""
+
+    def test_locked(self):
+        a = LexiconAddition(kind=LexiconAddition.KIND_WORD)
+        _apply_payload(a, {"hanzi": "嘭", "pinyin": "pang1", "french": "boum", "english": "bang", "word_type": "onomatopée"})
+        self.assertEqual((a.french, a.english), ("onomatopée", "onomatopoeia"))
+        # Another type: what was typed.
+        b = LexiconAddition(kind=LexiconAddition.KIND_WORD)
+        _apply_payload(b, {"hanzi": "嘭", "pinyin": "pang1", "french": "boum", "english": "bang", "word_type": "emprunt anglais"})
+        self.assertEqual((b.french, b.english), ("boum", "bang"))
+
+    def test_an_expression_has_no_type(self):
+        e = LexiconAddition(kind=LexiconAddition.KIND_EXPRESSION)
+        _apply_payload(e, {"hanzi": "我 嘭", "pinyin": "ngai1 pang1", "french": "moi boum", "word_type": "onomatopée"})
+        self.assertEqual((e.word_type, e.french), ("", "moi boum"))
