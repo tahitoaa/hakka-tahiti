@@ -173,10 +173,13 @@ class SegmentEditor {
               </div>
               <label class="eaf-field"><span>Français</span>
                 <textarea data-role="translation" rows="1"></textarea></label>
-              <div class="eaf-field"><span>Pinyin <small>(auto)</small></span><div data-role="pinyin" class="eaf-derived"></div></div>
-              <div class="eaf-field"><span>Mixte <small>(auto)</small></span><div data-role="mixed" class="eaf-derived"></div></div>
-              <div class="eaf-field"><span>Simplifié <small>(auto)</small></span><div data-role="hanzi" class="eaf-derived hanzi"></div></div>
-              <div class="eaf-field"><span>Traditionnel <small>(auto)</small></span><div data-role="trad" class="eaf-derived hanzi"></div></div>
+              <!-- The lines derived from the transcript, the main one first: Mixte, then the characters, then the pinyin. -->
+              <div class="eaf-renders">
+                <div class="eaf-field eaf-render is-main"><span>Mixte <small>(auto)</small></span><div data-role="mixed" class="eaf-derived"></div></div>
+                <div class="eaf-field eaf-render"><span>Simplifié <small>(auto)</small></span><div data-role="hanzi" class="eaf-derived hanzi"></div></div>
+                <div class="eaf-field eaf-render"><span>Traditionnel <small>(auto)</small></span><div data-role="trad" class="eaf-derived hanzi"></div></div>
+                <div class="eaf-field eaf-render is-minor"><span>Pinyin <small>(auto)</small></span><div data-role="pinyin" class="eaf-derived"></div></div>
+              </div>
             </div>`;
         const q = (sel) => this.row.querySelector(sel);
         this.transcript = q('[data-role="transcript"]');
