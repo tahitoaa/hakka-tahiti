@@ -4,9 +4,13 @@
    - in the Suivi tables, a character absent from the lexicon is coloured
      (cr-new-char), and so is a known character given a reading the lexicon
      doesn't have (cr-new-reading) -- AdditionList.entryCells();
-   - « 🔤 Caractères », a step of the Suivi page: one card per character,
-     the readings the additions give it next to the lexicon's (with words
-     that use them) and the dictionaries', each reading with its additions;
+   - « 🔤 Caractères », a step of the Suivi page: a table, one row per
+     character (its readings in the additions, the lexicon's, how many
+     additions, what is left to settle), sorted and searched (character,
+     reading, sense, word, French), gone through with ↑ ↓; a row opens its
+     card (Entrée or a tap): the readings the additions give it next to
+     the lexicon's (with words that use them) and the dictionaries', each
+     reading with its additions;
      a reading is replaced in all of them in one click, or an addition
      opened in the Saisie. Each member gives a reading a visa (👍 / 👎,
      visas.js); a validator accepts or refuses it, which settles it.
@@ -18,7 +22,7 @@
 const CharReview = (() => {
     const API = '/api/ajouts/caracteres';
     const STATUSES = ['draft', 'review', 'validated'];
-    const PAGE = 40;
+    const PAGE = 100;
     const HAN = /^(?:\p{Script=Han}|□)$/u;
     const esc = (t) => AdditionList.escapeHtml(t);
     const sup = (r) => AdditionList.superscriptTones(r || '');
@@ -29,7 +33,9 @@ const CharReview = (() => {
     let table = null;
     let box = null;
     let onCount = () => {};
-    const state = { filter: 'todo', search: '', statuses: new Set(STATUSES), limit: PAGE, unfolded: new Set() };
+    const state = { filter: 'todo', search: '', statuses: new Set(STATUSES), limit: PAGE, unfolded: new Set(),
+        sort: 'rank', open: new Set(), focus: '' };
+    const SORTS = { rank: 'À trancher d’abord', count: 'Plus d’ajouts', reading: 'Par lecture', char: 'Par caractère' };
     // A reading given in many additions (个 go⁴: 26) shows its first ones, the rest on demand.
     const FOLD_AT = 7;
     const FOLD_SHOW = 5;
@@ -171,9 +177,31 @@ const CharReview = (() => {
         if (state.filter === 'new-char' && !c.newChar) return false;
         const shown = [...c.readings.values(), c.unaligned].flat().some((a) => state.statuses.has(a.status));
         if (!shown) return false;
-        const needle = state.search.trim().toLowerCase();
-        if (!needle) return true;
-        return [...needle].some((x) => x === c.char) || [...c.readings.keys()].some((r) => r.startsWith(needle.replace(/\s+/g, '')));
+        const q = state.search.trim();
+        if (!q) return true;
+        // Characters typed (屋家): those characters, in any of their forms (髮 = 发).
+        const han = [...q].filter((x) => /\p{Script=Han}/u.test(x));
+        const forms = typeof HanziForms !== 'undefined' ? HanziForms : null;
+        if (han.length) return han.some((x) => x === c.char || (forms && forms.sameText(x, c.char)));
+        // Else a reading (ka, ka1, ka¹), a sense, a word, the French of an addition.
+        return typeof SearchMatch !== 'undefined' ? SearchMatch.match(haystack(c), q) : haystack(c).toLowerCase().includes(q.toLowerCase());
+    }
+
+    /** What a search reads for a character: its readings first. */
+    function haystack(c) {
+        const info = data.chars[c.char] || {};
+        const words = Object.values(info.words || {}).flatMap((w) => w.words || []);
+        const adds = [...c.readings.values(), c.unaligned].flat();
+        return [...c.readings.keys(), ...(data.lexicon[c.char] || []), info.mandarin || '', info.meaning || '',
+            ...words, ...adds.map((a) => `${a.french || ''} ${a.english || ''}`)].join(' ');
+    }
+
+    function sorter(x, y) {
+        const first = (c) => [...c.readings.keys()].sort()[0] || '~';
+        if (state.sort === 'count') return y.count - x.count || x.rank - y.rank || x.char.localeCompare(y.char);
+        if (state.sort === 'reading') return first(x).localeCompare(first(y)) || x.char.localeCompare(y.char);
+        if (state.sort === 'char') return x.char.localeCompare(y.char);
+        return x.rank - y.rank || y.count - x.count || x.char.localeCompare(y.char);
     }
 
     /** The other readings worth offering in « → ka¹ »: the lexicon's, then the dictionaries'. */
@@ -262,18 +290,12 @@ const CharReview = (() => {
             <span class="cr-what" title="Autant de syllabes que de caractères ? (lecture vide, ton manquant…)">⚠ Lecture non alignée · ${unaligned.length}</span></div>
             <ul>${unaligned.map((a) => additionLine(a, c, null)).join('')}</ul></section>` : '';
 
-        const badges = [
-            c.newChar ? '<span class="cr-badge is-new-char">caractère nouveau</span>' : '',
-            c.newReadings.length ? `<span class="cr-badge is-new-reading">${c.newReadings.length} lecture${c.newReadings.length > 1 ? 's' : ''} nouvelle${c.newReadings.length > 1 ? 's' : ''}</span>` : '',
-            c.mixed ? `<span class="cr-badge is-mixed">${c.readings.size} lectures différentes</span>` : '',
-            c.refused.length ? `<span class="cr-badge is-refused">${c.refused.length} refusée${c.refused.length > 1 ? 's' : ''} à corriger</span>` : '',
-            !toReview(c) && c.readings.size ? '<span class="cr-badge is-done">✓ tranché</span>' : '',
-        ].join('');
+        const badgeHtml = badges(c);
         return `<article class="cr-card${toReview(c) ? '' : ' is-seen'}" data-cr-char="${esc(c.char)}">
             <header class="cr-head">
               <span class="hanzi cr-big">${esc(c.char)}</span>
               <span class="cr-uh">${info.mandarin ? `<b>${esc(info.mandarin)}</b> ` : ''}${esc(info.meaning || '')}</span>
-              <span class="cr-badges">${badges}</span>
+              <span class="cr-badges">${badgeHtml}</span>
             </header>
             <div class="cr-compare">
               <div><span class="cr-label">Lexique</span>${lexicon}${examples ? `<ul class="cr-examples">${examples}</ul>` : ''}</div>
@@ -281,6 +303,47 @@ const CharReview = (() => {
             </div>
             ${groups}${loose}
         </article>`;
+    }
+
+    /** What is left to settle on a character, in short. */
+    function badges(c) {
+        return [
+            c.newChar ? '<span class="cr-badge is-new-char">caractère nouveau</span>' : '',
+            c.newReadings.length ? `<span class="cr-badge is-new-reading">${c.newReadings.length} lecture${c.newReadings.length > 1 ? 's' : ''} nouvelle${c.newReadings.length > 1 ? 's' : ''}</span>` : '',
+            c.mixed ? `<span class="cr-badge is-mixed">${c.readings.size} lectures différentes</span>` : '',
+            c.refused.length ? `<span class="cr-badge is-refused">${c.refused.length} refusée${c.refused.length > 1 ? 's' : ''} à corriger</span>` : '',
+            !toReview(c) && c.readings.size ? '<span class="cr-badge is-done">✓ tranché</span>' : '',
+        ].join('');
+    }
+
+    /** One row of the table; its card under it when open. */
+    function row(c) {
+        const info = data.chars[c.char] || {};
+        const open = state.open.has(c.char);
+        const readings = [...c.readings].sort((x, y) => y[1].length - x[1].length).map(([reading, adds]) => {
+            const kind = classify(c.char, reading);
+            const decision = decisionOf(c.char, reading);
+            const n = adds.filter((a) => state.statuses.has(a.status)).length;
+            if (!n) return '';
+            const what = kind === 'new-reading' ? 'lecture nouvelle' : kind === 'new-char' ? 'caractère nouveau' : 'lecture du lexique';
+            const decided = decision ? ` — ${decision.status === 'accepted' ? 'acceptée' : 'refusée'} par ${decision.by}` : '';
+            return `<span class="cr-chip cr-reading${kind ? ` is-${kind}` : ''}${decision ? ` is-${decision.status}` : ''}"
+                title="${esc(`${what} · ${n} ajout${n > 1 ? 's' : ''}${decided}`)}">${esc(sup(reading))} <small>${n}</small>${
+                decision ? (decision.status === 'accepted' ? ' ✓' : ' ✕') : ''}</span>`;
+        }).join('');
+        const loose = c.unaligned.filter((a) => state.statuses.has(a.status)).length;
+        const lexicon = (data.lexicon[c.char] || []).map((r) => esc(sup(r))).join(', ') || '<span class="cr-none">absent</span>';
+        const sense = [info.mandarin ? `<b>${esc(info.mandarin)}</b>` : '', esc((info.meaning || '').split(/[;,]/)[0])].filter(Boolean).join(' ');
+        return `<tr class="cr-row${toReview(c) ? '' : ' is-seen'}${open ? ' is-open' : ''}" data-cr-row="${esc(c.char)}" tabindex="0"
+                aria-expanded="${open}" title="${open ? 'Replier' : 'Détails'} (Entrée) · ↑ ↓ pour parcourir">
+              <td class="cr-td-char"><span class="hanzi">${esc(c.char)}</span></td>
+              <td class="cr-td-uh">${sense}</td>
+              <td class="cr-td-readings">${readings}${loose ? `<span class="cr-chip is-loose" title="Lecture non alignée (autant de syllabes que de caractères ?)">⚠ ${loose}</span>` : ''}</td>
+              <td class="cr-td-lex">${lexicon}</td>
+              <td class="cr-td-n">${c.count}</td>
+              <td class="cr-td-state">${badges(c)}</td>
+              <td class="cr-td-open" aria-hidden="true">${open ? '▾' : '▸'}</td>
+            </tr>${open ? `<tr class="cr-detail-row"><td colspan="7">${card(c)}</td></tr>` : ''}`;
     }
 
     function render() {
@@ -295,14 +358,22 @@ const CharReview = (() => {
         const labels = { todo: 'À trancher', refused: 'Refusées', 'new-reading': 'Lectures nouvelles', mixed: 'Lectures différentes',
             'new-char': 'Caractères nouveaux', all: 'Tous' };
         const statusLabels = AdditionList.statusLabels();
-        const shown = all.filter(matches).sort((x, y) => x.rank - y.rank || y.count - x.count || x.char.localeCompare(y.char));
+        const shown = all.filter(matches).sort(sorter);
         box.querySelector('[data-cr-filters]').innerHTML = Object.entries(labels).map(([k, l]) =>
             `<button type="button" data-cr-filter="${k}" aria-pressed="${state.filter === k}">${l} <span class="vt-kinds-n">${counts[k]}</span></button>`).join('');
         box.querySelector('[data-cr-statuses]').innerHTML = STATUSES.map((s) =>
             `<label><input type="checkbox" data-cr-status="${s}" ${state.statuses.has(s) ? 'checked' : ''}> ${esc(statusLabels[s] || s)}</label>`).join('');
         const list = box.querySelector('[data-cr-list]');
-        list.innerHTML = shown.length ? shown.slice(0, state.limit).map(card).join('')
+        list.innerHTML = shown.length ? `<table class="cr-table">
+              <thead><tr><th>Car.</th><th class="cr-td-uh">Sens</th><th>Lectures des ajouts</th><th class="cr-td-lex">Lexique</th>
+                <th title="Ajouts">Aj.</th><th>À trancher</th><th></th></tr></thead>
+              <tbody>${shown.slice(0, state.limit).map(row).join('')}</tbody></table>`
             : '<p class="vt-empty">Rien à relire ici.</p>';
+        const n = box.querySelector('[data-cr-shown]');
+        if (n) n.textContent = `${shown.length} caractère${shown.length > 1 ? 's' : ''}`;
+        box.querySelector('[data-cr-fold]').hidden = !state.open.size;
+        // The row gone through from the keyboard keeps the focus.
+        if (state.focus) list.querySelector(`[data-cr-row="${CSS.escape(state.focus)}"]`)?.focus({ preventScroll: true });
         const more = box.querySelector('[data-cr-more]');
         more.hidden = shown.length <= state.limit;
         more.textContent = `Afficher plus (${Math.max(shown.length - state.limit, 0)} restants)`;
@@ -355,6 +426,9 @@ const CharReview = (() => {
             const f = e.target.closest('[data-cr-filter]');
             if (f) { state.filter = f.dataset.crFilter; state.limit = PAGE; render(); return; }
             if (e.target.closest('[data-cr-more]')) { state.limit += PAGE; render(); return; }
+            if (e.target.closest('[data-cr-fold]')) { state.open.clear(); render(); return; }
+            const r = e.target.closest('[data-cr-row]');
+            if (r) { toggleRow(r.dataset.crRow); return; }
             const cardEl = e.target.closest('[data-cr-char]');
             if (!cardEl) return;
             const char = cardEl.dataset.crChar;
@@ -376,7 +450,45 @@ const CharReview = (() => {
             if (s.checked) state.statuses.add(s.dataset.crStatus); else state.statuses.delete(s.dataset.crStatus);
             render();
         });
-        box.querySelector('[data-cr-search]').addEventListener('input', (e) => { state.search = e.target.value; state.limit = PAGE; render(); });
+        box.querySelector('[data-cr-search]').addEventListener('input', (e) => {
+            state.search = e.target.value;
+            state.limit = PAGE;
+            state.focus = '';
+            render();
+        });
+        // Entrée in the search: the first character found, open.
+        box.querySelector('[data-cr-search]').addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); box.querySelector('[data-cr-row]')?.focus(); return; }
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const first = box.querySelector('[data-cr-row]');
+            if (first && !state.open.has(first.dataset.crRow)) toggleRow(first.dataset.crRow);
+        });
+        box.querySelector('[data-cr-sort]').addEventListener('change', (e) => { state.sort = e.target.value; render(); });
+        // The table from the keyboard: ↑ ↓ from row to row, Entrée or Espace opens it.
+        box.addEventListener('keydown', (e) => {
+            const r = e.target.closest?.('[data-cr-row]');
+            if (!r) return;
+            const rows = [...box.querySelectorAll('[data-cr-row]')];
+            const i = rows.indexOf(r);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const next = rows[i + (e.key === 'ArrowDown' ? 1 : -1)];
+                if (next) { state.focus = next.dataset.crRow; next.focus(); next.scrollIntoView({ block: 'nearest' }); }
+                else if (e.key === 'ArrowUp') box.querySelector('[data-cr-search]').focus();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleRow(r.dataset.crRow);
+            } else if (e.key === 'Escape' && state.open.has(r.dataset.crRow)) {
+                toggleRow(r.dataset.crRow);
+            }
+        });
+    }
+
+    function toggleRow(char) {
+        if (state.open.has(char)) state.open.delete(char); else state.open.add(char);
+        state.focus = char;
+        render();
     }
 
     return {
@@ -402,16 +514,24 @@ const CharReview = (() => {
                 const car = new URLSearchParams(location.search).get('car') || '';
                 state.search = car;
                 if (car) state.filter = 'all';
+                // Opened for one character (a link, « Retour » from the Saisie): its row open.
+                if (car && [...car].length === 1) state.open.add(car);
                 box.innerHTML = `<div class="cr-tools">
-                    <input type="search" data-cr-search placeholder="Caractère ou lecture…" value="${esc(car)}" aria-label="Chercher un caractère"
-                      class="min-h-9 w-full sm:w-56 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white">
+                    <input type="search" data-cr-search placeholder="Caractère, lecture (ka1), sens, mot…" value="${esc(car)}"
+                      aria-label="Chercher un caractère : caractère, lecture, sens, mot ou français"
+                      class="min-h-9 w-full sm:w-72 px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white">
+                    <label class="cr-sort">Trier <select data-cr-sort class="min-h-9 px-2 border border-gray-300 rounded-md bg-white text-sm">
+                      ${Object.entries(SORTS).map(([k, l]) => `<option value="${k}"${state.sort === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+                    <span class="vt-sub" data-cr-shown></span>
+                    <button type="button" data-cr-fold class="saisie-btn saisie-btn-neutral" hidden>Tout replier</button>
                     <div class="vt-kinds" role="group" aria-label="Quels caractères" data-cr-filters></div>
                     <div class="cr-statuses" data-cr-statuses></div>
                   </div>
                   <p class="cr-legend"><span class="cr-new-char">字</span> caractère absent du lexique ·
                     <span class="cr-new-reading">字</span> lecture que le lexique ne donne pas à ce caractère
                     (aussi dans les tableaux du suivi) · « → » remplace la lecture dans tous les ajouts du groupe ·
-                    👍 👎 votre visa sur une lecture, les validateurs l’acceptent ou la refusent.</p>
+                    👍 👎 votre visa sur une lecture, les validateurs l’acceptent ou la refusent ·
+                    <span class="cr-keys">clavier : ↓ depuis la recherche, ↑ ↓ d’une ligne à l’autre, Entrée ouvre ou replie</span>.</p>
                   <div data-cr-status-line class="text-sm min-h-5" role="status"></div>
                   <div data-cr-list class="cr-list"><p class="vt-sub">Chargement des lectures…</p></div>
                   <button type="button" data-cr-more class="saisie-btn saisie-btn-neutral vt-more" hidden></button>`;
