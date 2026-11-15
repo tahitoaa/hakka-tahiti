@@ -298,6 +298,65 @@ class AdditionList {
     }
 
     /** One line for the clipboard: 船只 shon²zak⁵ — navires — ships — Thème. */
+    static OCCURRENCES_API = '/api/ajouts/occurrences';
+    static SEARCH_URL = '/search/';
+    static _occurrences = new Map();     // hanzi -> Promise of the answer
+
+    /** The expressions holding a word, fetched once per word. */
+    static fetchOccurrences(hanzi) {
+        const key = String(hanzi || '').replace(/\s+/g, '');
+        if (!AdditionList._occurrences.has(key)) {
+            AdditionList._occurrences.set(key, AdditionList.request(`${AdditionList.OCCURRENCES_API}?hanzi=${encodeURIComponent(key)}`)
+                .catch((err) => { AdditionList._occurrences.delete(key); throw err; }));
+        }
+        return AdditionList._occurrences.get(key);
+    }
+
+    /** « 🔗 Dans 3 expressions » into `el` (the word `hanzi`): the lexicon's
+     *  (link: the Expressions tab, filtered on the word) and the additions'
+     *  (link: each one in the Saisie). Empty for no word; « aucune ». */
+    static async showOccurrences(el, hanzi) {
+        if (!el) return;
+        const word = String(hanzi || '').replace(/\s+/g, '');
+        el.dataset.occurrencesFor = word;
+        if (!word || !/\p{Script=Han}/u.test(word)) { el.innerHTML = ''; return; }
+        el.innerHTML = '<div class="occ"><span class="occ-head">🔗 Occurrences…</span></div>';
+        let data;
+        try {
+            data = await AdditionList.fetchOccurrences(word);
+        } catch (err) {
+            if (el.dataset.occurrencesFor === word) el.innerHTML = '';
+            return;
+        }
+        if (el.dataset.occurrencesFor !== word) return;      // another word meanwhile
+        const esc = AdditionList.escapeHtml;
+        const labels = AdditionList.statusLabels();
+        const n = data.lexicon.count + data.additions.count;
+        if (!n) {
+            el.innerHTML = `<div class="occ is-none"><span class="occ-head">🔗 Dans aucune expression</span></div>`;
+            return;
+        }
+        // The word marked in each expression (where it stands as a word).
+        const mark = (text) => esc(text).replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), (m) => `<mark>${m}</mark>`);
+        const search = `${AdditionList.SEARCH_URL}?q=${encodeURIComponent(word)}#expressions`;
+        const lexicon = data.lexicon.items.map((e) => `<li><a href="${esc(search)}" target="_blank" rel="noopener">
+              <span class="hanzi">${mark(e.hanzi)}</span></a>${e.rendering ? ` <span class="occ-py">${esc(AdditionList.superscriptTones(e.rendering.split(' ').filter((w) => !/\p{Script=Han}/u.test(w)).join(' ')))}</span>` : ''}
+              <span class="occ-fr">${esc(e.french)}</span></li>`).join('');
+        const additions = data.additions.items.map((a) => `<li><a href="/saisie/?modifier=${a.id}" target="_blank" rel="noopener">
+              <span class="hanzi">${mark(AdditionList.platformHanzi(a.hanzi))}</span></a>
+              <span class="vt-status vt-status-${esc(a.status)}">${esc(labels[a.status] || a.status)}</span>
+              <span class="occ-fr">${esc(a.french)}</span></li>`).join('');
+        const more = (shown, count) => (count > shown ? `<li class="occ-more">… et ${count - shown} autre${count - shown > 1 ? 's' : ''}</li>` : '');
+        el.innerHTML = `<details class="occ" ${n <= 3 ? 'open' : ''}>
+            <summary class="occ-head">🔗 Dans ${n} expression${n > 1 ? 's' : ''}
+              ${data.lexicon.count ? `<span class="occ-n">${data.lexicon.count} du lexique</span>` : ''}
+              ${data.additions.count ? `<span class="occ-n is-add">${data.additions.count} ajout${data.additions.count > 1 ? 's' : ''}</span>` : ''}</summary>
+            ${data.lexicon.count ? `<p class="occ-sub">Lexique — <a href="${esc(search)}" target="_blank" rel="noopener">voir dans Expressions →</a></p>
+              <ul>${lexicon}${more(data.lexicon.items.length, data.lexicon.count)}</ul>` : ''}
+            ${data.additions.count ? `<p class="occ-sub">Ajouts</p><ul>${additions}${more(data.additions.items.length, data.additions.count)}</ul>` : ''}
+          </details>`;
+    }
+
     /** « (emprunt anglais) » after the hakka, or ''. */
     static typeTag(e) {
         return e?.word_type ? ` <small class="vt-wtype" title="Type de mot">(${AdditionList.escapeHtml(e.word_type)})</small>` : '';
@@ -1451,6 +1510,7 @@ class ValidationShow {
               <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span>
               ${typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('addition', a.id, a.created_by) : ''}</div>
             <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}${AdditionList.typeTag(a)}</div>
+            ${a.kind === 'word' ? '<div class="vs-occurrences" data-vs-occurrences></div>' : ''}
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.notes(a) : ''}
             ${typeof Duplicates !== 'undefined' && Duplicates.of(a.id) ? Duplicates.list(a) : ''}
@@ -1474,6 +1534,9 @@ class ValidationShow {
                 <span class="vs-remark-actions">${c.applicable ? AdditionList.applyButton(c, 'data-vs-remark') : ''}
                   <button type="button" class="saisie-btn saisie-btn-neutral" data-vs-remark="dismiss" data-cid="${c.id}">Écarter</button></span></li>`).join('')}</ul>` : ''}
             <p class="vs-message" role="status">${esc(message)}</p>`;
+        // The expressions holding this word (fetched once per word).
+        const occ = this.card.querySelector('[data-vs-occurrences]');
+        if (occ) AdditionList.showOccurrences(occ, a.hanzi);
         this.dialog.querySelector('[data-vs-nav="-1"]').disabled = this.pos === 0;
         this.dialog.querySelector('[data-vs-nav="1"]').disabled = this.pos === this.ids.length - 1;
         const decider = AdditionList.canValidate();

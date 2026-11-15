@@ -318,6 +318,8 @@
             this.renderPreview();
             // A proposal made for other characters no longer applies.
             if (this.aiSuggestion && this.aiFor !== this.aiEntryKey()) this.clearSuggestion();
+            // The expressions holding the word, once its characters are settled.
+            this.renderOccurrences();
             // 🔎 Sources (Sources.js) follows the characters typed.
             const sources = document.getElementById('saisie-sources');
             if (sources) {
@@ -326,6 +328,16 @@
                 sources.dataset.reading = v.pinyin;
                 sources.hidden = !sources.dataset.sources;
             }
+        }
+
+        renderOccurrences() {
+            const el = document.getElementById('saisie-occurrences');
+            if (!el) return;
+            const word = this.kind === 'word' && !this.entry.syllables.length ? this.entry.values().hanzi.replace(/\s+/g, '') : '';
+            if ((el.dataset.occurrencesFor || '') === word) return;    // the same word: nothing to fetch again
+            clearTimeout(this.occurrencesTimer);
+            // While typing: once the characters stay a moment.
+            this.occurrencesTimer = setTimeout(() => AdditionList.showOccurrences(el, word), word ? 300 : 0);
         }
 
         // ---- AI suggestions (ai.py) ------------------------------------------
