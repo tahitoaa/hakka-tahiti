@@ -147,9 +147,13 @@
                 const other = document.getElementById('saisie-word-type-other');
                 other.hidden = event.target.value !== '__other';
                 if (!other.hidden) other.focus();
+                this.lockTranslations();
                 this.renderPreview();
             });
-            document.getElementById('saisie-word-type-other')?.addEventListener('input', () => this.renderPreview());
+            document.getElementById('saisie-word-type-other')?.addEventListener('input', () => {
+                this.lockTranslations();
+                this.renderPreview();
+            });
             // « Texte » : the selection (or the caret) between « », for words
             // written without characters (ma'a tinito).
             const textBtn = document.getElementById('saisie-text-btn');
@@ -223,6 +227,7 @@
             this.kindButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
             this.el.form.classList.toggle('is-word', kind === 'word');
             this.el.form.classList.toggle('is-expression', kind === 'expression');
+            if (this.el.french) this.lockTranslations();
             const example = typeof ReadingSourceSwitch !== 'undefined' && ReadingSourceSwitch.inputExample
                 ? ReadingSourceSwitch.inputExample() : '';
             this.el.text.placeholder = example ? `ex. ${example}` : (kind === 'word' ? 'ex. wuk5ka1' : 'ex. ngai2 oi4 wuk5ka1');
@@ -394,7 +399,7 @@
             this.el.text.value = SaisieEntry.textFromStored(p.hanzi, p.pinyin, p.kind, this.dico);
             this.setKind(p.kind);
             [['french', p.french], ['english', p.english]].forEach(([field, value]) => {
-                if (!value) return;
+                if (!value || this.el[field].readOnly) return;
                 this.el[field].value = value;
                 this.el[field].classList.add('is-ai');
             });
@@ -444,7 +449,8 @@
             // Never over what the editor typed: only empty fields (or ones
             // the AI filled before) take the proposal.
             ['french', 'english', 'themes'].forEach((name) => {
-                const typedByEditor = (state[name] || '').trim() && !state.ai[name];
+                const typedByEditor = ((state[name] || '').trim() && !state.ai[name])
+                    || (SaisieEntry.isOnomatopoeia(state.word_type) && name in SaisieEntry.ONOMATOPOEIA_TRANSLATIONS);
                 if (w[name] && !typedByEditor) { state[name] = w[name]; state.ai[name] = true; }
             });
             this.renderNewWords();
@@ -464,7 +470,7 @@
                 }
             }
             const fields = field === 'all' ? Object.keys(inputs) : [field];
-            fields.filter((f) => s[f] && inputs[f]).forEach((f) => {
+            fields.filter((f) => s[f] && inputs[f] && !inputs[f].readOnly).forEach((f) => {
                 inputs[f].value = s[f];
                 inputs[f].classList.add('is-ai');
             });
@@ -558,6 +564,22 @@
             return value.replace(/[()]/g, ' ').split(/\s+/).join(' ').trim();
         }
 
+        /** An onomatopoeia (SaisieEntry.ONOMATOPOEIA): French and English say
+         *  so and can't be changed (also enforced by the server); another type
+         *  frees them again, emptied if they still held that mention. */
+        lockTranslations() {
+            const locked = SaisieEntry.isOnomatopoeia(this.wordType());
+            Object.entries(SaisieEntry.ONOMATOPOEIA_TRANSLATIONS).forEach(([field, value]) => {
+                const input = this.el[field];
+                if (locked) input.value = value;
+                else if (input.readOnly && input.value === value) input.value = '';
+                input.readOnly = locked;
+                input.classList.toggle('is-locked', locked);
+                input.title = locked ? 'Onomatopée : la traduction le dit, elle ne se change pas' : '';
+            });
+            if (locked) this.renderMeaning();
+        }
+
         setWordType(type) {
             const select = document.getElementById('saisie-word-type');
             const other = document.getElementById('saisie-word-type-other');
@@ -566,6 +588,7 @@
             select.value = !type ? '' : listed ? type : '__other';
             other.value = type && !listed ? type : '';
             other.hidden = select.value !== '__other';
+            this.lockTranslations();
             // The mixed line shows the type: always redrawn with it.
             if (this.entry) this.renderPreview();
         }
@@ -624,19 +647,38 @@
                     const key = this.newWordKey(c);
                     if (!this.newWords.has(key)) {
                         // A sense given with « : » (把:prendre) is the new word's French.
-                        this.newWords.set(key, { checked: c.status !== 'reading', french: c.sense || '', english: '', themes: '', ai: {} });
+                        this.newWords.set(key, { checked: c.status !== 'reading', french: c.sense || '', english: '', themes: '',
+                            word_type: '', other: false, ai: {} });
                     }
                     const state = this.newWords.get(key);
-                    const field = (name, placeholder, extra = '') => `<input type="text" data-nw="${name}" value="${escapeHtml(state[name])}"
-                        placeholder="${placeholder}" ${extra} aria-label="${placeholder} de ${escapeHtml(c.hanzi)}"
-                        class="min-h-10 px-2 py-1 border border-gray-300 rounded-md text-sm${state.ai[name] ? ' is-ai' : ''}" ${state.checked ? '' : 'disabled'}>`;
+                    const locked = SaisieEntry.isOnomatopoeia(state.word_type);
+                    const field = (name, placeholder, extra = '') => {
+                        const fixed = locked && name in SaisieEntry.ONOMATOPOEIA_TRANSLATIONS;
+                        return `<input type="text" data-nw="${name}" value="${escapeHtml(state[name])}"
+                        placeholder="${placeholder}" ${extra} aria-label="${placeholder} de ${escapeHtml(c.hanzi)}"${fixed ? ' readonly title="Onomatopée : la traduction le dit"' : ''}
+                        class="min-h-10 px-2 py-1 border border-gray-300 rounded-md text-sm${state.ai[name] ? ' is-ai' : ''}${fixed ? ' is-locked' : ''}" ${state.checked ? '' : 'disabled'}>`;
+                    };
+                    // The same types as the word's own menu (saisie.html).
+                    const types = [...(document.getElementById('saisie-word-type')?.options || [])]
+                        .filter((o) => o.value && o.value !== '__other').map((o) => [o.value, o.textContent]);
+                    const listed = !state.word_type || types.some(([v]) => v === state.word_type);
+                    const choice = state.other || !listed ? '__other' : state.word_type;
+                    const typeField = `<span class="saisie-nw-type">
+                        <select data-nw="word_type" aria-label="Type du mot ${escapeHtml(c.hanzi)}" ${state.checked ? '' : 'disabled'}
+                          class="min-h-10 px-1 border border-gray-300 rounded-md text-sm bg-white">
+                          <option value="">— ordinaire —</option>
+                          ${types.map(([v, l]) => `<option value="${escapeHtml(v)}"${choice === v ? ' selected' : ''}>${escapeHtml(l)}</option>`).join('')}
+                          <option value="__other"${choice === '__other' ? ' selected' : ''}>Autre…</option>
+                        </select>${choice === '__other' ? `<input type="text" data-nw="word_type_other" maxlength="60" value="${escapeHtml(state.word_type)}"
+                          placeholder="Type" aria-label="Autre type du mot ${escapeHtml(c.hanzi)}" ${state.checked ? '' : 'disabled'}
+                          class="min-h-10 px-2 border border-gray-300 rounded-md text-sm">` : ''}</span>`;
                     return `<div class="saisie-new-word" data-key="${escapeHtml(key)}">
                         <label class="inline-flex items-center gap-2 min-w-0">
                           <input type="checkbox" data-nw="checked" ${state.checked ? 'checked' : ''}>
                           <span class="hanzi text-lg">${escapeHtml(c.hanzi)}</span>
                           <span class="text-sm text-gray-600">${escapeHtml(displayPinyin(c.pinyin))}</span>
                         </label>
-                        ${field('french', 'Français')}${field('english', 'Anglais')}${field('themes', 'Thème', 'list="saisie-theme-list"')}
+                        ${typeField}${field('french', 'Français')}${field('english', 'Anglais')}${field('themes', 'Thème', 'list="saisie-theme-list"')}
                       </div>`;
                 }).join('')}`;
         }
@@ -648,7 +690,31 @@
             const name = event.target.dataset.nw;
             if (name === 'checked') {
                 state.checked = event.target.checked;
-                row.querySelectorAll('input[type="text"]').forEach((input) => { input.disabled = !state.checked; });
+                row.querySelectorAll('input[type="text"], select').forEach((input) => { input.disabled = !state.checked; });
+            } else if (name === 'word_type' || name === 'word_type_other') {
+                if (event.type !== 'change' && name === 'word_type') return;
+                const was = SaisieEntry.isOnomatopoeia(state.word_type);
+                if (name === 'word_type') {
+                    state.other = event.target.value === '__other';
+                    state.word_type = state.other ? '' : event.target.value;
+                } else {
+                    state.word_type = event.target.value.replace(/[()]/g, ' ').split(/\s+/).join(' ').trim();
+                }
+                const now = SaisieEntry.isOnomatopoeia(state.word_type);
+                // An onomatopoeia: its French and English say so; freed again, emptied.
+                Object.entries(SaisieEntry.ONOMATOPOEIA_TRANSLATIONS).forEach(([field, value]) => {
+                    if (now) { state[field] = value; state.ai[field] = false; } else if (was && state[field] === value) state[field] = '';
+                });
+                if (name === 'word_type' || was !== now) {
+                    this.renderNewWords();
+                    if (name === 'word_type_other') {
+                        const input = this.el.newWords.querySelector(`[data-key="${CSS.escape(row.dataset.key)}"] [data-nw="word_type_other"]`);
+                        input?.focus();
+                        input?.setSelectionRange(input.value.length, input.value.length);
+                    } else if (state.other) {
+                        this.el.newWords.querySelector(`[data-key="${CSS.escape(row.dataset.key)}"] [data-nw="word_type_other"]`)?.focus();
+                    }
+                }
             } else if (['french', 'english', 'themes'].includes(name)) {
                 state[name] = event.target.value;
                 state.ai[name] = false;
@@ -663,7 +729,7 @@
                 .map((c) => ({ c, state: this.newWords.get(this.newWordKey(c)) }))
                 .filter(({ state }) => state?.checked)
                 .map(({ c, state }) => ({ hanzi: c.hanzi, pinyin: c.pinyin, french: state.french.trim(),
-                    english: state.english.trim(), themes: state.themes.trim() }));
+                    english: state.english.trim(), themes: state.themes.trim(), word_type: state.word_type || '' }));
         }
 
         /** `link`: optional {href, label} shown after the message. */
