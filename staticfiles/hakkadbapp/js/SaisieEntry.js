@@ -348,8 +348,11 @@ class SaisieEntry {
             if (t.match) return { ...w, status: 'known', entry: t.match,
                 entries: (this.sentence.matches[i] || []).map((m) => m.dataset || m),
                 sense: (this.sentence.parseToken(t.token).constraints || []).join(', ') };
-            const proposed = additions.find((a) => a.kind === 'word' && a.status !== 'rejected'
-                && a.hanzi === t.plain && a.pinyin.replace(/\s+/g, '') === t.pinyin);
+            // Same characters and reading; a reading still unsure (« / », « ? »): same characters.
+            const unsure = /[/?]/.test(t.pinyin || '');
+            const word = (a) => a.kind === 'word' && a.status !== 'rejected' && a.hanzi === t.plain;
+            const proposed = additions.find((a) => word(a) && a.pinyin.replace(/\s+/g, '') === t.pinyin)
+                || (unsure ? additions.find(word) : null);
             if (proposed) return { ...w, status: 'proposed', addition: proposed };
             // Punctuation (, 。 ? ...) is not a word to add.
             if (SaisieEntry.PUNCT_RE.test(t.plain)) return { ...w, status: 'punct' };
