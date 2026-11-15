@@ -485,10 +485,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyFilters() {
     const anomalyMatch = ANOMALY_TYPES[state.anomalyType];
+    const textMatch = state.q ? SearchMatch.compile(state.q) : null;
     return items.filter((it) => {
       if (state.category && !it.categories.includes(state.category)) return false;
       if (anomalyMatch && !anomalyMatch(it)) return false;
-      if (state.q && it.search.indexOf(state.q) === -1) return false;
+      if (textMatch && !textMatch(it.search)) return false;
       return true;
     });
   }

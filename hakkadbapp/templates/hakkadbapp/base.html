@@ -26,6 +26,8 @@
     </style>
     {{ romanization_config|json_script:"romanization-config" }}
     <script src="{% static 'hakkadbapp/js/Romanization.js' %}"></script>
+    <!-- Every search box: « zen lao » finds zen1lao1 (SearchMatch.js). -->
+    <script src="{% static 'hakkadbapp/js/SearchMatch.js' %}"></script>
     <script>Romanization.init();</script>
     <!-- Mandarin + short meaning of a character (Unicode Unihan), loaded on demand. -->
     <script src="{% static 'hakkadbapp/js/HanziInfo.js' %}" data-url="{% static 'hakkadbapp/data/hanzi_info.json' %}"></script>

@@ -61,8 +61,8 @@
         const type = $('[data-lr="type"]').value;
         const box = $('[data-lr="results"]');
         if (!q) { box.innerHTML = ''; return; }
-        const terms = q.split(/\s+/);
-        const found = ITEMS.filter((it) => (!type || it.type === type) && terms.every((t) => it.hay.includes(t)));
+        const matches = SearchMatch.compile(q);
+        const found = ITEMS.filter((it) => (!type || it.type === type) && matches(it.hay));
         box.innerHTML = found.length
             ? found.slice(0, MAX_RESULTS).map((it) => `<button type="button" class="lr-result" data-lr-pick="${key(it.type, it.id)}">
                 <span class="lr-type">${TYPE_LABELS[it.type]}</span><span class="hanzi">${esc(it.hanzi) || '—'}</span>

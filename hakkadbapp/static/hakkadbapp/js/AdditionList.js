@@ -267,12 +267,14 @@ class AdditionList {
 
     visible() {
         const needle = (this.el.search?.value || '').trim().toLowerCase();
+        // « zen lao » finds zen1lao1 (SearchMatch.js, base.html).
+        const matches = typeof SearchMatch !== 'undefined' ? SearchMatch.compile(needle) : null;
         return this.additions.filter((a) => {
             if (this.scope && !this.scope(a)) return false;
             if (!this.matchesFilter(a)) return false;
             if (!needle) return true;
-            return [a.hanzi, a.pinyin, a.french, a.english, a.themes, a.source || '', a.observations || '']
-                .some((f) => f.toLowerCase().includes(needle));
+            const fields = [a.hanzi, a.pinyin, a.french, a.english, a.themes, a.source || '', a.observations || ''];
+            return matches ? matches(fields.join(' ')) : fields.some((f) => f.toLowerCase().includes(needle));
         });
     }
 

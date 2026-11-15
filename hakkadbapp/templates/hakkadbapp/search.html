@@ -308,11 +308,10 @@ function setupSearch({ inputId, itemSelector, containerId, countId }) {
   const items = document.querySelectorAll(`${containerId} > ${itemSelector}`);
   const countDisplay = document.getElementById(countId);
   const filter = () => {
-    const query = searchInput.value.trim().toLowerCase();
+    const matches = SearchMatch.compile(searchInput.value);
     let visibleCount = 0;
     items.forEach(item => {
-      const haystack = item.dataset.search?.toLowerCase() || '';
-      const match = query.split(/\s+/).every(q => haystack.includes(q));
+      const match = matches(item.dataset.search || '');
       showRow(item, match);
       if (match) visibleCount++;
     });

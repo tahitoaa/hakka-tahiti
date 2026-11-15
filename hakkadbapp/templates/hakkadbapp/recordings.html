@@ -216,9 +216,10 @@
   (function () {
     const search = document.getElementById('rec-search'), theme = document.getElementById('rec-theme');
     const filter = () => {
-      const q = search.value.trim().toLowerCase(), t = theme.value;
+      const q = search.value.trim(), t = theme.value;
+      const matches = SearchMatch.compile(q);
       document.querySelectorAll('.rec-table tr[data-search]').forEach((tr) => {
-        tr.hidden = (t && tr.dataset.theme !== t) || (q && !tr.dataset.search.includes(q));
+        tr.hidden = (t && tr.dataset.theme !== t) || (q && !matches(tr.dataset.search));
       });
     };
     search.addEventListener('input', filter);

@@ -335,7 +335,7 @@
     var isResolved = !!resolved[g.id];
     if (state.status === "open" && isResolved) return false;
     if (state.status === "resolved" && !isResolved) return false;
-    if (state.search && (g.search || "").indexOf(state.search) === -1) return false;
+    if (state.search && !SearchMatch.match(g.search || "", state.search)) return false;
     return true;
   }
 

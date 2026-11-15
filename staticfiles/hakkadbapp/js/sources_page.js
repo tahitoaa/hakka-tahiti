@@ -150,12 +150,12 @@
 
     function matches() {
         const q = fold(state.query.trim());
-        const words = q ? q.split(/\s+/) : [];
+        const matches = SearchMatch.compile(q);
         return data.rows.filter((r, i) => {
             if (state.filter === 'lexicon' && !r[2]) return false;
             if (state.filter === 'guess' && r[2]) return false;
             if (state.filter === 'doubt' && !isDoubtful(r)) return false;
-            return words.every((w) => data.hay[i].includes(w));
+            return matches(data.hay[i]);
         });
     }
 
