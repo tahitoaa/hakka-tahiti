@@ -28,17 +28,9 @@ class SaisieEntry {
         return /^«[^»]*»?\S*$/u.test(String(token || ''));
     }
 
-    /** The "Texte" button: the selection put between « » (or « » inserted,
-     *  the caret inside). Returns {text, caret}. */
+    /** The "Texte" button (Sentence.wrapText). */
     static wrapText(text, start, end) {
-        const before = text.slice(0, start);
-        const inner = text.slice(start, end).trim();
-        const after = text.slice(end);
-        const lead = before && !/\s$/.test(before) ? ' ' : '';
-        const trail = after && !/^\s/.test(after) ? ' ' : '';
-        const out = `${before}${lead}«${inner}»${trail}${after}`;
-        const caret = before.length + lead.length + 1 + inner.length + (inner ? 1 : 0);
-        return { text: out, caret };
+        return Sentence.wrapText(text, start, end);
     }
 
     constructor(dico) {
