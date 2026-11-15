@@ -348,7 +348,16 @@
   .eaf-field textarea:focus { outline: 2px solid #a5b4fc; outline-offset: 0; }
   .eaf-field .hanzi-input { font-size: 1.15rem; }
   .eaf-derived { font-size: 0.85rem; color: #544D45; padding-top: 0.4rem; overflow-wrap: anywhere; }
-  .eaf-derived.hanzi { font-size: 1.05rem; }  .eaf-ime { position: relative; }
+  .eaf-derived.hanzi { font-size: 1.05rem; }
+  /* Rendered lines: one framed block, Mixte foremost, the pinyin last and quieter. */
+  .eaf-renders { margin-top: 0.6rem; padding: 0.25rem 0.6rem 0.45rem; border: 1px solid #E8DFD2; border-radius: 0.6rem; background: #FDFAF5; }
+  .eaf-renders .eaf-render { margin-top: 0.3rem; }
+  .eaf-render .eaf-derived { color: #261F1C; }
+  .eaf-render .eaf-derived.hanzi { font-size: 1.2rem; }
+  .eaf-render.is-main { padding: 0.35rem 0.5rem; margin: 0.25rem -0.35rem 0.35rem; border-left: 4px solid #9B1C1C; border-radius: 0.4rem; background: #fff; }
+  .eaf-render.is-main > span { font-weight: 700; color: #9B1C1C; }
+  .eaf-render.is-main .eaf-derived { font-size: 1.1rem; font-weight: 600; padding-top: 0.25rem; }
+  .eaf-render.is-minor .eaf-derived { font-size: 0.85rem; color: #6E665C; }  .eaf-ime { position: relative; }
   .eaf-preview { margin-top: 0.4rem; }
   .eaf-text-row { display: flex; gap: 0.4rem; align-items: stretch; }
   .eaf-text-row textarea { flex: 1; min-width: 0; }
