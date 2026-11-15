@@ -39,12 +39,18 @@ const WORD_BOXES_CSS = `
 .wb-box.is-new-char .wb-char, .wb-legend .is-new-char { background: #fee2e2; color: #991b1b; box-shadow: inset 0 -2px #ef4444; }
 .wb-box.is-new-reading .wb-char, .wb-legend .is-new-reading { background: #ffedd5; color: #9a3412; box-shadow: inset 0 -2px #f97316; }
 .wb-box.is-new-reading small { color: #9a3412; font-weight: 700; }
-/* Several readings: one button each, the chosen one is pinned. */
-.wb-box.is-ambiguous .wb-char { color: #c2410c; border-color: #fdba74; }
+/* Several readings: a warning in mauve, whatever the word's colour; one
+   button per reading, the chosen one is pinned. */
+.wb-box.is-ambiguous { position: relative; }
+.wb-box.is-ambiguous .wb-char, .wb-legend .is-ambiguous { background: #fae8ff; color: #86198f; border: 2px solid #c026d3; box-shadow: inset 0 -2px #c026d3; }
+.wb-box.is-ambiguous .wb-warn { position: absolute; top: -0.35rem; right: -0.3rem; z-index: 1; display: flex; align-items: center; justify-content: center;
+                                width: 1rem; height: 1rem; border-radius: 9999px; background: #c026d3; color: #fff; font-size: 0.6rem; line-height: 1; }
+.wb-word.has-ambiguous { outline: 2px dashed #c026d3; outline-offset: 1px; }
 .wb-ambig { display: flex; flex-direction: column; gap: 3px; }
-.wb-ambig button { min-height: 1.9rem; min-width: 2.6rem; padding: 0 0.35rem; border: 1px solid #fdba74; border-radius: 0.4rem;
-                   background: #fff7ed; color: #9a3412; font-size: 0.8rem; font-weight: 700; }
-.wb-ambig button:hover { background: #ffedd5; }
+.wb-ambig button { min-height: 1.9rem; min-width: 2.6rem; padding: 0 0.35rem; border: 1px solid #e879f9; border-radius: 0.4rem;
+                   background: #fdf4ff; color: #86198f; font-size: 0.8rem; font-weight: 700; }
+.wb-ambig button:hover { background: #fae8ff; }
+.wb-ambig button.is-hl { background: #c026d3; border-color: #a21caf; color: #fff; box-shadow: 0 0 0 2px #f0abfc; }
 /* Cut a word between two boxes; join two words. */
 .wb-gap { position: relative; flex: none; width: 0.8rem; align-self: stretch; min-height: 2.4rem; margin: 0 -0.2rem;
           border: 0; background: transparent; cursor: pointer; touch-action: manipulation; }
@@ -83,7 +89,7 @@ const WORD_BOXES_CSS = `
 .wb-legend { display: flex; flex-wrap: wrap; gap: 0.15rem 0.7rem; font-size: 0.72rem; color: #6E655C; }
 .wb-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
 .wb-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 0.2rem; border: 1px solid; }
-.wb-legend .is-new-char, .wb-legend .is-new-reading { padding: 0 0.15rem; border-radius: 0.2rem; }
+.wb-legend .is-new-char, .wb-legend .is-new-reading, .wb-legend .is-ambiguous { padding: 0 0.15rem; border-radius: 0.2rem; }
 .wb-empty { font-size: 0.85rem; color: #9ca3af; }
 @media (max-width: 640px) { .wb-ambig button { min-height: 2.5rem; min-width: 3.4rem; font-size: 0.9rem; } }
 `;
@@ -226,7 +232,8 @@ class WordBoxes {
             }
             if (u.reading.includes('/') && !this.readOnly) {
                 seen.add('ambiguous');
-                return `<span class="wb-box is-ambiguous" title="Plusieurs lectures : choisissez la bonne">`
+                return `<span class="wb-box is-ambiguous" title="Lecture ambiguë : choisissez la bonne">`
+                    + `<span class="wb-warn" aria-hidden="true">⚠</span>`
                     + `<span class="hanzi wb-char">${esc(u.char)}</span><span class="wb-ambig">`
                     + u.reading.split('/').map((r) => `<button type="button" data-pin="${u.pos}" data-reading="${esc(r)}"`
                         + ` aria-label="Lire ${esc(u.char)} ${esc(this.display(r))}">${esc(this.display(r))}</button>`).join('')
@@ -258,7 +265,8 @@ class WordBoxes {
             const lead = g && /\n/.test(between(groups[g - 1], group)) ? '<span class="wb-break"></span>' : joinGap(groups[g - 1], group);
             const boxes = group.map((u, k) => (k ? splitGap(group[k - 1], u) : '') + box(u)).join('');
             const gloss = this.gloss(c, status);
-            return `${lead}<span class="wb-word${status ? ` is-${status}` : ''}">`
+            const ambiguous = !this.readOnly && group.some((u) => u.type === 'char' && u.reading.includes('/'));
+            return `${lead}<span class="wb-word${status ? ` is-${status}` : ''}${ambiguous ? ' has-ambiguous' : ''}">`
                 + `<span class="wb-boxes">${boxes}</span>`
                 + (gloss ? `<button type="button" class="wb-gloss" data-gloss="${g}" aria-expanded="${g === this.open}" title="${esc(gloss.title)}">${gloss.html}</button>`
                     + `<div class="wb-pop" data-pop="${g}"${g === this.open ? '' : ' hidden'}>${this.details(c, status)}</div>` : '')
@@ -317,7 +325,7 @@ class WordBoxes {
             .map(([, s]) => `<span><i style="background:${s.bg};border-color:${s.colour}"></i>${esc(s.label)}</span>`);
         if (seen.has('new-char')) items.push('<span><span class="hanzi is-new-char">字</span> caractère absent du lexique</span>');
         if (seen.has('new-reading')) items.push(`<span><span class="hanzi is-new-reading">字</span> lecture que le lexique ne donne pas (${esc(newReadings.join(' · '))})</span>`);
-        if (seen.has('ambiguous')) items.push('<span>Plusieurs lectures : touchez la bonne sous le caractère</span>');
+        if (seen.has('ambiguous')) items.push('<span><span class="hanzi is-ambiguous">字</span> ⚠ lecture ambiguë : touchez la bonne sous le caractère</span>');
         return items.length ? `<div class="wb-legend">${items.join('')}</div>` : '';
     }
 }

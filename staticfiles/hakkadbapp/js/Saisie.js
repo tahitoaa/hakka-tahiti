@@ -644,7 +644,7 @@
             const problem = this.entry.problem();
             if (problem) return this.setStatus(problem, true);
             if (this.entry.values().pinyin.includes('/')) {
-                return this.setStatus('Choisissez la lecture des caractères en orange (plusieurs lectures possibles).', true);
+                return this.setStatus('Choisissez la lecture des caractères en mauve ⚠ (plusieurs lectures possibles).', true);
             }
             if (!this.el.french.value.trim()) return this.setStatus('Indiquez la traduction en français.', true);
             const newWords = this.newWordsPayload();
