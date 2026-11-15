@@ -566,6 +566,8 @@
             select.value = !type ? '' : listed ? type : '__other';
             other.value = type && !listed ? type : '';
             other.hidden = select.value !== '__other';
+            // The mixed line shows the type: always redrawn with it.
+            if (this.entry) this.renderPreview();
         }
 
         // ---- check against the lexicon --------------------------------------
@@ -759,13 +761,14 @@
             this.el.text.value = addition.input_text
                 || SaisieEntry.textFromStored(addition.hanzi, addition.pinyin, addition.kind, this.dico);
             this.newWords.clear();
+            // The type first: the text then drawn (setKind) shows it at once.
+            this.setWordType(addition.word_type || '');
             this.setKind(addition.kind);
             [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
             this.el.french.value = addition.french;
             this.el.english.value = addition.english;
             this.el.themes.value = addition.themes;
             this.el.observations.value = addition.observations;
-            this.setWordType(addition.word_type || '');
             this.renderMeaning();
             this.setStatus('');
             // A validator relisting « À valider » validates from here.
