@@ -124,13 +124,13 @@ class AdditionList {
             const cell = (field, shown, cls = '') => `<span class="vt-edit ${cls}" data-edit="${field}" tabindex="0" role="button"
                 title="Modifier">${shown || '<i>—</i>'}</span>`;
             const miss = (f) => (!String(e[f] || '').trim() || (f === 'pinyin' && /[/?]/.test(e.pinyin || '')) ? ' is-missing' : '');
-            return `<td class="hanzi vt-hanzi">${cell('hanzi', hanziHtml, miss('hanzi'))}</td>
+            return `<td class="hanzi vt-hanzi">${cell('hanzi', hanziHtml, miss('hanzi'))}${AdditionList.typeTag(e)}</td>
             <td class="vt-pinyin">${cell('pinyin', pinyin, miss('pinyin'))}</td>
             <td class="vt-french">${cell('french', esc(e.french), miss('french'))}<span class="vt-sub italic" lang="en"> · ${cell('english', esc(e.english), miss('english'))}</span>
                 ${e.observations ? `<div class="vt-sub vt-obs" title="${esc(e.observations)}">${esc(e.observations)}</div>` : ''}</td>
             <td class="vt-meta vt-type">${cell('themes', esc(e.themes || ''))}</td>`;
         }
-        return `<td class="hanzi vt-hanzi">${hanziHtml}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
+        return `<td class="hanzi vt-hanzi">${hanziHtml}${AdditionList.typeTag(e)}${opts.docHanzi && opts.docHanzi.replace(/\s+/g, '') !== hanzi
                 ? `<small class="vt-sub" title="Forme du document">${esc(opts.docHanzi)}</small>` : ''}</td>
             <td class="vt-pinyin">${pinyin}${opts.warn ? `<div class="vt-warn">⚠ ${esc(opts.warn)}</div>` : ''}</td>
             <td class="vt-french">${esc(e.french) || '<span class="vt-missing-tag">français ?</span>'}${opts.aiFrench ? ai : ''}${e.english
@@ -298,9 +298,16 @@ class AdditionList {
     }
 
     /** One line for the clipboard: 船只 shon²zak⁵ — navires — ships — Thème. */
+    /** « (emprunt anglais) » after the hakka, or ''. */
+    static typeTag(e) {
+        return e?.word_type ? ` <small class="vt-wtype" title="Type de mot">(${AdditionList.escapeHtml(e.word_type)})</small>` : '';
+    }
+
     static clipboardText(a) {
-        // The platform line first (pinyin then characters, as e-reo's « target »).
-        const target = [AdditionList.platformPinyin(a.pinyin), AdditionList.platformHanzi(a.hanzi)].filter(Boolean).join(' ');
+        // The platform line first (pinyin then characters, as e-reo's « target »),
+        // the word's type after it: « ok3 OK (emprunt anglais) » (text_to_words.split_word_type).
+        const target = [AdditionList.platformPinyin(a.pinyin), AdditionList.platformHanzi(a.hanzi), a.word_type ? `(${a.word_type})` : '']
+            .filter(Boolean).join(' ');
         return [target, a.french, a.english, a.themes]
             .map((x) => (x || '').trim()).filter(Boolean).join(' — ');
     }
@@ -383,7 +390,7 @@ class AdditionList {
         const who = a.updated_by && a.updated_by !== a.created_by ? `${a.created_by}, modifié par ${a.updated_by}` : a.created_by;
         return `<li data-id="${a.id}" class="py-3 flex flex-col gap-2">
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="hanzi text-lg text-gray-900">${esc(AdditionList.platformHanzi(a.hanzi))}</span>
+                <span class="hanzi text-lg text-gray-900">${esc(AdditionList.platformHanzi(a.hanzi))}${AdditionList.typeTag(a)}</span>
                 <span class="text-sm font-semibold text-gray-700">${esc(AdditionList.platformPinyin(a.pinyin))}</span>
                 <span class="text-sm text-gray-900">${esc(a.french)}</span>
                 ${a.english ? `<span class="text-sm text-gray-500 italic" lang="en">${esc(a.english)}</span>` : ''}
@@ -1443,7 +1450,7 @@ class ValidationShow {
               <span>${a.kind === 'word' ? 'Mot' : 'Expression'}${a.themes ? ` · ${esc(a.themes)}` : ''}</span>
               <span class="vs-author">par <b>${author}</b>${edited} · ${date}</span>
               ${typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('addition', a.id, a.created_by) : ''}</div>
-            <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}</div>
+            <div class="hanzi vs-hanzi">${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.markHanzi(a) : esc(AdditionList.platformHanzi(a.hanzi))}${AdditionList.typeTag(a)}</div>
             <div class="vs-pinyin">${esc(AdditionList.platformPinyin(a.pinyin))}</div>
             ${typeof CharReview !== 'undefined' && CharReview.ready() ? CharReview.notes(a) : ''}
             ${typeof Duplicates !== 'undefined' && Duplicates.of(a.id) ? Duplicates.list(a) : ''}

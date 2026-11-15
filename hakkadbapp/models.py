@@ -298,6 +298,9 @@ class LexiconAddition(models.Model):
     KIND_WORD = "word"
     KIND_EXPRESSION = "expression"
     KIND_CHOICES = [(KIND_WORD, "Mot"), (KIND_EXPRESSION, "Expression")]
+    # The Saisie's list (any other label can be typed: « Autre… »).
+    WORD_TYPES = ["emprunt anglais", "emprunt tahitien", "emprunt français", "onomatopée",
+                  "caractères phonétiques", "caractères inconnus"]
 
     STATUS_DRAFT = "draft"
     STATUS_REVIEW = "review"
@@ -329,6 +332,12 @@ class LexiconAddition(models.Model):
     # The Saisie text exactly as typed (生(sen1) 人...), given back as is when
     # the addition is reopened; empty for imports and AI suggestions.
     input_text = models.TextField(blank=True, default="")
+    # What kind of word it is, when it is out of the ordinary: a borrowing
+    # (« emprunt anglais »), characters unknown or chosen for their sound,
+    # an onomatopoeia… or any other label (WORD_TYPES). Kept apart from the
+    # hakka: shown after it in parentheses, « ok3 OK (emprunt anglais) »,
+    # which text_to_words.split_rendering() leaves out.
+    word_type = models.CharField(max_length=60, blank=True, default="")
     # Made by the AI, not sorted yet: shown on « Suggestions IA » only; kept
     # (« → Brouillons ») it joins the Brouillons step of Suivi.
     ai_pending = models.BooleanField(default=False)

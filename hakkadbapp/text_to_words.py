@@ -115,6 +115,21 @@ def join_hanzi(parts) -> str:
     return out.strip()
 
 
+# A word's type after its hakka (LexiconAddition.word_type): the last
+# « (…) » of the line, letters only -- no character, no tone digit, so a
+# pinned reading 生(sen1) or a Chinese parenthesis is never taken for one.
+_WORD_TYPE_RE = re.compile(r"\s+\(([^()\d\u3400-\u9fff]*(?:(?![\u3400-\u9fff])[^\W\d_])[^()\d\u3400-\u9fff]*)\)\s*$")
+
+
+def split_word_type(target: str) -> tuple[str, str]:
+    """« ok3 OK (emprunt anglais) » -> (« ok3 OK », « emprunt anglais »);
+    a line without type comes back as is, with ''."""
+    m = _WORD_TYPE_RE.search(target or "")
+    if not m:
+        return target or "", ""
+    return target[:m.start()], m.group(1).strip()
+
+
 def split_rendering(target: str) -> tuple[str, str]:
     """'<pinyin> <hanzi>' back into its two halves. Without a «…» block the
     hanzi half is the last word; with one, it starts at the first word
@@ -122,7 +137,7 @@ def split_rendering(target: str) -> tuple[str, str]:
     (ma'a 食飯): those appear in both halves, so the split is where the two
     halves carry the same text words (words with neither a character nor a
     tone mark)."""
-    target = target or ""
+    target, _word_type = split_word_type(target or "")
     words = target.split(" ")
     first_han = next((i for i, w in enumerate(words) if any(_is_cjk(c) for c in w)), None)
     if first_han is None:

@@ -4,6 +4,11 @@
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 <style>
   .saisie-text-row { display: flex; gap: 0.4rem; align-items: stretch; }
+  .saisie-wtype { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; margin-top: 0.5rem; font-size: 0.875rem; font-weight: 600; color: #544D45; }
+  .saisie-wtype input { flex: 1 1 10rem; max-width: 16rem; font-weight: 400; }
+  .saisie-wtype-hint { font-size: 0.75rem; font-weight: 400; color: #8C8478; }
+  /* An expression is no word: no type. */
+  #saisie-form.is-expression .saisie-wtype { display: none; }
   .saisie-text-row input { flex: 1; min-width: 0; }
   #saisie-text-btn { flex: none; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #FDFAF5;
                      font-size: 0.875rem; font-weight: 600; color: #4A3F35; }
@@ -120,6 +125,18 @@
               aria-label="Texte sans caractère : entre guillemets">« » Texte</button>
       </div>
       <div id="saisie-kind-warning" aria-live="polite"></div>
+      <!-- A word out of the ordinary (a borrowing, characters unknown…): shown after the hakka, « (emprunt anglais) ». -->
+      <div class="saisie-wtype">
+        <label for="saisie-word-type">Type de mot <span class="font-normal text-gray-500">(facultatif)</span></label>
+        <select id="saisie-word-type" class="min-h-10 px-2 border border-gray-300 rounded-md text-sm bg-white">
+          <option value="">— mot ordinaire —</option>
+          {% for t in word_types %}<option value="{{ t }}">{{ t|capfirst }}</option>{% endfor %}
+          <option value="__other">Autre…</option>
+        </select>
+        <input id="saisie-word-type-other" type="text" maxlength="60" hidden placeholder="Type, ex. nom propre"
+               aria-label="Autre type de mot" class="min-h-10 px-2 border border-gray-300 rounded-md text-sm">
+        <span class="saisie-wtype-hint">affiché après le mot : <i>(emprunt anglais)</i></span>
+      </div>
       <div id="saisie-suggestions" class="flex gap-1.5 flex-wrap mt-2"></div>
     </div>
 

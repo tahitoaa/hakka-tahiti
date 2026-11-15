@@ -29,6 +29,9 @@
                 font-weight: 600; line-height: 1.2; transition: background-color .15s, box-shadow .15s, opacity .15s;
                 touch-action: manipulation; }
   .saisie-btn[hidden] { display: none; }
+  /* A word's type after its hakka (LexiconAddition.word_type), never in the characters' font. */
+  .vt-wtype { font-family: system-ui, sans-serif; font-size: 0.72rem !important; font-weight: 500; font-style: italic; color: #8C8478;
+              white-space: nowrap; margin-left: 0.25rem; letter-spacing: 0; }
   .saisie-btn:focus-visible { outline: 2px solid var(--color-brand-gold); outline-offset: 2px; }
   .saisie-btn-lg { min-height: 2.75rem; padding: 0.5rem 1rem; font-size: 0.95rem; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
   .saisie-btn-save     { background: var(--color-brand, #9B1C1C); color: #fff; }

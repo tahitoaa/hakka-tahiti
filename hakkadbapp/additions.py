@@ -19,7 +19,7 @@ from .text_to_words import REVERSE_PUNCT_MAP, _PUNCT_ONLY_TOKEN_RE, normalize_pu
 from .models import Expression, LexiconAddition, Visa, Word
 from .permissions import AI_USERNAME, editor_required, is_editor, is_validator, status_change_refused
 
-EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source", "input_text")
+EDITABLE_FIELDS = ("hanzi", "pinyin", "french", "english", "themes", "observations", "source", "input_text", "word_type")
 KINDS = {k for k, _ in LexiconAddition.KIND_CHOICES}
 STATUSES = {s for s, _ in LexiconAddition.STATUS_CHOICES}
 
@@ -43,6 +43,7 @@ def _addition_json(a):
         "observations": a.observations,
         "source": a.source,
         "input_text": a.input_text,
+        "word_type": a.word_type,
         "platform_id": a.platform_id,
         "created_by": a.created_by.username if a.created_by else "",
         "by_ai": bool(a.created_by and a.created_by.username == AI_USERNAME),
@@ -116,6 +117,9 @@ def _apply_payload(addition, payload):
                                  for tok in value.split())
                 # Always in Wenfa's pinyin: si1 -> xi1, sit7 -> xit5, zhug5 -> zhuk5 (pinyin_rules).
                 value, _fixes = pinyin_rules.normalize(value)
+            elif field == "word_type":
+                # Shown « (emprunt anglais) » after the hakka: no parenthesis of its own.
+                value = " ".join(value.replace("(", " ").replace(")", " ").split())[:60]
             else:
                 value = value.strip()
             setattr(addition, field, value)
@@ -198,6 +202,7 @@ def saisie(request):
     context.update({
         "title": "Saisie",
         "page": "saisie",
+        "word_types": LexiconAddition.WORD_TYPES,
         "known_themes": _known_themes(),
         "status_labels": dict(LexiconAddition.STATUS_CHOICES),
         "ai_enabled": ai_enabled(),
