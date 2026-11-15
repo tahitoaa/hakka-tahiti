@@ -125,6 +125,7 @@
             // Readings, cuts, joins and the lexicon's segmentation: WordBoxes.
             this.boxes = new WordBoxes(this.el.slots, {
                 slotInputs: true,
+                additions: false,     // the page's own list (this.additions)
                 onChange: (text, what) => {
                     this.el.text.value = text;
                     // A word cut in two is an expression.

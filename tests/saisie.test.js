@@ -278,6 +278,25 @@ test("keys as in a Chinese input method: Tab moves the highlighted suggestion, E
   assert.deepEqual(changes, ["segment"]);
 });
 
+test("word boxes: the words of the additions shown by status, an unknown word offered as a draft", () => {
+  const { context, entry } = load();
+  const container = makeEl({ querySelectorAll: () => [] });
+  const boxes = new context.WordBoxes(container, { propose: true, additions: false });
+  entry.setText("我 爱 生(sen1)", "expression");
+  boxes.render(entry, { additions: [
+    { id: 7, kind: "word", status: "draft", hanzi: "我", pinyin: "ngai1", french: "je" },
+    { id: 8, kind: "word", status: "validated", hanzi: "爱", pinyin: "oi4", french: "aimer" },
+    { id: 9, kind: "word", status: "rejected", hanzi: "生", pinyin: "sen1", french: "naître" },
+  ] });
+  const html = container.innerHTML;
+  assert.match(html, /is-add-draft/);
+  assert.match(html, /is-add-validated/);
+  assert.match(html, /\?modifier=7/);              // opened in the Saisie
+  assert.match(html, /wb-word is-unknown/);          // 生: the rejected addition doesn't count
+  assert.match(html, /data-propose-go/);             // « ＋ Brouillon »
+  assert.equal(boxes.words[2].pinyin, "sen1");
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);

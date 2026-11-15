@@ -206,6 +206,9 @@ class SegmentEditor {
         // a join or the lexicon's segmentation rewrites the transcript.
         this.entry = new SaisieEntry(dico);
         this.boxes = new WordBoxes(this.preview, {
+            // An unknown word: « ＋ Brouillon » saves it for the Saisie.
+            propose: true,
+            from: 'Depuis Transcrire',
             onChange: (text) => {
                 this.transcript.value = text;
                 this.transcript.dispatchEvent(new Event('input'));
