@@ -141,6 +141,7 @@
                 this.save(button?.dataset.status || 'draft', button);
             });
             this.el.cancel.addEventListener('click', () => this.resetForm());
+            document.getElementById('saisie-delete')?.addEventListener('click', (event) => this.deleteEditing(event.currentTarget));
             // « Texte » : the selection (or the caret) between « », for words
             // written without characters (ma'a tinito).
             const textBtn = document.getElementById('saisie-text-btn');
@@ -718,6 +719,9 @@
             const label = this.statusLabels[addition.status] || addition.status;
             this.el.title.textContent = addition.status === 'draft' ? 'Modifier l’ajout' : `Modifier l’ajout (${label})`;
             this.el.cancel.hidden = false;
+            // Delete: any draft; a decided addition (validated, rejected) only by a validator.
+            const del = document.getElementById('saisie-delete');
+            if (del) del.hidden = ['validated', 'rejected'].includes(addition.status) && !AdditionList.canValidate();
             // An addition already proposed (opened from the Validation tab)
             // keeps its status when saved; a draft can still be proposed.
             this.setSaveButtons(addition.status);
@@ -741,6 +745,34 @@
             this.openedState = this.formState();
             this.el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
             this.el.text.focus();
+        }
+
+        /** « 🗑 Supprimer cet ajout »: the addition open, deleted (confirmed);
+         *  from Suivi, on to the next row. */
+        async deleteEditing(button) {
+            const id = this.editingId;
+            if (!id) return;
+            const r = this.review(id);
+            await this.list.handleAction('delete', id, null, button);
+            if (this.additions.some((a) => a.id === id)) return;     // not confirmed, or refused
+            if (r) {
+                // The deleted row is skipped: the next one, else back to the table.
+                this.reviewNav = { ...this.reviewNav, ids: this.reviewNav.ids.filter((x) => x !== id) };
+                try { sessionStorage.setItem(AdditionList.REVIEW_KEY, JSON.stringify(this.reviewNav)); } catch (e) { /* private mode */ }
+                const next = this.reviewNav.ids[r.index] ?? null;
+                const a = next !== null && this.additions.find((x) => x.id === next);
+                if (a) {
+                    this.edit(a);
+                    window.history.replaceState(null, '', `${window.location.pathname}?modifier=${a.id}`);
+                    this.setStatus('✓ Supprimé. Élément suivant.');
+                } else {
+                    this.setStatus('✓ Supprimé. C’était le dernier : retour au tableau…');
+                    setTimeout(() => { window.location.href = r.back; }, 700);
+                }
+                return;
+            }
+            this.resetForm();
+            this.setStatus('✓ Ajout supprimé.');
         }
 
         /** The Suivi rows this addition is one of: {ids, back, label, index}, or null. */
@@ -837,6 +869,8 @@
             this.editingStatus = null;
             this.el.title.textContent = 'Nouvel ajout';
             this.el.cancel.hidden = true;
+            const del = document.getElementById('saisie-delete');
+            if (del) del.hidden = true;
             this.setSaveButtons('draft');
             this.el.form.reset();
             [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
