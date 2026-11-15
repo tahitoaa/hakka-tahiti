@@ -687,23 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   });
 
-  function setupTheme() {
-    // The attribute lives on <html>, not the local #expr-app div, so it also
-    // drives Sentence.js's sitewide dark-mode CSS variables (base.html) --
-    // one flag for both the page chrome and the shared sentence renderer.
-    const btn = document.getElementById("expr-theme-toggle");
-    const root = document.documentElement;
-    if (!btn) return;
-    let stored = null;
-    try { stored = localStorage.getItem("hakka-theme"); } catch (e) {}
-    if (stored) root.setAttribute("data-theme", stored);
-    btn.addEventListener("click", () => {
-      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      root.setAttribute("data-theme", next);
-      try { localStorage.setItem("hakka-theme", next); } catch (e) {}
-    });
-  }
-  setupTheme();
+  // Dark mode: the 🌙 of the header, for the whole site (base.html).
 
   // Initial render
   rerender();
