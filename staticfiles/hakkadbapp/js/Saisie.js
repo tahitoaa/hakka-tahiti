@@ -142,6 +142,14 @@
             });
             this.el.cancel.addEventListener('click', () => this.resetForm());
             document.getElementById('saisie-delete')?.addEventListener('click', (event) => this.deleteEditing(event.currentTarget));
+            // « Autre… »: the type typed.
+            document.getElementById('saisie-word-type')?.addEventListener('change', (event) => {
+                const other = document.getElementById('saisie-word-type-other');
+                other.hidden = event.target.value !== '__other';
+                if (!other.hidden) other.focus();
+                this.renderPreview();
+            });
+            document.getElementById('saisie-word-type-other')?.addEventListener('input', () => this.renderPreview());
             // « Texte » : the selection (or the caret) between « », for words
             // written without characters (ma'a tinito).
             const textBtn = document.getElementById('saisie-text-btn');
@@ -490,6 +498,7 @@
                 english: this.el.english.value,
                 themes: this.el.themes.value,
                 observations: this.el.observations.value,
+                word_type: this.wordType(),
             };
         }
 
@@ -535,8 +544,28 @@
             this.renderCheck();
             this.renderMeaning();
             const mixed = this.entry.mixed();
+            const type = this.wordType();
             this.el.preview.innerHTML = mixed.hanzi
-                ? `${escapeHtml(mixed.pinyin)} <span class="hanzi">${escapeHtml(mixed.hanzi)}</span>` : '';
+                ? `${escapeHtml(mixed.pinyin)} <span class="hanzi">${escapeHtml(mixed.hanzi)}</span>${type ? ` <i>(${escapeHtml(type)})</i>` : ''}` : '';
+        }
+
+        /** The word's type (« emprunt anglais », or the one typed after
+         *  « Autre… »); '' for an ordinary word, and for an expression. */
+        wordType() {
+            const select = document.getElementById('saisie-word-type');
+            if (!select || this.kind !== 'word') return '';
+            const value = select.value === '__other' ? document.getElementById('saisie-word-type-other').value : select.value;
+            return value.replace(/[()]/g, ' ').split(/\s+/).join(' ').trim();
+        }
+
+        setWordType(type) {
+            const select = document.getElementById('saisie-word-type');
+            const other = document.getElementById('saisie-word-type-other');
+            if (!select) return;
+            const listed = [...select.options].some((o) => o.value === type);
+            select.value = !type ? '' : listed ? type : '__other';
+            other.value = type && !listed ? type : '';
+            other.hidden = select.value !== '__other';
         }
 
         // ---- check against the lexicon --------------------------------------
@@ -736,6 +765,7 @@
             this.el.english.value = addition.english;
             this.el.themes.value = addition.themes;
             this.el.observations.value = addition.observations;
+            this.setWordType(addition.word_type || '');
             this.renderMeaning();
             this.setStatus('');
             // A validator relisting « À valider » validates from here.
@@ -830,7 +860,7 @@
         /** What the form holds, to tell whether it changed since opened. */
         formState() {
             return JSON.stringify([this.el.text.value, this.el.french.value, this.el.english.value, this.el.themes.value,
-                this.el.observations.value, this.kind]);
+                this.el.observations.value, this.kind, this.wordType()]);
         }
 
         /** The previous / next row of the Suivi table (the ones deleted since skipped). */
@@ -873,6 +903,7 @@
             if (del) del.hidden = true;
             this.setSaveButtons('draft');
             this.el.form.reset();
+            this.setWordType('');
             [this.el.french, this.el.english, this.el.themes].forEach((input) => input.classList.remove('is-ai'));
             this.clearSuggestion();
             this.newWords.clear();
