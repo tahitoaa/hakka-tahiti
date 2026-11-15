@@ -180,11 +180,12 @@
                 bar: this.suggestionBar, boxes: this.boxes, pick: (index) => this.pickSuggestion(index),
                 accepts: (t) => t === this.el.text || t.dataset?.slot !== undefined,
             });
-            // Shift+1..9 picks a suggestion, as on the "Écrire" page.
+            // Alt+1..9 picks a suggestion, as on the "Écrire" and "Transcrire"
+            // pages (not Maj: on an AZERTY keyboard Maj+1 types the tone 1).
             this.el.form.addEventListener('keydown', (event) => {
-                if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;
+                if (!event.altKey || event.ctrlKey || !/^Digit[1-9]$/.test(event.code)) return;
                 if (event.target !== this.el.text && event.target.dataset?.slot === undefined) return;
-                const index = Number(event.key) - 1;
+                const index = Number(event.code.slice(5)) - 1;
                 if (index >= this.visible.length) return;
                 event.preventDefault();
                 this.pickSuggestion(index);

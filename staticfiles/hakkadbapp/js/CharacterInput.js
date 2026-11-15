@@ -202,7 +202,7 @@ function injectSuggestionBarCss() {
 }
 
 class SuggestionBar {
-    constructor(container, { onSelect, onUnknown, anchorTo, shortcutLabel = 'Maj' } = {}) {
+    constructor(container, { onSelect, onUnknown, anchorTo, shortcutLabel = 'Alt' } = {}) {
         injectSuggestionBarCss();
         this.container = container;
         this.shortcutLabel = shortcutLabel; // modifier shown in the tooltips
