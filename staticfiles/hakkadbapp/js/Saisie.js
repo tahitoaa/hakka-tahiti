@@ -20,17 +20,6 @@
 
     const AI_API = '/api/ia/suggestion';
 
-    const CHECK_LABELS = {
-        known: 'dans le lexique',
-        reading: 'dans le lexique, autre lecture',
-        sense: 'nouveau sens',
-        punct: 'ponctuation',
-        text: 'texte, gardé tel quel',
-        proposed: 'déjà proposé',
-        unknown: 'inconnu du lexique',
-        incomplete: 'à compléter',
-    };
-
     /* The form, and the drafts under it. What is proposed is handled on
        the "Validation" page (AdditionList.js). */
     class SaisiePage {
@@ -133,27 +122,15 @@
                 this.afterChange();
             };
             this.el.slots.addEventListener('input', onSlotInput);
-            // A reading chosen for an ambiguous character; a word cut or two
-            // words joined between their boxes (no caret to place on a phone).
-            this.el.slots.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin], [data-split], [data-join-from]')) event.preventDefault(); });
-            this.el.slots.addEventListener('click', (event) => {
-                const gap = event.target.closest('[data-split], [data-join-from]');
-                if (gap) {
-                    const done = gap.dataset.split !== undefined
-                        ? this.entry.splitAt([Number(gap.dataset.split)])
-                        : this.entry.joinAt(Number(gap.dataset.joinFrom), Number(gap.dataset.joinTo));
-                    if (!done) return;
-                    this.el.text.value = this.entry.text;
+            // Readings, cuts, joins and the lexicon's segmentation: WordBoxes.
+            this.boxes = new WordBoxes(this.el.slots, {
+                slotInputs: true,
+                onChange: (text, what) => {
+                    this.el.text.value = text;
                     // A word cut in two is an expression.
-                    if (this.kind === 'word') this.setKind('expression');
+                    if (this.kind === 'word' && what === 'split') this.setKind('expression');
                     else this.updateText();
-                    return;
-                }
-                const b = event.target.closest('[data-pin]');
-                if (b && this.entry.pinAt(Number(b.dataset.pin), b.dataset.reading)) {
-                    this.el.text.value = this.entry.text;
-                    this.updateText();
-                }
+                },
             });
             this.el.slots.addEventListener('compositionend', onSlotInput);
             this.el.form.addEventListener('submit', (event) => {
@@ -211,7 +188,7 @@
         /** The additions are in: "déjà proposé" can be checked, and an
          *  addition opened from the Validation page (?modifier=id) loaded. */
         afterLoad() {
-            this.renderPreview();
+            this.renderAll();
             const params = new URLSearchParams(window.location.search);
             const id = Number(params.get('modifier'));
             if (!id) return;
@@ -480,66 +457,16 @@
             inputs[fields[0]]?.focus();
         }
 
+        /** The characters, one box each, grouped by word and coloured by
+         *  what the lexicon says of each word (WordBoxes.js). */
         renderSlots() {
-            const groups = this.entry.units();
-            const label = (u) => (u.type === 'char' ? u.char : u.type === 'syl' ? u.syl : u.text);
-            // Between two boxes of a word: cut there. Between two words: join them.
-            const splitGap = (prev, u) => (prev.type === 'text' || u.type === 'text' ? ''
-                : `<button type="button" class="saisie-gap" data-split="${u.pos}" title="Couper ici"
-                    aria-label="Couper entre ${escapeHtml(label(prev))} et ${escapeHtml(label(u))}"></button>`);
-            const joinGap = (prev, next) => (!prev?.length || prev.some((u) => u.type === 'text') || next.some((u) => u.type === 'text') ? ''
-                : `<button type="button" class="saisie-gap is-join" data-join-from="${prev[prev.length - 1].end}" data-join-to="${next[0].pos}"
-                    title="Recoller ces deux mots" aria-label="Recoller ${escapeHtml(prev.map(label).join(''))} et ${escapeHtml(next.map(label).join(''))}"></button>`);
-            this.el.slots.innerHTML = groups.map((group, g) => `${joinGap(groups[g - 1], group)}<span class="saisie-word">${group.map((u, k) => (k ? splitGap(group[k - 1], u) : '') + (u.type === 'text'
-                ? `<span class="saisie-slot is-text" title="Texte gardé tel quel"><span class="saisie-text">${escapeHtml(u.text || '…')}</span><small>texte</small></span>`
-                : u.type === 'syl'
-                ? `<label class="saisie-slot"><input class="hanzi" data-slot="${u.index}" value="" inputmode="text" `
-                    + `aria-label="Caractère pour ${escapeHtml(u.syl)}"><small>${escapeHtml(superscriptTones(u.syl))}</small></label>`
-                : u.reading.includes('/')
-                    // Several readings: one button each; the chosen one is pinned.
-                    ? `<span class="saisie-slot is-char is-ambiguous" title="Plusieurs lectures : choisissez la bonne">`
-                        + `<span class="hanzi saisie-char">${escapeHtml(u.char)}</span><span class="saisie-ambig">`
-                        + u.reading.split('/').map((r) => `<button type="button" data-pin="${u.pos}" data-reading="${escapeHtml(r)}"`
-                            + ` aria-label="Lire ${escapeHtml(u.char)} ${escapeHtml(displayPinyin(r))}">${escapeHtml(displayPinyin(r))}</button>`).join('')
-                        + '</span></span>'
-                    : (() => {
-                        // New character / new reading: the Suivi's colours (char_review.js).
-                        const state = this.charState(u.char, u.reading);
-                        const title = state === 'new-char' ? 'Caractère absent du lexique'
-                            : state === 'new-reading' ? `Lecture nouvelle — le lexique lit ce caractère : ${this.lexiconReadings(u.char).map(displayPinyin).join(', ')}` : '';
-                        return `<span class="saisie-slot is-char${state ? ` is-${state}` : ''}"${title ? ` title="${escapeHtml(title)}"` : ''}><span class="hanzi saisie-char">${escapeHtml(u.char)}</span>`
-                            + `<small>${escapeHtml(u.reading ? displayPinyin(u.reading) : ' ')}</small></span>`;
-                    })())).join('')}</span>`).join('')
-                || '<span class="text-sm text-gray-400">Les cases apparaissent quand vous tapez le texte.</span>';
-            if (this.el.slots.querySelector('.is-new-char, .is-new-reading')) {
-                this.el.slots.insertAdjacentHTML('beforeend', `<p class="saisie-slot-legend">
-                    <span class="is-new-char">字</span> absent du lexique · <span class="is-new-reading">字</span> lecture que le lexique ne donne pas à ce caractère
-                    ${[...this.el.slots.querySelectorAll('.is-new-reading')].map((s) => `<br>${escapeHtml(s.textContent.trim().slice(0, 1))} : ${escapeHtml(s.title.split('— ')[1] || '')}`).join('')}</p>`);
-            }
-            this.renderSlotStates();
+            this.boxes.render(this.entry, { active: this.active, additions: this.additions || [] });
             this.renderSuggestions();
-        }
-
-        /** The lexicon's readings of a character (stored notation, tone digits). */
-        lexiconReadings(char) {
-            const key = (p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`);
-            return [...new Set(this.dico.lexiconPronunciations.filter((p) => p.simp === char || p.trad === char).map(key))];
-        }
-
-        /** 'new-char' (absent from the lexicon), 'new-reading' (a reading it
-         *  doesn't give that character) or ''. */
-        charState(char, reading) {
-            if (!/\p{Script=Han}/u.test(char || '')) return '';
-            const known = this.lexiconReadings(char);
-            if (!known.length) return 'new-char';
-            if (!reading || reading.includes('/')) return '';
-            return known.includes(reading) ? '' : 'new-reading';
         }
 
         renderSlotStates() {
             this.el.slots.querySelectorAll('[data-slot]').forEach((input) => {
-                input.closest('.saisie-slot').classList.toggle('is-active', Number(input.dataset.slot) === this.active);
-                input.closest('.saisie-slot').classList.add('is-empty');
+                input.closest('.wb-box').classList.toggle('is-active', Number(input.dataset.slot) === this.active);
             });
         }
 
@@ -630,10 +557,8 @@
                 this.el.newWords.innerHTML = '';
                 return;
             }
-            this.el.check.innerHTML = this.checks.length ? `<ul class="saisie-check-list">${this.checks.map((c) => `
-                <li class="saisie-check-${c.status}"><span class="hanzi">${escapeHtml(c.hanzi || '…')}</span>
-                  <span>${c.status === 'incomplete' ? '' : escapeHtml(displayPinyin(c.pinyin))}</span>
-                  <b>${CHECK_LABELS[c.status]}</b> ${describe(c)}</li>`).join('')}</ul>` : '';
+            // Each word's status is shown on its boxes (WordBoxes).
+            this.el.check.innerHTML = '';
             this.renderNewWords();
         }
 

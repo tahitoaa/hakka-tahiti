@@ -23,6 +23,13 @@ class View {
         this.insertHanzi = document.getElementById('insert-hanzi');
         this.dico = dico;
 
+        // The characters by word (WordBoxes.js): a reading, a cut, a join
+        // or the lexicon's segmentation rewrites the text.
+        this.entry = new SaisieEntry(dico);
+        this.wordBoxes = new WordBoxes(document.getElementById('word-boxes'), {
+            onChange: (text) => this.onTextChange?.(text),
+        });
+
         this.suggestionBar = new SuggestionBar(this.output, {
             anchorTo: this.input,
             onSelect: (index) => this.onSelectSuggestion?.(index),
@@ -63,6 +70,8 @@ class View {
         this.pinyinOnlyOutput.innerHTML = this.sentences.map(s => s.renderDisplayPinyinLine()).join('<br>');
         this.hanziOnlyOutput.innerHTML = this.sentences.map(s => s.renderHanziLine()).join('<br>');
         this.expressionOutput.innerHTML = this.sentences.map(s => s.render()).join('<br>');
+        this.entry.setText(text, 'expression');
+        this.wordBoxes.render(this.entry);
     }
 }
 
@@ -73,6 +82,10 @@ class Controller{
         this.view = new View({dico});
         this.dico = dico;
         this.view.onSelectSuggestion = (index) => this.handleSelectSuggestion(index);
+        this.view.onTextChange = (text) => {
+            this.view.input.value = text;
+            this.handleInput();
+        };
         this.view.unknownProns.addEventListener("input", (event) => this.handleInsertHanzi(event));
         // this.view.unknownProns.addEventListener("click", (event) => this.handleInsertChar(event));
         this.view.input.addEventListener("input", (event) => this.handleInput(event));

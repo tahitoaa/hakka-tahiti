@@ -274,26 +274,35 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>`;
   }
 
-  // The live analysis shown under the Split field: Sentence.js's own
-  // per-token decomposition chips (renderTokens() -- same one/multi/unknown
-  // match badges used everywhere else on the site) so a bad segmentation
-  // or an unresolved word is still visible token by token, plus a plain
-  // "pinyin hanzi" summary line in the platform's own format
-  // (renderPinyinLine/renderHanziLine -- the same pair the Hakka row above
-  // builds `hakkaVercel` from) instead of Sentence.render()'s own
-  // furigana/ruby + copy-button preview box, since what this needs to be
-  // compared against (the Hakka row, the platform's raw target) is already
-  // in that plain format. Run directly against whatever text is currently
-  // in the textarea (not the saved value), so typing shows the effect
-  // immediately, before hitting "Enregistrer". forceSimp=true for the same
-  // reason as hakkaVercel: the platform's own data is always simplified.
-  function renderSplitAnalysis(splitValue, french) {
+  // The live analysis shown under the Split field: its characters by word
+  // (WordBoxes.js -- the same boxes as the Saisie, Écrire and Transcrire
+  // pages: each word coloured by what the lexicon says of it, readings to
+  // choose, cuts and joins, the lexicon's segmentation proposed), so a bad
+  // segmentation or an unresolved word is visible word by word; then a
+  // plain "pinyin hanzi" line in the platform's own format (the same pair
+  // the Hakka row above builds `hakkaVercel` from), forceSimp=true as the
+  // platform's own data is always simplified. Run against whatever is in
+  // the textarea (not the saved value), so typing shows the effect at
+  // once. A change made in the boxes goes to the textarea (`textarea`;
+  // none: read only).
+  function renderSplitAnalysis(el, splitValue, french, textarea = null) {
+    if (!el._boxes) {
+      el.innerHTML = `<div data-role="split-boxes"></div>
+        <div class="val-box col-vercel hanzi mono" data-role="split-line" style="margin-top:6px;"></div>`;
+      el._entry = new SaisieEntry(dico);
+      el._boxes = new WordBoxes(el.firstElementChild, {
+        readOnly: !textarea,
+        onChange: (text) => {
+          textarea.value = text;
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        },
+      });
+    }
+    el._entry.setText(splitValue, "expression");
+    el._boxes.render(el._entry);
     const sentence = new Sentence(dico, splitValue, french, "");
     const line = `${sentence.renderPinyinLine()} ${sentence.renderHanziLine(true)}`.trim();
-    return `
-      ${sentence.renderTokens()}
-      <div class="val-box col-vercel hanzi mono" style="margin-top:6px;">${escapeHtml(line) || '<span class="no-match">&mdash;</span>'}</div>
-    `;
+    el.lastElementChild.innerHTML = escapeHtml(line) || '<span class="no-match">&mdash;</span>';
   }
 
   // The segmentation shown read only: the saved Split, else the platform's,
@@ -544,7 +553,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!it) return;
     const card = textarea.closest("[data-index]");
     const analysisEl = card.querySelector('[data-role="split-analysis"]');
-    if (analysisEl) analysisEl.innerHTML = renderSplitAnalysis(textarea.value, it.french);
+    if (analysisEl) renderSplitAnalysis(analysisEl, textarea.value, it.french, textarea);
   });
 
   // Live split analysis on every keystroke -- pure client-side, no request.
@@ -555,7 +564,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!it) return;
     const card = textarea.closest("[data-index]");
     const analysisEl = card.querySelector('[data-role="split-analysis"]');
-    if (analysisEl) analysisEl.innerHTML = renderSplitAnalysis(textarea.value, it.french);
+    if (analysisEl) renderSplitAnalysis(analysisEl, textarea.value, it.french, textarea);
   });
 
   // Commentaire auto-saves on blur (focusout bubbles, unlike blur) -- one
@@ -595,10 +604,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const analysisEl = detailByIndex[i].querySelector('[data-role="split-analysis"]');
         if (textarea && analysisEl && !textarea.dataset.analysisRendered) {
           textarea.dataset.analysisRendered = "1";
-          analysisEl.innerHTML = renderSplitAnalysis(textarea.value, items[i].french);
+          renderSplitAnalysis(analysisEl, textarea.value, items[i].french, textarea);
         } else if (!textarea && analysisEl && !analysisEl.dataset.rendered) {
           analysisEl.dataset.rendered = "1";
-          analysisEl.innerHTML = renderSplitAnalysis(analysisEl.dataset.split || "", items[i].french);
+          renderSplitAnalysis(analysisEl, analysisEl.dataset.split || "", items[i].french);
         }
       }
       return;
@@ -637,7 +646,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((data) => {
           it.excelFormat = data.excel_format;
           textarea.value = data.excel_format;
-          if (analysisEl) analysisEl.innerHTML = renderSplitAnalysis(data.excel_format, it.french);
+          if (analysisEl) renderSplitAnalysis(analysisEl, data.excel_format, it.french, textarea);
           setSplitStatus(card, "Revenu à l'état plateforme.", false);
         })
         .catch((err) => setSplitStatus(card, `Échec : ${err.message}`, true));
