@@ -62,10 +62,16 @@ const Duplicates = (() => {
         return LABELS[of(id)?.relation || ''];
     }
 
-    /** « ⧉ Doublon exact (2) », a button that opens the list; '' for none. */
-    function badge(a, open = false) {
+    /** « ⧉ Doublon exact (2) », a button that opens the list; '' for none.
+     *  `short`: « ⧉ doublon (2) », for the phone (under the characters,
+     *  the status column being hidden there). */
+    function badge(a, open = false, short = false) {
         const d = of(a.id);
         if (!d) return '';
+        if (short) {
+            return `<button type="button" class="dup-badge dup-badge-short is-${d.level}" data-dup-toggle="${a.id}" aria-expanded="${open}"
+                aria-label="${esc(LABELS[d.relation])} : voir la liste">⚠ doublon${d.level === 'weak' ? ' ?' : ''}${d.count > 1 ? ` (${d.count})` : ''}</button>`;
+        }
         return `<button type="button" class="dup-badge is-${d.level}" data-dup-toggle="${a.id}" aria-expanded="${open}"
             title="${esc(d.matches.map((m) => `${LABELS[m.relation]} — ${TYPES[m.type]} : ${AdditionList.platformHanzi(m.hanzi)} ${m.pinyin} — ${m.french} (${m.fields.map((f) => FIELDS[f]).join(', ')})`).join('\n'))}">⧉ ${
             LABELS[d.relation]}${d.count > 1 ? ` (${d.count})` : ''}</button>`;
