@@ -151,6 +151,15 @@
   .dup-badge.is-strong { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
   .dup-badge.is-weak { background: #F0EBE3; color: #544D45; }
   .dup-badge[aria-expanded="true"] { box-shadow: 0 0 0 2px rgb(0 0 0 / .12); }
+  /* Phone: the status column is hidden; a short « ⚠ doublon » under the characters. */
+  .vt-phone-only { display: none; }
+  .dup-badge-short { font-family: system-ui, sans-serif; font-size: 0.7rem !important; white-space: nowrap; min-height: 1.6rem; }
+  @media (max-width: 640px) {
+    .vt-phone-only { display: block; }
+    .vt-dup-row .dup-item { padding-left: 0.35rem; }
+    .vt-dup-row .dup-where { min-width: 0; flex-basis: 100%; }
+    .vt-dup-row td:first-child { display: none; }
+  }
   .vt-dup-row td { background: #FDFAF5; padding-top: 0.2rem; padding-bottom: 0.5rem; }
   .dup-list { font-size: 0.85rem; text-align: left; }
   .dup-head { font-size: 0.78rem; color: #6E655C; margin-bottom: 0.2rem; }

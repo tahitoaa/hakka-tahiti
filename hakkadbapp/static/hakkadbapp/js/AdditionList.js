@@ -950,7 +950,7 @@ class ValidationTable extends AdditionList {
         const row = `<tr data-id="${a.id}" class="${on ? 'is-selected' : ''}">
             <td class="vt-check"><input type="checkbox" data-select="${a.id}" ${on ? 'checked' : ''}
                 aria-label="Sélectionner ${esc(a.hanzi)}"></td>
-            ${AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' })}
+            ${this.withPhoneDuplicate(a, AdditionList.entryCells(a, { editable: this.inlineEdit && a.status === 'draft' }))}
             <td class="vt-meta vt-who">${who} <span class="vt-sub">${date}</span>${a.source ? `<div class="vt-src" title="Source : ${esc(a.source)}">📄 ${esc(a.source)}</div>` : ''}</td>
             <td class="vt-st"><span class="vt-status vt-status-${esc(a.status)}">${esc(this.statusLabels[a.status] || a.status)}</span>${AdditionList.incompleteBadge(a)}${
                 typeof Visas !== 'undefined' && Visas.ready() && a.status !== 'rejected' ? `<div>${Visas.html('addition', a.id, a.created_by)}</div>` : ''}${
@@ -965,6 +965,13 @@ class ValidationTable extends AdditionList {
         const dups = this.dupOpen?.has(a.id) && typeof Duplicates !== 'undefined' && Duplicates.of(a.id)
             ? `<tr class="vt-dup-row"><td></td><td colspan="8">${Duplicates.list(a)}</td></tr>` : '';
         return (open ? row + this.renderDetail(a, remarks, muted) : row) + dups;
+    }
+
+    /** On a phone the status column is hidden, and with it the duplicate
+     *  badge: a short one goes under the characters (first cell). */
+    withPhoneDuplicate(a, cells) {
+        const short = typeof Duplicates !== 'undefined' ? Duplicates.badge(a, this.dupOpen?.has(a.id), true) : '';
+        return short ? cells.replace('</td>', `<div class="vt-phone-only">${short}</div></td>`) : cells;
     }
 
     /** The remarks under a row: corrections to apply, comments, mute, a comment of one's own. */
