@@ -109,7 +109,7 @@ class AdditionList {
     /** « ⚠ Incomplet » with what is missing, or ''. */
     static incompleteBadge(e) {
         const missing = AdditionList.missing(e);
-        return missing.length ? `<span class="vt-incomplete" title="À compléter avant de valider : ${AdditionList.escapeHtml(missing.join(', '))}">⚠ Incomplet</span>` : '';
+        return missing.length ? `<span class="vt-incomplete" title="À compléter avant de proposer ou valider : ${AdditionList.escapeHtml(missing.join(', '))}">⚠ Incomplet</span>` : '';
     }
 
     static entryCells(e, opts = {}) {
@@ -359,12 +359,15 @@ class AdditionList {
 
     renderItem(a) {
         const esc = AdditionList.escapeHtml;
-        const button = (action, label, status = '', variant = 'neutral') =>
+        const button = (action, label, status = '', variant = 'neutral', off = '') =>
             `<button type="button" data-action="${action}" data-status="${status}" `
-            + `class="saisie-btn saisie-btn-${variant}">${label}</button>`;
+            + `class="saisie-btn saisie-btn-${variant}"${off ? ` disabled title="${esc(off)}"` : ''}>${label}</button>`;
+        // An incomplete addition stays a draft (additions.incomplete_refused).
+        const missing = AdditionList.missing(a);
+        const incomplete = missing.length ? `Incomplet : ${missing.join(', ')} — à compléter avant de proposer` : '';
         // The step forward first and coloured; the others plain.
         const actions = [];
-        if (a.status === 'draft') actions.push(button('status', '↑ Proposer', 'review', 'review'));
+        if (a.status === 'draft') actions.push(button('status', '↑ Proposer', 'review', 'review', incomplete));
         const decider = AdditionList.canValidate();
         if (a.status === 'review' && decider) {
             actions.push(button('status', '✓ Valider', 'validated', 'validate'));
@@ -923,12 +926,14 @@ class ValidationTable extends AdditionList {
             const decider = AdditionList.canValidate();
             const decided = (s) => ['validated', 'rejected'].includes(s);
             if (decided(action)) b.hidden = !decider;
-            if (action === 'validated' && chosen.some((a) => AdditionList.missing(a).length)) {
+            // An incomplete addition can be neither proposed nor validated.
+            const complete = ['validated', 'review'].includes(action);
+            if (complete && chosen.some((a) => a.status !== action && AdditionList.missing(a).length)) {
                 b.disabled = true;
-                b.title = 'Des lignes cochées sont incomplètes (⚠) : complétez-les avant de valider.';
+                b.title = `Des lignes cochées sont incomplètes (⚠) : complétez-les avant de ${action === 'review' ? 'proposer' : 'valider'}.`;
                 return;
             }
-            if (action === 'validated') b.title = '';
+            if (complete) b.title = '';
             b.disabled = !n || (action === 'delete'
                 ? chosen.some((a) => !['draft', 'rejected'].includes(a.status)) || (!decider && chosen.some((a) => decided(a.status)))
                 // (an AI draft still to sort: « Garder » moves it to Brouillons)
@@ -1469,8 +1474,8 @@ class ValidationShow {
         this.dialog.querySelectorAll('[data-vs-status]').forEach((b) => {
             if (decided(b.dataset.vsStatus)) b.hidden = !decider;
             b.disabled = this.editing || this.commenting || (b.dataset.vsStatus === a.status && !(a.status === 'draft' && a.ai_pending)) || (!decider && decided(a.status))
-                || (b.dataset.vsStatus === 'validated' && AdditionList.missing(a).length > 0);
-            if (b.dataset.vsStatus === 'validated') {
+                || (['validated', 'review'].includes(b.dataset.vsStatus) && AdditionList.missing(a).length > 0);
+            if (['validated', 'review'].includes(b.dataset.vsStatus)) {
                 b.title = AdditionList.missing(a).length ? `Incomplet : ${AdditionList.missing(a).join(', ')}` : '';
             }
         });
