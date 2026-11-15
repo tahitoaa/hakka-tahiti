@@ -450,130 +450,6 @@ renderFurigana() {
     }
 
     // -----------------------------
-    // Token rendering
-    // -----------------------------
-    renderToken(group, index) {
-        const best = group?.[0];
-        if (!best) return '';
-
-        const data = best.dataset || best;
-        const isUnknown = !!best.isUnknown;
-        const extra = group.length - 1;
-        const tokenObj = this.parseToken(this.words?.[index] || '');
-        const isDisambiguated = !isUnknown && !!(tokenObj.constraints && tokenObj.constraints.length > 0);
-
-        // CSS-var-backed instead of fixed Tailwind colors, so these badges
-        // stay legible under dark mode (system prefers-color-scheme, or a
-        // page's own manual [data-theme="dark"] toggle) -- see base.html.
-        // Four distinct hues are kept even in dark mode so each state stays
-        // easy to tell apart at a glance: green = single unambiguous match,
-        // yellow = disambiguated via a ":constraint" on the token, blue =
-        // still ambiguous (several entries, no constraint given), orange =
-        // no dictionary entry found at all.
-        let colorClass = "bg-[var(--sentence-badge-known-bg)] text-[var(--sentence-badge-known-fg)]";
-        // «ma'a»: wanted as is -- neutral, not an error.
-        if (best.isText) colorClass = "bg-[var(--sentence-preview-bg)] text-[var(--sentence-text-primary)] border border-[var(--sentence-preview-border)]";
-        else if (isUnknown) colorClass = "bg-[var(--sentence-badge-unknown-bg)] text-[var(--sentence-badge-unknown-fg)]";
-        else if (isDisambiguated) colorClass = "bg-[var(--sentence-badge-disambig-bg)] text-[var(--sentence-badge-disambig-fg)]";
-        else if (extra > 0) colorClass = "bg-[var(--sentence-badge-multi-bg)] text-[var(--sentence-badge-multi-fg)]";
-
-        return `
-        <span onclick="toggleDetail(${index})" class="relative inline-flex flex-col justify-between items-center rounded-lg px-1.5 py-1 ${colorClass} min-w-[3.5rem] max-w-[5.5rem] h-[3.75rem] cursor-pointer">
-
-            <div class="text-[9px] italic leading-none truncate w-full text-center">
-                ${this.displayPinyinHtml(data)}
-            </div>
-
-            <div class="hanzi text-base font-semibold leading-tight truncate w-full text-center">
-                ${pickHanzi(data)}
-            </div>
-
-            <div class="text-[9px] leading-none truncate w-full text-center" title="${escapeAttr(isUnknown ? data.raw : data.french)}">
-                ${isUnknown ? this.truncateFrench(data.raw, 10) : this.truncateFrench(data.french, 10)}
-            </div>
-
-            ${(!isUnknown && extra > 0) ? `
-                <button onclick="event.stopPropagation(); toggleAlt(${index})" class="absolute -top-1 -right-1 leading-none text-[9px] w-3.5 h-3.5 rounded-full bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] border border-[var(--sentence-preview-border)]">+${extra}</button>
-            ` : ""}
-
-            ${extra > 0 && !isUnknown ? `
-                <div id="alt-${index}" onclick="event.stopPropagation()" class="hidden absolute top-full left-0 z-10 mt-0.5 min-w-[13rem] max-w-[20rem] rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow-lg p-1.5 divide-y divide-[var(--sentence-preview-border)]">
-                    ${group.map(w => {
-                        // Ambiguous entries can still differ in the hanzi
-                        // shown (simp/trad aren't always both filled in), so
-                        // each row gets its own hanzi alongside the pinyin,
-                        // french gloss and category -- otherwise entries with
-                        // an identical or missing french gloss look like the
-                        // same option repeated.
-                        const d = w.dataset || w;
-                        return `
-                            <div class="flex items-center gap-2 text-[13px] leading-snug py-1.5 px-1" title="${escapeAttr(d.french || '?')}">
-                                <span class="hanzi text-base font-semibold shrink-0">${pickHanzi(d) || '?'}</span>
-                                <span class="italic text-[var(--sentence-text-muted)] text-[11px] shrink-0">${this.displayPinyinHtml(d)}</span>
-                                <span class="flex-1 min-w-0">${escapeAttr(d.french || '?')}</span>
-                                ${d.category ? `<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[var(--sentence-preview-border)]">${escapeAttr(d.category)}</span>` : ""}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            ` : ""}
-
-            ${this.renderDetailPopup(data, index, isUnknown)}
-        </span>
-        `;
-    }
-
-    // Full-detail popup shown when a token badge is clicked -- unlike the
-    // badge itself (which truncates pinyin/hanzi/french to fit) and the
-    // "+n" alternates list (which only covers other dictionary entries for
-    // the same hanzi), this always shows the complete entry for the token's
-    // best match: pinyin, both hanzi variants, and every gloss field the
-    // Word model carries (french/english/mandarin/category).
-    renderDetailPopup(data, index, isUnknown) {
-        if (isUnknown) {
-            return `
-                <div id="detail-${index}" onclick="event.stopPropagation()" class="hidden absolute top-full left-0 z-20 mt-0.5 min-w-[10rem] max-w-[16rem] rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow-lg p-2 text-left text-[11px] leading-snug">
-                    <div class="hanzi font-semibold text-sm mb-1">${escapeAttr(data.raw || data.simp || '?')}</div>
-                    <div class="italic text-[var(--sentence-text-muted)]">${data.text
-                        ? 'Texte « » : recopié tel quel dans le pinyin et les caractères.'
-                        : 'Aucune entrée trouvée dans le dictionnaire.'}</div>
-                </div>
-            `;
-        }
-
-        const rows = [
-            ['Pinyin', this.displayPinyinHtml(data)],
-            ['Simplifié', data.simp],
-            ['Traditionnel', data.trad],
-            ['Français', data.french],
-            ['Anglais', data.english],
-            ['Mandarin', data.mandarin],
-            ['Catégorie', data.category],
-        ].filter(([, value]) => value);
-
-        return `
-            <div id="detail-${index}" onclick="event.stopPropagation()" class="hidden absolute top-full left-0 z-20 mt-0.5 min-w-[11rem] max-w-[18rem] rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-popup-bg)] text-[var(--sentence-text-primary)] shadow-lg p-2 text-left text-[11px] leading-snug">
-                ${rows.map(([label, value]) => `
-                    <div class="flex gap-1 py-0.5">
-                        <span class="font-semibold text-[var(--sentence-text-muted)] shrink-0">${label}:</span>
-                        <span class="${label === 'Pinyin' ? '' : (label === 'Simplifié' || label === 'Traditionnel' ? 'hanzi' : '')}">${label === 'Pinyin' ? value : escapeAttr(value)}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    renderTokens(){
-        return `<div class="flex flex-wrap gap-1.5">
-                ${this.matches.map((g, i) => {
-                    const [core, tail] = Sentence.splitPunct(this.words[i]);
-                    return (core || !tail ? this.renderToken(g, i) : '')
-                        + (tail ? `<span class="hanzi self-end">${escapeAttr(Sentence.hanPunct(tail))}</span>` : '');
-                }).join('')}
-            </div>`;
-    }
-
-    // -----------------------------
     // Copy-to-clipboard field
     // -----------------------------
     renderCopyButton(text, label) {
@@ -589,7 +465,8 @@ renderFurigana() {
     }
 
     // -----------------------------
-    // Main render
+    // Main render: the lines, ready to copy. The words themselves are
+    // shown by WordBoxes.js (one box per character, coloured by word).
     // -----------------------------
     render() {
         const pinyinLine = this.renderDisplayPinyinLine();
@@ -597,7 +474,6 @@ renderFurigana() {
 
         return `
         <div class="flex flex-col gap-2">
-                ${this.renderTokens()}
             <div class="flex flex-col rounded-md border border-[var(--sentence-preview-border)] bg-[var(--sentence-preview-bg)] overflow-hidden">
                 <div class="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--sentence-preview-border)]">
                     <div class="flex-1 min-w-0">
@@ -618,34 +494,6 @@ renderFurigana() {
 }
 
 // global helpers
-
-// Alternates ("+n") and detail popups share a token's badge, so only one
-// should ever be open at a time -- across all tokens in the sentence, not
-// just the one being toggled, otherwise stray popups from other tokens pile
-// up as the user clicks around.
-function closeSentencePopups(exceptId) {
-    document.querySelectorAll('[id^="alt-"], [id^="detail-"]').forEach(el => {
-        if (el.id !== exceptId) el.classList.add('hidden');
-    });
-}
-
-function toggleAlt(i) {
-    const id = `alt-${i}`;
-    const el = document.getElementById(id);
-    if (!el) return;
-    const opening = el.classList.contains('hidden');
-    closeSentencePopups(id);
-    el.classList.toggle('hidden', !opening);
-}
-
-function toggleDetail(i) {
-    const id = `detail-${i}`;
-    const el = document.getElementById(id);
-    if (!el) return;
-    const opening = el.classList.contains('hidden');
-    closeSentencePopups(id);
-    el.classList.toggle('hidden', !opening);
-}
 
 function escapeAttr(str) {
     return String(str == null ? '' : str)

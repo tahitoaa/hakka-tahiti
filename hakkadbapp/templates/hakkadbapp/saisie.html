@@ -3,54 +3,10 @@
 {% block content %}
 {% include "hakkadbapp/components/addition_list_styles.html" %}
 <style>
-  .saisie-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-  .saisie-slot.is-ambiguous .saisie-char { color: #c2410c; }
-  .saisie-ambig { display: flex; flex-direction: column; gap: 3px; }
-  .saisie-ambig button { min-height: 1.9rem; min-width: 3rem; padding: 0 0.4rem; border: 1px solid #fdba74; border-radius: 0.4rem;
-                         background: #fff7ed; color: #9a3412; font-size: 0.82rem; font-weight: 700; }
-  .saisie-ambig button:hover { background: #ffedd5; }
-  .saisie-slot input {
-    width: 2.6rem; height: 2.6rem; text-align: center; font-size: 1.4rem;
-    border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #fff;
-  }
-  .saisie-slot input:focus { outline: none; }
-  .saisie-slot.is-active input { border-color: var(--color-brand-gold); box-shadow: 0 0 0 2px var(--color-brand-gold); }
-  .saisie-slot.is-empty input { background: #fff7ed; border-style: dashed; }
-  .saisie-slot small { font-size: 0.7rem; color: #8C8478; }
-  .saisie-word { display: inline-flex; gap: 2px; padding: 2px; border-radius: 0.5rem; background: #F6EFE4; }
-  /* A converted character: same box as an input, filled in. */
-  .saisie-slot.is-char .saisie-char {
-    display: flex; align-items: center; justify-content: center; width: 2.6rem; height: 2.6rem; font-size: 1.4rem;
-    border: 1px solid #a5b4fc; border-radius: 0.375rem; background: #FBF0E6; color: #261F1C;
-  }
-  /* «ma'a tinito»: text kept as written, one box. */
-  .saisie-slot.is-text .saisie-text {
-    display: flex; align-items: center; min-height: 2.6rem; padding: 0 0.6rem; font-size: 1rem; font-style: italic;
-    border: 1px dashed #B8A98F; border-radius: 0.375rem; background: #fff; color: #261F1C;
-  }
-  /* Between two boxes: cut the word there; between two words: join them. */
-  .saisie-gap { position: relative; flex: none; width: 0.85rem; align-self: stretch; min-height: 2.6rem; margin: 0 -0.2rem;
-                border: 0; background: transparent; cursor: pointer; touch-action: manipulation; }
-  .saisie-gap::after { content: ''; position: absolute; left: 50%; top: 10%; bottom: 30%; border-left: 2px dotted #C9B99F; }
-  .saisie-gap:hover::after, .saisie-gap:focus-visible::after { border-left: 2px solid var(--color-brand-gold); }
-  .saisie-gap.is-join { width: 1.4rem; margin: 0 -0.35rem; }
-  .saisie-gap.is-join::after { content: '⌒'; border: 0; left: 0; right: 0; top: 0.6rem; bottom: auto; text-align: center;
-                               color: #B8A98F; font-size: 1rem; line-height: 1; }
-  .saisie-gap.is-join:hover::after, .saisie-gap.is-join:focus-visible::after { color: var(--color-brand-gold); border: 0; }
   .saisie-text-row { display: flex; gap: 0.4rem; align-items: stretch; }
   .saisie-text-row input { flex: 1; min-width: 0; }
   #saisie-text-btn { flex: none; padding: 0 0.75rem; border: 1px solid #DDD0BD; border-radius: 0.375rem; background: #FDFAF5;
                      font-size: 0.875rem; font-weight: 600; color: #4A3F35; }
-  .saisie-check-list { display: grid; gap: 0.25rem; font-size: 0.875rem; }
-  .saisie-check-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.6rem; padding: 0.25rem 0.5rem;
-                          border-radius: 0.375rem; border-left: 4px solid #DDD0BD; background: #FDFAF5; }
-  .saisie-check-list .hanzi { font-size: 1.1rem; }
-  /* New character / new reading in the boxes (Saisie.js charState), the Suivi's colours. */
-  .saisie-slot.is-new-char .saisie-char, .saisie-slot-legend .is-new-char { background: #fee2e2; color: #991b1b; border-radius: 0.2rem; box-shadow: inset 0 -2px #ef4444; }
-  .saisie-slot.is-new-reading .saisie-char, .saisie-slot-legend .is-new-reading { background: #ffedd5; color: #9a3412; border-radius: 0.2rem; box-shadow: inset 0 -2px #f97316; }
-  .saisie-slot.is-new-reading small { color: #9a3412; font-weight: 700; }
-  .saisie-slot-legend { flex-basis: 100%; margin-top: 0.3rem; font-size: 0.78rem; color: #6E655C; }
-  .saisie-slot-legend span { padding: 0 0.15rem; }
   .saisie-meaning { font-size: 0.85rem; padding: 0.4rem 0.6rem; border-radius: 0.375rem; background: #FFF7ED; color: #7c2d12; border-left: 4px solid #f97316; }
   .saisie-meaning ul { display: grid; gap: 0.15rem; margin-top: 0.25rem; }
   .saisie-meaning li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.6rem; color: #3A3430; }
@@ -88,7 +44,6 @@
     .saisie-actions-bar #saisie-copy { font-size: 0; padding: 0 0.8rem; }
     .saisie-actions-bar #saisie-copy::before { content: "📋"; font-size: 1.2rem; }
     .saisie-actions-bar #saisie-cancel { grid-column: 1 / -1; min-height: 2.4rem; }
-    .saisie-ambig button { min-height: 2.6rem; min-width: 3.8rem; font-size: 0.95rem; }
   }
   @media (max-width: 640px) { .saisie-new-word { grid-template-columns: 1fr 1fr; } .saisie-new-word > label { grid-column: 1 / -1; } }
   /* AI suggestions: a proposal to accept, never saved on its own. */
@@ -172,8 +127,10 @@
       <div class="text-sm font-semibold text-gray-700 mb-1">Caractères
         <details class="help-tip"><summary aria-label="Aide : caractères">ⓘ</summary><div>Touchez une case vide puis un caractère proposé
         (ou <kbd>Maj</kbd>+<kbd>1</kbd>…<kbd>9</kbd>), ou tapez-le directement dans la case.
-        Touchez <b>entre deux cases</b> (pointillés) pour couper le mot, le <b>⌒</b> entre deux mots pour les recoller.</div></details></div>
-      <div id="saisie-slots" class="flex flex-wrap gap-2 min-h-12 items-end"></div>
+        Touchez <b>entre deux cases</b> (pointillés) pour couper le mot, le <b>⌒</b> entre deux mots pour les recoller.
+        Chaque mot est coloré d'après le lexique (vert : connu, bleu : plusieurs entrées, rouge : inconnu…) ; touchez son sens pour voir les entrées.
+        Si le lexique découpe autrement, « ✂ Découper ainsi » applique son découpage.</div></details></div>
+      <div id="saisie-slots" class="min-h-12"></div>
     </div>
 
     <!-- Each word against the lexicon (same matching as the Écrire page) -->
@@ -266,5 +223,7 @@
 <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/AdditionList.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/SaisieEntry.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/WordBoxes.js' %}"></script>
 <script src="{% static 'hakkadbapp/js/Saisie.js' %}"></script>
 {% endblock %}

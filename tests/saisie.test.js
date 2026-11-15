@@ -8,7 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createContext, loadScripts, makeDocumentStub } = require("./helpers/load");
+const { createContext, loadScripts, makeEl, makeDocumentStub } = require("./helpers/load");
 
 const CONFIG_PATH = path.join(__dirname, "..", "hakkadbapp", "romanization.json");
 
@@ -27,7 +27,8 @@ function load() {
     { file: "Dictionary.js", exports: ["Dictionary"] },
     { file: "CharacterInput.js", exports: ["SyllableInputModel"] },
     { file: "Sentence.js", exports: ["Sentence"] },
-    { file: "Saisie.js", exports: ["SaisieEntry"] },
+    { file: "SaisieEntry.js", exports: ["SaisieEntry"] },
+    { file: "WordBoxes.js", exports: ["WordBoxes"] },
   ]);
   context.Romanization.load(JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")));
   context.Romanization.setInput("wenfa");
@@ -193,6 +194,56 @@ test("Mot -> Expression: cut where the lexicon's words start", () => {
   assert.deepEqual([...entry.lexiconCuts()], []);
   entry.setText("我ngai_", "word");
   assert.deepEqual([...entry.lexiconCuts()], []);
+});
+
+test("the lexicon's segmentation, proposed for the boxes (cut and join)", () => {
+  const { entry } = load();
+  const seg = (text) => { entry.setText(text, "expression"); return entry.segmentation(); };
+  // Characters making no word stay together; the lexicon's word is cut out.
+  assert.equal(seg("我爱屋家"), "我爱 屋家");
+  // Two words that make one of the lexicon: joined.
+  assert.equal(seg("我 屋 家"), "我 屋家");
+  // Punctuation stays with its word.
+  assert.equal(seg("屋 家，"), "屋家，");
+  // Already cut so, a known word, or a line between: nothing to propose.
+  assert.equal(seg("我 爱 屋家"), null);
+  assert.equal(seg("屋家(wuk5ka1)"), null);
+  assert.equal(seg("屋\n家"), null);
+  // A :sense or a syllable left to convert is never touched.
+  assert.equal(seg("屋:toit 家"), null);
+  assert.equal(seg("屋 ka1"), null);
+  // A word (not an expression): never.
+  entry.setText("我爱屋家", "word");
+  assert.equal(entry.segmentation(), null);
+});
+
+test("word boxes: each word coloured after the lexicon, its readings, cuts and the segmentation to apply", () => {
+  const { context, entry } = load();
+  const container = makeEl({ querySelectorAll: () => [] });
+  const changes = [];
+  const boxes = new context.WordBoxes(container, { onChange: (text, what) => changes.push([text, what]) });
+  entry.setText("我 屋 家 生 ngai_", "expression");
+  boxes.render(entry);
+  const html = container.innerHTML;
+  assert.match(html, /wb-word is-unknown/);           // 我: not a word of the lexicon
+  assert.match(html, /data-segment/);                 // 屋 家 -> 屋家 proposed
+  assert.match(html, /data-pin="\d+" data-reading="sen1"/); // 生: two readings to choose
+  assert.match(html, /is-syl/);                       // ngai_ still to convert
+  assert.match(html, /data-join-from/);
+  // A tap on « Découper ainsi »: the text cut after the lexicon.
+  const click = (attr) => ({ target: { closest: (sel) => (sel.includes(attr) ? { dataset: {} } : null) } });
+  boxes.handleClick(click("data-segment"));
+  assert.deepEqual(changes.pop(), ["我 屋家 生 ngai_", "segment"]);
+  // The known word, its sense under it.
+  entry.setText("屋家", "expression");
+  boxes.render(entry);
+  assert.match(container.innerHTML, /wb-word is-known/);
+  assert.match(container.innerHTML, /maison/);
+  // Read only: no button.
+  const ro = new context.WordBoxes(makeEl({ querySelectorAll: () => [] }), { readOnly: true });
+  entry.setText("我 屋 家 生", "expression");
+  ro.render(entry);
+  assert.doesNotMatch(ro.container.innerHTML, /data-(segment|pin|split|join-from)/);
 });
 
 function loadAdditionList() {

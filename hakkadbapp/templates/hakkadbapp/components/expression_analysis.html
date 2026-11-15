@@ -275,10 +275,7 @@
   #expr-app .split-status { font-size: 11.5px; color: var(--text-muted); }
   #expr-app .split-status--error { color: #d03b3b; font-weight: 600; }
   #expr-app .split-analysis { margin-top: 6px; }
-  /* Sentence.render() (shared with converter/transcripter) draws its token
-     badges/preview box with hardcoded light backgrounds and isn't
-     theme-aware on its own -- these CSS variables are what it reads, kept
-     legible in dark mode without touching that shared file. */
+  /* Sentence's lines read these CSS variables: kept legible in dark mode. */
   #expr-app .split-analysis {
     --sentence-preview-border: var(--border-strong);
     --sentence-preview-bg: var(--page-plane);
@@ -374,4 +371,8 @@
     <script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     {# Pronunciation.js: already on the lexicon browser (components/caracters_panel.html); expressions.js only uses it on DOMContentLoaded. #}
+    {# WordBoxes.js: the Split's characters by word (SaisieEntry.js, CharacterInput.js for its syllables). #}
+    <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/SaisieEntry.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/WordBoxes.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/expressions.js' %}"></script>

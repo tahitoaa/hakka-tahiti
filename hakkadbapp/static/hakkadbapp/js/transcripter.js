@@ -168,7 +168,6 @@ class SegmentEditor {
                             aria-label="Texte sans caractère : entre guillemets">« » Texte</button>
                   </div>
                   <div data-role="suggestions" class="flex gap-1.5 flex-wrap"></div>
-                  <div data-role="ambiguous" class="eaf-ambig" hidden></div>
                   <div data-role="preview" class="eaf-preview"></div>
                 </div>
               </div>
@@ -185,7 +184,6 @@ class SegmentEditor {
         this.preview = q('[data-role="preview"]');
         this.hanziOut = q('[data-role="hanzi"]');
         this.tradOut = q('[data-role="trad"]');
-        this.ambiguous = q('[data-role="ambiguous"]');
         this.pinyinOut = q('[data-role="pinyin"]');
         this.mixedOut = q('[data-role="mixed"]');
 
@@ -201,14 +199,15 @@ class SegmentEditor {
 
         this.transcript.addEventListener('input', () => { this.touched = true; this.renderIme(); this.commit(); });
         this.translation.addEventListener('input', () => this.app.write(s, 'translation', this.translation.value));
-        // A reading chosen for a character read several ways: pinned in the transcript.
-        this.ambiguous.addEventListener('mousedown', (event) => { if (event.target.closest('[data-pin]')) event.preventDefault(); });
-        this.ambiguous.addEventListener('click', (event) => {
-            const b = event.target.closest('[data-pin]');
-            if (!b) return;
-            this.transcript.value = TranscriptLines.pin(this.transcript.value, Number(b.dataset.pin), b.dataset.reading);
-            this.transcript.dispatchEvent(new Event('input'));
-            this.transcript.focus();
+        // The characters by word (WordBoxes.js): a reading chosen, a cut,
+        // a join or the lexicon's segmentation rewrites the transcript.
+        this.entry = new SaisieEntry(dico);
+        this.boxes = new WordBoxes(this.preview, {
+            onChange: (text) => {
+                this.transcript.value = text;
+                this.transcript.dispatchEvent(new Event('input'));
+                this.transcript.focus();
+            },
         });
         // « Texte » keeps the selection in the transcript: it never takes the focus.
         q('[data-act="text"]').addEventListener('mousedown', (event) => event.preventDefault());
@@ -233,18 +232,8 @@ class SegmentEditor {
     renderIme() {
         this.model.update({ hanzi: this.transcript.value });
         this.suggestionBar.render(this.model.suggestions);
-        this.preview.innerHTML = this.model.sentences.map((x) => x.renderTokens()).join('');
-        this.renderAmbiguous();
-    }
-
-    /** As in Saisie: one button per reading of a character read several ways. */
-    renderAmbiguous() {
-        const found = TranscriptLines.ambiguous(dico, this.transcript.value);
-        const sentence = new Sentence(dico, '');
-        this.ambiguous.hidden = !found.length;
-        this.ambiguous.innerHTML = found.length ? `<span class="eaf-ambig-label">Plusieurs lectures :</span>${found.map((a) =>
-            `<span class="eaf-ambig-char"><span class="hanzi">${escapeHtml(a.char)}</span>${a.readings.map((r) =>
-                `<button type="button" data-pin="${a.pos}" data-reading="${escapeHtml(r)}" aria-label="Lire ${escapeHtml(a.char)} ${escapeHtml(sentence.displayPinyin(r))}">${escapeHtml(sentence.displayPinyin(r))}</button>`).join('')}</span>`).join('')}` : '';
+        this.entry.setText(this.transcript.value, 'expression');
+        this.boxes.render(this.entry);
     }
 
     /** « Texte »: the selection (or the caret) between « », for words that

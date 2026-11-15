@@ -135,7 +135,7 @@ test("Sentence shows the selected system but keeps the stored notation for rende
   assert.equal(s.renderPinyinLine(), "ba¹");
   assert.equal(s.renderDisplayPinyinLine(), "pɑ˥");
   assert.match(s.renderFurigana(), /pɑ˥/);
-  assert.match(s.renderTokens(), /pɑ˥/);
+  assert.match(s.displayPinyinHtml(s.matches[0][0].dataset), /pɑ˥/);
 });
 
 test("fromPinyin() also reads superscript tones (Python's Pronunciation.pinyin() output)", () => {
@@ -171,7 +171,7 @@ test("Pronunciation's static helpers are the shared display entry point", () => 
   assert.equal(src.pinyinSpan(), `<span title="Dictionnaire : k'ak⁷">k'ak⁷</span>`);
 });
 
-test("Sentence badges carry data-py so they follow later switches without a re-render", () => {
+test("Sentence pinyin HTML carries data-py so they follow later switches without a re-render", () => {
   const context = createContext();
   loadScripts(context, ["Romanization.js", { file: "Sentence.js", exports: ["Sentence"] }]);
   context.Romanization.load({ ...MINI, default_system: "b" });
@@ -180,7 +180,7 @@ test("Sentence badges carry data-py so they follow later switches without a re-r
     getMatchesForHanzi: () => [],
   };
   const s = new context.Sentence(dico, "爸");
-  assert.match(s.renderTokens(), /<span data-py="ba1">pɑ˥<\/span>/);
+  assert.match(s.displayPinyinHtml(s.matches[0][0].dataset), /<span data-py="ba1">pɑ˥<\/span>/);
   assert.equal(s.renderDisplayPinyinLine(), "pɑ˥", "lines meant for copying stay plain text");
 });
 

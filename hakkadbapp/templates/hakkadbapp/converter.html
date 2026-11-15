@@ -55,6 +55,11 @@
     <div id="suggested-hanzi" class="flex gap-1.5 flex-wrap justify-center"></div>
   </div>
 
+  <!-- The characters by word, coloured after the lexicon (WordBoxes.js): readings, cuts, joins. -->
+  <div class="relative mt-4 bg-white p-3 rounded-md shadow border border-gray-100">
+    <div id="word-boxes"></div>
+  </div>
+
   <div class="relative mt-4 bg-white p-3 pr-11 rounded-md shadow border border-gray-100">
     <div id="expression-output" class="text-sm text-gray-700 leading-snug text-left break-words"></div>
   </div>
@@ -98,6 +103,8 @@
     <script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/SaisieEntry.js' %}"></script>
+    <script src="{% static 'hakkadbapp/js/WordBoxes.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/CopyButton.js' %}"></script>
     <script src="{% static 'hakkadbapp/js/converter.js' %}"></script>
 {% endblock %}
