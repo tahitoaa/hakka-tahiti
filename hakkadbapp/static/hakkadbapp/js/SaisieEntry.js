@@ -311,7 +311,7 @@ class SaisieEntry {
         const ambiguous = tokens.filter((t) => t.pinyin.includes('/'));
         if (ambiguous.length) {
             return `Plusieurs lectures pour ${ambiguous.map((t) => `${t.plain} (${t.pinyin})`).join(', ')} : `
-                + 'touchez la bonne lecture sous le caractère (en orange).';
+                + 'touchez la bonne lecture sous le caractère (en mauve ⚠).';
         }
         return '';
     }
