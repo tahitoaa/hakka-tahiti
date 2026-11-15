@@ -212,6 +212,8 @@ class SegmentEditor {
                 this.transcript.focus();
             },
         });
+        // Tab / Entrée / Échap, as in a Chinese input method (WordBoxes.bindKeys).
+        WordBoxes.bindKeys(this.transcript, { bar: this.suggestionBar, boxes: this.boxes, pick: (i) => this.select(i) });
         // « Texte » keeps the selection in the transcript: it never takes the focus.
         q('[data-act="text"]').addEventListener('mousedown', (event) => event.preventDefault());
         this.row.addEventListener('click', (event) => {

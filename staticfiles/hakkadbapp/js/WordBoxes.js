@@ -90,6 +90,8 @@ const WORD_BOXES_CSS = `
 .wb-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
 .wb-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 0.2rem; border: 1px solid; }
 .wb-legend .is-new-char, .wb-legend .is-new-reading, .wb-legend .is-ambiguous { padding: 0 0.15rem; border-radius: 0.2rem; }
+.wb-keys { font-size: 0.68rem; color: #8C8478; }
+@media (hover: none) and (pointer: coarse) { .wb-keys { display: none; } }
 .wb-empty { font-size: 0.85rem; color: #9ca3af; }
 @media (max-width: 640px) { .wb-ambig button { min-height: 2.5rem; min-width: 3.4rem; font-size: 0.9rem; } }
 `;
@@ -132,6 +134,8 @@ class WordBoxes {
         this.entry = null;
         this.open = -1;           // word whose entries are shown
         this.proposal = null;     // the text cut after the lexicon
+        this.choice = -1;         // reading button highlighted from the keyboard (Tab)
+        this.dismissed = false;   // Échap: Tab back to its usual role
         container.classList.add('wb');
 
         // Tapping a button never takes the focus (and the caret) from the field typed in.
@@ -169,6 +173,85 @@ class WordBoxes {
         }
         const gloss = target.closest('[data-gloss]');
         if (gloss) this.toggle(Number(gloss.dataset.gloss) === this.open ? -1 : Number(gloss.dataset.gloss));
+    }
+
+    // ---- keyboard (WordBoxes.bindKeys) ------------------------------------
+
+    /** The reading buttons, in text order. */
+    choices() {
+        return [...(this.container.querySelectorAll?.('[data-pin]') || [])];
+    }
+
+    get active() {
+        return !this.dismissed && this.choices().length > 0;
+    }
+
+    /** Tab / Maj+Tab: the next / previous reading highlighted. */
+    moveChoice(delta) {
+        const n = this.choices().length;
+        if (!n) return;
+        this.choice = this.choice < 0 ? (delta > 0 ? 0 : n - 1) : (this.choice + delta + n) % n;
+        this.paintChoice();
+    }
+
+    paintChoice() {
+        this.choices().forEach((b, i) => {
+            b.classList.toggle('is-hl', i === this.choice);
+            if (i === this.choice) b.scrollIntoView?.({ block: 'nearest' });
+        });
+    }
+
+    /** Entrée: the highlighted reading pinned. False when none is. */
+    applyChoice() {
+        const b = this.choices()[this.choice];
+        if (!b || !this.entry?.pinAt(Number(b.dataset.pin), b.dataset.reading)) return false;
+        this.onChange?.(this.entry.text, 'pin');
+        return true;
+    }
+
+    /** Ctrl+Entrée: the lexicon's segmentation applied. */
+    applySegment() {
+        if (!this.proposal) return false;
+        this.onChange?.(this.proposal, 'segment');
+        return true;
+    }
+
+    /** Keys of a field typed in (or of the fields `accepts` takes), as in a
+     *  Chinese input method:
+     *  - suggestions shown: Tab / Maj+Tab move the highlighted tile, Entrée
+     *    picks it (`pick(index)`), Échap closes them;
+     *  - then, characters with several readings: Tab / Maj+Tab go from
+     *    reading to reading, Entrée pins the highlighted one, Échap gives
+     *    Tab back its usual role;
+     *  - Ctrl+Entrée: « Découper ainsi » (the lexicon's segmentation).
+     *  Maj+Entrée is never taken (new line). */
+    static bindKeys(target, { bar, boxes, pick, accepts = null }) {
+        target.addEventListener('keydown', (event) => {
+            if (event.isComposing || event.altKey || event.metaKey) return;
+            if (accepts && !accepts(event.target)) return;
+            const tab = event.key === 'Tab' && !event.ctrlKey;
+            const enter = event.key === 'Enter' && !event.shiftKey;
+            const escape = event.key === 'Escape';
+            if (enter && event.ctrlKey) {
+                if (boxes?.applySegment()) event.preventDefault();
+                return;
+            }
+            if (event.ctrlKey) return;
+            const take = () => { event.preventDefault(); event.stopPropagation(); };
+            if (bar?.active) {
+                if (tab) { take(); bar.move(event.shiftKey ? -1 : 1); }
+                else if (enter) { take(); pick(bar.highlight); }
+                else if (escape) { take(); bar.dismiss(); }
+                return;
+            }
+            if (boxes?.active) {
+                if (tab) { take(); boxes.moveChoice(event.shiftKey ? -1 : 1); }
+                else if (enter && boxes.choice >= 0) { take(); boxes.applyChoice(); }
+                else if (escape && boxes.choice >= 0) { take(); boxes.dismissed = true; boxes.choice = -1; boxes.paintChoice(); }
+            }
+        });
+        // Typing again: Tab back on the readings.
+        target.addEventListener('input', () => { if (boxes) boxes.dismissed = false; });
     }
 
     toggle(index) {
@@ -275,8 +358,13 @@ class WordBoxes {
 
         const proposal = this.proposal
             ? `<div class="wb-segment">✂ Découpage d’après le lexique : <span class="hanzi">${esc(this.proposal.replace(/\([^()]*\)/g, '').replace(/[«»]/g, ''))}</span>
-                <button type="button" data-segment>Découper ainsi</button></div>` : '';
+                <button type="button" data-segment title="Ctrl+Entrée">Découper ainsi</button><span class="wb-keys">Ctrl+Entrée</span></div>` : '';
         this.container.innerHTML = `${proposal}<div class="wb-words">${words}</div>${this.legend ? this.renderLegend(seen, newReadings) : ''}`;
+        // The highlighted reading stays where it was (after a pin: the next one).
+        const n = this.choices().length;
+        if (!n) this.choice = -1;
+        else if (this.choice >= n) this.choice = n - 1;
+        if (this.choice >= 0) this.paintChoice();
     }
 
     /** A word's colour: its check status, 'multi' for a word with several
@@ -325,7 +413,8 @@ class WordBoxes {
             .map(([, s]) => `<span><i style="background:${s.bg};border-color:${s.colour}"></i>${esc(s.label)}</span>`);
         if (seen.has('new-char')) items.push('<span><span class="hanzi is-new-char">字</span> caractère absent du lexique</span>');
         if (seen.has('new-reading')) items.push(`<span><span class="hanzi is-new-reading">字</span> lecture que le lexique ne donne pas (${esc(newReadings.join(' · '))})</span>`);
-        if (seen.has('ambiguous')) items.push('<span><span class="hanzi is-ambiguous">字</span> ⚠ lecture ambiguë : touchez la bonne sous le caractère</span>');
+        if (seen.has('ambiguous')) items.push('<span><span class="hanzi is-ambiguous">字</span> ⚠ lecture ambiguë : touchez la bonne sous le caractère'
+            + '<span class="wb-keys">(clavier : Tab puis Entrée)</span></span>');
         return items.length ? `<div class="wb-legend">${items.join('')}</div>` : '';
     }
 }

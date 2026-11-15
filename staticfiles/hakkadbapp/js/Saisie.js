@@ -174,6 +174,11 @@
             // 📋 Copy what the form holds (characters, reading, senses, theme).
             document.getElementById('saisie-copy')?.addEventListener('click', (event) =>
                 AdditionList.copy(AdditionList.clipboardText(this.values()), event.currentTarget));
+            // Tab / Entrée / Échap, as in a Chinese input method (WordBoxes.bindKeys).
+            WordBoxes.bindKeys(this.el.form, {
+                bar: this.suggestionBar, boxes: this.boxes, pick: (index) => this.pickSuggestion(index),
+                accepts: (t) => t === this.el.text || t.dataset?.slot !== undefined,
+            });
             // Shift+1..9 picks a suggestion, as on the "Écrire" page.
             this.el.form.addEventListener('keydown', (event) => {
                 if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;

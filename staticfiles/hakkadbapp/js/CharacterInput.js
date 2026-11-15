@@ -115,7 +115,8 @@ class SyllableInputModel {
  *  small label and title tooltip; purely a bonus for physical keyboards,
  *  ignored on touch devices where users just tap the character. */
 function suggestionKeyHint(i) {
-    return i < 9 ? String(i + 1) : String.fromCharCode(65 + i - 9);
+    // Beyond 9: no shortcut, Tab gets there (the highlighted tile).
+    return i < 9 ? String(i + 1) : '';
 }
 
 /** Renders a grid of tappable hanzi suggestion buttons and handles selecting
@@ -155,6 +156,10 @@ const SUGGESTION_BAR_CSS = `
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .sugg:active { background: #E8D9C2; }
+/* The tile Entrée picks (Tab / Maj+Tab move it), as in a Chinese input method. */
+.sugg.is-hl { border-color: #9B1C1C; box-shadow: 0 0 0 2px #9B1C1C; background: #FBF0E6; }
+.sugg-help { grid-column: 1 / -1; font-size: 0.68rem; color: #8C8478; text-align: left; padding: 0 0.15rem; }
+@media (hover: none) and (pointer: coarse) { .sugg-help { display: none; } }
 @media (hover: hover) { .sugg:hover { background: #F3E8D6; } }
 .sugg .sugg-hanzi { font-size: 1.3rem !important; line-height: 1.1; letter-spacing: 0; white-space: nowrap; }
 .sugg .sugg-alt { font-size: 0.6em; color: #8C8478; font-weight: 500; margin-left: 1px; }
@@ -208,6 +213,9 @@ class SuggestionBar {
         this.unknown = '';
         this.anchorTo = anchorTo;
         this.suggestions = [];
+        this.highlight = 0;       // the tile Entrée picks
+        this.dismissed = false;   // Échap: hidden until the suggestions change
+        this.signature = '';
 
         this.container.addEventListener('click', (event) => this.handleClick(event));
         // Tapping a suggestion must not take the focus (and the caret) away
@@ -236,12 +244,41 @@ class SuggestionBar {
 
     updateVisibility() {
         if (!this.anchorTo) return;
-        const show = document.activeElement === this.anchorTo && (this.suggestions.length > 0 || !!this.unknown);
+        const show = !this.dismissed && document.activeElement === this.anchorTo && (this.suggestions.length > 0 || !!this.unknown);
         // Inline style rather than a `hidden` class: this element also
         // carries `flex`, and Tailwind's utility ordering doesn't reliably
         // guarantee `display: none` wins over `display: flex` when both
         // classes are present on the same element.
         this.container.style.display = show ? '' : 'none';
+    }
+
+    /** Suggestions the keyboard can act on (shown, not dismissed). */
+    get active() {
+        return this.suggestions.length > 0 && !this.dismissed;
+    }
+
+    /** Tab / Maj+Tab: the next / previous tile highlighted. */
+    move(delta) {
+        const n = this.suggestions.length;
+        if (!n) return;
+        this.highlight = (this.highlight + delta + n) % n;
+        this.paintHighlight();
+    }
+
+    paintHighlight() {
+        this.container.querySelectorAll?.('[data-suggestion-index]').forEach((b) => {
+            const on = Number(b.dataset.suggestionIndex) === this.highlight;
+            b.classList.toggle('is-hl', on);
+            b.setAttribute?.('aria-selected', String(on));
+            if (on) b.scrollIntoView?.({ block: 'nearest' });
+        });
+    }
+
+    /** Échap: hidden until the suggestions change (a new syllable typed). */
+    dismiss() {
+        this.dismissed = true;
+        if (this.anchorTo) this.updateVisibility();
+        else this.container.style.display = 'none';
     }
 
     handleClick(event) {
@@ -256,6 +293,16 @@ class SuggestionBar {
     render(suggestions, { unknown = '' } = {}) {
         this.suggestions = suggestions || [];
         this.unknown = this.onUnknown ? unknown : '';
+        // Other suggestions (another syllable, or the same one converted):
+        // the first tile highlighted again, Échap forgotten.
+        const signature = this.suggestions.map((s) => `${s.for}:${s.pron.simp}:${s.pron.initial}${s.pron.final}${s.pron.tone}`).join('|') + `|${this.unknown}`;
+        if (signature !== this.signature) {
+            this.signature = signature;
+            this.highlight = 0;
+            this.dismissed = false;
+            if (!this.anchorTo) this.container.style.display = '';
+        }
+        this.highlight = Math.min(this.highlight, Math.max(0, this.suggestions.length - 1));
         const unknownTile = this.unknown
             ? `<button type="button" data-suggestion-unknown class="sugg sugg-unknown" title="Caractère inconnu : garder seulement la lecture, -(${escapeSugg(this.unknown)})">`
               + `<span class="hanzi sugg-hanzi">?</span><span class="sugg-py">inconnu</span></button>`
@@ -297,13 +344,15 @@ class SuggestionBar {
             const mandarin = uh?.mandarin ? `<span class="sugg-man">${escapeSugg(uh.mandarin.split(', ')[0])}</span>` : '';
             const english = uh?.meaning ? `<span class="sugg-en" lang="en">${escapeSugg(uh.meaning.split(/[;,]/)[0].trim())}</span>` : '';
             if (uh) withUnihan = true;
-            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn${s.doubtful ? ' sugg-doubt' : ''}" title="Raccourci : ${this.shortcutLabel}+${keyHint}${sourceTitle}${doubtTitle}${infoTitle}">`
+            const shortcut = keyHint ? `Raccourci : ${this.shortcutLabel}+${keyHint} · ` : '';
+            return `<button type="button" data-suggestion-index="${i}" class="sugg suggestion-btn${s.doubtful ? ' sugg-doubt' : ''}${i === this.highlight ? ' is-hl' : ''}" aria-selected="${i === this.highlight}" title="${shortcut}Tab pour y aller, Entrée pour choisir${sourceTitle}${doubtTitle}${infoTitle}">`
                 + `<span class="sugg-key">${keyHint}</span>${warn}${marks}`
                 + `<span class="hanzi sugg-hanzi">${hanzi}</span>`
                 + `<span class="sugg-py"><span class="sugg-hk">${pinyin}</span>${mandarin}</span>`
                 + english
                 + `</button>`;
-        }).join('') + unknownTile;
+        }).join('') + unknownTile
+            + `<span class="sugg-help">⌨ Tab / Maj+Tab : suggestion suivante / précédente · Entrée : choisir · Échap : fermer</span>`;
 
         this.container.classList.toggle?.('has-uh', withUnihan);
         this.updateVisibility();

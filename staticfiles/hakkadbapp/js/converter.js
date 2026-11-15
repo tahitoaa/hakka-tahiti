@@ -123,6 +123,11 @@ class Controller{
      *  transcription editor. Ignored while editing the small csv-style
      *  <input> fields (unknown chars/prons), active everywhere else. */
     bindKeyboard() {
+        // Tab / Entrée / Échap, as in a Chinese input method (WordBoxes.bindKeys).
+        WordBoxes.bindKeys(this.view.input, {
+            bar: this.view.suggestionBar, boxes: this.view.wordBoxes,
+            pick: (index) => this.handleSelectSuggestion(index),
+        });
         window.addEventListener('keydown', (event) => {
             if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;
             if (document.activeElement?.tagName === 'INPUT') return;
