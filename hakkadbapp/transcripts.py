@@ -24,6 +24,16 @@ class StorageError(Exception):
     pass
 
 
+def project_url():
+    """The project's root, https://<ref>.supabase.co: SUPABASE_URL may be
+    given with a path (the REST API's /rest/v1/, copied from the
+    dashboard), which put the Storage API at /rest/v1/storage/v1 -- a 404."""
+    parts = urllib.parse.urlsplit(settings.SUPABASE_URL.strip())
+    if not parts.scheme or not parts.netloc:
+        return settings.SUPABASE_URL.strip().rstrip("/")
+    return f"{parts.scheme}://{parts.netloc}"
+
+
 def storage_configured():
     return bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY)
 
@@ -35,7 +45,7 @@ def _request(method, path, body=None):
             "Le stockage audio n'est pas configuré (SUPABASE_URL et SUPABASE_SERVICE_KEY).")
     key = settings.SUPABASE_SERVICE_KEY
     request = urllib.request.Request(
-        f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1{path}",
+        f"{project_url()}/storage/v1{path}",
         method=method,
         data=json.dumps(body).encode() if body is not None else None,
         headers={"Authorization": f"Bearer {key}", "apikey": key, "Content-Type": "application/json"},
@@ -62,7 +72,7 @@ def signed_upload_url(path):
     url = answer.get("url") or answer.get("signedURL")
     if not url:
         raise StorageError("Stockage audio : pas d'adresse d'envoi dans la réponse.")
-    return f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1{url}"
+    return f"{project_url()}/storage/v1{url}"
 
 
 def signed_audio_url(path):
@@ -71,7 +81,7 @@ def signed_audio_url(path):
     url = answer.get("signedURL") or answer.get("signedUrl")
     if not url:
         raise StorageError("Stockage audio : pas d'adresse de lecture dans la réponse.")
-    return f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1{url}"
+    return f"{project_url()}/storage/v1{url}"
 
 
 def delete_objects(paths):
