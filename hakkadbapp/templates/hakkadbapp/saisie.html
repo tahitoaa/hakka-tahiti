@@ -43,7 +43,7 @@
     .saisie-actions-bar .saisie-btn { min-height: 3rem; padding: 0.3rem 0.5rem; font-size: 0.9rem; line-height: 1.15; }
     .saisie-actions-bar #saisie-copy { font-size: 0; padding: 0 0.8rem; }
     .saisie-actions-bar #saisie-copy::before { content: "📋"; font-size: 1.2rem; }
-    .saisie-actions-bar #saisie-cancel { grid-column: 1 / -1; min-height: 2.4rem; }
+    .saisie-actions-bar #saisie-cancel, .saisie-actions-bar #saisie-delete { grid-column: 1 / -1; min-height: 2.4rem; }
   }
   @media (max-width: 640px) { .saisie-new-word { grid-template-columns: 1fr 1fr; } .saisie-new-word > label { grid-column: 1 / -1; } }
   /* AI suggestions: a proposal to accept, never saved on its own. */
@@ -199,6 +199,9 @@
       <button type="submit" data-status="validated" id="saisie-validate" hidden class="saisie-btn saisie-btn-lg saisie-btn-validate"
               title="Enregistrer les modifications et valider cet ajout">✓ Enregistrer et valider</button>
       <button type="button" id="saisie-copy" class="saisie-btn saisie-btn-lg saisie-btn-neutral" title="Copier dans le presse-papiers">📋 Copier</button>
+      <!-- Shown while an existing addition is open (SaisiePage.edit): deleted after confirmation. -->
+      <button type="button" id="saisie-delete" hidden class="saisie-btn saisie-btn-lg saisie-btn-delete"
+              title="Supprimer définitivement cet ajout">🗑 Supprimer cet ajout</button>
       <button type="button" id="saisie-cancel" hidden class="saisie-btn saisie-btn-lg saisie-btn-neutral">
         Annuler
       </button>
