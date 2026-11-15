@@ -31,6 +31,64 @@
     <!-- Simplified / traditional forms of a character (HanziForms.js, table in components/data.html). -->
     <script src="{% static 'hakkadbapp/js/HanziForms.js' %}"></script>
     <script>Romanization.init();</script>
+    <!-- Dark mode (🌙 in the header): the saved choice, else the system's,
+         applied before first paint. The whole page is inverted at once
+         (filter on <body>, the CSS below), since its styles hold hundreds of
+         light colours written as is; data-theme stays "light" so the few
+         components with dark colours of their own don't invert twice. -->
+    <script>
+      (function () {
+        var KEY = 'hakka-theme', saved = null, root = document.documentElement;
+        try { saved = localStorage.getItem(KEY); } catch (e) { /* private mode */ }
+        var system = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+        function apply(dark) {
+          root.setAttribute('data-theme', 'light');
+          root.toggleAttribute('data-dark', !!dark);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#3A0B0B' : '#9B1C1C');
+          var btn = document.getElementById('toggle-dark');
+          if (btn) {
+            btn.setAttribute('aria-pressed', String(!!dark));
+            btn.textContent = dark ? '☀️' : '🌙';
+            btn.title = dark ? 'Mode clair' : 'Mode sombre';
+          }
+        }
+        window.HakkaTheme = {
+          isDark: function () { return root.hasAttribute('data-dark'); },
+          set: function (dark) {
+            try { localStorage.setItem(KEY, dark ? 'dark' : 'light'); } catch (e) { /* private mode */ }
+            apply(dark);
+          },
+          refresh: function () { apply(root.hasAttribute('data-dark')); },
+        };
+        apply(saved ? saved === 'dark' : !!(system && system.matches));
+        // No choice made: follow the system when it changes.
+        if (system && !saved && system.addEventListener) {
+          system.addEventListener('change', function (e) {
+            var now = null;
+            try { now = localStorage.getItem(KEY); } catch (err) { /* private mode */ }
+            if (!now) apply(e.matches);
+          });
+        }
+      })();
+    </script>
+    <style>
+      /* Dark mode: everything inverted, hues kept (hue-rotate). What must
+         keep its true colours is inverted back: pictures, videos, canvases,
+         the red header; a modal <dialog> sits outside <body> (top layer)
+         and is inverted on its own. */
+      html[data-dark] { background: #0d0a08 !important; color-scheme: dark; }
+      /* (Light controls inside: the inversion makes them dark.) */
+      html[data-dark] body { filter: invert(1) hue-rotate(180deg); color-scheme: light; }
+      html[data-dark] body img, html[data-dark] body video, html[data-dark] body canvas, html[data-dark] body iframe,
+      html[data-dark] body picture, html[data-dark] body > header, html[data-dark] body .keep-colours,
+      html[data-dark] dialog:modal { filter: invert(1) hue-rotate(180deg); }
+      /* Inside the header (inverted back), its own pictures stay as they are. */
+      html[data-dark] body > header img, html[data-dark] body > header .keep-colours,
+      html[data-dark] dialog:modal img, html[data-dark] dialog:modal video, html[data-dark] dialog:modal canvas { filter: none; }
+      html[data-dark] dialog:modal::backdrop { background: rgb(0 0 0 / .6); }
+      @media print { html[data-dark] body, html[data-dark] dialog:modal { filter: none; } }
+    </style>
     <!-- Mandarin + short meaning of a character (Unicode Unihan), loaded on demand. -->
     <script src="{% static 'hakkadbapp/js/HanziInfo.js' %}" data-url="{% static 'hakkadbapp/data/hanzi_info.json' %}"></script>
     <style>
@@ -306,6 +364,13 @@
       <!-- Reading controls -->
       <div class="no-print flex flex-wrap items-center gap-2 sm:gap-3">
         <button
+          id="toggle-dark" type="button"
+          class="min-h-9 min-w-9 bg-black/20 text-white text-base px-2.5 py-1.5 rounded-full hover:bg-black/30 active:bg-black/40 transition-colors touch-manipulation"
+          aria-pressed="false" aria-label="Mode sombre" title="Mode sombre"
+          onclick="HakkaTheme.set(!HakkaTheme.isDark())"
+        >🌙</button>
+
+        <button
           id="toggle-hanzi"
           class="min-h-9 bg-black/20 text-white font-semibold text-sm px-3 py-2 rounded-full hover:bg-black/30 active:bg-black/40 transition-colors touch-manipulation"
           aria-pressed="false"
@@ -455,6 +520,7 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    window.HakkaTheme?.refresh();
     const toggleButton = document.getElementById('toggle-hanzi');
     let showingTrad = false;
 

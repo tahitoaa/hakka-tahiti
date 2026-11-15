@@ -176,22 +176,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     loadWords();
 
-    var themeBtn = document.getElementById("fc-theme-toggle");
-    var root = document.documentElement;
-    if (themeBtn) {
-      // Shares the "hakka-theme" preference/toggle mechanics with
-      // expressions.html (see expressions.js) -- same localStorage key and
-      // data-theme attribute on <html>, so the choice carries over between
-      // pages instead of each page tracking its own.
-      var stored = null;
-      try { stored = localStorage.getItem("hakka-theme"); } catch (e) {}
-      if (stored) root.setAttribute("data-theme", stored);
-      themeBtn.addEventListener("click", function () {
-        var nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-        root.setAttribute("data-theme", nextTheme);
-        try { localStorage.setItem("hakka-theme", nextTheme); } catch (e) {}
-      });
-    }
+    // Dark mode: the 🌙 of the header, for the whole site (base.html).
 
     var categorySelect = document.getElementById("category-select");
     if (categorySelect) {
