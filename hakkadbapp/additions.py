@@ -77,11 +77,16 @@ def missing_fields(addition):
     return out
 
 
+# An incomplete addition stays a draft: neither proposed nor validated.
+COMPLETE_STATUSES = (LexiconAddition.STATUS_REVIEW, LexiconAddition.STATUS_VALIDATED)
+
+
 def incomplete_refused(addition, status):
-    if status == LexiconAddition.STATUS_VALIDATED:
+    if status in COMPLETE_STATUSES:
         missing = missing_fields(addition)
         if missing:
-            return f"Incomplet, impossible de valider « {addition.hanzi} » : il manque {', '.join(missing)}."
+            what = "valider" if status == LexiconAddition.STATUS_VALIDATED else "proposer à la validation"
+            return f"Incomplet, impossible de {what} « {addition.hanzi} » : il manque {', '.join(missing)}."
     return None
 
 
@@ -151,6 +156,13 @@ def _save_with_new_words(request, addition, payload):
             return None, "Un mot à ajouter n'a pas de caractères."
         prepared.append((hanzi, pinyin, item.get("french", "").strip(), item.get("english", "").strip(),
                          item.get("themes", "").strip()))
+        # Proposed (or validated) with the expression: complete like any addition.
+        word = LexiconAddition(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin,
+                               french=prepared[-1][2], english=prepared[-1][3])
+        message = incomplete_refused(word, addition.status)
+        if message and not (LexiconAddition.objects.filter(kind=LexiconAddition.KIND_WORD, hanzi=hanzi, pinyin=pinyin)
+                            .exclude(status=LexiconAddition.STATUS_REJECTED).exists()):
+            return None, message
 
     words = []
     with transaction.atomic():
@@ -285,6 +297,9 @@ def additions_api(request):
         message = status_change_refused(request.user, LexiconAddition.STATUS_DRAFT, addition.status)
         if message:
             return JsonResponse({"error": message}, status=403)
+        message = incomplete_refused(addition, addition.status)
+        if message:
+            return JsonResponse({"error": message}, status=400)
         words, message = _save_with_new_words(request, addition, payload)
         if message:
             return JsonResponse({"error": message}, status=400)
@@ -506,10 +521,11 @@ def additions_bulk(request):
     refused = next((m for m in (status_change_refused(request.user, a.status, status) for a in additions) if m), None)
     if refused:
         return JsonResponse({"error": refused}, status=403)
-    incomplete = [a for a in additions if incomplete_refused(a, status)]
+    incomplete = [a for a in additions if a.status != status and incomplete_refused(a, status)]
     if incomplete:
         names = ", ".join(f"{a.hanzi} ({', '.join(missing_fields(a))})" for a in incomplete[:5])
-        return JsonResponse({"error": f"Incomplet, impossible de valider : {names}{'…' if len(incomplete) > 5 else ''}."}, status=400)
+        what = "valider" if status == LexiconAddition.STATUS_VALIDATED else "proposer à la validation"
+        return JsonResponse({"error": f"Incomplet, impossible de {what} : {names}{'…' if len(incomplete) > 5 else ''}."}, status=400)
     with transaction.atomic():
         for addition in additions:
             addition.status = status

@@ -659,6 +659,19 @@
             if (untranslated.length) {
                 return this.setStatus(`Indiquez le français des mots à ajouter (${untranslated.map((w) => w.hanzi).join(', ')}), ou décochez-les.`, true);
             }
+            // Proposed or validated: complete, English included (additions.incomplete_refused).
+            // An addition already proposed keeps its status: its edits are saved as they are.
+            if (['review', 'validated'].includes(status) && status !== this.editingStatus) {
+                if (!this.el.english.value.trim()) {
+                    return this.setStatus('Indiquez la traduction en anglais : un ajout incomplet reste en brouillon '
+                        + '(« Garder en brouillon » pour le compléter plus tard).', true);
+                }
+                const noEnglish = newWords.filter((w) => !w.english);
+                if (noEnglish.length) {
+                    return this.setStatus(`Indiquez l’anglais des mots à ajouter (${noEnglish.map((w) => w.hanzi).join(', ')}), `
+                        + 'ou décochez-les, ou gardez l’expression en brouillon.', true);
+                }
+            }
 
             const payload = { ...this.values(), input_text: this.el.text.value.trim(), status, new_words: newWords };
             const buttons = [...this.el.form.querySelectorAll('button[type="submit"]'), this.el.cancel];
