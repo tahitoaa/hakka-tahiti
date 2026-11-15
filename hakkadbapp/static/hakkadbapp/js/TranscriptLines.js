@@ -42,6 +42,10 @@ class TranscriptLines {
                 if (!toTrad.has(p.simp)) toTrad.set(p.simp, p.trad);
                 if (!toSimp.has(p.trad)) toSimp.set(p.trad, p.simp);
             });
+            // Every other form of the lexicon's characters (髮 -> 发).
+            if (typeof HanziForms !== 'undefined') {
+                Object.entries(HanziForms.load()).forEach(([form, simp]) => { if (!toSimp.has(form)) toSimp.set(form, simp); });
+            }
             TranscriptLines._forms = { list, toTrad, toSimp };
         }
         return TranscriptLines._forms;
@@ -67,8 +71,18 @@ class TranscriptLines {
         return {
             pinyin: sentence.renderDisplayPinyinLine(),
             simp: TranscriptLines.convert(simp, forms.toSimp),
-            trad: known && data.trad ? data.trad : TranscriptLines.convert(TranscriptLines.convert(typed, forms.toSimp), forms.toTrad),
+            trad: TranscriptLines.tradOf(typed, known && data.trad ? data.trad : TranscriptLines.convert(TranscriptLines.convert(typed, forms.toSimp), forms.toTrad)),
         };
+    }
+
+    /** The traditional line: `trad`, except where a traditional form was
+     *  typed (髮, not the 發 the lexicon's 发 gives): kept as typed. */
+    static tradOf(typed, trad) {
+        if (typeof HanziForms === 'undefined') return trad;
+        const t = [...typed];
+        const out = [...trad];
+        if (t.length !== out.length) return trad;
+        return out.map((c, i) => (HanziForms.isOtherForm(t[i]) ? t[i] : c)).join('');
     }
 
     static derive(dico, text) {

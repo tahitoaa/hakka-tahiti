@@ -180,12 +180,19 @@ class Sentence {
     findMatches(hanzi, constraints, readings = null) {
         if (!hanzi) return [];
 
+        // Written so, else in other forms of the same characters (頭髮 for
+        // 頭发, 愛 for 爱: HanziForms.js) when nothing is written so.
+        const forms = typeof HanziForms !== 'undefined' ? HanziForms : null;
+        const exact = (simp, trad) => simp === hanzi || trad === hanzi;
+        const other = (simp, trad) => !!forms && (forms.sameText(simp, hanzi) || forms.sameText(trad, hanzi));
+        const spelled = this.dico.words.some((w) => exact((w.dataset || w).simp, (w.dataset || w).trad)) ? exact : other;
+
         let matches = this.dico.words.filter(w => {
             const d = w.dataset || w;
             const { simp, trad, french = '', pinyin = '' } = d;
 
             if (!simp) return false;
-            if (simp !== hanzi && trad !== hanzi) return false;
+            if (!spelled(simp, trad)) return false;
             // A pinned reading (生(sen1)) rules out homophones read otherwise.
             if (!Sentence.agreesWithReadings(d, readings)) return false;
 

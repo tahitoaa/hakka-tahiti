@@ -365,7 +365,7 @@ class WordBoxes {
     lexiconReadings(char) {
         const list = this.entry?.dico?.lexiconPronunciations || [];
         const key = (p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`);
-        return [...new Set(list.filter((p) => p.simp === char || p.trad === char).map(key))];
+        return [...new Set(SaisieEntry.lexiconOf(list, char).map(key))];
     }
 
     /** 'new-char' (absent from the lexicon), 'new-reading' (a reading it

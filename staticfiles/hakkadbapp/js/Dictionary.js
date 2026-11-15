@@ -177,7 +177,12 @@ class Dictionary {
 
         // 1. The lexicon's own reading of this character.
         const sameChar = (p) => [p.simp, p.trad].some((h) => h && (h === pron.simp || h === pron.trad));
-        const lexicon = this.lexiconPronunciations.filter((p) => sameChar(p) && fits(p.initial, p.final, String(p.tone ?? '')));
+        let lexicon = this.lexiconPronunciations.filter((p) => sameChar(p) && fits(p.initial, p.final, String(p.tone ?? '')));
+        // Another form of the character (髮 for 发): its readings.
+        if (!lexicon.length && typeof HanziForms !== 'undefined') {
+            const same = (p) => [p.simp, p.trad].some((h) => h && [pron.simp, pron.trad].some((x) => HanziForms.sameText(h, x)));
+            lexicon = this.lexiconPronunciations.filter((p) => same(p) && fits(p.initial, p.final, String(p.tone ?? '')));
+        }
         if (lexicon.length) {
             const p = lexicon.find((q) => wasTyped(q.initial, q.final, String(q.tone ?? ''))) || lexicon[0];
             return stored(p.initial, p.final, p.tone);
@@ -247,9 +252,8 @@ class Dictionary {
         if (!char || char.length !== 1 || !isHanzi(char)) {
             return [new NoHanziToken({text:char})]
         }
-        const matches = this.pronunciations.filter(p => {
-            return p.simp == char || p.trad == char;
-        });
+        // Written so, else another form of it (髮 for 发, 愛 for 爱): HanziForms.js.
+        const matches = (typeof HanziForms !== 'undefined' ? HanziForms.pick(this.pronunciations, char) : this.pronunciations.filter((p) => p.simp === char || p.trad === char));
 
         if (matches.length == 0) this.unknowns.add(char);
         return matches;

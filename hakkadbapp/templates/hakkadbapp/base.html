@@ -28,6 +28,8 @@
     <script src="{% static 'hakkadbapp/js/Romanization.js' %}"></script>
     <!-- Every search box: « zen lao » finds zen1lao1 (SearchMatch.js). -->
     <script src="{% static 'hakkadbapp/js/SearchMatch.js' %}"></script>
+    <!-- Simplified / traditional forms of a character (HanziForms.js, table in components/data.html). -->
+    <script src="{% static 'hakkadbapp/js/HanziForms.js' %}"></script>
     <script>Romanization.init();</script>
     <!-- Mandarin + short meaning of a character (Unicode Unihan), loaded on demand. -->
     <script src="{% static 'hakkadbapp/js/HanziInfo.js' %}" data-url="{% static 'hakkadbapp/data/hanzi_info.json' %}"></script>

@@ -80,7 +80,8 @@ class SyllableInputModel {
         // with another reading than the one chosen.
         const key = (p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`);
         const pool = this.dico.lexiconPronunciations
-            ? this.dico.lexiconPronunciations.filter((p) => p.simp === char || p.trad === char)
+            // (another form of the character -- 髮 for 发 -- reads like it: HanziForms.js)
+            ? (typeof HanziForms !== 'undefined' ? HanziForms.pick(this.dico.lexiconPronunciations, char) : this.dico.lexiconPronunciations.filter((p) => p.simp === char || p.trad === char))
             : this.dico.getMatchesForHanzi(char);
         const readings = new Set(pool.map(key));
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;

@@ -25,6 +25,26 @@ def to_trad(hanzi):
     return _s2t.convert(hanzi) if hanzi else hanzi
 
 @register.simple_tag
+def hanzi_forms_json(pronunciations):
+    """<script id="hanzi-forms">: every other form of the lexicon's
+    characters -> its simplified one (髮 發 -> 发), for HanziForms.js: a
+    character typed in another form than the lexicon's is still known."""
+    from django.utils.html import json_script
+    from hakkadbapp.models import hanzi_forms
+    from hakkadbapp.models import to_simp as simp_of
+    table = {}
+    for p in pronunciations or []:
+        hanzi = getattr(p, "hanzi", "")
+        if not hanzi:
+            continue
+        simp = simp_of(hanzi)
+        for form in hanzi_forms(hanzi):
+            if form != simp:
+                table.setdefault(form, simp)
+    return json_script(table, "hanzi-forms")
+
+
+@register.simple_tag
 def combo_exists(initial_id, final_id, combo_set):
     return (initial_id, final_id) in combo_set
 

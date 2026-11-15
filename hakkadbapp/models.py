@@ -24,6 +24,34 @@ def to_trad(text):
 def to_simp(text):
     return t2s.convert(text)
 
+
+@lru_cache(maxsize=None)
+def _traditional_forms():
+    """{simplified: every traditional form} from OpenCC's own table
+    (发: 發 髮, 干: 幹 乾 干): s2t keeps only the first one."""
+    import os
+    import opencc
+    out = {}
+    path = os.path.join(os.path.dirname(opencc.__file__), "dictionary", "STCharacters.txt")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if "\t" in line:
+                    simp, trads = line.rstrip("\n").split("\t", 1)
+                    out.setdefault(simp, set()).update(trads.split())
+    except OSError:
+        pass
+    return out
+
+
+@lru_cache(maxsize=None)
+def hanzi_forms(char):
+    """Every form of a character, simplified and traditional: 髮 -> 发 發 髮.
+    The lexicon stores one; a text may use any (a dictionary's 髮, a 發
+    typed). Only a fallback: a form the lexicon has itself comes first."""
+    simp = to_simp(char)
+    return frozenset({char, simp, to_trad(char), *_traditional_forms().get(simp, ())})
+
 class Initial(models.Model):
     initial = models.CharField(max_length=10, null=True)  # Adjust this as per your requirements
 

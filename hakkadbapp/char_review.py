@@ -16,7 +16,7 @@ from collections import defaultdict
 from django.http import JsonResponse
 from django.views.decorators.gzip import gzip_page
 
-from .models import LexiconAddition, Pronunciation, Word, WordPronunciation, to_simp, to_trad
+from .models import LexiconAddition, Pronunciation, Word, WordPronunciation, hanzi_forms, to_simp, to_trad
 from .permissions import editor_required, is_editor
 
 STATUSES = (LexiconAddition.STATUS_DRAFT, LexiconAddition.STATUS_REVIEW, LexiconAddition.STATUS_VALIDATED)
@@ -39,14 +39,23 @@ def lexicon_map():
     {pronunciation id: (char, reading)}."""
     readings = defaultdict(list)
     by_id = {}
+    others = defaultdict(list)       # the other forms (髮 for 发): only where nothing else
     for p in Pronunciation.objects.select_related("initial", "final", "tone"):
         if not p.hanzi:
             continue
         r = reading_of(p)
         by_id[p.id] = (p.hanzi, r)
-        for form in {p.hanzi, to_simp(p.hanzi), to_trad(p.hanzi)}:
+        exact = {p.hanzi, to_simp(p.hanzi), to_trad(p.hanzi)}
+        for form in exact:
             if r not in readings[form]:
                 readings[form].append(r)
+        for form in hanzi_forms(p.hanzi) - exact:
+            if r not in others[form]:
+                others[form].append(r)
+    # A form the lexicon has itself keeps its own readings (乾 is not 干).
+    for form, rs in others.items():
+        if form not in readings:
+            readings[form] = rs
     return dict(readings), by_id
 
 
@@ -62,7 +71,7 @@ def addition_chars():
 def word_examples(chars, by_id):
     """{char: {reading: {"count": n, "words": ["屋家 wuk5ga1 — maison"]}}} from
     the lexicon words that use one of these characters."""
-    forms = {f: c for c in chars for f in {c, to_simp(c), to_trad(c)}}
+    forms = {f: c for c in chars for f in hanzi_forms(c)}
     pron_ids = [pid for pid, (hanzi, _r) in by_id.items() if hanzi in forms]
     uses = defaultdict(list)          # pronunciation id -> word ids
     for pid, wid in WordPronunciation.objects.filter(pronunciation_id__in=pron_ids).values_list("pronunciation_id", "word_id"):

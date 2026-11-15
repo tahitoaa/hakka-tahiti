@@ -14,6 +14,12 @@ class SaisieEntry {
     // (group 4); comments, (pins) and :constraints are matched and skipped.
     static UNIT_RE = new RegExp(`(«[^»]*»?)|${SyllableInputModel.SYLLABLE_RE.source}|(\\s+)|([\\s\\S])`, 'gu');
 
+    /** The lexicon readings of `char`: written so, else in another form
+     *  of it (髮 for 发, 愛 for 爱: HanziForms.js). */
+    static lexiconOf(list, char) {
+        return (typeof HanziForms !== 'undefined' ? HanziForms.pick(list, char) : list.filter((p) => p.simp === char || p.trad === char));
+    }
+
     /** Space-separated words, a «…» block being one (Sentence.splitWords). */
     static words(text) {
         return String(text || '').match(/«[^»]*»?\S*|\S+/gu) || [];
@@ -54,7 +60,7 @@ class SaisieEntry {
         // can't give it by itself (a character with several readings, none,
         // or another one) -- same rule as picking a suggestion.
         const lexicon = dico?.lexiconPronunciations;
-        const readingsOf = (char) => new Set(lexicon.filter((p) => p.simp === char || p.trad === char)
+        const readingsOf = (char) => new Set(SaisieEntry.lexiconOf(lexicon, char)
             .map((p) => (p.storedKey ? p.storedKey() : `${p.initial}${p.final}${p.tone ?? ''}`)));
         const pinned = (word, reading) => {
             if (!lexicon) return `${word}(${reading})`;
@@ -213,7 +219,7 @@ class SaisieEntry {
         const reading = this.readingFor(char, syl);
         if (!reading) return false;
         const known = new Set(this.dico.lexiconPronunciations
-            .filter((p) => p.simp === char || p.trad === char)
+            .filter((p) => SaisieEntry.lexiconOf([p], char).length)
             .map((p) => `${p.initial}${p.final}${p.tone ?? ''}`));
         this.model.replace(sylIndex, known.size === 1 && known.has(reading) ? char : `${char}(${reading})`);
         this.setText(this.model.text);
@@ -231,8 +237,7 @@ class SaisieEntry {
         if (!R) return /[0-8]$/.test(plain) ? plain : '';
         const candidates = R.typedToStored(plain, system);
         if (char) {
-            const fits = this.dico.lexiconPronunciations.filter((p) => (p.simp === char || p.trad === char)
-                && candidates.some((c) => c.initial === p.initial && c.final === p.final
+            const fits = SaisieEntry.lexiconOf(this.dico.lexiconPronunciations, char).filter((p) => candidates.some((c) => c.initial === p.initial && c.final === p.final
                     && (!c.tones || c.tones.includes(String(p.tone ?? '')))));
             const exact = fits.find((p) => candidates.some((c) => c.tones?.length === 1 && c.tones[0] === String(p.tone ?? '')));
             const p = exact || (fits.length === 1 ? fits[0] : null);
@@ -442,6 +447,8 @@ class SaisieEntry {
                 const d = w.dataset || w;
                 if (d.simp) set.add(d.simp);
                 if (d.trad) set.add(d.trad);
+                // Another form typed (頭髮 for 頭发): found by its simplified form.
+                if (d.simp && typeof HanziForms !== 'undefined') set.add(HanziForms.canon(d.simp));
             });
             SaisieEntry._spellings = { words, size: words.length, set };
         }
@@ -461,7 +468,8 @@ class SaisieEntry {
         const spellings = SaisieEntry.spellings(this.dico);
         const isWord = (units) => {
             const hanzi = units.map((u) => u.char).join('');
-            return spellings.has(hanzi) && this.sentence.findMatches(hanzi, null,
+            const known = spellings.has(hanzi) || (typeof HanziForms !== 'undefined' && spellings.has(HanziForms.canon(hanzi)));
+            return known && this.sentence.findMatches(hanzi, null,
                 units.some((u) => u.pinned) ? units.map((u) => u.pinned || null) : null).length > 0;
         };
         // Runs of characters, each one knowing its group.
