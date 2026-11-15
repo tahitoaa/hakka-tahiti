@@ -338,12 +338,31 @@ def addition_update(request, addition_id):
 @require_POST
 @editor_required
 def addition_delete(request, addition_id):
-    get_object_or_404(LexiconAddition, id=addition_id).delete()
+    addition = get_object_or_404(LexiconAddition, id=addition_id)
+    message = delete_refused(request.user, [addition])
+    if message:
+        return JsonResponse({"error": message}, status=403)
+    addition.delete()
     Visa.objects.filter(target_type=Visa.TARGET_ADDITION, target_key=str(addition_id)).delete()
     return JsonResponse({"ok": True})
 
 
 MAX_BULK = 500
+
+# Decided additions: only a validator may delete them.
+DECIDED_STATUSES = (LexiconAddition.STATUS_VALIDATED, LexiconAddition.STATUS_REJECTED)
+
+
+def delete_refused(user, additions):
+    """A message when `user` may not delete one of `additions` (a validated
+    or rejected one, unless a validator), else None."""
+    if is_validator(user):
+        return None
+    decided = [a for a in additions if a.status in DECIDED_STATUSES]
+    if decided:
+        return ("Seuls les validateurs peuvent supprimer un ajout validé ou rejeté"
+                f" ({', '.join(a.hanzi for a in decided[:5])}{'…' if len(decided) > 5 else ''}).")
+    return None
 
 
 SYLLABLE_RE = re.compile(r"[^\s\d⁰¹²³⁴⁵⁶⁷⁸]+[\d⁰¹²³⁴⁵⁶⁷⁸]")
@@ -467,6 +486,9 @@ def additions_bulk(request):
         return JsonResponse({"error": "Certains ajouts n'existent plus : rechargez la page."}, status=404)
 
     if payload.get("action") == "delete":
+        message = delete_refused(request.user, additions)
+        if message:
+            return JsonResponse({"error": message}, status=403)
         with transaction.atomic():
             LexiconAddition.objects.filter(id__in=ids).delete()
             Visa.objects.filter(target_type=Visa.TARGET_ADDITION, target_key__in=[str(i) for i in ids]).delete()

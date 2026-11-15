@@ -132,6 +132,7 @@ def _forget(addition_id):
 def api_merge(request, addition_id):
     """POST {type: "addition" | "word" | "expression", id}: merges that item
     and this addition (see the module). Returns {ok, addition?, removed, remarks, message}."""
+    from .additions import delete_refused   # (additions imports this module's neighbours)
     addition = get_object_or_404(LexiconAddition, id=addition_id)
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -145,6 +146,10 @@ def api_merge(request, addition_id):
         other = LexiconAddition.objects.filter(id=other_id).first()
         if not other:
             return JsonResponse({"error": "L'autre ajout n'existe plus : rechargez la page."}, status=404)
+        # The other one is deleted: a decided one only by a validator.
+        message = delete_refused(request.user, [other])
+        if message:
+            return JsonResponse({"error": message}, status=403)
         with transaction.atomic():
             changed = merge_additions(addition, other)
             addition.updated_by = request.user
@@ -160,6 +165,10 @@ def api_merge(request, addition_id):
     entry = lexicon_entry(kind, other_id)
     if not entry:
         return JsonResponse({"error": "Cette entrée du lexique n'existe plus."}, status=404)
+    # This addition is deleted: a decided one only by a validator.
+    message = delete_refused(request.user, [addition])
+    if message:
+        return JsonResponse({"error": message}, status=403)
     remarks = lexicon_remarks(addition, entry)
     status = ReviewComment.STATUS_TODO if is_validator(request.user) else ReviewComment.STATUS_OPEN
     target_type = ReviewComment.TARGET_WORD if kind == "word" else ReviewComment.TARGET_EXPRESSION

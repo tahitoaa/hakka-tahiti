@@ -36,3 +36,19 @@ class IncompleteAdditionTest(SimpleTestCase):
     def test_text_block_is_no_unsure_reading(self):
         a = addition(kind=LexiconAddition.KIND_EXPRESSION, hanzi="我 «ma'a?»", pinyin="ngai1 «ma'a?»")
         self.assertIsNone(incomplete_refused(a, REVIEW))
+
+
+class DeleteDecidedTest(SimpleTestCase):
+    """A validated or rejected addition: deleted by a validator only."""
+
+    def test_rule(self):
+        from unittest import mock
+
+        from . import additions as module
+
+        draft, validated = addition(status=DRAFT), addition(status=VALIDATED, hanzi="家")
+        with mock.patch.object(module, "is_validator", return_value=False):
+            self.assertIsNone(module.delete_refused(object(), [draft]))
+            self.assertIn("家", module.delete_refused(object(), [draft, validated]))
+        with mock.patch.object(module, "is_validator", return_value=True):
+            self.assertIsNone(module.delete_refused(object(), [validated]))
