@@ -119,7 +119,7 @@ class Controller{
         document.addEventListener('romanization-input-change', () => this.handleInput());
     }
 
-    /** Shift+1..9 picks a suggestion by its keyboard hint, mirroring the
+    /** Alt+1..9 picks a suggestion by its keyboard hint, mirroring the
      *  transcription editor. Ignored while editing the small csv-style
      *  <input> fields (unknown chars/prons), active everywhere else. */
     bindKeyboard() {
@@ -129,10 +129,12 @@ class Controller{
             pick: (index) => this.handleSelectSuggestion(index),
         });
         window.addEventListener('keydown', (event) => {
-            if (!event.shiftKey || !/^[1-9]$/.test(event.key)) return;
+            // Alt, not Maj: on an AZERTY keyboard Maj+1 types the tone 1.
+            // event.code: Alt+digit types nothing, the same on AZERTY and QWERTY.
+            if (!event.altKey || event.ctrlKey || !/^Digit[1-9]$/.test(event.code)) return;
             if (document.activeElement?.tagName === 'INPUT') return;
 
-            const index = parseInt(event.key, 10) - 1;
+            const index = Number(event.code.slice(5)) - 1;
             if (index >= this.model.suggestions.length) return;
 
             event.preventDefault();
