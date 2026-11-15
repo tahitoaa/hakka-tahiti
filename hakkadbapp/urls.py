@@ -92,6 +92,7 @@ urlpatterns = [
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ajouts/caracteres", char_review.api_characters, name="additions_characters"),
     path("api/ajouts/doublons", addition_duplicates.api_duplicates, name="additions_duplicates"),
+    path("api/ajouts/occurrences", additions.additions_occurrences, name="additions_occurrences"),
     path("api/ajouts/<int:addition_id>/fusionner", addition_merge.api_merge, name="addition_merge"),
     path("api/visas", visas.api_visas, name="visas"),
     path("api/visas/donner", visas.api_visa, name="visa_give"),

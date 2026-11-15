@@ -369,6 +369,64 @@ def addition_delete(request, addition_id):
 
 MAX_BULK = 500
 
+OCCURRENCES_SHOWN = 8
+_TOKEN_NOISE_RE = re.compile(r"\([^()]*\)|:\S*|[，。、；：？！…,.;:?!«»\"“”‘’'()（）\-]")
+
+
+def _word_tokens(text):
+    """The words of an expression's maillage, as their simplified form:
+    « 若 爸爸(ba1ba1) 在 屋家:maison 么 ? » -> {若, 爸爸, 在, 屋家, 么}."""
+    from .models import to_simp
+    out = set()
+    for token in str(text or "").split():
+        core = _TOKEN_NOISE_RE.sub("", token)
+        if core:
+            out.add(to_simp(core))
+    return out
+
+
+def occurrences(hanzi):
+    """The expressions holding the word `hanzi` (one of their words, in
+    any form, 屋家 = 屋傢): the lexicon's and the additions' (not rejected).
+    {"lexicon": {"count", "items": [{hanzi, rendering, french}]},
+     "additions": {"count", "items": [{id, hanzi, pinyin, french, status}]}}"""
+    from .models import to_simp
+    word = to_simp("".join(str(hanzi or "").split()))
+    if not word:
+        return {"lexicon": {"count": 0, "items": []}, "additions": {"count": 0, "items": []}}
+    # A first cut in the database (any character of the word), the words compared here.
+    lexicon = [e for e in Expression.objects.filter(text__contains=word[0]).only("text", "rendering", "french")
+               if word in _word_tokens(e.text)]
+    adds = [a for a in LexiconAddition.objects.filter(kind=LexiconAddition.KIND_EXPRESSION)
+            .exclude(status=LexiconAddition.STATUS_REJECTED).filter(hanzi__contains=word[0])
+            .only("id", "hanzi", "pinyin", "french", "status")
+            if word in _word_tokens(a.hanzi)]
+    return {
+        "lexicon": {"count": len(lexicon), "items": [
+            {"hanzi": _shown_hanzi(e), "rendering": e.rendering or "", "french": e.french or ""}
+            for e in lexicon[:OCCURRENCES_SHOWN]]},
+        "additions": {"count": len(adds), "items": [
+            {"id": a.id, "hanzi": a.hanzi, "pinyin": a.pinyin, "french": a.french, "status": a.status}
+            for a in adds[:OCCURRENCES_SHOWN]]},
+    }
+
+
+def _shown_hanzi(expression):
+    """The characters of an expression as the platform shows them: the hanzi
+    half of its rendering, else its words without readings nor senses."""
+    from .text_to_words import split_rendering
+    hanzi = split_rendering(expression.rendering or "")[1]
+    return hanzi or "".join(_TOKEN_NOISE_RE.sub("", t) for t in (expression.text or "").split())
+
+
+@editor_required
+def additions_occurrences(request):
+    """GET ?hanzi=屋家: the expressions holding that word (occurrences())."""
+    if not is_editor(request.user):
+        return JsonResponse({"error": "Réservé aux éditeurs."}, status=403)
+    hanzi = request.GET.get("hanzi", "")[:40]
+    return JsonResponse({"hanzi": hanzi, **occurrences(hanzi)}, json_dumps_params={"ensure_ascii": False})
+
 # Decided additions: only a validator may delete them.
 DECIDED_STATUSES = (LexiconAddition.STATUS_VALIDATED, LexiconAddition.STATUS_REJECTED)
 

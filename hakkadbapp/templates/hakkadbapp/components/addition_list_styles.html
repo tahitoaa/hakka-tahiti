@@ -29,6 +29,25 @@
                 font-weight: 600; line-height: 1.2; transition: background-color .15s, box-shadow .15s, opacity .15s;
                 touch-action: manipulation; }
   .saisie-btn[hidden] { display: none; }
+  /* « 🔗 Dans 3 expressions »: where a word is used (AdditionList.showOccurrences). */
+  .occ { margin-top: 0.4rem; padding: 0.35rem 0.6rem; border-radius: 0.5rem; background: #eef2ff; border: 1px solid #c7d2fe;
+         color: #312e81; font-size: 0.85rem; text-align: left; }
+  .occ.is-none { background: #F6EFE4; border-color: #ECE2D3; color: #8C8478; }
+  .occ-head { font-weight: 700; cursor: pointer; }
+  .occ-n { margin-left: 0.35rem; padding: 0 0.4rem; border-radius: 9999px; background: #fff; font-size: 0.72rem; font-weight: 600; }
+  .occ-n.is-add { color: #9a3412; }
+  .occ-sub { margin: 0.3rem 0 0.1rem; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6366f1; }
+  .occ-sub a { text-transform: none; letter-spacing: 0; font-weight: 600; text-decoration: underline; }
+  .occ ul { display: grid; gap: 0.1rem; margin: 0; padding: 0; list-style: none; }
+  .occ li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.5rem; }
+  .occ li a { color: inherit; text-decoration: none; }
+  .occ li a:hover .hanzi { text-decoration: underline; }
+  .occ .hanzi { font-size: 1.1rem !important; color: #261F1C; }
+  .occ mark { background: #fde68a; color: inherit; border-radius: 0.15rem; padding: 0 0.05rem; }
+  .occ-fr { color: #544D45; }
+  .occ-py { font-size: 0.75rem; color: #6E655C; }
+  .occ-more { color: #6E655C; font-style: italic; }
+  .vs-occurrences { max-width: 36rem; margin: 0 auto; }
   /* A word's type after its hakka (LexiconAddition.word_type), never in the characters' font. */
   .vt-wtype { font-family: system-ui, sans-serif; font-size: 0.72rem !important; font-weight: 500; font-style: italic; color: #8C8478;
               white-space: nowrap; margin-left: 0.25rem; letter-spacing: 0; }

@@ -47,3 +47,14 @@ class OnomatopoeiaTest(SimpleTestCase):
         e = LexiconAddition(kind=LexiconAddition.KIND_EXPRESSION)
         _apply_payload(e, {"hanzi": "我 嘭", "pinyin": "ngai1 pang1", "french": "moi boum", "word_type": "onomatopée"})
         self.assertEqual((e.word_type, e.french), ("", "moi boum"))
+
+
+class OccurrenceTokensTest(SimpleTestCase):
+    """The words of an expression, to find where a word is used (additions.occurrences)."""
+
+    def test_words_of_a_maillage(self):
+        from .additions import _word_tokens
+        self.assertEqual(_word_tokens("若 爸爸(ba1ba1) 在 屋家:maison 么 ?"), {"若", "爸爸", "在", "屋家", "么"})
+        # In its simplified form: a traditional spelling finds the same word.
+        self.assertIn("屋家", _word_tokens("屋家，"))
+        self.assertIn("头发", _word_tokens("頭髮"))
