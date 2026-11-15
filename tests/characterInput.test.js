@@ -16,13 +16,12 @@ function loadCharacterInput() {
   return context;
 }
 
-test("suggestionKeyHint labels the first 9 suggestions 1-9, then A, B, C...", () => {
+test("suggestionKeyHint labels the first 9 suggestions 1-9, none after (Tab gets there)", () => {
   const { suggestionKeyHint } = loadCharacterInput();
 
   assert.equal(suggestionKeyHint(0), "1");
   assert.equal(suggestionKeyHint(8), "9");
-  assert.equal(suggestionKeyHint(9), "A");
-  assert.equal(suggestionKeyHint(10), "B");
+  assert.equal(suggestionKeyHint(9), "");
 });
 
 test("SyllableInputModel.parse extracts romanized syllables and looks each one up in the dictionary", () => {

@@ -246,6 +246,38 @@ test("word boxes: each word coloured after the lexicon, its readings, cuts and t
   assert.doesNotMatch(ro.container.innerHTML, /data-(segment|pin|split|join-from)/);
 });
 
+test("keys as in a Chinese input method: Tab moves the highlighted suggestion, Entrée picks it, then the readings", () => {
+  const { context, entry } = load();
+  const field = makeEl();
+  const picked = [];
+  const bar = { active: true, highlight: 0, move(d) { this.highlight += d; }, dismiss() { this.active = false; } };
+  const changes = [];
+  const boxes = new context.WordBoxes(makeEl({ querySelectorAll: () => [] }), { onChange: (t, w) => changes.push(w) });
+  context.WordBoxes.bindKeys(field, { bar, boxes, pick: (i) => picked.push(i) });
+  const key = (k, extra = {}) => {
+    const e = { key: k, target: field, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...extra };
+    field._trigger("keydown", e);
+    return e.defaultPrevented;
+  };
+  assert.equal(key("Tab"), true);
+  assert.equal(key("Tab"), true);
+  assert.equal(key("Tab", { shiftKey: true }), true);
+  assert.equal(bar.highlight, 1);
+  assert.equal(key("Enter"), true);
+  assert.deepEqual(picked, [1]);
+  assert.equal(key("Enter", { shiftKey: true }), false);   // a new line, never taken
+  assert.equal(key("Escape"), true);
+  assert.equal(bar.active, false);
+  // No suggestion, no reading to choose: Tab and Entrée do as usual.
+  assert.equal(key("Tab"), false);
+  assert.equal(key("Enter"), false);
+  // Ctrl+Entrée: the lexicon's segmentation.
+  entry.setText("屋 家", "expression");
+  boxes.render(entry);
+  assert.equal(key("Enter", { ctrlKey: true }), true);
+  assert.deepEqual(changes, ["segment"]);
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);
