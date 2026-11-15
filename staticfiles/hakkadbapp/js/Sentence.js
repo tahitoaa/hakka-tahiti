@@ -55,6 +55,20 @@ class Sentence {
         return m ? m[1].trim() : null;
     }
 
+    /** The « Texte » button (Saisie, Transcrire): the selection put
+     *  between « » (or « » inserted, the caret inside), spaced from its
+     *  neighbours. Returns {text, caret}. */
+    static wrapText(text, start, end) {
+        const before = text.slice(0, start);
+        const inner = text.slice(start, end).trim();
+        const after = text.slice(end);
+        const lead = before && !/\s$/.test(before) ? ' ' : '';
+        const trail = after && !/^\s/.test(after) ? ' ' : '';
+        const out = `${before}${lead}«${inner}»${trail}${after}`;
+        const caret = before.length + lead.length + 1 + inner.length + (inner ? 1 : 0);
+        return { text: out, caret };
+    }
+
     static latinPunct(text) {
         return [...String(text || '')].map((c) => Sentence.PUNCT_TO_LATIN[c] ?? c).join('');
     }

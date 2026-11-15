@@ -161,7 +161,12 @@ class SegmentEditor {
               </div>
               <div class="eaf-field"><span>Transcript<br><small>tier « ${escapeHtml(s.speaker.id)} »</small></span>
                 <div class="eaf-ime">
-                  <textarea data-role="transcript" class="hanzi-input" rows="2" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+                  <div class="eaf-text-row">
+                    <textarea data-role="transcript" class="hanzi-input" rows="2" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+                    <button type="button" class="eaf-btn eaf-btn-light eaf-text-btn" data-act="text"
+                            title="Texte sans caractère (tahitien, français, nom propre…) : met la sélection entre « »"
+                            aria-label="Texte sans caractère : entre guillemets">« » Texte</button>
+                  </div>
                   <div data-role="suggestions" class="flex gap-1.5 flex-wrap"></div>
                   <div data-role="ambiguous" class="eaf-ambig" hidden></div>
                   <div data-role="preview" class="eaf-preview"></div>
@@ -205,8 +210,11 @@ class SegmentEditor {
             this.transcript.dispatchEvent(new Event('input'));
             this.transcript.focus();
         });
+        // « Texte » keeps the selection in the transcript: it never takes the focus.
+        q('[data-act="text"]').addEventListener('mousedown', (event) => event.preventDefault());
         this.row.addEventListener('click', (event) => {
             const act = event.target.closest('[data-act]')?.dataset.act;
+            if (act === 'text') this.wrapSelectionAsText();
             if (act === 'play') this.app.play(s);
             if (act === 'prev') this.app.step(-1);
             if (act === 'next') this.app.step(1);
@@ -237,6 +245,18 @@ class SegmentEditor {
         this.ambiguous.innerHTML = found.length ? `<span class="eaf-ambig-label">Plusieurs lectures :</span>${found.map((a) =>
             `<span class="eaf-ambig-char"><span class="hanzi">${escapeHtml(a.char)}</span>${a.readings.map((r) =>
                 `<button type="button" data-pin="${a.pos}" data-reading="${escapeHtml(r)}" aria-label="Lire ${escapeHtml(a.char)} ${escapeHtml(sentence.displayPinyin(r))}">${escapeHtml(sentence.displayPinyin(r))}</button>`).join('')}</span>`).join('')}` : '';
+    }
+
+    /** « Texte »: the selection (or the caret) between « », for words that
+     *  are not Hakka (ma'a tinito, Raiatea): written as is in every line. */
+    wrapSelectionAsText() {
+        const input = this.transcript;
+        const { text, caret } = Sentence.wrapText(input.value, input.selectionStart ?? input.value.length,
+            input.selectionEnd ?? input.value.length);
+        input.value = text;
+        input.focus();
+        input.setSelectionRange(caret, caret);
+        input.dispatchEvent(new Event('input'));
     }
 
     select(index) {
