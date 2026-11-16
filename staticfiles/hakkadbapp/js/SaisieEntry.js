@@ -175,6 +175,22 @@ class SaisieEntry {
         return true;
     }
 
+    /** The word at text position `pos` given the sense `sense`, written
+     *  after it as a :constraint (把:prendre; spaces as _: prendre_en_main),
+     *  before its punctuation, instead of any sense it had. */
+    senseAt(pos, sense) {
+        const clean = String(sense || '').trim().replace(/[:,]/g, ' ').split(/\s+/).filter(Boolean).join('_');
+        if (!clean) return false;
+        let start = pos;
+        while (start > 0 && !/\s/.test(this.text[start - 1])) start -= 1;
+        let end = pos;
+        while (end < this.text.length && !/\s/.test(this.text[end])) end += 1;
+        const [core, tail] = Sentence.splitPunct(this.text.slice(start, end));
+        if (!core || Sentence.textBlock(core) !== null) return false;
+        this.setText(`${this.text.slice(0, start)}${core.split(':')[0]}:${clean}${tail}${this.text.slice(end)}`);
+        return true;
+    }
+
     /** The spaces between text positions `from` and `to` removed: two
      *  words become one. */
     joinAt(from, to) {
@@ -360,7 +376,7 @@ class SaisieEntry {
             // Every entry spelled so (homographs: several senses, or readings).
             if (t.match) return { ...w, status: 'known', entry: t.match,
                 entries: (this.sentence.matches[i] || []).map((m) => m.dataset || m),
-                sense: (this.sentence.parseToken(t.token).constraints || []).join(', ') };
+                sense: (this.sentence.parseToken(Sentence.splitPunct(t.token)[0]).constraints || []).join(', ').replace(/_/g, ' ') };
             // Same characters and reading; a reading still unsure (« / », « ? »): same characters.
             const unsure = /[/?]/.test(t.pinyin || '');
             const word = (a) => a.kind === 'word' && a.status !== 'rejected' && a.hanzi === t.plain;
@@ -371,7 +387,7 @@ class SaisieEntry {
             if (SaisieEntry.PUNCT_RE.test(t.plain)) return { ...w, status: 'punct' };
             const same = this.sentence.findMatches(t.plain, null, null).map((m) => m.dataset || m);
             // 把:prendre while the lexicon only has 把 « classificateur »: a new sense to add.
-            const sense = (this.sentence.parseToken(t.token).constraints || []).join(', ');
+            const sense = (this.sentence.parseToken(Sentence.splitPunct(t.token)[0]).constraints || []).join(', ').replace(/_/g, ' ');
             if (same.length && sense) return { ...w, status: 'sense', sense, entries: same };
             if (same.length) return { ...w, status: 'reading', entries: same };
             return { ...w, status: 'unknown', sense };
