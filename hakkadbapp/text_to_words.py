@@ -254,7 +254,8 @@ def find_words_by_hanzi_with_disambiguation(token, all_words):
 
     constraints = None
     if len(parts) == 2 and parts[1].strip():
-        constraints = [c.strip().lower() for c in parts[1].split(",") if c.strip()]
+        # « _ » stands for a space (屋家:foyer_familial, written by the Saisie's « Nouveau sens »).
+        constraints = [c.replace("_", " ").strip().lower() for c in parts[1].split(",") if c.strip()]
 
     matches = []
 

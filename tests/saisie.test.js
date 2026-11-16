@@ -297,6 +297,29 @@ test("word boxes: the words of the additions shown by status, an unknown word of
   assert.equal(boxes.words[2].pinyin, "sen1");
 });
 
+test("a new sense for a known word of an expression: written as its :sense, the word then to add with that French", () => {
+  const { context, entry } = load();
+  entry.setText("我 屋家，", "expression");
+  const [, [wu]] = entry.units();
+  assert.equal(entry.senseAt(wu.pos, "foyer familial"), true);
+  assert.equal(entry.text, "我 屋家:foyer_familial，", "before the punctuation, spaces as _");
+  const c = entry.check()[1];
+  assert.equal(c.status, "sense");
+  assert.equal(c.sense, "foyer familial");
+  // Another sense replaces it.
+  assert.equal(entry.senseAt(wu.pos, "maison"), true);
+  assert.equal(entry.text, "我 屋家:maison，");
+  // The ＋ only on a word the lexicon has (屋家), in an expression.
+  const boxes = new context.WordBoxes(makeEl({ querySelectorAll: () => [] }), { additions: false });
+  entry.setText("我 屋家", "expression");
+  boxes.render(entry);
+  assert.match(boxes.container.innerHTML, /data-sense-open="1"/);
+  assert.doesNotMatch(boxes.container.innerHTML, /data-sense-open="0"/);
+  entry.setText("屋家", "word");
+  boxes.render(entry);
+  assert.doesNotMatch(boxes.container.innerHTML, /data-sense-open/);
+});
+
 function loadAdditionList() {
   const context = createContext({ document: makeDocumentStub() });
   loadScripts(context, [{ file: "AdditionList.js", exports: ["AdditionList"] }]);

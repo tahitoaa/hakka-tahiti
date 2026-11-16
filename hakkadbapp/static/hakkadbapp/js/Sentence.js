@@ -101,7 +101,8 @@ class Sentence {
         const base = parts[0];
 
         const constraints = parts[1]
-            ? parts[1].split(',').map(c => c.trim().toLowerCase()).filter(Boolean)
+            // « _ » stands for a space (屋家:foyer_familial: the « Nouveau sens » of WordBoxes).
+            ? parts[1].split(',').map(c => c.replace(/_/g, ' ').trim().toLowerCase()).filter(Boolean)
             : null;
 
         const inlineMatch = base.match(/\(([^()]*)\)/);

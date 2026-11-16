@@ -78,6 +78,13 @@ const WORD_BOXES_CSS = `
 .wb-propose button:disabled { opacity: 0.5; }
 .wb-propose-msg { flex-basis: 100%; font-size: 0.75rem; }
 .wb-propose-msg.is-error { color: #b91c1c; }
+/* ＋ on a known word of an expression: « Nouveau sens ». */
+.wb-word { padding-right: 2px; }
+.wb-sense-btn { position: absolute; top: -0.45rem; left: -0.35rem; z-index: 2; width: 1.1rem; height: 1.1rem; border-radius: 9999px;
+                border: 1px solid currentColor; background: #fff; font-size: 0.7rem; line-height: 1; font-weight: 700; opacity: 0.55; }
+.wb-word:hover .wb-sense-btn, .wb-sense-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .wb-sense-btn { opacity: 0.8; width: 1.4rem; height: 1.4rem; } }
+.wb-sense { border-top: 1px dashed #E8DFD2; padding-top: 0.35rem; }
 .wb-word.is-unknown { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
 .wb-word.is-text { background: #F8F5F0; border-color: #E8DFD2; color: #6E655C; }
 .wb-word.is-punct { background: transparent; }
@@ -201,10 +208,16 @@ class WordBoxes {
         container.addEventListener('click', (event) => this.handleClick(event));
         // Entrée in the French of « ＋ Brouillon »: saved.
         container.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' || !event.target.matches?.('[data-propose-fr]')) return;
-            event.preventDefault();
-            event.stopPropagation();
-            this.proposeDraft(Number(event.target.closest('[data-propose]').dataset.propose));
+            if (event.key !== 'Enter') return;
+            if (event.target.matches?.('[data-propose-fr]')) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.proposeDraft(Number(event.target.closest('[data-propose]').dataset.propose));
+            } else if (event.target.matches?.('[data-sense-fr]')) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.newSense(Number(event.target.closest('[data-sense]').dataset.sense));
+            }
         });
         if (typeof document !== 'undefined') {
             // (An editor closed since -- off the page -- stays as it is.)
@@ -238,6 +251,16 @@ class WordBoxes {
             if (entry.pinAt(Number(pin.dataset.pin), pin.dataset.reading)) this.onChange?.(entry.text, 'pin');
             return;
         }
+        // ＋ on a word: its card open, on « Nouveau sens ».
+        const open = target.closest('[data-sense-open]');
+        if (open) {
+            const g = Number(open.dataset.senseOpen);
+            this.toggle(g);
+            this.container.querySelector?.(`[data-sense="${g}"] [data-sense-fr]`)?.focus();
+            return;
+        }
+        const senseGo = target.closest('[data-sense-go]');
+        if (senseGo) { this.newSense(Number(senseGo.closest('[data-sense]').dataset.sense)); return; }
         const go = target.closest('[data-propose-go]');
         if (go) { this.proposeDraft(Number(go.closest('[data-propose]').dataset.propose)); return; }
         const gloss = target.closest('[data-gloss]');
@@ -325,12 +348,11 @@ class WordBoxes {
 
     /** « ＋ Brouillon »: the word saved as a draft addition (the Saisie
      *  completes it later: English, theme…). */
-    async proposeDraft(g) {
+    async proposeDraft(g, box = this.container.querySelector?.(`[data-propose="${g}"]`), field = '[data-propose-fr]', go = '[data-propose-go]') {
         const word = this.words[g];
-        const box = this.container.querySelector?.(`[data-propose="${g}"]`);
         if (!word || !box) return;
-        const input = box.querySelector('[data-propose-fr]');
-        const button = box.querySelector('[data-propose-go]');
+        const input = box.querySelector(field);
+        const button = box.querySelector(go);
         const msg = box.querySelector('.wb-propose-msg');
         const french = (input?.value || '').trim();
         const say = (text, error = false) => { msg.textContent = text; msg.classList.toggle('is-error', error); };
@@ -342,11 +364,61 @@ class WordBoxes {
                 kind: 'word', status: 'draft', hanzi: word.hanzi, pinyin: word.pinyin, french,
                 input_text: word.token, observations: this.from,
             });
+            // Said again after the re-render the new addition brings.
+            this.notice = { g, text: `✓ « ${french} » enregistré en brouillon dans la Saisie.` };
             WordBoxes.setAdditions([...(WordBoxes.additions || []), data.addition]);
         } catch (err) {
             button.disabled = false;
             say(`Échec : ${err.message}`, true);
         }
+    }
+
+    /** « Nouveau sens » for a word the lexicon knows (another meaning, not
+     *  in it yet): written in the text as its sense, 把:prendre -- the Saisie
+     *  then adds the word with that French -- or, where the text must stay
+     *  as typed (Transcrire, `propose`), saved at once as a draft word. */
+    newSense(g) {
+        const box = this.container.querySelector?.(`[data-sense="${g}"]`);
+        const group = this.entry?.units()[g];
+        if (!box || !group) return;
+        if (this.propose) { this.proposeDraft(g, box, '[data-sense-fr]', '[data-sense-go]'); return; }
+        const input = box.querySelector('[data-sense-fr]');
+        const sense = (input?.value || '').trim();
+        if (!sense) {
+            const msg = box.querySelector('.wb-propose-msg');
+            if (msg) { msg.textContent = 'Indiquez le sens, en français.'; msg.classList.add('is-error'); }
+            input?.focus();
+            return;
+        }
+        if (this.entry.senseAt(group[0].pos, sense)) {
+            this.open = -1;
+            this.onChange?.(this.entry.text, 'sense');
+        }
+    }
+
+    /** The « Nouveau sens » field, in the card of a word the lexicon knows. */
+    senseForm(c, g) {
+        if (!this.canAddSense(c) || g < 0) return '';
+        const esc = WordBoxes.escape;
+        return `<div class="wb-propose wb-sense" data-sense="${g}">
+            <input type="text" data-sense-fr placeholder="Nouveau sens (français)" aria-label="Nouveau sens de ${esc(c.hanzi)}">
+            <button type="button" data-sense-go title="${this.propose ? 'Enregistrer ce mot, avec ce sens, en brouillon dans la Saisie'
+                : 'Écrire ce sens dans le texte : le mot sera ajouté avec lui'}">＋ Ce sens</button>
+            <span class="wb-propose-msg" aria-live="polite">${this.noticeFor(g)}</span></div>`;
+    }
+
+    /** The message of the last draft saved from word `g`, shown once. */
+    noticeFor(g) {
+        if (!this.notice || this.notice.g !== g) return '';
+        const text = WordBoxes.escape(this.notice.text);
+        this.notice = null;
+        return text;
+    }
+
+    /** A word of an expression the lexicon has: another sense can be declared. */
+    canAddSense(c) {
+        return !this.readOnly && !!c && this.entry?.kind === 'expression' && ['known', 'reading', 'sense'].includes(c.status)
+            && !!c.pinyin && !/[/?]/.test(c.pinyin);
     }
 
     toggle(index) {
@@ -451,6 +523,8 @@ class WordBoxes {
             const ambiguous = !this.readOnly && group.some((u) => u.type === 'char' && u.reading.includes('/'));
             return `${lead}<span class="wb-word${status ? ` is-${status}` : ''}${ambiguous ? ' has-ambiguous' : ''}">`
                 + `<span class="wb-boxes">${boxes}</span>`
+                + (this.canAddSense(c) ? `<button type="button" class="wb-sense-btn" data-sense-open="${g}" title="Déclarer un nouveau sens pour ${esc(c.hanzi)}"
+                    aria-label="Nouveau sens pour ${esc(c.hanzi)}">＋</button>` : '')
                 + (gloss ? `<button type="button" class="wb-gloss" data-gloss="${g}" aria-expanded="${g === this.open}" title="${esc(gloss.title)}">${gloss.html}</button>`
                     + `<div class="wb-pop" data-pop="${g}"${g === this.open ? '' : ' hidden'}>${this.details(c, status, g)}</div>` : '')
                 + '</span>';
@@ -502,10 +576,11 @@ class WordBoxes {
             <span>${esc(this.display(Sentence.wordSyllables(d).join('') || d.pinyin || ''))}</span>
             <span>${esc(d.french || '?')}</span>${d.english ? `<i lang="en">${esc(d.english)}</i>` : ''}
             ${d.category ? `<span class="wb-cat">${esc(d.category)}</span>` : ''}</li>`).join('')}</ul>`;
+        const sense = this.senseForm(c, g);
         if (status === 'known' || status === 'multi') {
-            return `${status === 'multi' ? `<p>${c.entries.length} entrées pour ${esc(c.hanzi)} : précisez le sens avec « : » (${esc(c.hanzi)}:sens) si besoin.</p>` : ''}${entries(c.entries || [c.entry])}`;
+            return `${status === 'multi' ? `<p>${c.entries.length} entrées pour ${esc(c.hanzi)} : précisez le sens avec « : » (${esc(c.hanzi)}:sens) si besoin.</p>` : ''}${entries(c.entries || [c.entry])}${sense}`;
         }
-        const propose = this.proposeForm(c, g);
+        const propose = this.propose && ['reading', 'sense'].includes(status) ? sense || this.proposeForm(c, g) : this.proposeForm(c, g);
         if (status === 'reading') return `<p>Dans le lexique avec une autre lecture que ${esc(this.display(c.pinyin))} :</p>${entries(c.entries)}${propose}`;
         if (status === 'sense') return `<p>Sens « ${esc(c.sense)} » absent ; le lexique a :</p>${entries(c.entries)}${propose}`;
         if (status.startsWith('add-')) {
@@ -527,7 +602,7 @@ class WordBoxes {
         return `<div class="wb-propose" data-propose="${g}">
             <input type="text" data-propose-fr value="${esc(c.sense || '')}" placeholder="Français" aria-label="Français de ${esc(c.hanzi)}">
             <button type="button" data-propose-go title="Enregistrer ce mot en brouillon dans la Saisie">＋ Brouillon</button>
-            <span class="wb-propose-msg" aria-live="polite"></span></div>`;
+            <span class="wb-propose-msg" aria-live="polite">${this.noticeFor(g)}</span></div>`;
     }
 
     renderLegend(seen, newReadings) {
