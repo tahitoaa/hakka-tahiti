@@ -210,6 +210,31 @@
   .dup-item.dup-self { border-left-color: #2563eb; background: #eff6ff; border-radius: 0.2rem; }
   .dup-item.dup-self .dup-rel { background: #dbeafe; color: #1e40af; }
   .vs-card .dup-list { margin: 0.4rem auto 0; max-width: 40rem; }
+  /* « Caractères » slideshow: one new reading at a time (char_review.js). */
+  .cs-slide { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; width: 100%; }
+  .cs-reading { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0.3rem 1.2rem; }
+  .cs-py { padding: 0 0.6rem; border-radius: 0.5rem; }
+  .cs-py.is-new-reading { background: #ffedd5; color: #9a3412; }
+  .cs-py.is-new-char { background: #fee2e2; color: #991b1b; }
+  .cs-what { font-size: 0.9rem; color: #6E655C; }
+  .cs-uh { display: block; margin-top: 0.15rem; color: #544D45; }
+  .cs-uh b { color: #3730a3; font-weight: 600; }
+  .cs-verdict { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem; }
+  .cs-compare { width: 100%; max-width: 46rem; text-align: left; }
+  .cs-lex { display: grid; gap: 0.15rem; }
+  .cs-words { font-size: 0.8rem; color: #6E655C; }
+  .cr-chip.is-same { box-shadow: inset 0 0 0 2px #f97316; }
+  .cs-fix { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.4rem; width: 100%; max-width: 46rem; }
+  .cs-fix .cr-label { min-width: 0; }
+  .cs-fix .cr-replace { min-height: 2.6rem; padding: 0 0.9rem; font-size: 1.05rem; touch-action: manipulation; }
+  .cs-fix .cr-replace kbd { font: 600 0.65rem/1 ui-monospace, monospace; color: #8C8478; margin-right: 0.15rem; }
+  @media (hover: none), (max-width: 640px) { .cs-fix .cr-replace kbd { display: none; } }
+  .cs-other { display: inline-flex; gap: 0.3rem; }
+  .cs-other input { width: 8.5rem; min-height: 2.6rem; padding: 0 0.6rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-size: 1rem; }
+  .cs-adds { width: 100%; max-width: 46rem; display: grid; gap: 0.3rem; text-align: left; }
+  .cs-dialog .vs-message.is-error { color: #991b1b; }
+  .cs-dialog .vs-actions[hidden] { display: none; }
+  .cs-dialog [data-cs-decide][aria-pressed="true"] { outline: 3px solid #261F1C; outline-offset: 2px; }
   .cr-notes { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1rem; margin: 0.2rem 0; font-size: 0.85rem; color: #544D45; }
   .cr-notes .hanzi { font-size: 1.15rem !important; padding: 0 0.15rem; }
   .vt-ai-count input { width: 3.4rem; min-height: 2rem; padding: 0 0.3rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; text-align: center; }

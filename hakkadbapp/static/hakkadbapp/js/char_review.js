@@ -14,6 +14,9 @@
      a reading is replaced in all of them in one click, or an addition
      opened in the Saisie. Each member gives a reading a visa (👍 / 👎,
      visas.js); a validator accepts or refuses it, which settles it.
+     « ▶ Diaporama »: the new readings of the characters shown, one at a
+     time, corrected (→ ka¹, another reading typed), given a visa,
+     accepted or refused in one gesture or one key.
    Characters and syllables are paired here, in the browser, so an edit
    shows at once: the Han characters of the hanzi (and □) in order, against
    the syllables of the pinyin («…» text blocks and :sense hints left out);
@@ -372,6 +375,10 @@ const CharReview = (() => {
         const n = box.querySelector('[data-cr-shown]');
         if (n) n.textContent = `${shown.length} caractère${shown.length > 1 ? 's' : ''}`;
         box.querySelector('[data-cr-fold]').hidden = !state.open.size;
+        // The slideshow: the new readings of the characters shown.
+        const slides = slideKeys(all).length;
+        box.querySelector('[data-cr-show-n]').textContent = `(${slides})`;
+        box.querySelector('[data-cr-show]').disabled = !slides;
         // The row gone through from the keyboard keeps the focus.
         if (state.focus) list.querySelector(`[data-cr-row="${CSS.escape(state.focus)}"]`)?.focus({ preventScroll: true });
         const more = box.querySelector('[data-cr-more]');
@@ -385,13 +392,15 @@ const CharReview = (() => {
         s.classList.toggle('text-red-700', isError);
     }
 
-    /** Every syllable `reading` of `char` in these additions becomes `next`. */
-    async function replaceReading(char, reading, next, button) {
+    /** Every syllable `reading` of `char` in these additions becomes `next`;
+     *  {done, failed} or null. The slideshow doesn't ask (`ask` false). */
+    async function replaceReading(char, reading, next, button, { ask = true } = {}) {
         const c = characters().find((x) => x.char === char);
         const adds = (c?.readings.get(reading) || []).filter((a) => state.statuses.has(a.status));
-        if (!adds.length) return;
+        if (!adds.length) return null;
         const n = adds.length;
-        if (!confirm(`Remplacer ${sup(reading)} par ${sup(next)} pour ${char} dans ${n} ajout${n > 1 ? 's' : ''} ?`)) return;
+        if (ask && !confirm(`Remplacer ${sup(reading)} par ${sup(next)} pour ${char} dans ${n} ajout${n > 1 ? 's' : ''} ?`)) return null;
+        let result = null;
         await AdditionList.whileBusy(button, 'Correction…', async () => {
             let done = 0;
             const failed = [];
@@ -408,9 +417,264 @@ const CharReview = (() => {
                     failed.push(`${a.hanzi} (${err.message})`);
                 }
             }
+            result = { done, failed };
             render();
             say(`✓ ${char} : ${sup(reading)} → ${sup(next)} dans ${done} ajout${done > 1 ? 's' : ''}.${failed.length ? ` Échec : ${failed.join(', ')}` : ''}`, failed.length > 0);
         });
+        return result;
+    }
+
+    // ---- the slideshow: the new readings, one at a time --------------------
+    // Gone through quickly, on a tablet or with the keys: the reading big,
+    // the lexicon's and the dictionaries' next to it, the additions giving
+    // it; corrected in one gesture (→ ka¹, or another reading typed), given
+    // a visa, accepted or refused by a validator. Accepted or corrected, the
+    // next reading comes by itself; refused, it stays to be corrected.
+
+    const show = { dialog: null, keys: [], pos: 0, lockedUntil: 0, busy: false, message: '' };
+
+    /** The readings to go through, in the table's order (filter, search,
+     *  sort): each reading the lexicon doesn't give the character; under
+     *  « À trancher » those still undecided or refused, under « Refusées »
+     *  the refused ones. */
+    function slideKeys(all) {
+        return all.filter(matches).sort(sorter).flatMap((c) => [...c.readings]
+            .filter(([reading, adds]) => classify(c.char, reading) && adds.some((a) => state.statuses.has(a.status)))
+            .filter(([reading]) => {
+                const status = decisionOf(c.char, reading)?.status;
+                if (state.filter === 'todo') return !status || status === 'refused';
+                if (state.filter === 'refused') return status === 'refused';
+                return true;
+            })
+            .sort((x, y) => y[1].length - x[1].length)
+            .map(([reading]) => `${c.char}|${reading}`));
+    }
+
+    const splitKey = (key) => [key.slice(0, key.indexOf('|')), key.slice(key.indexOf('|') + 1)];
+
+    /** A reading as typed (ka2, KA², ka_), or '' when it isn't one. */
+    function typedReading(text) {
+        const r = String(text || '').trim().toLowerCase()
+            .replace(/[¹²³⁴⁵⁶⁷⁸]/gu, (d) => String('¹²³⁴⁵⁶⁷⁸'.indexOf(d) + 1));
+        return /^[a-zü]+[0-9_]?$/u.test(r) ? r : '';
+    }
+
+    function showDialog() {
+        if (show.dialog) return show.dialog;
+        const d = document.createElement('dialog');
+        d.className = 'vs-dialog cs-dialog';
+        d.setAttribute('aria-labelledby', 'cs-count');
+        d.innerHTML = `<div class="vs-head"><span id="cs-count" aria-live="polite"></span>
+              <button type="button" class="vs-close" data-cs="close" aria-label="Fermer le diaporama">✕</button></div>
+            <div class="vs-card" data-cs-card></div>
+            <div class="vs-actions" data-cs-actions>
+              <button type="button" class="saisie-btn-validate" data-cs-decide="accepted" title="La lecture est juste (même si le lexique ne l’a pas encore)">✓ Accepter la lecture</button>
+              <button type="button" class="saisie-btn-reject" data-cs-decide="refused" title="La lecture est fausse : à corriger dans ces ajouts">✕ Refuser</button>
+            </div>
+            <div class="vs-nav"><button type="button" data-cs-nav="-1">← Précédente</button><button type="button" data-cs-nav="1">Suivante →</button></div>
+            <p class="vs-keys" aria-hidden="true"><kbd>←</kbd> <kbd>→</kbd> naviguer · <kbd>A</kbd> accepter · <kbd>R</kbd> refuser ·
+              <kbd>1</kbd>…<kbd>5</kbd> corriger par la lecture proposée · <kbd>L</kbd> taper une autre lecture ·
+              <kbd>+</kbd> <kbd>-</kbd> votre visa · <kbd>Échap</kbd> fermer</p>`;
+        document.body.appendChild(d);
+        d.addEventListener('click', onShowClick);
+        d.addEventListener('submit', (e) => {
+            const form = e.target.closest('[data-cs-other]');
+            if (!form) return;
+            e.preventDefault();
+            const input = form.querySelector('input');
+            const next = typedReading(input.value);
+            if (!next) { slide('Lecture non reconnue : des lettres puis un chiffre de ton (ka2).', true); return; }
+            fix(next, form.querySelector('button'));
+        });
+        d.addEventListener('keydown', onShowKey);
+        d.addEventListener('close', () => render());
+        const card = d.querySelector('[data-cs-card]');
+        let x0 = null;
+        card.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+            if (x0 === null || e.target.closest('input')) { x0 = null; return; }
+            const dx = e.changedTouches[0].clientX - x0;
+            x0 = null;
+            if (Math.abs(dx) > 60) move(dx < 0 ? 1 : -1);
+        });
+        document.addEventListener('visas-change', () => { if (d.open) slide(); });
+        show.dialog = d;
+        return d;
+    }
+
+    function openShow() {
+        show.keys = slideKeys(characters());
+        if (!show.keys.length) { say('Aucune lecture nouvelle à passer en revue avec ce filtre.', true); return; }
+        // From the character gone through in the table, if it has one.
+        const from = state.focus ? show.keys.findIndex((k) => splitKey(k)[0] === state.focus) : -1;
+        show.pos = Math.max(0, from);
+        show.message = '';
+        const d = showDialog();
+        slide();
+        if (!d.open) d.showModal();
+    }
+
+    function locked() {
+        const now = Date.now();
+        if (now < show.lockedUntil || show.busy) return true;
+        show.lockedUntil = now + 450;
+        return false;
+    }
+
+    function move(step, { force = false, message = '' } = {}) {
+        if (!force && locked()) return;
+        const next = Math.min(show.keys.length - 1, Math.max(0, show.pos + step));
+        if (next === show.pos) { slide(message || (step > 0 ? 'C’était la dernière lecture.' : '')); return; }
+        show.pos = next;
+        const card = show.dialog.querySelector('[data-cs-card]');
+        card.classList.add('is-changing');
+        setTimeout(() => { slide(message); card.classList.remove('is-changing'); card.scrollTop = 0; }, 120);
+    }
+
+    /** The current reading, drawn again (after a change: fresh data). */
+    function slide(message = '', isError = false) {
+        const d = show.dialog;
+        if (!d || !data) return;
+        const card = d.querySelector('[data-cs-card]');
+        const [char, reading] = splitKey(show.keys[show.pos]);
+        const c = characters().find((x) => x.char === char);
+        const adds = (c?.readings.get(reading) || []).filter((a) => state.statuses.has(a.status));
+        d.querySelector('#cs-count').innerHTML = `🔤 Lectures nouvelles · <b>${show.pos + 1} / ${show.keys.length}</b>`;
+        d.querySelector('[data-cs-nav="-1"]').disabled = show.pos === 0;
+        d.querySelector('[data-cs-nav="1"]').disabled = show.pos === show.keys.length - 1;
+        const decider = typeof Visas !== 'undefined' && Visas.canDecide();
+        const decision = decisionOf(char, reading);
+        d.querySelector('[data-cs-actions]').hidden = !decider;
+        d.querySelectorAll('[data-cs-decide]').forEach((b) => {
+            b.disabled = !adds.length;
+            b.setAttribute('aria-pressed', String(decision?.status === b.dataset.csDecide));
+        });
+        const line = `<p class="vs-message${isError ? ' is-error' : ''}" role="status">${esc(message)}</p>`;
+        if (!c || !adds.length) {
+            card.innerHTML = `<div class="hanzi vs-hanzi">${esc(char)}</div><div class="vs-pinyin"><del>${esc(sup(reading))}</del></div>
+                <p class="cs-what">Plus aucun ajout ne lit ${esc(char)} ainsi (corrigé).</p>${line}`;
+            return;
+        }
+        const info = data.chars[char] || {};
+        const kind = classify(char, reading);
+        const words = info.words || {};
+        const lexicon = (data.lexicon[char] || []).map((r) => {
+            const w = words[r];
+            return `<li><span class="cr-chip">${esc(sup(r))}${w ? ` <small>${w.count} mot${w.count > 1 ? 's' : ''}</small>` : ''}</span>
+                <span class="cs-words">${esc((w?.words || []).slice(0, 2).join(' · '))}</span></li>`;
+        }).join('');
+        let dicts = '';
+        if (withDictionaries) {
+            const grouped = new Map();
+            (info.sources || []).forEach((s) => {
+                const k = s.wenfa || `?${s.raw}`;
+                if (!grouped.has(k)) grouped.set(k, []);
+                grouped.get(k).push(s);
+            });
+            dicts = [...grouped].map(([wenfa, list]) => {
+                const doubtful = list.every((s) => s.doubtful);
+                const title = list.map((s) => `${s.source} : ${s.raw}${s.doubtful ? ' (⚠ douteuse)' : ''}`).join('\n');
+                return `<span class="cr-chip cr-dict${doubtful ? ' is-doubt' : ''}${wenfa === reading ? ' is-same' : ''}" title="${esc(title)}">${doubtful ? '⚠ ' : ''}${
+                    esc(wenfa.startsWith('?') ? wenfa.slice(1) : sup(wenfa))} <small>${esc(list.map((s) => s.source.split(' ')[0]).join(', '))}</small></span>`;
+            }).join('') || '<span class="cr-none">aucun dictionnaire</span>';
+        }
+        const n = adds.length;
+        const fixes = alternatives(c, reading).map((r, k) => `<button type="button" class="cr-replace" data-cs-fix="${esc(r)}"
+            title="Remplacer ${esc(sup(reading))} par ${esc(sup(r))} pour ${esc(char)} dans ${n === 1 ? 'cet ajout' : `ces ${n} ajouts`}"><kbd>${k + 1}</kbd> → ${esc(sup(r))}</button>`).join('');
+        const decided = decision ? `<span class="cr-decision is-${decision.status}">${decision.status === 'accepted' ? '✓ Acceptée' : '✕ Refusée'} par ${esc(decision.by)}</span>` : '';
+        const visa = typeof Visas !== 'undefined' && Visas.ready() ? Visas.html('reading', `${char}|${reading}`) : '';
+        const shown = folded(char, reading, adds) ? adds.slice(0, FOLD_SHOW) : adds;
+        card.innerHTML = `<div class="cs-slide" data-cr-char="${esc(char)}" data-cr-reading="${esc(reading)}">
+            <div class="cs-reading"><span class="hanzi vs-hanzi">${esc(char)}</span>
+              <span class="vs-pinyin cs-py is-${kind}">${esc(sup(reading))}</span></div>
+            <div class="cs-what">${kind === 'new-char' ? 'caractère absent du lexique' : 'lecture que le lexique ne donne pas'} · ${n} ajout${n > 1 ? 's' : ''}
+              ${info.mandarin || info.meaning ? `<span class="cs-uh">${info.mandarin ? `<b>${esc(info.mandarin)}</b> ` : ''}${esc(info.meaning || '')}</span>` : ''}</div>
+            <div class="cs-verdict">${decided}${visa}</div>
+            <div class="cr-compare cs-compare">
+              <div><span class="cr-label">Lexique</span>${lexicon ? `<ul class="cs-lex">${lexicon}</ul>` : '<span class="cr-none">absent du lexique</span>'}</div>
+              ${withDictionaries ? `<div><span class="cr-label">Dictionnaires</span>${dicts}</div>` : ''}
+            </div>
+            <div class="cs-fix"><span class="cr-label">Corriger</span>${fixes}
+              <form data-cs-other class="cs-other"><input type="text" placeholder="autre lecture (ka2)" aria-label="Autre lecture"
+                autocomplete="off" autocapitalize="off" spellcheck="false"><button type="submit" class="saisie-btn saisie-btn-neutral">Remplacer</button></form></div>
+            <ul class="cs-adds">${shown.map((a) => additionLine(a, c, reading)).join('')}</ul>
+            ${shown.length < adds.length ? `<button type="button" class="cr-unfold" data-cr-unfold>Voir les ${adds.length - shown.length} autres ajouts</button>` : ''}
+            ${line}</div>`;
+    }
+
+    /** Every `reading` of the current character becomes `next`, then the next reading. */
+    async function fix(next, button) {
+        const [char, reading] = splitKey(show.keys[show.pos]);
+        if (next === reading || show.busy) return;
+        show.busy = true;
+        try {
+            const res = await replaceReading(char, reading, next, button, { ask: false });
+            if (!res) return;
+            const msg = `✓ ${char} : ${sup(reading)} → ${sup(next)} dans ${res.done} ajout${res.done > 1 ? 's' : ''}.`;
+            if (res.failed.length) { slide(`${msg} Échec : ${res.failed.join(', ')}`, true); return; }
+            show.busy = false;
+            move(1, { force: true, message: msg });
+        } finally {
+            show.busy = false;
+        }
+    }
+
+    async function decideShown(status, button) {
+        const [char, reading] = splitKey(show.keys[show.pos]);
+        if (show.busy || typeof Visas === 'undefined' || !Visas.canDecide()) return;
+        show.busy = true;
+        try {
+            await Visas.decide(char, reading, status, button);
+        } finally {
+            show.busy = false;
+        }
+        const now = decisionOf(char, reading)?.status;
+        if (now === 'accepted') move(1, { force: true, message: `✓ ${char} ${sup(reading)} acceptée.` });
+        else if (now === 'refused') slide(`✕ ${char} ${sup(reading)} refusée : choisissez la bonne lecture ci-dessus.`);
+        else slide();
+    }
+
+    function onShowClick(e) {
+        const d = show.dialog;
+        if (e.target.closest('[data-cs="close"]')) { d.close(); return; }
+        const nav = e.target.closest('[data-cs-nav]');
+        if (nav) { move(Number(nav.dataset.csNav)); return; }
+        const dec = e.target.closest('[data-cs-decide]');
+        if (dec) { decideShown(dec.dataset.csDecide, dec); return; }
+        const f = e.target.closest('[data-cs-fix]');
+        if (f) { fix(f.dataset.csFix, f); return; }
+        const [char, reading] = splitKey(show.keys[show.pos] || '|');
+        if (e.target.closest('[data-cr-unfold]')) { state.unfolded.add(`${char}|${reading}`); slide(); return; }
+        const ed = e.target.closest('[data-cr-edit]');
+        if (ed) edit(Number(ed.dataset.crEdit), char);
+    }
+
+    /** ← → (↑ ↓, Page↑ Page↓) previous / next, Début / Fin, A accepter,
+     *  R refuser, 1…5 the readings offered, L another reading, + - a visa. */
+    function onShowKey(e) {
+        if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.target.closest?.('input, textarea, select')) return;
+        const d = show.dialog;
+        const step = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1 }[e.key];
+        if (step) { e.preventDefault(); move(step); return; }
+        if (e.key === 'Home' || e.key === 'End') {
+            e.preventDefault();
+            move(e.key === 'Home' ? -show.pos : show.keys.length - 1 - show.pos);
+            return;
+        }
+        const key = e.key.toLowerCase();
+        if (key === 'l') {
+            e.preventDefault();
+            d.querySelector('[data-cs-other] input')?.focus();
+            return;
+        }
+        const target = /^[1-9]$/.test(key) ? d.querySelectorAll('[data-cs-fix]')[Number(key) - 1]
+            : { a: '[data-cs-decide="accepted"]', r: '[data-cs-decide="refused"]', '+': '[data-vz="ok"]', '-': '[data-vz="ko"]' }[key];
+        const button = typeof target === 'string' ? d.querySelector(target) : target;
+        if (button && !button.disabled && button.offsetParent !== null) {
+            e.preventDefault();
+            button.click();
+        }
     }
 
     function edit(id, char) {
@@ -427,6 +691,7 @@ const CharReview = (() => {
             if (f) { state.filter = f.dataset.crFilter; state.limit = PAGE; render(); return; }
             if (e.target.closest('[data-cr-more]')) { state.limit += PAGE; render(); return; }
             if (e.target.closest('[data-cr-fold]')) { state.open.clear(); render(); return; }
+            if (e.target.closest('[data-cr-show]')) { openShow(); return; }
             const r = e.target.closest('[data-cr-row]');
             if (r) { toggleRow(r.dataset.crRow); return; }
             const cardEl = e.target.closest('[data-cr-char]');
@@ -523,6 +788,7 @@ const CharReview = (() => {
                     <label class="cr-sort">Trier <select data-cr-sort class="min-h-9 px-2 border border-gray-300 rounded-md bg-white text-sm">
                       ${Object.entries(SORTS).map(([k, l]) => `<option value="${k}"${state.sort === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
                     <span class="vt-sub" data-cr-shown></span>
+                    <button type="button" data-cr-show class="vs-open" title="Les lectures nouvelles une à une, à corriger, accepter ou refuser">▶ Diaporama <span data-cr-show-n></span></button>
                     <button type="button" data-cr-fold class="saisie-btn saisie-btn-neutral" hidden>Tout replier</button>
                     <div class="vt-kinds" role="group" aria-label="Quels caractères" data-cr-filters></div>
                     <div class="cr-statuses" data-cr-statuses></div>
