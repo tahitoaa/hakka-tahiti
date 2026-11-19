@@ -5,7 +5,7 @@ Liste des demandes en cours. Les propositions d'amélioration sont dans
 
 ## Nouvelles demandes (19/11/2026)
 
-- [ ] **Transcriptions publiées : demander un avis par WhatsApp sur un segment.**
+- [x] **Transcriptions publiées : demander un avis par WhatsApp sur un segment.** Fait (commit e32a56d), pas encore déployé.
   Un lien qui mène directement à l'audio du segment, avec la transcription et
   les traductions proposées dans le message.
 - [ ] **Dictionnaires : une page de recherche unique** pour chercher un mot ou
