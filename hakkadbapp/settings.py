@@ -117,7 +117,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Heure de Tahiti pour l'affichage (« mis à jour le … à H:i ») ; la base reste en UTC (USE_TZ).
+TIME_ZONE = 'Pacific/Tahiti'
 
 USE_I18N = True
 
