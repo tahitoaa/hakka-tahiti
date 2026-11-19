@@ -398,12 +398,8 @@ def new_word(request):
     else:
         form = WordForm()
 
-    # Pass all pronunciations to template for optional display
     context = {
         'form': form,
-        'all_pronunciations': json.dumps(list(Pronunciation.objects.values('id', 'hanzi', 'initial', 'final', 'tone')), indent = 6),
-        'initials' : json.dumps(list(Initial.objects.values('id', 'initial'))),
-        'finals': json.dumps(list(Final.objects.values('id', 'final'))),
     }
     return render(request, 'hakkadbapp/word_form.html', context)
 
@@ -454,9 +450,6 @@ def edit_word(request, pk):
     context ={
         'form': form,
         'editing': True,
-        'all_pronunciations': json.dumps(list(Pronunciation.objects.values('id', 'hanzi', 'initial', 'final', 'tone')), indent = 6),
-        'initials' : json.dumps(list(Initial.objects.values('id', 'initial'))),
-        'finals': json.dumps(list(Final.objects.values('id', 'final'))),
     }
     return render(request, 'hakkadbapp/word_form.html', context)
 
