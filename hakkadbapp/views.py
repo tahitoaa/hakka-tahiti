@@ -38,6 +38,14 @@ from . import pronunciation_sources
 from urllib.parse import urlencode
 from .permissions import editor_required, is_editor, owner_required
 
+
+def script_json(data):
+    """JSON to put as is (|safe) in a <script type="application/json">:
+    < > & escaped like Django's json_script, so a text holding
+    « </script> » can't end the block and inject HTML."""
+    return (json.dumps(data, ensure_ascii=False)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
 # The rosace poster (components/hanzi_block.html) renders every syllable of
 # every word (and every word of every expression) through pinyin_switch.html,
 # which walks wp.pronunciation.initial/final/tone -- without prefetching
@@ -700,7 +708,7 @@ def reports(request):
     # percentages in JS from scattered template values, and it stays in sync
     # with the tables/cards automatically since it's built from the exact
     # same context values.
-    context["dashboard_data_json"] = json.dumps({
+    context["dashboard_data_json"] = script_json({
         "words_total": words_total,
         "expressions_total": Expression.objects.count(),
         "pronunciations_total": Pronunciation.objects.count(),
@@ -719,7 +727,7 @@ def reports(request):
             }
             if context["audio_snapshot"] else None
         ),
-    }, ensure_ascii=False)
+    })
 
     return render(request, "hakkadbapp/reports.html", context)
 
@@ -823,7 +831,7 @@ def search(request):
         'words': words,
         'expressions': expressions,
         'themes': _themes_overview(words, expressions),
-        'duplicates_json': json.dumps(duplicates, ensure_ascii=False),
+        'duplicates_json': script_json(duplicates),
         'duplicates_count': duplicates_count,
         'title': "Lexique Wenfa",
         'page': "search",
@@ -1341,7 +1349,7 @@ def _expression_analysis(expressions, components_by_hanzi, snapshot_timestamp):
     expressions.js): each expression compared with the platform, its Split
     and whether it may be exported. `expressions` are annotated in place."""
     context = {
-        "platform_components_json": json.dumps(components_by_hanzi, ensure_ascii=False),
+        "platform_components_json": script_json(components_by_hanzi),
         "platform_snapshot_timestamp": snapshot_timestamp,
         "expressions_count": len(expressions),
     }
