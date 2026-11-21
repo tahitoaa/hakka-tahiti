@@ -39,6 +39,40 @@
     });
 
     $('tr-print').addEventListener('click', () => window.print());
+
+    // « 💬 Avis » on each segment: a WhatsApp message with the segment's text
+    // (hanzi, pinyin, proposed translation) and a link straight to its audio
+    // (?seg=N, 1-based; it survives the login page's « next »).
+    const segmentLink = (i) => `${location.origin}${location.pathname}?seg=${i + 1}`;
+    function askMessage(i) {
+        const s = t.segments[i];
+        const person = t.participants[s.speaker] || { name: '?' };
+        const hanzi = TranscriptDocument.hanzi(s);
+        return [
+            `Ton avis sur ce passage de « ${t.title} » (${person.name}, ${TranscriptDocument.time(s.start)}) ?`,
+            hanzi || s.transcript || '',
+            hanzi && s.pinyin ? s.pinyin : '',
+            s.translation ? `Traduction proposée : ${s.translation}` : '',
+            `Écouter : ${segmentLink(i)}`,
+        ].filter(Boolean).join('\n');
+    }
+    rows.forEach((row, i) => {
+        row.querySelector('.tr-meta')?.insertAdjacentHTML('beforeend',
+            `<a class="tr-ask no-print" href="https://wa.me/?text=${encodeURIComponent(askMessage(i))}" target="_blank" rel="noopener"
+                title="Demander un avis sur ce passage par WhatsApp">💬 Avis</a>`);
+    });
+    // The link opens WhatsApp; it doesn't also play the segment.
+    list.addEventListener('click', (event) => {
+        if (event.target.closest('.tr-ask')) event.stopPropagation();
+    }, true);
+
+    // Opened from such a link: the segment asked about, marked and in view.
+    const asked = Number(new URLSearchParams(location.search).get('seg')) - 1;
+    const askedSeg = Number.isInteger(asked) ? t.segments[asked] : undefined;
+    if (askedSeg) {
+        rows[asked].classList.add('is-asked');
+        rows[asked].scrollIntoView({ block: 'center' });
+    }
     if (!audio) return;
 
     let stopAt = null;
@@ -92,8 +126,27 @@
         store.set('time', Math.floor(audio.currentTime));
     });
 
-    // Back where the listener stopped last time (not playing).
+    // Opened from a « 💬 Avis » link: a button plays that segment only (a
+    // phone won't start the audio without a touch).
+    if (askedSeg) {
+        const resume = $('tr-resume');
+        resume.innerHTML = `<button type="button" class="tr-btn tr-play-asked">▶ Écouter le passage (${TranscriptDocument.time(askedSeg.start)})</button>`;
+        resume.querySelector('button').addEventListener('click', () => {
+            audio.currentTime = askedSeg.start / 1000;
+            stopAt = askedSeg.end / 1000;
+            setCurrent(asked, { scroll: false });
+            audio.play().catch(() => {});
+        });
+    }
+
+    // Back where the listener stopped last time (not playing), unless a link
+    // asked for a segment.
     audio.addEventListener('loadedmetadata', () => {
+        if (askedSeg) {
+            audio.currentTime = askedSeg.start / 1000;
+            setCurrent(asked, { scroll: false });
+            return;
+        }
         const time = store.get('time', 0);
         if (time > 5 && time < audio.duration - 5) {
             audio.currentTime = time;
