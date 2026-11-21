@@ -32,6 +32,8 @@ PUBLIC = {
     "duplicates": {"GET", "POST"},  # redirect to the lexicon browser's Doublons tab
     "expressions": {"GET", "POST"},  # redirect to its Expressions tab (the editing endpoints stay owner-only)
     "search": {"GET", "POST"},
+    "rechercher": {"GET"},  # search across the sources, no AI; members-only sources filtered inside
+    "api_rechercher": {"GET"},
     "pinyin_converter": {"GET", "POST"},
     "transcripter": {"GET", "POST"},
     "caracters": {"GET", "POST"},  # redirect to the search page

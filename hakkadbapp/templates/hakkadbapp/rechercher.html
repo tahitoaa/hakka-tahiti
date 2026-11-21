@@ -1,0 +1,137 @@
+{% extends "hakkadbapp/base.html" %}
+{% block content %}
+{% comment %}
+  « Rechercher » : un mot, une lecture ou un sens dans toutes les sources,
+  sans IA (search_sources.py). Ouverte à tous ; les transcriptions (membres)
+  et les documents importés, ajouts en cours (éditeurs) selon le compte.
+{% endcomment %}
+<style>
+  .rs-page { max-width: 52rem; margin: 0 auto; }
+  .rs-form { display: flex; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
+  .rs-form input { flex: 1; min-width: 0; min-height: 2.75rem; padding: 0 0.85rem; border: 1px solid #DDD0BD; border-radius: 0.6rem;
+                   background: #fff; font-size: 1.05rem; }
+  .rs-form button { min-height: 2.75rem; padding: 0 1.1rem; border-radius: 0.6rem; background: #9B1C1C; color: #fff; font-weight: 700; }
+  .rs-status { font-size: 0.85rem; color: #8C8478; margin: 0.25rem 0 0.75rem; }
+  .rs-jump { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
+  .rs-jump a { padding: 0.15rem 0.6rem; border: 1px solid #DDD0BD; border-radius: 9999px; background: #fff; font-size: 0.8rem; color: #544D45; text-decoration: none; }
+  .rs-jump a.is-empty { color: #B5AA9B; border-style: dashed; }
+  .rs-section { margin-bottom: 0.75rem; border: 1px solid #E8DFD2; border-radius: 0.75rem; background: #fff; overflow: hidden; scroll-margin-top: 1rem; }
+  .rs-section > summary { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.55rem 0.8rem; background: #F6EFE4; cursor: pointer;
+                          font-weight: 700; color: #261F1C; list-style: none; }
+  .rs-section > summary::-webkit-details-marker { display: none; }
+  .rs-section > summary::before { content: "▸"; color: #8C8478; }
+  .rs-section[open] > summary::before { content: "▾"; }
+  .rs-count { font-weight: 400; font-size: 0.8rem; color: #8C8478; }
+  .rs-list { list-style: none; margin: 0; padding: 0; }
+  .rs-item { display: grid; grid-template-columns: minmax(5rem, auto) minmax(0, 1fr); gap: 0.1rem 0.8rem; padding: 0.5rem 0.8rem;
+             border-top: 1px solid #F0E8DC; }
+  .rs-item:first-child { border-top: 0; }
+  .rs-hanzi { font-size: 1.25rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .rs-hanzi a { color: inherit; text-decoration: none; border-bottom: 1px dotted #B5AA9B; }
+  .rs-pinyin { font-size: 0.82rem; color: #9B1C1C; }
+  .rs-sense { font-size: 0.9rem; color: #261F1C; overflow-wrap: anywhere; }
+  .rs-sense .rs-en { color: #6E655C; font-style: italic; }
+  .rs-detail { font-size: 0.75rem; color: #8C8478; overflow-wrap: anywhere; }
+  .rs-detail a { color: #9B1C1C; }
+  .rs-quote { grid-column: 1 / -1; font-size: 0.88rem; overflow-wrap: anywhere; }
+  .rs-note, .rs-empty { padding: 0.5rem 0.8rem; font-size: 0.8rem; color: #8C8478; }
+  mark.rs-hit { background: #fef3c7; color: inherit; padding: 0 0.05rem; border-radius: 0.15rem; }
+  @media (max-width: 30rem) { .rs-item { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="rs-page">
+  <h1 class="text-2xl font-bold">Rechercher
+    <details class="help-tip"><summary>ⓘ</summary>
+      Tapez des caractères (屋家), une lecture (« wuk ka », sans les tons) ou un sens (« maison », « house »).
+      La recherche parcourt le lexique, les ajouts validés, les dictionnaires de caractères et les pages de Rey déjà lues ;
+      connecté, aussi les transcriptions publiées{% if editor %}, les ajouts en cours et les documents importés{% endif %}. Aucune IA.
+    </details>
+  </h1>
+  <form id="rs-form" class="rs-form" action="" method="get" role="search">
+    <input id="rs-q" name="q" type="search" value="{{ q }}" placeholder="屋家, wuk ka, maison…" autocomplete="off" autofocus
+           aria-label="Mot, lecture ou sens">
+    <button type="submit">Chercher</button>
+  </form>
+  <p id="rs-status" class="rs-status" aria-live="polite"></p>
+  <nav id="rs-jump" class="rs-jump" aria-label="Sources"></nav>
+  <div id="rs-results"></div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  let words = [];
+  // The typed word, highlighted (accents and case ignored, as the search does).
+  const fold = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function mark(text) {
+    const s = esc(text);
+    if (!words.length || !text) return s;
+    const plain = fold(s);
+    let out = '', at = 0;
+    const hits = [];
+    words.forEach((w) => { let i = plain.indexOf(w); while (i >= 0) { hits.push([i, i + w.length]); i = plain.indexOf(w, i + w.length); } });
+    hits.sort((a, b) => a[0] - b[0]).forEach(([a, b]) => {
+      if (a < at) return;
+      // Not inside an entity (&amp;…).
+      if (/&[a-z#0-9]*$/i.test(s.slice(Math.max(0, a - 6), a))) return;
+      out += s.slice(at, a) + `<mark class="rs-hit">${s.slice(a, b)}</mark>`; at = b;
+    });
+    return out + s.slice(at);
+  }
+
+  function item(it) {
+    if (it.text !== undefined) {
+      return `<li class="rs-item"><div class="rs-quote">${mark(it.text)}</div><div class="rs-detail" style="grid-column:1/-1">${esc(it.detail)}</div></li>`;
+    }
+    const hanzi = it.link ? `<a href="${esc(it.link)}"${/^https?:/.test(it.link) ? ' target="_blank" rel="noopener"' : ''}>${mark(it.hanzi)}</a>` : mark(it.hanzi);
+    const sense = [it.french ? mark(it.french) : '', it.english ? `<span class="rs-en">${mark(it.english)}</span>` : ''].filter(Boolean).join(' · ');
+    const detail = [it.detail ? esc(it.detail) : '', ...(it.readings || []).map(esc)].filter(Boolean).join('<br>');
+    return `<li class="rs-item">
+        <div><div class="rs-hanzi" lang="zh">${hanzi}</div>${it.pinyin ? `<div class="rs-pinyin">${esc(it.pinyin)}</div>` : ''}</div>
+        <div>${sense ? `<div class="rs-sense">${sense}</div>` : ''}${detail ? `<div class="rs-detail">${detail}</div>` : ''}</div></li>`;
+  }
+
+  function show(data) {
+    const sections = data.sections || [];
+    const total = sections.reduce((n, s) => n + s.count, 0);
+    $('rs-status').textContent = sections.length
+      ? `${total} résultat${total > 1 ? 's' : ''} pour « ${data.q} » (par ${data.by}).`
+      : 'Tapez au moins deux lettres ou un caractère.';
+    $('rs-jump').innerHTML = sections.map((s) =>
+      `<a href="#rs-${s.id}" class="${s.count ? '' : 'is-empty'}">${esc(s.label)} (${s.count})</a>`).join('');
+    $('rs-results').innerHTML = sections.map((s) => `
+      <details class="rs-section" id="rs-${s.id}"${s.count ? ' open' : ''}>
+        <summary>${esc(s.label)} <span class="rs-count">${s.count}${s.count > s.items.length ? ` (les ${s.items.length} premiers)` : ''}</span></summary>
+        ${s.note ? `<div class="rs-note">${esc(s.note)}</div>` : ''}
+        ${s.items.length ? `<ul class="rs-list">${s.items.map(item).join('')}</ul>` : '<div class="rs-empty">Rien trouvé ici.</div>'}
+      </details>`).join('');
+    $('rs-jump').querySelectorAll('a').forEach((a) => a.addEventListener('click', () => { document.querySelector(a.getAttribute('href')).open = true; }));
+  }
+
+  let pending = null;
+  async function run(q) {
+    words = /[㐀-鿿]/.test(q) ? [] : fold(q).split(/\s+/).filter((w) => w.length > 1);
+    if (/[㐀-鿿]/.test(q)) words = [q.replace(/\s/g, '')];
+    $('rs-status').textContent = 'Recherche…';
+    pending?.abort();
+    pending = new AbortController();
+    try {
+      const response = await fetch(`{% url 'api_rechercher' %}?q=${encodeURIComponent(q)}`, { signal: pending.signal });
+      if (!response.ok) throw new Error(`erreur ${response.status}`);
+      show(await response.json());
+    } catch (err) {
+      if (err.name !== 'AbortError') $('rs-status').textContent = `La recherche a échoué (${err.message}).`;
+    }
+  }
+
+  $('rs-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const q = $('rs-q').value.trim();
+    history.replaceState(null, '', q ? `?q=${encodeURIComponent(q)}` : location.pathname);
+    run(q);
+  });
+  if ($('rs-q').value.trim()) run($('rs-q').value.trim());
+})();
+</script>
+{% endblock %}
