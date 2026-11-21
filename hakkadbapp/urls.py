@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from . import ask_ai
-from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, hakkadict, importer, platform_corrections, recordings, rey, search_sources, sources, surprising_readings, visas
+from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, grammar, hakkadict, importer, platform_corrections, recordings, rey, search_sources, sources, surprising_readings, visas
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -44,6 +44,12 @@ urlpatterns = [
     # One search across every source, no AI (search_sources.py): open to all.
     path("rechercher/", search_sources.page, name="rechercher"),
     path("api/rechercher", search_sources.api_search, name="api_rechercher"),
+    # Grammar rules as a tree, illustrated by the site's sentences (grammar.py): owner only for now.
+    path("grammaire/", grammar.page, name="grammar"),
+    path("api/grammaire", grammar.api_tree, name="grammar_tree"),
+    path("api/grammaire/regle", grammar.api_rule, name="grammar_rule"),
+    path("api/grammaire/exemple", grammar.api_example, name="grammar_example"),
+    path("api/grammaire/phrases", grammar.api_sentences, name="grammar_sentences"),
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
     path("transcripter/", views.transcripter, name="transcripter"),

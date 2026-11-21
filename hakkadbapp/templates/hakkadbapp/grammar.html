@@ -1,0 +1,344 @@
+{% extends "hakkadbapp/base.html" %}
+{% block content %}
+{% comment %}
+  « Grammaire » (grammar.py) : l'arbre des règles à gauche, la règle choisie
+  à droite, avec ses exemples (des liens vers les expressions, les ajouts et
+  les segments des transcriptions publiées) et la recherche de phrases.
+  Privé : propriétaire du site seulement.
+{% endcomment %}
+{% csrf_token %}
+<style>
+  .gr-page { display: grid; grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+  @media (max-width: 48rem) { .gr-page { grid-template-columns: minmax(0, 1fr); } }
+  .gr-box { border: 1px solid #E8DFD2; border-radius: 0.75rem; background: #fff; }
+  .gr-tree { position: sticky; top: 0.5rem; max-height: calc(100vh - 1rem); overflow: auto; padding: 0.5rem; }
+  .gr-tree ul { list-style: none; margin: 0; padding-left: 0.9rem; }
+  .gr-tree > ul { padding-left: 0; }
+  .gr-node { display: flex; align-items: baseline; gap: 0.35rem; width: 100%; padding: 0.3rem 0.45rem; border-radius: 0.45rem; text-align: left;
+             font-size: 0.9rem; color: #261F1C; background: none; border: 0; cursor: pointer; }
+  .gr-node:hover { background: #FBF6EE; }
+  .gr-node.is-current { background: #FBF0E6; color: #9B1C1C; font-weight: 700; }
+  .gr-node small { color: #8C8478; font-weight: 400; font-size: 0.72rem; margin-left: auto; white-space: nowrap; }
+  .gr-node .gr-draft { color: #B5AA9B; }
+  .gr-tools { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+  .gr-btn { min-height: 2.1rem; padding: 0 0.7rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; background: #fff; font-size: 0.82rem; color: #544D45; }
+  .gr-btn:disabled { opacity: 0.45; }
+  .gr-btn-main { background: #9B1C1C; border-color: #9B1C1C; color: #fff; font-weight: 700; }
+  .gr-edit { padding: 0.8rem; }
+  .gr-edit label { display: block; font-size: 0.75rem; color: #6E655C; margin: 0.6rem 0 0.15rem; }
+  .gr-edit input, .gr-edit textarea, .gr-edit select { width: 100%; border: 1px solid #DDD0BD; border-radius: 0.5rem; padding: 0.45rem 0.6rem; background: #fff; }
+  .gr-edit input.gr-title { font-size: 1.15rem; font-weight: 700; }
+  .gr-edit textarea { min-height: 8rem; font-size: 0.92rem; line-height: 1.45; }
+  .gr-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.6rem; }
+  .gr-status { font-size: 0.8rem; color: #8C8478; }
+  .gr-status.is-error { color: #9B1C1C; }
+  .gr-h2 { font-weight: 700; margin: 1.1rem 0 0.4rem; display: flex; align-items: baseline; gap: 0.5rem; }
+  .gr-h2 small { font-weight: 400; color: #8C8478; font-size: 0.8rem; }
+  .gr-list { list-style: none; margin: 0; padding: 0; }
+  .gr-ex { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.2rem 0.6rem; padding: 0.5rem 0.2rem; border-top: 1px solid #F0E8DC; }
+  .gr-ex:first-child { border-top: 0; }
+  .gr-hanzi { font-size: 1.2rem; line-height: 1.35; overflow-wrap: anywhere; }
+  .gr-hanzi mark { background: #fef3c7; color: inherit; border-radius: 0.15rem; }
+  .gr-pinyin { font-size: 0.8rem; color: #9B1C1C; }
+  .gr-fr { font-size: 0.88rem; }
+  .gr-meta { font-size: 0.72rem; color: #8C8478; overflow-wrap: anywhere; }
+  .gr-meta a { color: #9B1C1C; }
+  .gr-missing { color: #B5AA9B; font-style: italic; }
+  .gr-ex-tools { display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-end; }
+  .gr-ex-tools .gr-btn { min-height: 1.8rem; padding: 0 0.5rem; }
+  .gr-ex-fields { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .gr-ex-fields input { flex: 1 1 8rem; min-width: 0; border: 1px solid #EFE6D8; border-radius: 0.4rem; padding: 0.2rem 0.45rem; font-size: 0.78rem; }
+  .gr-ex-fields input.gr-focus { flex: 0 1 6rem; }
+  .gr-find { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .gr-find input[type=search] { flex: 1 1 12rem; min-width: 0; min-height: 2.3rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; padding: 0 0.6rem; }
+  .gr-find label { font-size: 0.8rem; color: #544D45; display: inline-flex; gap: 0.3rem; align-items: center; }
+  .gr-cited { font-size: 0.72rem; color: #6E655C; }
+  .gr-empty { padding: 1rem; color: #8C8478; font-size: 0.9rem; }
+</style>
+
+<h1 class="text-2xl font-bold mb-2">Grammaire
+  <details class="help-tip"><summary>ⓘ</summary>
+    Les règles en arbre (chapitre › règle › règle plus fine). Choisissez une règle à gauche : ←/→ la sortent ou la rangent
+    sous celle du dessus, ↑/↓ changent l'ordre. Les exemples sont des liens vers les expressions du lexique, les ajouts et les
+    segments des transcriptions publiées : ils montrent toujours la phrase à jour. « Mot » = ce que la règle illustre dans la
+    phrase (surligné). Page privée pour l'instant.
+  </details>
+</h1>
+
+<div class="gr-page">
+  <aside class="gr-box gr-tree">
+    <div class="gr-tools">
+      <button id="gr-new-root" type="button" class="gr-btn">＋ Chapitre</button>
+    </div>
+    <div id="gr-tree"><p class="gr-empty">Chargement…</p></div>
+  </aside>
+
+  <section id="gr-main" class="gr-box gr-edit">
+    <p class="gr-empty">Choisissez une règle, ou créez un premier chapitre (« ＋ Chapitre »).</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const URLS = { tree: "{% url 'grammar_tree' %}", rule: "{% url 'grammar_rule' %}", example: "{% url 'grammar_example' %}",
+                 sentences: "{% url 'grammar_sentences' %}" };
+  const KINDS = { expression: 'Expression', addition: 'Ajout', segment: 'Transcription' };
+  let rules = [];
+  let current = null;
+  let dirty = false;
+  try { current = Number(localStorage.getItem('hakka-grammar:current')) || null; } catch (e) { /* convenience only */ }
+
+  async function call(url, body) {
+    const response = await fetch(url, body === undefined ? { headers: { Accept: 'application/json' } } : {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
+      body: JSON.stringify(body) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `erreur ${response.status}`);
+    if (data.rules) rules = data.rules;
+    return data;
+  }
+  function status(text, error = false) {
+    const el = $('gr-status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('is-error', error);
+  }
+  const byId = (id) => rules.find((r) => r.id === id);
+  const children = (id) => rules.filter((r) => r.parent === id).sort((a, b) => a.position - b.position || a.id - b.id);
+  function count(id) { return byId(id).examples.length + children(id).reduce((n, c) => n + count(c.id), 0); }
+  function path(rule) { const out = []; for (let r = rule; r; r = byId(r.parent)) out.unshift(r); return out; }
+  function numbering(rule) { return path(rule).map((r) => children(r.parent).indexOf(r) + 1).join('.'); }
+
+  // ---- the tree -------------------------------------------------------------------------------
+  function drawTree() {
+    const draw = (parent) => {
+      const list = children(parent);
+      if (!list.length) return '';
+      return `<ul>${list.map((r) => `<li>
+          <button type="button" class="gr-node${r.id === current ? ' is-current' : ''}" data-id="${r.id}">
+            <span>${numbering(r)}</span><span class="${r.status === 'draft' ? 'gr-draft' : ''}">${esc(r.title)}</span>
+            <small title="exemples, sous-règles comprises">${count(r.id) || ''}</small></button>${draw(r.id)}</li>`).join('')}</ul>`;
+    };
+    $('gr-tree').innerHTML = draw(null) || '<p class="gr-empty">Aucune règle pour l\'instant.</p>';
+  }
+  $('gr-tree').addEventListener('click', (event) => {
+    const node = event.target.closest('.gr-node');
+    if (node) select(Number(node.dataset.id));
+  });
+
+  function select(id) {
+    if (dirty && id !== current && !confirmLeave()) return;
+    current = byId(id) ? id : null;
+    try { localStorage.setItem('hakka-grammar:current', String(current || '')); } catch (e) { /* convenience only */ }
+    dirty = false;
+    drawTree();
+    drawMain();
+  }
+  // Unsaved text is saved, never lost, when another rule is chosen.
+  function confirmLeave() { save(); return true; }
+
+  // ---- the rule -------------------------------------------------------------------------------
+  function highlight(hanzi, focus) {
+    const text = esc(hanzi);
+    if (!focus) return text;
+    return text.split(esc(focus)).join(`<mark>${esc(focus)}</mark>`);
+  }
+  function exampleHtml(e, i, n) {
+    const where = [KINDS[e.target_type] || e.target_type, e.detail].filter(Boolean).join(' · ');
+    return `<li class="gr-ex" data-ex="${e.id}">
+        <div>
+          ${e.missing ? `<div class="gr-missing">${esc(e.label || e.target_key)}</div>`
+                      : `<div class="gr-hanzi" lang="zh">${highlight(e.hanzi, e.focus)}</div>
+                         ${e.pinyin ? `<div class="gr-pinyin">${esc(e.pinyin)}</div>` : ''}
+                         ${e.french ? `<div class="gr-fr">${esc(e.french)}</div>` : ''}`}
+          <div class="gr-meta">${e.link ? `<a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(where)}</a>` : esc(where)}</div>
+        </div>
+        <div class="gr-ex-tools">
+          <button type="button" class="gr-btn" data-exact="up" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button type="button" class="gr-btn" data-exact="down" title="Descendre" ${i === n - 1 ? 'disabled' : ''}>↓</button>
+          <button type="button" class="gr-btn" data-exact="remove" title="Retirer cet exemple de la règle">✕</button>
+        </div>
+        <div class="gr-ex-fields">
+          <input class="gr-focus" data-exfield="focus" value="${esc(e.focus)}" placeholder="Mot" title="Ce que la règle illustre ici (surligné)">
+          <input data-exfield="note" value="${esc(e.note)}" placeholder="Note (facultatif)">
+        </div>
+      </li>`;
+  }
+
+  function drawMain() {
+    const main = $('gr-main');
+    const rule = byId(current);
+    if (!rule) {
+      main.innerHTML = '<p class="gr-empty">Choisissez une règle, ou créez un premier chapitre (« ＋ Chapitre »).</p>';
+      return;
+    }
+    const sibs = children(rule.parent);
+    const at = sibs.indexOf(rule);
+    main.innerHTML = `
+      <div class="gr-tools">
+        <button type="button" class="gr-btn" data-act="child">＋ Sous-règle</button>
+        <button type="button" class="gr-btn" data-act="sibling">＋ Règle à côté</button>
+        <button type="button" class="gr-btn" data-move="up" title="Monter" ${at === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="gr-btn" data-move="down" title="Descendre" ${at === sibs.length - 1 ? 'disabled' : ''}>↓</button>
+        <button type="button" class="gr-btn" data-move="outdent" title="Sortir d'un niveau" ${rule.parent ? '' : 'disabled'}>←</button>
+        <button type="button" class="gr-btn" data-move="indent" title="Ranger sous la règle du dessus" ${at === 0 ? 'disabled' : ''}>→</button>
+        <button type="button" class="gr-btn" data-act="delete" title="Supprimer la règle">🗑</button>
+      </div>
+      <div class="gr-meta">${path(rule).map((r) => esc(r.title)).join(' › ')}</div>
+      <label for="gr-title">Titre</label>
+      <input id="gr-title" class="gr-title" data-field="title" value="${esc(rule.title)}" maxlength="200">
+      <label for="gr-pattern">Schéma</label>
+      <input id="gr-pattern" data-field="pattern" value="${esc(rule.pattern)}" maxlength="300" placeholder="Sujet + ng² + Verbe (+ Complément)">
+      <label for="gr-explanation">Explication</label>
+      <textarea id="gr-explanation" data-field="explanation" placeholder="La règle, ses exceptions, ce qui la distingue du mandarin…">${esc(rule.explanation)}</textarea>
+      <div class="gr-row">
+        <select id="gr-state" data-field="status" style="width:auto">
+          <option value="draft"${rule.status === 'draft' ? ' selected' : ''}>Brouillon</option>
+          <option value="done"${rule.status === 'done' ? ' selected' : ''}>Rédigée</option>
+        </select>
+        <button id="gr-save" type="button" class="gr-btn gr-btn-main">Enregistrer</button>
+        <span id="gr-status" class="gr-status" aria-live="polite"></span>
+      </div>
+
+      <h2 class="gr-h2">Exemples <small>${rule.examples.length}</small></h2>
+      ${rule.examples.length ? `<ul class="gr-list">${rule.examples.map((e, i) => exampleHtml(e, i, rule.examples.length)).join('')}</ul>`
+                             : '<p class="gr-meta">Aucun exemple : cherchez des phrases ci-dessous.</p>'}
+
+      <h2 class="gr-h2">Ajouter des phrases <small>expressions, ajouts, transcriptions</small></h2>
+      <form id="gr-find" class="gr-find">
+        <input id="gr-q" type="search" placeholder="唔, ng, « ne pas »…" autocomplete="off" aria-label="Mot, lecture ou sens">
+        <label><input id="gr-free" type="checkbox"> seulement les phrases d'aucune règle</label>
+        <button type="submit" class="gr-btn">Chercher</button>
+      </form>
+      <p id="gr-found-status" class="gr-status"></p>
+      <ul id="gr-found" class="gr-list"></ul>`;
+  }
+
+  async function save() {
+    const rule = byId(current);
+    if (!rule || !dirty) return;
+    const body = { action: 'update', id: rule.id };
+    $('gr-main').querySelectorAll('[data-field]').forEach((el) => { body[el.dataset.field] = el.value; });
+    status('Enregistrement…');
+    try {
+      await call(URLS.rule, body);
+      dirty = false;
+      drawTree();
+      status('Enregistré.');
+    } catch (err) { status(err.message, true); }
+  }
+
+  $('gr-main').addEventListener('input', (event) => {
+    if (event.target.matches('[data-field]')) { dirty = true; status('Modifié, pas encore enregistré.'); }
+  });
+  $('gr-main').addEventListener('change', (event) => {
+    const field = event.target.dataset.exfield;
+    if (field) {
+      const id = Number(event.target.closest('[data-ex]').dataset.ex);
+      call(URLS.example, { action: 'update', id, [field]: event.target.value })
+        .then(() => { if (field === 'focus') drawMain(); })
+        .catch((err) => status(err.message, true));
+    }
+  });
+  $('gr-main').addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') { event.preventDefault(); save(); }
+  });
+
+  $('gr-main').addEventListener('click', async (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const rule = byId(current);
+    try {
+      if (button.id === 'gr-save') return save();
+      if (button.dataset.move) {
+        await save();
+        await call(URLS.rule, { action: 'move', id: rule.id, direction: button.dataset.move });
+        drawTree(); drawMain();
+      } else if (button.dataset.act === 'child' || button.dataset.act === 'sibling') {
+        await save();
+        const data = await call(URLS.rule, { action: 'create', parent: button.dataset.act === 'child' ? rule.id : rule.parent });
+        select(data.id);
+        $('gr-title')?.select();
+      } else if (button.dataset.act === 'delete') {
+        const below = children(rule.id).length;
+        // An inline confirmation (no browser dialog): a second touch deletes.
+        if (button.dataset.armed !== '1') {
+          button.dataset.armed = '1';
+          button.textContent = below ? `Supprimer avec ${below} sous-règle${below > 1 ? 's' : ''} ?` : 'Supprimer ?';
+          return;
+        }
+        await call(URLS.rule, { action: 'delete', id: rule.id, with_children: below > 0 });
+        dirty = false;
+        current = rule.parent;
+        drawTree(); drawMain();
+      } else if (button.dataset.exact) {
+        const id = Number(button.closest('[data-ex]').dataset.ex);
+        await call(URLS.example, { action: button.dataset.exact, id });
+        drawTree(); drawMain();
+      } else if (button.dataset.add) {
+        const item = found[Number(button.dataset.add)];
+        const q = $('gr-q').value.trim();
+        await call(URLS.example, { action: 'add', rule: rule.id, target_type: item.target_type, target_key: item.target_key,
+                                   focus: /[㐀-鿿]/.test(q) ? q : '' });
+        button.disabled = true;
+        button.textContent = '✓ Ajoutée';
+        // The new example shows up; the search results stay as they are.
+        const keep = { q, free: $('gr-free').checked, html: $('gr-found').innerHTML, status: $('gr-found-status').textContent };
+        drawTree(); drawMain();
+        $('gr-q').value = keep.q; $('gr-free').checked = keep.free;
+        $('gr-found').innerHTML = keep.html; $('gr-found-status').textContent = keep.status;
+      }
+    } catch (err) { status(err.message, true); }
+  });
+
+  // ---- finding sentences ------------------------------------------------------------------------
+  let found = [];
+  $('gr-main').addEventListener('submit', async (event) => {
+    if (event.target.id !== 'gr-find') return;
+    event.preventDefault();
+    const q = $('gr-q').value.trim();
+    const free = $('gr-free').checked;
+    $('gr-found-status').textContent = 'Recherche…';
+    try {
+      const data = await call(`${URLS.sentences}?q=${encodeURIComponent(q)}${free ? '&libres=1' : ''}`);
+      found = data.items;
+      const rule = byId(current);
+      const linked = new Set(rule.examples.map((e) => `${e.target_type}|${e.target_key}`));
+      const focus = /[㐀-鿿]/.test(q) ? q : '';
+      $('gr-found-status').textContent = data.items.length
+        ? `${data.count} phrase${data.count > 1 ? 's' : ''}${data.count > data.items.length ? ` (les ${data.items.length} premières)` : ''}.`
+        : (q || free ? 'Aucune phrase trouvée.' : 'Tapez un mot, une lecture ou un sens.');
+      $('gr-found').innerHTML = found.map((s, i) => `<li class="gr-ex">
+          <div>
+            <div class="gr-hanzi" lang="zh">${highlight(s.hanzi, focus)}</div>
+            ${s.pinyin ? `<div class="gr-pinyin">${esc(s.pinyin)}</div>` : ''}
+            ${s.french ? `<div class="gr-fr">${esc(s.french)}</div>` : ''}
+            <div class="gr-meta"><a href="${esc(s.link)}" target="_blank" rel="noopener">${esc([KINDS[s.target_type], s.detail].join(' · '))}</a></div>
+            ${s.rules.length ? `<div class="gr-cited">déjà dans : ${s.rules.map(esc).join(', ')}</div>` : ''}
+          </div>
+          <div class="gr-ex-tools">${linked.has(`${s.target_type}|${s.target_key}`)
+            ? '<span class="gr-meta">✓ exemple</span>'
+            : `<button type="button" class="gr-btn" data-add="${i}">＋ Exemple</button>`}</div>
+        </li>`).join('');
+    } catch (err) { $('gr-found-status').textContent = err.message; }
+  });
+
+  // ---- start ----------------------------------------------------------------------------------
+  $('gr-new-root').addEventListener('click', async () => {
+    try {
+      await save();
+      const data = await call(URLS.rule, { action: 'create', parent: null, title: 'Nouveau chapitre' });
+      select(data.id);
+      $('gr-title')?.select();
+    } catch (err) { status(err.message, true); }
+  });
+  window.addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+
+  call(URLS.tree).then(() => { if (!byId(current)) current = null; drawTree(); drawMain(); })
+    .catch((err) => { $('gr-tree').innerHTML = `<p class="gr-empty">Échec du chargement : ${esc(err.message)}</p>`; });
+})();
+</script>
+{% endblock %}

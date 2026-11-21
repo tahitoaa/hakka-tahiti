@@ -458,6 +458,9 @@
                    class="nav-link{% if page == 'saisie' or page == 'validation' or page == 'ai_suggestions' or page == 'document_import' or page == 'guide_saisie' %} is-active{% endif %}">Ajouts{% with n=review_count %}{% if n %} <span class="nav-count" title="{{ n }} entrée{{ n|pluralize }} à valider">{{ n }}</span>{% endif %}{% endwith %}</a></li>
             {% endif %}
             <li><a href="{% url 'recordings' %}" class="nav-link{% if page == 'recordings' %} is-active{% endif %}">À enregistrer</a></li>
+            {% if is_owner %}
+            <li><a href="{% url 'grammar' %}" class="nav-link{% if page == 'grammar' %} is-active{% endif %}" title="Règles de grammaire en arbre, illustrées par les expressions et les transcriptions (privé)">Grammaire</a></li>
+            {% endif %}
             <li>
               <details class="nav-user">
                 <summary class="nav-link">{{ user.get_short_name|default:user.username }} <span aria-hidden="true">▾</span></summary>

@@ -605,3 +605,64 @@ class ReadingDecision(models.Model):
 
     def __str__(self):
         return f"{self.char} {self.reading} {self.status}"
+
+
+class GrammarRule(models.Model):
+    """One node of the « Grammaire » tree (grammar.py): a chapter (« La
+    négation »), a rule under it (« La négation au présent »), a finer rule
+    under that... Its own table, outside the lexicon's reset=True reach.
+    Private for now: the owner only (permissions.owner_required)."""
+    STATUS_DRAFT = "draft"
+    STATUS_DONE = "done"
+    STATUS_CHOICES = [(STATUS_DRAFT, "Brouillon"), (STATUS_DONE, "Rédigée")]
+
+    parent = models.ForeignKey("self", related_name="children", on_delete=models.CASCADE, null=True, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    title = models.CharField(max_length=200)
+    # The rule as a pattern: « Sujet + ng² + Verbe (+ Complément) ».
+    pattern = models.CharField(max_length=300, blank=True, default="")
+    explanation = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["parent_id", "position", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class GrammarExample(models.Model):
+    """A sentence that illustrates a rule: a lexicon expression, an addition
+    or a segment of a published transcription. A link, not a copy:
+    correcting the sentence corrects the example. Keyed by what survives a
+    lexicon reset (Expression.platform_id), the addition's id, or the
+    transcription and the segment's start (« <uuid>@<start ms> »: a segment
+    keeps its start when the transcription is published again). `label`:
+    the sentence as it was when linked, shown if it is gone."""
+    TARGET_EXPRESSION = "expression"
+    TARGET_ADDITION = "addition"
+    TARGET_SEGMENT = "segment"
+    TARGET_CHOICES = [(TARGET_EXPRESSION, "Expression du lexique"), (TARGET_ADDITION, "Ajout"),
+                      (TARGET_SEGMENT, "Segment de transcription")]
+
+    rule = models.ForeignKey(GrammarRule, related_name="examples", on_delete=models.CASCADE)
+    target_type = models.CharField(max_length=12, choices=TARGET_CHOICES)
+    target_key = models.CharField(max_length=80)
+    label = models.CharField(max_length=400, blank=True, default="")
+    # The word the rule is about in this sentence (ng²: 唔), highlighted.
+    focus = models.CharField(max_length=40, blank=True, default="")
+    note = models.CharField(max_length=300, blank=True, default="")
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [models.UniqueConstraint(fields=["rule", "target_type", "target_key"], name="one_example_per_rule")]
+
+    def __str__(self):
+        return f"{self.rule} : {self.label or self.target_key}"

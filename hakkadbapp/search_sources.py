@@ -137,10 +137,10 @@ def _build_lexicon():
     for eid, pos, wid in ExpressionWord.objects.values_list("expression_id", "position", "word_id"):
         in_expr[eid].append((pos, wid))
     expressions = []
-    for e in Expression.objects.only("id", "text", "french", "english"):
+    for e in Expression.objects.only("id", "text", "french", "english", "platform_id"):
         ws = [by_id[wid] for _pos, wid in sorted(in_expr[e.id]) if wid in by_id]
         hanzi = (e.text or "").replace(" ", "") or "".join(w["hanzi"] for w in ws)
-        expressions.append({"id": e.id, "hanzi": hanzi, "pinyin": " ".join(w["pinyin"] for w in ws),
+        expressions.append({"id": e.id, "platform_id": e.platform_id or "", "hanzi": hanzi, "pinyin": " ".join(w["pinyin"] for w in ws),
                             "french": e.french or "", "english": e.english or ""})
     return {"words": words, "expressions": expressions}
 
