@@ -8,11 +8,14 @@ Liste des demandes en cours. Les propositions d'amélioration sont dans
 - [x] **Transcriptions publiées : demander un avis par WhatsApp sur un segment.** Fait (commit e32a56d), pas encore déployé.
   Un lien qui mène directement à l'audio du segment, avec la transcription et
   les traductions proposées dans le message.
-- [ ] **Dictionnaires : une page de recherche unique** pour chercher un mot ou
-  un sens dans toutes les sources (avec ou sans IA). Esquisse dans PROPOSITIONS.md.
-- [ ] **Section « Grammaire » :** des règles de grammaire éditables sous forme
-  d'arbre, construites à partir des phrases existantes. À spécifier plus tard ;
-  premières pistes dans PROPOSITIONS.md.
+- [x] **Dictionnaires : une page de recherche unique** (« Rechercher », /rechercher/),
+  ouverte à tous, sans IA. Fait (commit ae51ae4), pas encore déployé. Transcriptions
+  pour les membres connectés, documents importés et ajouts en cours pour les éditeurs.
+- [ ] **Section « Grammaire » :** première version faite (commit 4d62cf3, pas
+  déployée ; migration 0035) : arbre de règles, exemples liés aux expressions,
+  ajouts et segments de transcription, propriétaire seulement. Reste à spécifier :
+  import des 5 chapitres de `grammar/grammar.md`, propositions de règles par l'IA,
+  export vers `hakka-grammar`, ouverture aux éditeurs.
 
 ## En attente d'une action ou d'une décision
 
