@@ -32,7 +32,8 @@ from .permissions import owner_required
 from . import grammar_analysis, search_sources
 
 LIMIT = 60
-FIELDS = {"title": 200, "pattern": 300, "explanation": 20000}
+FIELDS = {"title": 200, "pattern": 300, "explanation": 20000, "learner_text": 20000, "post_text": 5000}
+TEXTS = {"explanation", "learner_text", "post_text"}   # kept as typed, line breaks included
 
 
 def _read(request):
@@ -145,6 +146,7 @@ def tree():
                                                 patterns.get(e.rule_id), tags))
     return [{"id": r.id, "parent": r.parent_id, "position": r.position, "title": r.title, "pattern": r.pattern,
              "explanation": r.explanation, "status": r.status, "updated_at": r.updated_at.isoformat(),
+             "learner_text": r.learner_text, "post_text": r.post_text,
              "pattern_parts": patterns[r.id],
              "examples": by_rule.get(r.id, [])} for r in rules]
 
@@ -247,7 +249,7 @@ def api_rule(request):
             changed = []
             for field, size in FIELDS.items():
                 if isinstance(p.get(field), str):
-                    value = p[field][:size] if field == "explanation" else " ".join(p[field].split())[:size]
+                    value = p[field][:size] if field in TEXTS else " ".join(p[field].split())[:size]
                     if field == "title" and not value:
                         return _bad("Le titre est vide.")
                     setattr(rule, field, value)

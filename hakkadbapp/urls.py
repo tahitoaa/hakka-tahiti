@@ -60,6 +60,7 @@ urlpatterns = [
     path("api/grammaire/corpus/saisir", grammar_corpus.api_enter, name="grammar_enter"),
     path("api/grammaire/induites", grammar_corpus.api_induced, name="grammar_induced"),
     path("api/grammaire/induites/creer", grammar_corpus.api_create_induced, name="grammar_induced_create"),
+    path("api/grammaire/regle/ia", grammar_corpus.api_rule_ai, name="grammar_rule_ai"),
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
     path("transcripter/", views.transcripter, name="transcripter"),

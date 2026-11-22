@@ -342,3 +342,43 @@ class CorpusTests(TestCase):
         examples = [r for r in self.client.get(reverse("grammar_tree"), HTTP_ACCEPT="application/json").json()["rules"]
                     if r["id"] == rule.id][0]["examples"]
         self.assertTrue(all(e["conforms"]["ok"] for e in examples))
+
+    def test_rule_scope_retain_and_learner_texts(self):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from . import ai
+
+        self.analyse(self.a, [("佢", "PRO"), ("唔", "NÉG"), ("來", "V")])
+        self.analyse(self.b, [("我", "PRO"), ("唔", "NÉG"), ("食", "V")])
+        chapter = GrammarRule.objects.create(title="La négation")
+        self.post("grammar_example", action="add", rule=chapter.id, target_type="addition", target_key=str(self.a.id))
+        # Only this chapter's example: one sentence, not two.
+        data = self.client.get(reverse("grammar_induced"), {"regle": chapter.id, "mots": "1"}).json()
+        self.assertEqual(data["analyses"], 1)
+        p = {(x["lhs"], x["pattern"]): x for x in data["productions"]}[("GV", "唔 + V")]
+        self.assertEqual(p["count"], 1)
+        self.post("grammar_induced_create", pattern=p["pattern"], title="Avec 唔", parent=chapter.id, examples=p["examples"])
+        again = {(x["lhs"], x["pattern"]): x for x in
+                 self.client.get(reverse("grammar_induced"), {"regle": chapter.id, "mots": "1"}).json()["productions"]}
+        self.assertTrue(again[("GV", "唔 + V")]["rule"]["here"])
+        self.assertEqual(chapter.children.get().title, "Avec 唔")
+
+        # The learner's texts: written by hand, or by the AI from the rule's own examples.
+        self.post("grammar_rule", action="update", id=chapter.id, learner_text="Pour dire non :\n唔 + verbe")
+        self.assertEqual(GrammarRule.objects.get(id=chapter.id).learner_text, "Pour dire non :\n唔 + verbe")
+        reply = SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="Dire **non** : 佢唔來")])
+        client = mock.MagicMock()
+        client.beta.messages.create.return_value = reply
+        # anthropic itself is only needed in production: a stand-in with its error classes.
+        fake = SimpleNamespace(**{n: type(n, (Exception,), {}) for n in ("RateLimitError", "APIConnectionError", "APIStatusError")})
+        with mock.patch.object(ai, "ai_enabled", return_value=True), mock.patch.object(ai, "_client", return_value=client),                 mock.patch.dict("sys.modules", {"anthropic": fake}):
+            out = self.post("grammar_rule_ai", id=chapter.id, kind="post").json()
+        self.assertEqual(out["text"], "Dire non : 佢唔來")
+        self.assertEqual(GrammarRule.objects.get(id=chapter.id).post_text, "Dire non : 佢唔來")
+        sent = client.beta.messages.create.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("il ne vient pas", sent)
+        self.assertIn("Facebook", sent)
+        empty = GrammarRule.objects.create(title="Vide")
+        with mock.patch.object(ai, "ai_enabled", return_value=True):
+            self.assertEqual(self.post("grammar_rule_ai", id=empty.id, kind="learner").status_code, 400)

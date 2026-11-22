@@ -622,6 +622,11 @@ class GrammarRule(models.Model):
     # The rule as a pattern: « Sujet + ng² + Verbe (+ Complément) ».
     pattern = models.CharField(max_length=300, blank=True, default="")
     explanation = models.TextField(blank=True, default="")
+    # For learners (grammar_corpus.api_rule_ai): the rule told as simply as
+    # possible, and a short article to publish (Facebook). Drafted by the AI
+    # or by hand, always edited before use.
+    learner_text = models.TextField(blank=True, default="")
+    post_text = models.TextField(blank=True, default="")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_DRAFT)
 
     updated_by = models.ForeignKey(

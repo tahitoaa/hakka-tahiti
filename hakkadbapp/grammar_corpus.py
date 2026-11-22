@@ -18,8 +18,11 @@ Privé : le propriétaire du site seulement (owner_required).
 
     GET  /api/grammaire/corpus?source=&etat=&q=&page=   le parcours
     POST /api/grammaire/corpus/saisir                   {hanzi, french, source, rule}
-    GET  /api/grammaire/induites?mots=1                 les constructions et les inventaires
+    GET  /api/grammaire/induites?mots=1&regle=<id>      les constructions et les inventaires (d'une
+                                                        règle : de ses exemples et de ceux de ses sous-règles)
     POST /api/grammaire/induites/creer                  {pattern, title, parent, examples}
+    POST /api/grammaire/regle/ia                        {id, kind: learner|post} : le texte de l'IA,
+                                                        enregistré dans la règle
 """
 import json
 import re
@@ -261,12 +264,25 @@ def api_induced(request):
     tags = grammar_analysis.Tags()
     words = request.GET.get("mots") == "1"
     analyses = list(SentenceAnalysis.objects.all())
+    # D'une règle : seulement les phrases qu'elle cite, elle et ses sous-règles ; une construction
+    # « retenue » est une sous-règle directe de même schéma.
+    scope = GrammarRule.objects.filter(id=request.GET["regle"]).first() if request.GET.get("regle", "").isdigit() else None
+    if scope is not None:
+        from .grammar import _descendant_ids
+
+        ids = _descendant_ids(scope) | {scope.id}
+        quoted = set(GrammarExample.objects.filter(rule_id__in=ids).values_list("target_type", "target_key"))
+        analyses = [a for a in analyses if (a.target_type, a.target_key) in quoted]
     found = productions(analyses, tags, words)
     labels = {(s["target_type"], s["target_key"]): s for s in sentences(
         {t: {a.target_key for a in analyses if a.target_type == t} for t in {a.target_type for a in analyses}})} \
         if analyses else {}
     rules = list(GrammarRule.objects.exclude(pattern=""))
-    by_pattern = {_key(r.pattern): r for r in rules}
+    if scope is not None:
+        rules = [r for r in rules if r.parent_id == scope.id] + [r for r in rules if r.parent_id != scope.id]
+    by_pattern = {}
+    for r in rules:
+        by_pattern.setdefault(_key(r.pattern), r)
     citing = defaultdict(set)
     for kind, key, title in GrammarExample.objects.values_list("target_type", "target_key", "rule__title"):
         citing[(kind, key)].add(title)
@@ -283,7 +299,8 @@ def api_induced(request):
                              "link": s["link"] if s else "", "bracketed": grammar_analysis.bracketed(a.tokens, a.groups, tags)})
         out.append({"lhs": lhs, "rhs": list(rhs), "pattern": pattern, "count": len(items), "examples": examples,
                     "sentences": len({(a.target_type, a.target_key) for a in items}),
-                    "rule": {"id": rule.id, "title": rule.title} if rule else None,
+                    "rule": {"id": rule.id, "title": rule.title, "here": bool(scope and rule.parent_id == scope.id)}
+                    if rule else None,
                     "cited_by": sorted(set().union(*[citing[(a.target_type, a.target_key)] for a in items]))[:6]})
     out.sort(key=lambda p: (-p["count"], p["lhs"], p["pattern"]))
 
@@ -336,3 +353,113 @@ def api_create_induced(request):
             GrammarExample.objects.get_or_create(rule=rule, target_type=s["target_type"], target_key=s["target_key"],
                                                  defaults={"label": _label(s), "position": n})
     return _json({"ok": True, "id": rule.id, "rules": tree()})
+
+
+# ---- Pour les apprenants : l'IA explique, l'IA propose un article ---------------------------------
+
+LEARNER_PROMPT = """You write for people of the Chinese community of Tahiti (French Polynesia) who want to learn or relearn the Hakka their grandparents spoke. They are French speakers, often adults, not linguists. You get one grammar rule written by a linguist: its title, its schema (written with the linguist's grammatical labels), its explanation, its sub-rules, and its example sentences, each with its Hakka characters, its reading (Wenfa romanization with tone numbers), its French translation and sometimes its analysis.
+
+Rules:
+- Write in French, simply, warmly, without jargon: no grammatical codes (GN, GV, NÉG…), no linguistic terms a learner would not know; say « le mot qui dit non » rather than « la particule de négation » when it helps, and explain any term you keep.
+- Use only the example sentences given, with their characters, their reading and their translation exactly as given. Never invent a Hakka sentence, word or reading; if there are too few examples, say less rather than invent.
+- Do not state anything about Hakka that the rule or its examples do not show. Hakka is not Mandarin: never rely on Mandarin usage.
+- Plain text only, no Markdown: no #, no **, no tables. Line breaks are fine."""
+
+LEARNER_TASK = """Write the learner's explanation of this rule: 120 to 250 words.
+1. One or two sentences: what this construction is for, in everyday terms.
+2. How to build it, as a simple formula in words (for example « celui qui parle + 唔 + ce qu'il fait »).
+3. Two to four of the examples, each on its own line: characters, then reading in parentheses, then « = » and the translation.
+4. One tip or a common mistake, only if the rule or its examples show it."""
+
+POST_TASK = """Write a short article for the community's Facebook page that teaches this rule: 80 to 180 words.
+- A first line that catches the eye (a question or a familiar situation), with at most one emoji.
+- The rule in one or two simple sentences.
+- Two or three of the examples, each on its own line: characters, reading in parentheses, « = » translation.
+- A last line inviting readers to answer or to share how their family says it.
+- Then, on a separate last line, three to five hashtags, among them #hakka #Tahiti #客家話."""
+
+
+def _rule_context(rule):
+    from .grammar import sentences
+
+    tags = grammar_analysis.Tags()
+    examples = list(rule.examples.all()[:12])
+    wanted = defaultdict(set)
+    for e in examples:
+        wanted[e.target_type].add(e.target_key)
+    found = {(s["target_type"], s["target_key"]): s for s in sentences(dict(wanted))} if wanted else {}
+    analyses = {(a.target_type, a.target_key): a for a in SentenceAnalysis.objects.filter(
+        target_key__in=[e.target_key for e in examples])}
+    out = []
+    for e in examples:
+        s = found.get((e.target_type, e.target_key))
+        if not s:
+            continue
+        a = analyses.get((e.target_type, e.target_key))
+        out.append({"hanzi": s["hanzi"], "reading": s["pinyin"], "french": s["french"], "word_the_rule_is_about": e.focus,
+                    "note": e.note, "analysis": grammar_analysis.bracketed(a.tokens, a.groups, tags) if a else ""})
+    parts = grammar_analysis.parse_pattern(rule.pattern, tags)
+    legend = {}
+    for p in parts:
+        for alternative in p.get("tags", []):
+            for tag_id in alternative:
+                t = tags.by_id[tag_id]
+                legend[t.code] = t.name or t.code
+    return {
+        "title": rule.title, "schema": rule.pattern, "schema_labels": legend,
+        "chapter": rule.parent.title if rule.parent_id else "",
+        "explanation": rule.explanation[:4000],
+        "sub_rules": [{"title": c.title, "schema": c.pattern} for c in rule.children.all()[:12]],
+        "examples": out,
+    }
+
+
+@require_POST
+@owner_required
+def api_rule_ai(request):
+    from . import ai
+
+    try:
+        p = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _bad("Demande invalide.")
+    kind = p.get("kind")
+    if kind not in ("learner", "post"):
+        return _bad("Texte inconnu.")
+    rule = GrammarRule.objects.filter(id=p.get("id")).first() if isinstance(p.get("id"), int) else None
+    if rule is None:
+        return _bad("Règle introuvable : rechargez la page.", 404)
+    if not ai.ai_enabled():
+        return _bad("L'IA n'est pas configurée sur ce serveur (ANTHROPIC_API_KEY).", 503)
+    context = _rule_context(rule)
+    if not context["examples"]:
+        return _bad("Ajoutez d'abord des exemples à cette règle : l'IA n'écrit qu'à partir des phrases du corpus.")
+    if ai._over_limit(request.user):
+        return _bad(f"Limite de {ai.DAILY_LIMIT} demandes à l'IA par jour atteinte.", 429)
+    import anthropic
+
+    try:
+        response = ai._client().beta.messages.create(
+            model=ai.MODEL, max_tokens=1500,
+            betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+            output_config={"effort": "low"},
+            cache_control={"type": "ephemeral"},
+            system=LEARNER_PROMPT,
+            messages=[{"role": "user", "content": (LEARNER_TASK if kind == "learner" else POST_TASK)
+                       + "\n\nThe rule:\n" + json.dumps(context, ensure_ascii=False)}],
+        )
+    except anthropic.RateLimitError:
+        return _bad("L'IA est très demandée : réessayez dans une minute.", 429)
+    except anthropic.APIConnectionError:
+        return _bad("L'IA ne répond pas : réessayez plus tard.", 503)
+    except anthropic.APIStatusError:
+        return _bad("L'IA a renvoyé une erreur : réessayez plus tard.", 502)
+    if response.stop_reason in ("refusal", "max_tokens"):
+        return _bad("L'IA n'a pas pu écrire ce texte : réessayez.", 502)
+    text = "".join(b.text for b in response.content if b.type == "text").strip()
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)   # no Markdown on Facebook
+    field = "learner_text" if kind == "learner" else "post_text"
+    setattr(rule, field, text[:20000])
+    rule.updated_by = request.user
+    rule.save(update_fields=[field, "updated_by", "updated_at"])
+    return _json({"ok": True, "field": field, "text": getattr(rule, field)})

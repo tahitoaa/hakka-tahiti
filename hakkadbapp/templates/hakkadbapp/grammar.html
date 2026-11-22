@@ -142,6 +142,9 @@
 
 <h1 class="text-2xl font-bold mb-2">Grammaire
   <details class="help-tip"><summary>ⓘ</summary>
+    La démarche : ① un chapitre ou un thème (« ＋ Chapitre ») ; ② des phrases d'exemple (en bas d'une règle) ;
+    ③ leur analyse (🌱, avec ou sans l'IA) ; ④ « Règles induites de ces exemples » : retenir celles qui entrent dans le
+    chapitre ; ⑤ « Pour les apprenants » : l'explication simple et l'article Facebook, proposés par l'IA, à relire.
     Les règles en arbre (chapitre › règle › règle plus fine). Choisissez une règle à gauche : ←/→ la sortent ou la rangent
     sous celle du dessus, ↑/↓ changent l'ordre. Les exemples sont des liens vers les expressions du lexique, les ajouts et les
     segments des transcriptions publiées : ils montrent toujours la phrase à jour. « Mot » = ce que la règle illustre dans la
@@ -191,7 +194,9 @@
                  analysis: "{% url 'grammar_analysis' %}", analysisSave: "{% url 'grammar_analysis_save' %}",
                  analysisAi: "{% url 'grammar_analysis_ai' %}", import: "{% url 'grammar_import' %}",
                  corpus: "{% url 'grammar_corpus' %}", enter: "{% url 'grammar_enter' %}",
-                 induced: "{% url 'grammar_induced' %}", inducedCreate: "{% url 'grammar_induced_create' %}" };
+                 induced: "{% url 'grammar_induced' %}", inducedCreate: "{% url 'grammar_induced_create' %}",
+                 ruleAi: "{% url 'grammar_rule_ai' %}" };
+  const AI = {{ ai_enabled|yesno:"true,false" }};
   const GA = window.GrammarAnalysis;
   const tags = new GA.TagSet([]);
   let tab = 'rules';
@@ -356,7 +361,10 @@
     }
     const rule = byId(current);
     if (!rule) {
-      main.innerHTML = '<p class="gr-empty">Choisissez une règle, ou créez un premier chapitre (« ＋ Chapitre »).</p>';
+      main.innerHTML = `<div class="gr-empty"><p>Choisissez une règle, ou créez un premier chapitre (« ＋ Chapitre »).</p>
+        <ol class="gc-steps"><li>Un chapitre ou un thème de règle.</li><li>Des phrases d'exemple, cherchées dans le corpus.</li>
+        <li>Leur analyse, avec ou sans l'IA (🌱).</li><li>Les règles induites de ces exemples, à retenir dans le chapitre.</li>
+        <li>Pour les apprenants : l'explication simple et l'article Facebook, proposés par l'IA.</li></ol></div>`;
       return;
     }
     const sibs = children(rule.parent);
@@ -394,6 +402,29 @@
       ${rule.examples.length ? `<ul class="gr-list">${rule.examples.map((e, i) => exampleHtml(e, i, rule.examples.length)).join('')}</ul>`
                              : '<p class="gr-meta">Aucun exemple : cherchez des phrases ci-dessous.</p>'}
 
+      <h2 class="gr-h2">Règles induites de ces exemples <small>à retenir dans « ${esc(rule.title)} »</small></h2>
+      <p class="gr-meta">Les constructions que montrent les exemples analysés (de cette règle et de ses sous-règles).
+        « Retenir » en fait une sous-règle de celle-ci, avec son schéma et ses phrases.</p>
+      <div class="gr-row"><button type="button" class="gr-btn" data-act="induced">Voir les constructions</button>
+        <label class="gr-meta"><input id="gr-ind-words" type="checkbox" checked> avec les mots des catégories fermées (唔, 冇, 倒…)</label></div>
+      <div id="gr-induced"></div>
+
+      <h2 class="gr-h2">Pour les apprenants <small>à relire avant de publier</small></h2>
+      <label for="gr-learner">Explication simple</label>
+      <textarea id="gr-learner" data-field="learner_text" placeholder="La règle expliquée simplement, avec deux ou trois exemples…">${esc(rule.learner_text)}</textarea>
+      <div class="gr-row">
+        ${AI ? '<button type="button" class="gr-btn" data-ai="learner">✨ Expliquer simplement (IA)</button>' : ''}
+        <button type="button" class="gr-btn" data-copy="gr-learner">Copier</button>
+      </div>
+      <label for="gr-post">Article pour Facebook</label>
+      <textarea id="gr-post" data-field="post_text" placeholder="Un petit article qui enseigne la règle…">${esc(rule.post_text)}</textarea>
+      <div class="gr-row">
+        ${AI ? '<button type="button" class="gr-btn" data-ai="post">✨ Proposer un article (IA)</button>' : ''}
+        <button type="button" class="gr-btn" data-copy="gr-post">Copier</button>
+        <span id="gr-ai-status" class="gr-status" aria-live="polite"></span>
+      </div>
+      ${AI ? '' : '<p class="gr-meta">L\'IA n\'est pas configurée sur ce serveur : les deux textes s\'écrivent à la main.</p>'}
+
       <h2 class="gr-h2">Ajouter des phrases <small>expressions, ajouts, transcriptions</small></h2>
       <form id="gr-find" class="gr-find">
         <div class="gr-find-wrap">
@@ -408,6 +439,40 @@
       <ul id="gr-found" class="gr-list"></ul>`;
     mountEditor();
     attachIme($('gr-q'), $('gr-q-sugg'));
+  }
+
+  // The constructions of this rule's examples, to retain as its sub-rules.
+  let induced = [];
+  async function showInduced(rule) {
+    const box = $('gr-induced');
+    box.innerHTML = '<p class="gr-meta">Lecture des analyses…</p>';
+    try {
+      const data = await call(`${URLS.induced}?regle=${rule.id}${$('gr-ind-words').checked ? '&mots=1' : ''}`);
+      induced = data.productions;
+      if (!data.analyses) {
+        box.innerHTML = '<p class="gr-meta">Aucun exemple analysé : « 🌱 Analyser » sur les exemples ci-dessus, puis revenez ici.</p>';
+        return;
+      }
+      box.innerHTML = `<p class="gr-meta">${data.analyses} exemple(s) analysé(s).</p>` + (induced.length ? `<ul class="gr-list">${induced.map((p, i) => `
+        <li class="gi-row"><div class="gi-head"><b class="gi-rule">${esc(p.lhs)} → ${esc(p.pattern)}</b>
+          <span class="gr-meta">${p.count} fois</span>
+          ${p.rule ? `<span class="gr-ok">${p.rule.here ? '✓ retenue' : 'déjà une règle'} : ${esc(p.rule.title)}</span>`
+                   : `<span class="gi-create"><input data-retain-title="${i}" value="${esc(p.lhs === '(phrase)' ? p.pattern : `${p.lhs} : ${p.pattern}`)}" aria-label="Titre">
+                      <button type="button" class="gr-btn" data-retain="${i}">Retenir</button></span>`}</div>
+          <div class="gr-meta">${p.examples.map((e) => `<span lang="zh">${esc(e.hanzi)}</span>`).join(' · ')}</div></li>`).join('')}</ul>`
+        : '<p class="gr-meta">Pas encore de groupes dans ces analyses.</p>');
+    } catch (err) { box.innerHTML = `<p class="gr-status is-error">${esc(err.message)}</p>`; }
+  }
+  async function retain(rule, i, button) {
+    const p = induced[i];
+    button.disabled = true;
+    try {
+      const title = $('gr-induced').querySelector(`[data-retain-title="${i}"]`).value;
+      await call(URLS.inducedCreate, { pattern: p.pattern, title, parent: rule.id,
+                                       examples: p.examples.map(({ target_type, target_key }) => ({ target_type, target_key })) });
+      drawTree();
+      await showInduced(rule);
+    } catch (err) { button.disabled = false; status(err.message, true); }
   }
 
   function attachIme(input, barEl) {
@@ -480,6 +545,32 @@
         return;
       }
       if (button.dataset.act === 'schema') { await save(); return findSentences(true); }
+      if (button.dataset.act === 'induced') { return showInduced(rule); }
+      if (button.dataset.retain !== undefined) { return retain(rule, Number(button.dataset.retain), button); }
+      if (button.dataset.copy) {
+        const text = $(button.dataset.copy).value;
+        try { await navigator.clipboard.writeText(text); button.textContent = 'Copié ✓'; } catch (e) { $(button.dataset.copy).select(); }
+        return;
+      }
+      if (button.dataset.ai) {
+        const field = button.dataset.ai === 'learner' ? 'gr-learner' : 'gr-post';
+        if ($(field).value.trim() && button.dataset.armed !== '1') {
+          button.dataset.armed = '1'; button.textContent = 'Remplacer le texte actuel ?'; return;
+        }
+        await save();
+        button.disabled = true;
+        $('gr-ai-status').textContent = 'L\'IA écrit…';
+        try {
+          const data = await call(URLS.ruleAi, { id: rule.id, kind: button.dataset.ai });
+          rule[data.field] = data.text;
+          $(field).value = data.text;
+          $('gr-ai-status').textContent = 'Texte proposé et enregistré : relisez-le, corrigez-le si besoin (puis Enregistrer).';
+        } catch (err) { $('gr-ai-status').textContent = err.message; }
+        button.disabled = false;
+        button.dataset.armed = '';
+        button.textContent = button.dataset.ai === 'learner' ? '✨ Expliquer simplement (IA)' : '✨ Proposer un article (IA)';
+        return;
+      }
       if (button.dataset.move) {
         await save();
         await call(URLS.rule, { action: 'move', id: rule.id, direction: button.dataset.move });
