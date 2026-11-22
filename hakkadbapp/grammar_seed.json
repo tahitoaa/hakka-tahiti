@@ -1,0 +1,193 @@
+{
+  "about": "Chapitres et règles de départ de la page « Grammaire », tirés des documents existants : notes/notebook/grammaire.tex (le cahier), grammar/grammar.md (la méthode), hakka-grammar/grammaire/chapters (la grammaire LaTeX). Importés par grammar_import.py (bouton « Importer les cahiers ») ; un exemple est relié à la phrase du corpus qui a les mêmes caractères (hanzi), la même traduction (french) ou le même identifiant (platform_id) ; sinon il est noté dans l'explication, à saisir. Les macros du cahier sont remplacées : \\ngai 𠊎, \\e 嘅, \\ai 介, \\mai 乜介, \\lai 㖠, \\thang 噔, \\pin 畀.",
+  "chapters": [
+    {
+      "title": "La structure de la phrase",
+      "explanation": "L'ordre de base est Sujet-Verbe-Objet, avec possibilité de sérialisation verbale (plusieurs verbes à la suite partageant le même sujet), comme en mandarin.",
+      "rules": [
+        {"title": "L'ordre des constituants", "pattern": "GN:sujet + GV",
+         "explanation": "Sujet + Verbe (+ Objet). Plusieurs verbes peuvent se suivre en partageant le même sujet (sérialisation).\n\nÀ explorer : la structure thème-commentaire (ce dont on parle en tête de phrase), la place des compléments de temps et de lieu.",
+         "source": "hakka-grammar, Syntaxe", "examples": [{"platform_id": "c2fd8313-fe12-4a5f-ab5a-1496283c07a7"}]},
+        {"title": "La phrase verbale S + V", "pattern": "GN:sujet + V",
+         "explanation": "", "source": "cahier", "examples": []},
+        {"title": "La phrase adjectivale S + Adj.", "pattern": "GN:sujet + (ADV) + ADJ",
+         "explanation": "Un adjectif (verbe d'état) est prédicat sans verbe « être ».", "source": "cahier", "examples": []},
+        {"title": "Le verbe être 係", "pattern": "GN:sujet + 係 + GN:attr",
+         "explanation": "", "source": "cahier", "examples": [], "focus": "係"},
+        {"title": "La particule 係 + phrase + 嘅", "pattern": "係 + … + 嘅",
+         "explanation": "", "source": "cahier", "focus": "嘅",
+         "examples": [{"hanzi": "佢係台灣來嘅", "french": ""}, {"hanzi": "這係舊嘅", "french": "Celui-là est vieux."}]},
+        {"title": "Les compléments résultatifs", "pattern": "V + V|ADJ",
+         "explanation": "Un verbe peut être suivi d'un second morphème qui en précise le résultat (V + résultat), comme en mandarin : par exemple dao³ 倒, ou un adjectif indiquant que l'action a mal tourné.\n\nÀ explorer : l'inventaire des compléments résultatifs du corpus et leurs valeurs.",
+         "source": "hakka-grammar, Syntaxe",
+         "examples": [{"platform_id": "d76b9018-60bb-439c-963e-5d9f5794e88f"}, {"platform_id": "ebb5f3a1-da54-4ee6-b0de-f7831a9416b3"}]},
+        {"title": "La comparaison 較 / 過 + Adj.", "pattern": "較|過 + ADJ",
+         "explanation": "", "source": "cahier",
+         "examples": [{"hanzi": "這過好", "french": "Celui-ci est mieux."}, {"hanzi": "這條路過平", "french": "Cette route est plus plate."},
+                      {"hanzi": "咁樣過甜", "french": "C'est plus sucré ainsi."}]}
+      ]
+    },
+    {
+      "title": "La négation",
+      "explanation": "Les particules de négation (ng² 唔, mao³ 冇…) et leur distribution, probablement liée, comme en mandarin avec 不/没, à une distinction d'aspect.",
+      "rules": [
+        {"title": "La négation au présent (ou au futur) 唔", "pattern": "GN:sujet + 唔 + V|ADJ (+ GN:obj)",
+         "explanation": "En hakka, la négation au présent s'exprime avec l'adverbe ng² 唔, placé directement avant le verbe ou l'adjectif.",
+         "source": "méthode, chapitre 1 ; cahier", "focus": "唔",
+         "examples": [{"hanzi": "爾唔去", "french": "Je ne vais pas."}, {"french": "Je ne mange pas de porc"},
+                      {"french": "Il ne peut pas manger les arachides."}]},
+        {"title": "La négation au passé 冇 + V", "pattern": "GN:sujet + 冇 + V (+ 倒)",
+         "explanation": "Pour nier une action passée ou exprimer l'absence, on utilise mao³ 冇, l'équivalent négatif passé du verbe « avoir ».",
+         "source": "méthode, chapitre 1 ; cahier", "focus": "冇",
+         "examples": [{"hanzi": "𠊎冇看", "french": "Je n'ai pas vu."}, {"hanzi": "𠊎冇看倒", "french": "Je n'ai pas vu."},
+                      {"hanzi": "佢冇來倒", "french": "Il n'est pas venu."}, {"hanzi": "佢冇來", "french": "Il n'est pas venu."},
+                      {"french": "Ne pas avoir (assez?) à manger"}]},
+        {"title": "La négation littéraire", "pattern": "",
+         "explanation": "Deux formes littéraires existent, issues du mandarin et du wenyan : mo² et but⁵. Elles sont moins courantes dans la conversation quotidienne mais apparaissent dans les textes écrits et les expressions figées.",
+         "source": "méthode, chapitre 1", "examples": []}
+      ]
+    },
+    {
+      "title": "L'aspect",
+      "explanation": "Le hakka, comme les autres langues sinitiques, n'exprime pas le temps par la conjugaison mais par des particules aspectuelles, qui indiquent la manière dont se déroule l'action.",
+      "rules": [
+        {"title": "L'action en cours choi¹", "pattern": "GN:sujet + choi1 + …",
+         "explanation": "La particule choi¹ indique que l'action est en train de se passer, comme le présent progressif.\nStructure : Sujet + choi¹ + Lieu/Verbe.",
+         "source": "méthode, chapitre 2", "examples": [{"french": "Je vais à l'école à Papeete"}]},
+        {"title": "L'action récemment accomplie loi²", "pattern": "",
+         "explanation": "loi² indique que l'action vient d'être accomplie ; on le traduit souvent par « venir de… ».",
+         "source": "méthode, chapitre 2", "examples": [{"french": "Je vais me servir tout seul"}]},
+        {"title": "L'action accomplie V + 倒", "pattern": "V + 倒",
+         "explanation": "Traduit une action accomplie ; peut se traduire par le passé composé.",
+         "source": "cahier (dictionnaire Bao'an)", "focus": "倒",
+         "examples": [{"hanzi": "𠊎看倒", "french": "J'ai vu."}, {"hanzi": "佢來倒", "french": "Il est venu."}]},
+        {"title": "L'expérience passée 過", "pattern": "V + 過",
+         "explanation": "go⁴ 過 marque une expérience vécue dans le passé, sans lien direct avec le présent (« avoir déjà… »).",
+         "source": "méthode, chapitre 2 ; cahier", "focus": "過",
+         "examples": [{"hanzi": "𠊎去過", "french": "J'ai déjà été"}, {"hanzi": "𠊎冇去過", "french": "Je n'y suis jamais allé."}]},
+        {"title": "L'action complètement terminée to³ et hoi¹", "pattern": "",
+         "explanation": "Deux particules signalent l'achèvement d'une action : to³ et hoi¹.",
+         "source": "méthode, chapitre 2",
+         "examples": [{"french": "Je mangerai après avoir fini le travail. Je dormirai après avoir étudié."}]},
+        {"title": "La continuité han²", "pattern": "",
+         "explanation": "han² exprime la persistance ou la continuation d'un état. Il peut aussi marquer l'ajout (aussi, en plus).",
+         "source": "méthode, chapitre 2",
+         "examples": [{"french": "Tu aimes le taro ? Il en reste dans le réfrigérateur."},
+                      {"french": "Il nous reste dix minutes, allons-y doucement, ne soyons pas pressés."}]}
+      ]
+    },
+    {
+      "title": "La possession et la détermination",
+      "explanation": "",
+      "rules": [
+        {"title": "Les possessifs 吾, 若, 其", "pattern": "PRO|N + (嘅|介) + N",
+         "explanation": "吾 « mon », 若 « ton » se placent devant le nom, avec ou sans 嘅 / 介 ; 其 relie un possesseur nominal (先生其學校).",
+         "source": "cahier (dictionnaire Bao'an)",
+         "examples": [{"hanzi": "吾爸爸", "french": "Mon papa."}, {"hanzi": "吾嘅學校", "french": "Mon école."}, {"hanzi": "吾介學校", "french": "Mon école."},
+                      {"hanzi": "若爸爸", "french": "Ton papa."}, {"hanzi": "若嘅學校", "french": "Ton école."},
+                      {"hanzi": "先生其學校", "french": "L'école de Monsieur."}]},
+        {"title": "La particule possessive zü³", "pattern": "GN + zü3 + GN",
+         "explanation": "La particule zü³ s'intercale entre le possesseur et le possédé, à l'image du « de » français.\nStructure : Possesseur + zü³ + Objet possédé.",
+         "source": "méthode, chapitre 3", "examples": []},
+        {"title": "La possession avec 介 / 嘅", "pattern": "N + 嘅|介 + N",
+         "explanation": "", "source": "cahier",
+         "examples": [{"hanzi": "大溪地嘅客家人", "french": "Les Hakkas de Tahiti."}, {"hanzi": "大溪地介客家人", "french": "Les Hakkas de Tahiti."}]},
+        {"title": "La particule de détermination e³ 嘅", "pattern": "… + 嘅 + N",
+         "explanation": "e³ est une particule structurale très fréquente. Elle se place entre un déterminant (adjectif, proposition relative) et le nom qu'il qualifie ; en tête, elle sert aussi d'article (嘅兜人 « les gens »).",
+         "source": "méthode, chapitre 3 ; cahier", "focus": "嘅",
+         "examples": [{"hanzi": "嘅兜人好歡喜", "french": "Les gens sont content"},
+                      {"french": "Son linge est très beau, sais tu où est-ce qu'il l'a acheté ?"}]},
+        {"title": "Le quantificateur dit⁵xit⁵", "pattern": "",
+         "explanation": "Pour exprimer une petite quantité, le hakka utilise dit⁵xit⁵ (« un petit peu »), très courant dans la conversation.",
+         "source": "méthode, chapitre 3",
+         "examples": [{"french": "Je voudrais faire de la soupe ce soir, je vais mettre beaucoup de carottes pour la rendre bien sucrée."}]}
+      ]
+    },
+    {
+      "title": "Les pronoms, démonstratifs et classificateurs",
+      "explanation": "",
+      "rules": [
+        {"title": "Les pronoms personnels", "pattern": "",
+         "explanation": "Le corpus atteste au moins ngai 𠊎/我 (1re personne) et ngi 你/爾 (2e personne).\n\nÀ explorer : le paradigme complet (singulier, pluriel, possessif en e³ 嘅) en tableau.",
+         "source": "hakka-grammar, Morphologie", "examples": [{"platform_id": "ff682bae-6d5f-46ee-8707-be27c008821f"}]},
+        {"title": "Les démonstratifs ngia⁴ et ai⁴", "pattern": "",
+         "explanation": "Le hakka distingue deux degrés de distance : ngia⁴ (proche, « ceci ») et ai⁴ (éloigné, « cela »).",
+         "source": "méthode, chapitre 4", "examples": []},
+        {"title": "Les classificateurs", "pattern": "NUM|DÉM + CL + N",
+         "explanation": "Comme en mandarin, un numéral ne porte pas directement sur un nom comptable : il est suivi d'un classificateur accordé au nom. Par exemple bai³ 摆, classificateur des occurrences (« une fois, deux fois »).\n\nÀ explorer : l'inventaire des classificateurs du corpus (thème « spécificatifs ») et leur choix selon le nom.",
+         "source": "hakka-grammar, Morphologie", "examples": [{"platform_id": "3af5ca61-88c0-4f55-b7c0-bee954133cb1"}]}
+      ]
+    },
+    {
+      "title": "Les questions",
+      "explanation": "",
+      "rules": [
+        {"title": "La particule finale mo¹ / 無", "pattern": "… + 無|mo1",
+         "explanation": "mo¹ transforme une phrase affirmative en question totale (oui/non), en se plaçant en fin de phrase.",
+         "source": "méthode, chapitre 4 ; cahier", "focus": "無",
+         "examples": [{"hanzi": "爾去無", "french": "Tu vas ?"}]},
+        {"title": "Les questions en 有 … 冇, 有冇 …, V + 倒 + 冇", "pattern": "",
+         "explanation": "", "source": "cahier",
+         "examples": [{"hanzi": "爾看倒冇", "french": "Tu as vu ?"}, {"hanzi": "大溪地有冇客家人", "french": "Y a-t-il des Hakkas à Tahiti ?"},
+                      {"hanzi": "大溪地有客家人冇", "french": "Y a-t-il des Hakkas à Tahiti ?"}]},
+        {"title": "Les questions V + 唔 + V", "pattern": "V + 唔 + V",
+         "explanation": "À l'oral, 係唔係 devient 係唔 e (le dernier 係 réduit à e).", "source": "cahier", "focus": "唔",
+         "examples": [{"hanzi": "爾係唔係學生", "french": ""}, {"hanzi": "爾去唔去學生", "french": ""}]},
+        {"title": "Quoi ? mai⁴, mak⁶ai⁴ (乜介)", "pattern": "",
+         "explanation": "Graphies incertaines : 乜介, 乜個, 麽介, 麽個…", "source": "méthode, chapitre 4 ; cahier",
+         "examples": [{"hanzi": "爾想乜介", "french": "Qu'est-ce que tu veux ?"}]},
+        {"title": "Où ? lai⁴ (㖠, 㖠噔, 㖠位)", "pattern": "… + 㖠",
+         "explanation": "", "source": "cahier (dictionnaire Bao'an)", "focus": "㖠",
+         "examples": [{"hanzi": "爾去㖠", "french": "Où vas-tu ?"}, {"hanzi": "爾去㖠噔", "french": "Où vas-tu ?"}, {"hanzi": "爾去㖠位", "french": "Où vas-tu ?"}]},
+        {"title": "Qui ? Pourquoi ? Comment ? Lequel ?", "pattern": "",
+         "explanation": "Qui ? la⁴ngin². Pourquoi ? zo⁴mak⁶ai⁴. Comment ? liong⁴ben¹. Lequel ? lai⁴.",
+         "source": "méthode, chapitre 4", "examples": []}
+      ]
+    },
+    {
+      "title": "Les verbes de lieu et de mouvement",
+      "explanation": "",
+      "rules": [
+        {"title": "Se trouver 在", "pattern": "GN:sujet + 在 + GN:compl",
+         "explanation": "", "source": "cahier", "focus": "在",
+         "examples": [{"hanzi": "𠊎在黎爹", "french": "Je me trouve à Raiatea."}]},
+        {"title": "La provenance 在 … 來", "pattern": "在 + GN + 來",
+         "explanation": "", "source": "cahier (dictionnaire Bao'an)", "focus": "在",
+         "examples": [{"hanzi": "𠊎在學校來", "french": "Je viens de l'école."}, {"hanzi": "吾爸爸在唐山來", "french": "Mon papa vient de Chine."}]},
+        {"title": "Aller hi⁴", "pattern": "GN:sujet + hi4 + …",
+         "explanation": "Le verbe hi⁴ (aller) se combine fréquemment avec un lieu ou un autre verbe pour former des structures de déplacement-but.\nStructure : Sujet + hi⁴ + Lieu / Verbe.",
+         "source": "méthode, chapitre 5",
+         "examples": [{"french": "Je vais au magasin acheter des choses."}, {"french": "Je vais voir des copains"}, {"french": "Aller manger au restaurant."}]},
+        {"title": "Vouloir xiong³", "pattern": "GN:sujet + xiong3 + GV",
+         "explanation": "Pour exprimer un souhait ou une intention, on utilise xiong³ (vouloir, avoir l'intention de).",
+         "source": "méthode, chapitre 5",
+         "examples": [{"french": "Je voudrais manger du canard pékinois"},
+                      {"french": "Je voudrais faire de la soupe ce soir, je vais mettre beaucoup de carottes pour la rendre bien sucrée."}]}
+      ]
+    },
+    {
+      "title": "Les constructions en 畀 bin¹",
+      "explanation": "Le morphème bin¹ 畀 (« donner ») introduit aussi l'agent d'un passif (« se faire … par ») ou le destinataire.",
+      "rules": [
+        {"title": "Le complément d'agent 畀 + agent (passif)", "pattern": "畀 + GN + V",
+         "explanation": "Comme gei³ 给 dans certains dialectes mandarins.\n\nÀ explorer : conditions d'emploi, autres stratégies de passif.",
+         "source": "cahier ; hakka-grammar, Syntaxe", "focus": "畀",
+         "examples": [{"hanzi": "早時做細人有好多蚊仔,好常畀蚊蚊仔叼", "french": "Avant lorque j'étais petit, je me faisais souvent pîqué par les moustiques, il y en avait beaucoup."},
+                      {"hanzi": "畀蜜仔叼倒", "french": "Piqué par une abeille."},
+                      {"platform_id": "a583c0fb-794b-4eb5-9549-c18ffbf75089"}]},
+        {"title": "Le complément destinataire 畀 + destinataire", "pattern": "V + GN + 畀 + GN",
+         "explanation": "", "source": "cahier", "focus": "畀",
+         "examples": [{"hanzi": "畀𠊎", "french": "Donne-moi."}, {"hanzi": "畀𠊎用", "french": "Pour que je l'utilise."},
+                      {"hanzi": "舀一碗飯畀𠊎", "french": "Sers moi une cuillère de riz."}]}
+      ]
+    },
+    {
+      "title": "Expressions",
+      "explanation": "",
+      "rules": [
+        {"title": "Exprimer l'amour", "pattern": "", "explanation": "", "source": "méthode, chapitre 5",
+         "examples": [{"french": "Je t'aime"}]}
+      ]
+    }
+  ]
+}

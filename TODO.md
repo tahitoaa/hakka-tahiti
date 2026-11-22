@@ -11,11 +11,14 @@ Liste des demandes en cours. Les propositions d'amélioration sont dans
 - [x] **Dictionnaires : une page de recherche unique** (« Rechercher », /rechercher/),
   ouverte à tous, sans IA. Fait (commit ae51ae4), pas encore déployé. Transcriptions
   pour les membres connectés, documents importés et ajouts en cours pour les éditeurs.
-- [ ] **Section « Grammaire » :** première version faite (commit 4d62cf3, pas
-  déployée ; migration 0035) : arbre de règles, exemples liés aux expressions,
-  ajouts et segments de transcription, propriétaire seulement. Reste à spécifier :
-  import des 5 chapitres de `grammar/grammar.md`, propositions de règles par l'IA,
-  export vers `hakka-grammar`, ouverture aux éditeurs.
+- [ ] **Section « Grammaire » :** déployée (f05a9d0) : arbre de règles, exemples liés.
+  Ajouté le 21/11 (pas encore déployé ; migration 0036) : étiquettes (catégories, groupes,
+  fonctions), analyse des exemples linéaire puis en arbre, proposition IA, schémas lus avec
+  les étiquettes (exemples conformes, recherche par schéma), saisie assistée dans la
+  recherche, import des cahiers (notebook, grammar.md, hakka-grammar ; 21 exemples reliés,
+  42 phrases du cahier à saisir). Reste : saisir les phrases du cahier (en brouillons
+  Saisie ?), propositions de règles par l'IA, export vers `hakka-grammar`, ouverture
+  aux éditeurs, aide « repères » (références, questionnaire).
 
 ## En attente d'une action ou d'une décision
 

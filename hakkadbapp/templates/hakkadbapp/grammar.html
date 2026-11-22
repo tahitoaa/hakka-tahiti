@@ -138,7 +138,9 @@
     </div>
     <div class="gr-tools">
       <button id="gr-new-root" type="button" class="gr-btn">＋ Chapitre</button>
+      <button id="gr-import" type="button" class="gr-btn" title="Chapitres et règles tirés du cahier, de la méthode et de hakka-grammar ; rien n'est écrasé">Importer les cahiers</button>
     </div>
+    <p id="gr-import-status" class="gr-status"></p>
     <div id="gr-tree"><p class="gr-empty">Chargement…</p></div>
   </aside>
 
@@ -162,7 +164,7 @@
   const URLS = { tree: "{% url 'grammar_tree' %}", rule: "{% url 'grammar_rule' %}", example: "{% url 'grammar_example' %}",
                  sentences: "{% url 'grammar_sentences' %}", tags: "{% url 'grammar_tags' %}", tag: "{% url 'grammar_tag' %}",
                  analysis: "{% url 'grammar_analysis' %}", analysisSave: "{% url 'grammar_analysis_save' %}",
-                 analysisAi: "{% url 'grammar_analysis_ai' %}" };
+                 analysisAi: "{% url 'grammar_analysis_ai' %}", import: "{% url 'grammar_import' %}" };
   const GA = window.GrammarAnalysis;
   const tags = new GA.TagSet([]);
   let tab = 'rules';
@@ -517,6 +519,33 @@
     } catch (err) { status(err.message, true); }
   });
   window.addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+
+  // « Importer les cahiers » : d'abord ce qui serait fait, puis une seconde touche le fait.
+  $('gr-import').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const say = (t) => { $('gr-import-status').textContent = t; };
+    try {
+      if (button.dataset.armed !== '1') {
+        say('Lecture des documents…');
+        const p = await call(URLS.import, { action: 'preview' });
+        if (!p.new_rules) { say(`Tout est déjà importé (${p.already} règles).`); return; }
+        say(`${p.chapters} chapitre(s) et ${p.new_rules} règle(s) à créer, ${p.linked} exemple(s) reliés au corpus, `
+          + `${p.missing} à saisir (notés dans l'explication)${p.already ? ` ; ${p.already} règle(s) déjà là, laissées telles quelles` : ''}.`);
+        button.dataset.armed = '1';
+        button.textContent = 'Confirmer l'import';
+        return;
+      }
+      button.disabled = true;
+      await save();
+      const r = await call(URLS.import, { action: 'run' });
+      await call(URLS.tags).then((d) => tags.set(d.tags));
+      say(`Importé : ${r.new_rules} règle(s), ${r.linked} exemple(s) reliés.`);
+      button.dataset.armed = '';
+      button.textContent = 'Importer les cahiers';
+      drawTree(); drawMain();
+    } catch (err) { say(err.message); }
+    button.disabled = false;
+  });
 
   function setTab(name, redraw = true) {
     if (name === 'tags' && dirty) save();

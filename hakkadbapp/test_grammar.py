@@ -225,3 +225,37 @@ class AnalysisTests(TestCase):
         self.assertEqual(out["tokens"][1]["c"], self.tag("NÉGX"))
         # The crossing group (0–2 against 1–3) is dropped.
         self.assertEqual([(g["s"], g["e"]) for g in out["groups"]], [(0, 1), (1, 3)])
+
+
+@unittest.skipUnless(SQLITE, "réglages de test (SQLite) seulement")
+class ImportTests(TestCase):
+    databases = {"default"} if SQLITE else set()
+
+    def test_import_links_and_never_duplicates(self):
+        from . import grammar_import
+
+        search_sources._cache.clear()
+        self.client.force_login(User.objects.create_superuser("owner", password="x"))
+        # 𠊎冇看 in the notebook, 我冇看 in the corpus: the same sentence.
+        found = LexiconAddition.objects.create(kind="expression", status="review", hanzi="我 冇 看", pinyin="ngai1 mo2 kon4",
+                                               french="je n'ai pas vu")
+        post = lambda action: self.client.post(reverse("grammar_import"), json.dumps({"action": action}),
+                                               content_type="application/json").json()
+        preview = post("preview")
+        self.assertFalse(GrammarRule.objects.exists())
+        self.assertGreater(preview["new_rules"], 20)
+        done = post("run")
+        self.assertEqual(done["new_rules"], preview["new_rules"])
+        rule = GrammarRule.objects.get(title__startswith="La négation au passé")
+        self.assertEqual(list(rule.examples.values_list("target_key", flat=True)), [str(found.id)])
+        self.assertIn("pas encore trouvés dans le corpus", rule.explanation)
+        self.assertTrue(GrammarTag.objects.filter(code="NÉG").exists())   # the schemas' tags
+        # Every schema of the import reads with the tags of the base.
+        tags = ga.Tags()
+        unread = [(r.title, p["text"]) for r in GrammarRule.objects.exclude(pattern="")
+                  for p in ga.parse_pattern(r.pattern, tags) if p["kind"] == "unknown"]
+        self.assertEqual(unread, [])
+        count = GrammarRule.objects.count()
+        self.assertEqual(post("run")["new_rules"], 0)
+        self.assertEqual(GrammarRule.objects.count(), count)
+        self.assertEqual(grammar_import.seed()["chapters"][0]["title"], GrammarRule.objects.filter(parent=None).first().title)
