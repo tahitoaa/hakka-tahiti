@@ -686,6 +686,11 @@ class GrammarTag(models.Model):
     code = models.CharField(max_length=20)
     name = models.CharField(max_length=100, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    # How to recognise it, by what the word accepts around it (« se nie par 唔,
+    # prend 倒 après lui ») -- the tests that frame the analysis.
+    tests = models.TextField(blank=True, default="")
+    # Its Universal Dependencies equivalent (NOUN, nsubj…), for comparison.
+    equivalent = models.CharField(max_length=60, blank=True, default="")
     parent = models.ForeignKey("self", related_name="children", on_delete=models.SET_NULL, null=True, blank=True)
     position = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_OK)

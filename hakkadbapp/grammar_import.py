@@ -19,7 +19,7 @@ from django.db.models import Max
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-from .models import GrammarExample, GrammarRule, GrammarTag, to_simp
+from .models import GrammarExample, GrammarRule, to_simp
 from .permissions import owner_required
 from . import grammar_analysis, search_sources
 
@@ -113,10 +113,7 @@ def run(user):
     steps = plan()
     with transaction.atomic():
         # Les schémas sont écrits avec les étiquettes de la base de départ.
-        have = set(GrammarTag.objects.values_list("kind", "code"))
-        for i, (kind, code, name, description) in enumerate(grammar_analysis.SEED):
-            if (kind, code) not in have:
-                GrammarTag.objects.create(kind=kind, code=code, name=name, description=description, position=i)
+        grammar_analysis.ensure_seed()
         last = GrammarRule.objects.filter(parent=None).aggregate(m=Max("position"))["m"]
         position = -1 if last is None else last
         for step in steps:

@@ -34,11 +34,18 @@
         }
         options(kind, value, empty = '—') {
             return `<option value="">${empty}</option>` + this.of(kind).map(({ tag, depth }) =>
-                `<option value="${tag.id}"${tag.id === value ? ' selected' : ''}>${'  '.repeat(depth)}${esc(tag.code)}${tag.name && tag.name !== tag.code ? ` — ${esc(tag.name)}` : ''}${tag.status === 'proposed' ? ' (IA)' : ''}</option>`).join('')
+                `<option value="${tag.id}"${tag.id === value ? ' selected' : ''} title="${esc([tag.description, tag.tests && `Test : ${tag.tests}`].filter(Boolean).join(' — '))}">${'  '.repeat(depth)}${esc(tag.code)}${tag.name && tag.name !== tag.code ? ` — ${esc(tag.name)}` : ''}${tag.status === 'proposed' ? ' (IA)' : ''}</option>`).join('')
                 + `<option value="new">＋ nouvelle ${KIND_ONE[kind]}…</option>`;
         }
         label(item) {
             return [this.code(item.c), this.code(item.f)].filter(Boolean).join(':');
+        }
+        /** Les repères d'une étiquette : définition, test, équivalent UD. */
+        hint(id) {
+            const t = this.byId.get(id);
+            if (!t) return '';
+            return `<span class="ga-hint"><b>${esc(t.code)}</b>${t.name && t.name !== t.code ? ` (${esc(t.name)})` : ''}${t.description ? ` : ${esc(t.description)}` : ''}`
+                + `${t.tests ? ` <span class="ga-test">🔎 ${esc(t.tests)}</span>` : ''}${t.equivalent ? ` <span class="ga-ud">UD ${esc(t.equivalent)}</span>` : ''}</span>`;
         }
     }
 
@@ -218,7 +225,8 @@
                     <select data-gf="c" aria-label="Type de groupe">${this.tags.options('phrase', g.c, 'groupe ?')}</select>
                     <select data-gf="f" aria-label="Fonction du groupe">${this.tags.options('function', g.f, 'fonction ?')}</select>
                     <button type="button" class="gr-btn" data-ga="ungroup">Défaire le groupe</button>
-                    <button type="button" class="gr-btn" data-ga="unselect">OK</button>`;
+                    <button type="button" class="gr-btn" data-ga="unselect">OK</button>
+                    ${[g.c, g.f].map((id) => this.tags.hint(id)).filter(Boolean).join('')}`;
             } else if (sel) {
                 const one = sel[0] === sel[1];
                 const t = this.tokens[sel[0]];
@@ -228,7 +236,8 @@
                     <button type="button" class="gr-btn gr-btn-main" data-ga="group">Grouper</button>
                     ${one && [...t.t].length > 1 ? '<button type="button" class="gr-btn" data-ga="split" title="Un mot par caractère">✂ Couper</button>' : ''}
                     ${one && sel[0] < this.tokens.length - 1 ? '<button type="button" class="gr-btn" data-ga="join" title="Avec le mot suivant">⊕ Joindre au suivant</button>' : ''}
-                    <button type="button" class="gr-btn" data-ga="unselect">Annuler</button>`;
+                    <button type="button" class="gr-btn" data-ga="unselect">Annuler</button>
+                    ${one ? [t.c, t.f].map((id) => this.tags.hint(id)).filter(Boolean).join('') : ''}`;
             }
             const stale = this.saved?.stale
                 ? `<p class="gr-status is-error">La phrase a changé depuis l'analyse (« ${esc(this.saved.text)} »).
@@ -474,6 +483,10 @@
             Object.assign(this, { container, api, call, tags, onTags });
             this.editing = null;
             this.container.addEventListener('click', (e) => this.onClick(e));
+            this.container.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.target.querySelector('[data-gt="add"],[data-gt="update"]')?.click();
+            });
             this.render();
         }
 
@@ -483,9 +496,12 @@
               <div class="gt">
                 <p class="gr-meta">Les étiquettes des analyses, à définir au fur et à mesure. Une étiquette peut en préciser une autre
                   (V › V de mouvement) : un schéma qui demande V accepte aussi V de mouvement. Dans un schéma de règle, écrivez
-                  leur abréviation (ou leur nom) : <code>GN:sujet + NÉG + V (+ GN:obj)</code>.</p>
+                  leur abréviation (ou leur nom) : <code>GN:sujet + NÉG + V (+ GN:obj)</code>.
+                  Chaque étiquette a un <b>test</b> 🔎 pour la reconnaître : ce que le mot accepte autour de lui
+                  (« se nie par 唔 », « se compte avec un classificateur »), plus sûr que son sens ou sa traduction.
+                  L'équivalent <b>UD</b> (Universal Dependencies) permet de comparer avec d'autres langues.</p>
                 <div class="gr-row">
-                  <button type="button" class="gr-btn${empty ? ' gr-btn-main' : ''}" data-gt="seed" title="N, V, NÉG, CL, GN, GV, sujet, objet… : seules celles qui manquent sont ajoutées">${empty ? 'Partir d\'une base de départ' : 'Compléter avec la base de départ'}</button>
+                  <button type="button" class="gr-btn${empty ? ' gr-btn-main' : ''}" data-gt="seed" title="N, V, NÉG, CL, GN, GV, sujet, objet… : seules celles qui manquent sont ajoutées">${empty ? 'Partir d\'une base de départ' : 'Compléter avec la base de départ (et ses tests)'}</button>
                   <span class="gr-status" aria-live="polite">${esc(message)}</span>
                 </div>
                 ${['category', 'phrase', 'function'].map((kind) => this.section(kind)).join('')}
@@ -501,6 +517,8 @@
                 <input name="name" placeholder="nom" maxlength="100">
                 <select name="parent" aria-label="Précise">${this.parentOptions(kind, null)}</select>
                 <input name="description" placeholder="ce qu'elle couvre (facultatif)">
+                <input name="tests" placeholder="test pour la reconnaître (facultatif)">
+                <input name="equivalent" placeholder="équivalent UD" maxlength="60">
                 <button type="button" class="gr-btn" data-gt="add">＋ Ajouter</button>
               </form>`;
         }
@@ -518,6 +536,8 @@
                     <input name="name" value="${esc(tag.name)}" maxlength="100" placeholder="nom">
                     <select name="parent">${this.parentOptions(tag.kind, tag.parent, tag.id)}</select>
                     <input name="description" value="${esc(tag.description)}" placeholder="ce qu'elle couvre">
+                    <input name="tests" value="${esc(tag.tests)}" placeholder="test pour la reconnaître">
+                    <input name="equivalent" value="${esc(tag.equivalent)}" placeholder="équivalent UD" maxlength="60">
                     <button type="button" class="gr-btn gr-btn-main" data-gt="update">Enregistrer</button>
                     <button type="button" class="gr-btn" data-gt="cancel">Annuler</button>
                   </form></li>`;
@@ -526,6 +546,8 @@
                 <span><b>${esc(tag.code)}</b> ${tag.name && tag.name !== tag.code ? esc(tag.name) : ''}
                   ${tag.status === 'proposed' ? '<span class="gt-ai">proposée par l\'IA</span>' : ''}
                   ${tag.description ? `<span class="gr-meta"> — ${esc(tag.description)}</span>` : ''}
+                  ${tag.tests ? `<br><span class="ga-test">🔎 ${esc(tag.tests)}</span>` : ''}
+                  ${tag.equivalent ? ` <span class="ga-ud">UD ${esc(tag.equivalent)}</span>` : ''}
                   <span class="gr-meta"> · ${tag.uses} emploi${tag.uses > 1 ? 's' : ''}</span></span>
                 <span class="gt-tools">
                   ${tag.status === 'proposed' ? '<button type="button" class="gr-btn" data-gt="accept">Retenir</button>' : ''}
@@ -549,12 +571,12 @@
                     data = await this.call(this.api.tag, { action: 'seed' });
                     message = data.created ? `${data.created} étiquette(s) ajoutée(s).` : 'Rien ne manquait.';
                 } else if (act === 'add') {
-                    data = await this.call(this.api.tag, { action: 'create', kind: form.dataset.kind, code: fields.code, name: fields.name, description: fields.description, parent });
+                    data = await this.call(this.api.tag, { action: 'create', kind: form.dataset.kind, code: fields.code, name: fields.name, description: fields.description, tests: fields.tests, equivalent: fields.equivalent, parent });
                     message = `« ${fields.code} » ajoutée.`;
                 } else if (act === 'edit') { this.editing = id; this.render(); return; }
                 else if (act === 'cancel') { this.editing = null; this.render(); return; }
                 else if (act === 'update') {
-                    data = await this.call(this.api.tag, { action: 'update', id, code: fields.code, name: fields.name, description: fields.description, parent });
+                    data = await this.call(this.api.tag, { action: 'update', id, code: fields.code, name: fields.name, description: fields.description, tests: fields.tests, equivalent: fields.equivalent, parent });
                     this.editing = null;
                 } else if (act === 'accept') {
                     data = await this.call(this.api.tag, { action: 'accept', id });

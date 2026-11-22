@@ -49,34 +49,110 @@ PUNCTUATION = re.compile(r"^[\s,.;:!?…，。、；：！？「」『』（）(
 SYLLABLE = re.compile(r"[a-zA-ZÀ-ɏŋεɔ'’]+[0-9¹²³⁴⁵⁶⁷⁸]?")
 
 # Une base de départ, si on la veut (« Partir d'une base ») : rien n'est créé sans le demander.
+# (type, abréviation, nom, définition, test pour la reconnaître, équivalent Universal Dependencies)
+# Les tests sont distributionnels : ce que le mot accepte autour de lui, plutôt que son sens.
 SEED = [
-    ("category", "N", "nom", ""),
-    ("category", "PRO", "pronom", ""),
-    ("category", "V", "verbe", ""),
-    ("category", "ADJ", "verbe d'état / adjectif", "Qualité, état : peut être prédicat sans copule."),
-    ("category", "ADV", "adverbe", ""),
-    ("category", "NÉG", "négation", "唔 m², 冇 mo², 唔曾 m² hen²…"),
-    ("category", "NUM", "numéral", ""),
-    ("category", "CL", "classificateur", "Entre le numéral (ou le démonstratif) et le nom : 一隻 jit⁵ zak⁵."),
-    ("category", "DÉM", "démonstratif", ""),
-    ("category", "PRÉP", "coverbe / préposition", ""),
-    ("category", "ASP", "marque d'aspect", "Accompli, progressif, expérientiel…"),
-    ("category", "PART", "particule finale", "Modalité, question, insistance."),
-    ("category", "CONJ", "conjonction", ""),
-    ("category", "INTERJ", "interjection", ""),
-    ("phrase", "P", "phrase", ""),
-    ("phrase", "GN", "groupe nominal", ""),
-    ("phrase", "GV", "groupe verbal", ""),
-    ("phrase", "GP", "groupe prépositionnel", "Coverbe + son complément."),
-    ("function", "sujet", "sujet", ""),
-    ("function", "préd", "prédicat", ""),
-    ("function", "obj", "objet (COD)", ""),
-    ("function", "attr", "attribut", ""),
-    ("function", "compl", "complément circonstanciel", "Temps, lieu, manière…"),
-    ("function", "dét", "déterminant", "Ce qui détermine un nom : démonstratif, numéral + CL, possesseur."),
-    ("function", "mod", "modifieur", "Ce qui qualifie un nom ou un verbe."),
-    ("function", "thème", "thème (topique)", "Ce dont on parle, en tête de phrase, avant le sujet."),
+    ("category", "N", "nom", "Désigne une personne, une chose, un lieu, une notion.",
+     "Se compte avec un numéral + classificateur (一隻狗) ou se montre avec 這 / 介 + classificateur ; ne se nie pas directement par 唔.",
+     "NOUN"),
+    ("category", "PRO", "pronom", "Tient la place d'un groupe nominal entier : 我 / 𠊎, 你 / 爾, 佢.",
+     "Ne prend ni démonstratif ni classificateur ; se met au pluriel avec 兜 (𠊎兜 « nous ») ; possessif : 吾, 若, ou PRO + 嘅.",
+     "PRON"),
+    ("category", "V", "verbe", "Exprime une action ou un processus.",
+     "Se nie par 唔 (présent) ou 冇 (accompli) ; accepte une marque d'aspect après lui (倒, 過) ; peut avoir un objet.",
+     "VERB"),
+    ("category", "ADJ", "verbe d'état / adjectif", "Exprime une qualité, un état ; prédicat sans verbe « être ».",
+     "Se met après 好 « très » (好靚) et se nie par 唔 comme un verbe, mais ne prend pas d'objet ; se compare avec 過 / 較.",
+     "ADJ"),
+    ("category", "ADV", "adverbe", "Modifie un verbe, un adjectif ou la phrase : degré, temps, manière.",
+     "Toujours devant le verbe ou l'adjectif (好常, 正) ; ne peut pas être prédicat seul ni se nier.",
+     "ADV"),
+    ("category", "NÉG", "négation", "唔 ng² (présent, habitude, futur), 冇 mao³ (accompli, absence), 莫 / 唔好 (interdiction).",
+     "Juste devant le verbe ou l'adjectif ; la forme change avec l'aspect : comparez 𠊎唔看 / 𠊎冇看.",
+     "ADV (Polarity=Neg)"),
+    ("category", "NUM", "numéral", "Un nombre : 一, 兩, 三…",
+     "Devant un classificateur, jamais directement devant un nom comptable (*三人 → 三個人).",
+     "NUM"),
+    ("category", "CL", "classificateur", "Mot choisi selon le nom, entre le numéral (ou le démonstratif) et le nom : 一隻 jit⁵ zak⁵.",
+     "Remplissez « 一 ___ 人 » ou « 這 ___ 狗 » ; seul après 這 / 介, il remplace le nom déjà connu (這隻).",
+     "NOUN (relation clf)"),
+    ("category", "DÉM", "démonstratif", "Montre ce dont on parle : ngia⁴ 這 (proche), ai⁴ 介 (éloigné).",
+     "Devant un classificateur (這隻) ou seul comme pronom (這係舊嘅).",
+     "DET"),
+    ("category", "PRÉP", "coverbe / préposition", "Introduit un groupe nominal devant le verbe principal : 在, 畀, 㧯…",
+     "Souvent aussi verbe plein (在 « se trouver », 畀 « donner ») : c'est un coverbe quand un autre verbe suit, dans la même phrase.",
+     "ADP"),
+    ("category", "ASP", "marque d'aspect", "Dit comment l'action se déroule : accomplie (倒), déjà vécue (過), en cours, continue…",
+     "Collée après le verbe, jamais seule ; ne se traduit pas par un mot français mais par un temps.",
+     "AUX"),
+    ("category", "PART", "particule finale", "En fin de phrase, change sa modalité : question (無 mo¹), constat, insistance (嘅).",
+     "Retirée, la phrase reste correcte mais change de valeur (question → affirmation).",
+     "PART"),
+    ("category", "CONJ", "conjonction", "Relie deux groupes ou deux propositions : 㧯 « et », 但係 « mais »…",
+     "Entre les deux éléments qu'elle relie ; ne porte ni aspect ni négation.",
+     "CCONJ / SCONJ"),
+    ("category", "INTERJ", "interjection", "Exclamation, appel, réponse : 哎, 係啊…",
+     "Hors de la construction : peut former un énoncé à elle seule.",
+     "INTJ"),
+    ("phrase", "P", "phrase", "L'énoncé complet : un sujet (parfois sous-entendu) et ce qu'on en dit.",
+     "Peut se dire seul et se transformer en question avec 無 en fin.",
+     "root"),
+    ("phrase", "GN", "groupe nominal", "Un nom et ce qui le détermine : (DÉM / NUM + CL) (… 嘅) N.",
+     "Peut être remplacé en bloc par un pronom (佢) ou par « quoi ? » / « qui ? ».",
+     "nominal"),
+    ("phrase", "GV", "groupe verbal", "Le verbe (ou l'adjectif) avec sa négation, ses marques d'aspect et ses compléments.",
+     "Se nie en bloc par 唔 / 冇 placé devant ; répond à « que fait-il ? ».",
+     "prédicat"),
+    ("phrase", "GP", "groupe prépositionnel", "Un coverbe et son groupe nominal, devant le verbe principal : 在學校, 畀蚊仔.",
+     "Peut se déplacer ou disparaître sans que la phrase devienne fausse : il est complément, pas noyau.",
+     "obl"),
+    ("function", "sujet", "sujet", "Ce dont on dit quelque chose ; en général avant le verbe.",
+     "Répond à « qui ? / qu'est-ce qui ? » avant le verbe ; souvent omis quand il est connu.",
+     "nsubj"),
+    ("function", "préd", "prédicat", "Ce qu'on dit du sujet : le groupe verbal ou adjectival.",
+     "C'est la partie qui porte la négation et l'aspect.",
+     "root"),
+    ("function", "obj", "objet (COD)", "Ce sur quoi porte l'action, après le verbe.",
+     "Répond à « quoi ? » après le verbe ; peut passer en tête comme thème (豬肉，𠊎唔食).",
+     "obj"),
+    ("function", "attr", "attribut", "Ce que le sujet est, après 係.",
+     "Remplacez 係 par une autre copule ou supprimez-le : avec un adjectif, 係 est inutile (佢好靚).",
+     "root + cop"),
+    ("function", "compl", "complément circonstanciel", "Temps, lieu, manière, cause… de l'action.",
+     "Peut se déplacer en tête de phrase (今晡日，𠊎去) ou disparaître sans rendre la phrase fausse.",
+     "obl / advmod"),
+    ("function", "dét", "déterminant", "Ce qui détermine un nom : démonstratif, numéral + classificateur, possesseur.",
+     "Devant le nom, jamais après ; répond à « lequel ? / combien ? / à qui ? ».",
+     "det / nummod / clf / nmod:poss"),
+    ("function", "mod", "modifieur", "Ce qui qualifie un nom (avec 嘅) ou un verbe (adverbe).",
+     "Peut être retiré : le groupe garde sa fonction (好靚嘅衫 → 衫).",
+     "amod / advmod / acl"),
+    ("function", "thème", "thème (topique)", "Ce dont on parle, mis en tête de phrase avant le sujet, souvent suivi d'une pause.",
+     "Peut être suivi d'une virgule à l'écrit ; reprend souvent un objet déplacé (豬肉，𠊎唔食).",
+     "dislocated"),
 ]
+
+
+def ensure_seed():
+    """Crée les étiquettes de la base qui manquent ; complète celles qui
+    existent (même type, même abréviation) sans rien écraser. Renvoie le
+    nombre d'étiquettes créées."""
+    existing = {(t.kind, t.code): t for t in GrammarTag.objects.all()}
+    created = 0
+    for i, (kind, code, name, description, tests, equivalent) in enumerate(SEED):
+        tag = existing.get((kind, code))
+        if tag is None:
+            GrammarTag.objects.create(kind=kind, code=code, name=name, description=description, tests=tests,
+                                      equivalent=equivalent, position=i)
+            created += 1
+            continue
+        changed = [f for f, v in (("description", description), ("tests", tests), ("equivalent", equivalent))
+                   if not getattr(tag, f) and v]
+        for f in changed:
+            setattr(tag, f, dict(description=description, tests=tests, equivalent=equivalent)[f])
+        if changed:
+            tag.save(update_fields=changed)
+    return created
 
 
 def _read(request):
@@ -115,6 +191,7 @@ def tag_uses():
 def tags_json():
     uses = tag_uses()
     return [{"id": t.id, "kind": t.kind, "code": t.code, "name": t.name, "description": t.description,
+             "tests": t.tests, "equivalent": t.equivalent,
              "parent": t.parent_id, "status": t.status, "uses": uses.get(t.id, 0)}
             for t in GrammarTag.objects.all()]
 
@@ -175,13 +252,7 @@ def api_tag(request):
     action = p.get("action")
     with transaction.atomic():
         if action == "seed":
-            existing = set(GrammarTag.objects.values_list("kind", "code"))
-            n = 0
-            for i, (kind, code, name, description) in enumerate(SEED):
-                if (kind, code) not in existing:
-                    GrammarTag.objects.create(kind=kind, code=code, name=name, description=description, position=i)
-                    n += 1
-            return _json({"ok": True, "created": n, "tags": tags_json()})
+            return _json({"ok": True, "created": ensure_seed(), "tags": tags_json()})
         if action == "create":
             kind = p.get("kind")
             if kind not in KINDS:
@@ -197,6 +268,8 @@ def api_tag(request):
             last = GrammarTag.objects.filter(kind=kind).aggregate(m=Max("position"))["m"]
             tag = GrammarTag.objects.create(kind=kind, code=code, name=_clean(p.get("name"), 100),
                                             description=str(p.get("description") or "")[:2000].strip(), parent=parent,
+                                            tests=str(p.get("tests") or "")[:2000].strip(),
+                                            equivalent=_clean(p.get("equivalent"), 60),
                                             position=0 if last is None else last + 1)
             return _json({"ok": True, "id": tag.id, "tags": tags_json()})
 
@@ -218,6 +291,10 @@ def api_tag(request):
                 tag.name = _clean(p.get("name"), 100)
             if "description" in p:
                 tag.description = str(p.get("description") or "")[:2000].strip()
+            if "tests" in p:
+                tag.tests = str(p.get("tests") or "")[:2000].strip()
+            if "equivalent" in p:
+                tag.equivalent = _clean(p.get("equivalent"), 60)
             if "parent" in p:
                 parent = _parent(p.get("parent"), tag.kind)
                 if parent is False or (parent and parent.id in Tags().below(tag.id)):
@@ -705,6 +782,7 @@ def api_ai_analysis(request):
         return _bad(f"Limite de {ai.DAILY_LIMIT} demandes à l'IA par jour atteinte.", 429)
 
     labels = [{"kind": t.kind, "code": t.code, "name": t.name, "description": t.description,
+               "how_to_recognise": t.tests, "universal_dependencies": t.equivalent,
                "broader": tags.by_id[t.parent_id].code if t.parent_id in tags.by_id else ""}
               for t in tags.list if t.status == GrammarTag.STATUS_OK]
     rules = list(GrammarExample.objects.filter(target_type=p["target_type"], target_key=p["target_key"])

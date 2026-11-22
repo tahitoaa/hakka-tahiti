@@ -171,7 +171,16 @@ class AnalysisTests(TestCase):
         return GrammarTag.objects.get(code=code).id
 
     def test_tags(self):
-        self.assertEqual(self.post("grammar_tag", action="seed").json()["created"], len(ga.SEED))
+        # One already written by hand: kept, only its empty fields are filled in.
+        GrammarTag.objects.create(kind="category", code="N", name="nom", description="ma définition")
+        self.assertEqual(self.post("grammar_tag", action="seed").json()["created"], len(ga.SEED) - 1)
+        noun = GrammarTag.objects.get(code="N")
+        self.assertEqual(noun.description, "ma définition")
+        self.assertIn("classificateur", noun.tests)
+        self.assertEqual(noun.equivalent, "NOUN")
+        self.post("grammar_tag", action="update", id=noun.id, tests="mon test")
+        self.post("grammar_tag", action="seed")
+        self.assertEqual(GrammarTag.objects.get(code="N").tests, "mon test")
         self.assertEqual(self.post("grammar_tag", action="seed").json()["created"], 0)
         self.assertEqual(self.post("grammar_tag", action="create", kind="category", code="v").status_code, 409)
         vm = self.post("grammar_tag", action="create", kind="category", code="Vmvt", parent=self.tag("V")).json()["id"]
