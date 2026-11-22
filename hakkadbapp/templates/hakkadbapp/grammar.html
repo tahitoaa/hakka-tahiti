@@ -132,6 +132,20 @@
   .gi-inv { padding: 0.3rem 0; border-top: 1px solid #F0E8DC; font-size: 0.9rem; overflow-wrap: anywhere; }
   .gi-word { display: inline-block; margin: 0 0.15rem; font-size: 1.05rem; }
   .gi-word sub { font-size: 0.6rem; color: #8C8478; }
+  .gr-page > * { min-width: 0; }
+  /* Téléphone : l'arbre au-dessus, ni collé ni plein écran ; les outils en ligne ; des champs à 16px (pas de zoom iOS). */
+  @media (max-width: 48rem) {
+    .gr-tree { position: static; max-height: 45vh; }
+    .gr-edit { padding: 0.6rem; }
+    .gr-ex { grid-template-columns: minmax(0, 1fr); }
+    .gr-ex-tools { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+    .gr-tabs button { flex: 1 1 auto; padding: 0 0.4rem; }
+    .ga-tok { width: calc(50% - 0.2rem); }
+    .ga-bar select, .gi-create select, .gc-filters select { max-width: 100%; flex: 1 1 100%; }
+    .gr-find-wrap, .gi-create, .gi-create input { flex-basis: 100%; }
+    .gr-edit input, .gr-edit textarea, .gr-edit select, .gr-tree input, .ga-tok select, .ga-tok input { font-size: 16px; }
+    .gr-node { padding: 0.45rem; }
+  }
   .gt-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem; padding: 0.35rem 0.2rem; border-top: 1px solid #F0E8DC; font-size: 0.88rem; }
   .gt-tools { display: flex; gap: 0.25rem; }
   .gt-tools .gr-btn { min-height: 1.8rem; padding: 0 0.5rem; }
@@ -256,6 +270,8 @@
     if (dirty && id !== current && !confirmLeave()) return;
     current = byId(id) ? id : null;
     if (tab !== 'rules') setTab('rules', false);
+    // On a phone the rule is under the tree: go to it.
+    if (current && window.matchMedia?.('(max-width: 48rem)').matches) setTimeout(() => $('gr-main').scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     try { localStorage.setItem('hakka-grammar:current', String(current || '')); } catch (e) { /* convenience only */ }
     dirty = false;
     drawTree();
