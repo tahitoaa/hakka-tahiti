@@ -535,7 +535,7 @@
         say(`${p.chapters} chapitre(s) et ${p.new_rules} règle(s) à créer, ${p.linked} exemple(s) reliés au corpus, `
           + `${p.missing} à saisir (notés dans l'explication)${p.already ? ` ; ${p.already} règle(s) déjà là, laissées telles quelles` : ''}.`);
         button.dataset.armed = '1';
-        button.textContent = 'Confirmer l'import';
+        button.textContent = "Confirmer l'import";
         return;
       }
       button.disabled = true;
