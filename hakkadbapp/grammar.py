@@ -27,9 +27,9 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Expression, GrammarExample, GrammarRule, LexiconAddition, SharedTranscript
+from .models import Expression, GrammarExample, GrammarRule, LexiconAddition, SentenceAnalysis, SharedTranscript
 from .permissions import owner_required
-from . import search_sources
+from . import grammar_analysis, search_sources
 
 LIMIT = 60
 FIELDS = {"title": 200, "pattern": 300, "explanation": 20000}
@@ -66,6 +66,7 @@ def sentences(only=None):
             if key and want(GrammarExample.TARGET_EXPRESSION, key):
                 out.append({"target_type": GrammarExample.TARGET_EXPRESSION, "target_key": key, "hanzi": e["hanzi"],
                             "pinyin": e["pinyin"], "french": e["french"], "detail": "Expression du lexique",
+                            "spaced": e.get("spaced", ""),
                             "link": f"{reverse('rechercher')}?q={quote(e['hanzi'])}"})
 
     if only is None or only.get(GrammarExample.TARGET_ADDITION):
@@ -79,6 +80,7 @@ def sentences(only=None):
             out.append({"target_type": GrammarExample.TARGET_ADDITION, "target_key": str(a.id),
                         "hanzi": a.hanzi.replace(" ", "") if a.kind == LexiconAddition.KIND_EXPRESSION else a.hanzi,
                         "pinyin": a.pinyin, "french": a.french, "detail": f"Ajout · {labels.get(a.status, a.status)}",
+                        "spaced": a.hanzi,
                         "link": f"{reverse('saisie')}?modifier={a.id}"})
 
     if only is None or only.get(GrammarExample.TARGET_SEGMENT):
@@ -115,9 +117,11 @@ def _label(s):
 
 # ---- L'arbre ------------------------------------------------------------------------------------
 
-def _example_json(example, found):
+def _example_json(example, found, analysis=None, parts=None, tags=None):
     s = found.get((example.target_type, example.target_key))
-    return {"id": example.id, "target_type": example.target_type, "target_key": example.target_key,
+    return {"analysis": grammar_analysis.analysis_json(analysis, s) if analysis else None,
+            "conforms": grammar_analysis.conformity(parts, analysis, tags) if parts else None,
+            "id": example.id, "target_type": example.target_type, "target_key": example.target_key,
             "focus": example.focus, "note": example.note, "missing": s is None,
             "hanzi": s["hanzi"] if s else "", "pinyin": s["pinyin"] if s else "", "french": s["french"] if s else "",
             "detail": s["detail"] if s else "Phrase introuvable (supprimée ou modifiée)", "link": s["link"] if s else "",
@@ -127,15 +131,21 @@ def _example_json(example, found):
 def tree():
     rules = list(GrammarRule.objects.all())
     examples = list(GrammarExample.objects.all())
+    tags = grammar_analysis.Tags()
+    analyses = {(a.target_type, a.target_key): a for a in SentenceAnalysis.objects.filter(
+        target_key__in={e.target_key for e in examples})} if examples else {}
+    patterns = {r.id: grammar_analysis.parse_pattern(r.pattern, tags) for r in rules}
     only = defaultdict(set)
     for e in examples:
         only[e.target_type].add(e.target_key)
     found = {(s["target_type"], s["target_key"]): s for s in sentences(dict(only))} if examples else {}
     by_rule = defaultdict(list)
     for e in examples:
-        by_rule[e.rule_id].append(_example_json(e, found))
+        by_rule[e.rule_id].append(_example_json(e, found, analyses.get((e.target_type, e.target_key)),
+                                                patterns.get(e.rule_id), tags))
     return [{"id": r.id, "parent": r.parent_id, "position": r.position, "title": r.title, "pattern": r.pattern,
              "explanation": r.explanation, "status": r.status, "updated_at": r.updated_at.isoformat(),
+             "pattern_parts": patterns[r.id],
              "examples": by_rule.get(r.id, [])} for r in rules]
 
 
@@ -199,7 +209,12 @@ def _move(rule, direction):
 
 @owner_required
 def page(request):
-    return render(request, "hakkadbapp/grammar.html", {"page": "grammar", "title": "Grammaire"})
+    from .ai import ai_enabled
+    from .views import get_all_data  # les lectures du lexique : la saisie assistée, comme Saisie
+
+    context = get_all_data()
+    context.update({"page": "grammar", "title": "Grammaire", "ai_enabled": ai_enabled()})
+    return render(request, "hakkadbapp/grammar.html", context)
 
 
 @require_GET
@@ -313,7 +328,15 @@ def api_sentences(request):
     celles qu'aucune règle ne cite encore."""
     query = search_sources.parse_query(request.GET.get("q", ""))
     free_only = request.GET.get("libres") == "1"
-    if not query["han"] and len(query["sense"]) < 2 and not free_only:
+    # ?schema=<règle> : seulement les phrases analysées qui suivent son schéma.
+    schema_rule = GrammarRule.objects.filter(id=request.GET["schema"]).first()         if request.GET.get("schema", "").isdigit() else None
+    tags = grammar_analysis.Tags()
+    parts = grammar_analysis.parse_pattern(schema_rule.pattern, tags) if schema_rule else None
+    if schema_rule and (not parts or any(x["kind"] == "unknown" for x in parts)):
+        return _bad("Le schéma de cette règle n'est pas encore lisible : chaque élément doit être une étiquette, "
+                    "un caractère ou une lecture.")
+    analyses = {(a.target_type, a.target_key): a for a in SentenceAnalysis.objects.all()}
+    if not query["han"] and len(query["sense"]) < 2 and not free_only and not parts:
         return JsonResponse({"q": query["text"], "count": 0, "items": []})
     cited = defaultdict(list)
     titles = dict(GrammarRule.objects.values_list("id", "title"))
@@ -324,9 +347,19 @@ def api_sentences(request):
         rules = cited.get((s["target_type"], s["target_key"]), [])
         if free_only and rules:
             continue
+        analysis = analyses.get((s["target_type"], s["target_key"]))
+        span = None
+        if parts:
+            if analysis is None:
+                continue
+            span = grammar_analysis.match(parts, analysis.tokens or [], analysis.groups or [], tags)
+            if span is None:
+                continue
         score = search_sources._match(query, s["hanzi"], s["pinyin"], [s["french"]]) if (query["han"] or query["sense"]) else 1
         if score:
-            found.append((score, {**s, "rules": rules}))
+            found.append((score, {**s, "rules": rules, "analysed": analysis is not None,
+                                  "tokens": analysis.tokens if analysis and parts else None,
+                                  "span": list(span) if span else None}))
     found.sort(key=lambda pair: (-pair[0], len(pair[1]["hanzi"])))
     return JsonResponse({"q": query["text"], "count": len(found), "items": [s for _sc, s in found[:LIMIT]]},
                         json_dumps_params={"ensure_ascii": False})

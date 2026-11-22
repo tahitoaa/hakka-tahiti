@@ -1,4 +1,5 @@
 {% extends "hakkadbapp/base.html" %}
+{% load static %}
 {% block content %}
 {% comment %}
   « Grammaire » (grammar.py) : l'arbre des règles à gauche, la règle choisie
@@ -54,6 +55,66 @@
   .gr-find label { font-size: 0.8rem; color: #544D45; display: inline-flex; gap: 0.3rem; align-items: center; }
   .gr-cited { font-size: 0.72rem; color: #6E655C; }
   .gr-empty { padding: 1rem; color: #8C8478; font-size: 0.9rem; }
+  .gr-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.5rem; }
+  .gr-tabs button { flex: 1; min-height: 2.1rem; border-radius: 0.5rem; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; color: #544D45; }
+  .gr-tabs button[aria-pressed="true"] { background: #9B1C1C; border-color: #9B1C1C; color: #fff; font-weight: 700; }
+  .gr-find-wrap { position: relative; flex: 1 1 12rem; min-width: 0; display: flex; }
+  .gr-find-wrap input { flex: 1; }
+  /* Le schéma lu : chaque élément reconnu (étiquette, mot, lecture) ou non. */
+  .gr-parts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.3rem; align-items: center; }
+  .gr-part { font-size: 0.75rem; padding: 0.05rem 0.45rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #FBF6EE; }
+  .gr-part.is-tag { background: #EEF4FB; border-color: #BFD3EA; color: #1E4E8C; }
+  .gr-part.is-word, .gr-part.is-reading { background: #fef3c7; border-color: #F0D78A; }
+  .gr-part.is-unknown { background: #fff; border-style: dashed; border-color: #9B1C1C; color: #9B1C1C; }
+  .gr-part.is-opt { opacity: 0.75; font-style: italic; }
+  .gr-codes { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; }
+  .gr-codes button { font-size: 0.72rem; padding: 0 0.4rem; min-height: 1.5rem; border: 1px solid #E8DFD2; border-radius: 0.35rem; background: #fff; color: #544D45; }
+  .gr-ok { color: #1F7A3A; font-size: 0.75rem; font-weight: 700; }
+  .gr-ko { color: #9B1C1C; font-size: 0.75rem; font-weight: 700; }
+  .gr-analysis-line { font-size: 0.85rem; margin-top: 0.15rem; overflow-wrap: anywhere; }
+  .ga-lin sub { font-size: 0.62rem; color: #1E4E8C; margin-left: 0.05rem; }
+  .ga-lin.is-mark { background: #DCFCE7; border-radius: 0.2rem; }
+  .gr-ex-editor { grid-column: 1 / -1; border: 1px solid #E8DFD2; border-radius: 0.6rem; padding: 0.6rem; background: #FFFCF7; margin-top: 0.3rem; min-width: 0; }
+  .ga-sentence { display: flex; flex-wrap: wrap; gap: 0.2rem 0.7rem; align-items: baseline; }
+  .ga-h3 { font-size: 0.8rem; font-weight: 700; color: #544D45; margin: 0.7rem 0 0.3rem; }
+  .ga-tokens { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .ga-tok { display: flex; flex-direction: column; gap: 0.15rem; width: 8.2rem; padding: 0.3rem; border: 1px solid #E8DFD2; border-radius: 0.5rem; background: #fff; }
+  .ga-tok.is-sel { border-color: #9B1C1C; box-shadow: 0 0 0 2px #FBE3E3; }
+  .ga-tok select, .ga-tok input { width: 100%; font-size: 0.75rem; padding: 0.1rem 0.25rem; border: 1px solid #EFE6D8; border-radius: 0.3rem; background: #fff; }
+  .ga-tok select.is-guess { font-style: italic; color: #6E655C; }
+  .ga-word { display: flex; flex-direction: column; align-items: center; border: 0; background: none; cursor: pointer; padding: 0.1rem; border-radius: 0.3rem; }
+  .ga-word span { font-size: 1.2rem; line-height: 1.3; }
+  .ga-word small { font-size: 0.72rem; color: #9B1C1C; }
+  .ga-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.5rem; padding: 0.4rem; border-radius: 0.5rem; background: #F6EFE4; font-size: 0.82rem; }
+  .ga-bar select { font-size: 0.8rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; padding: 0.15rem 0.3rem; background: #fff; max-width: 12rem; }
+  .ga-tree { overflow-x: auto; border: 1px solid #F0E8DC; border-radius: 0.5rem; background: #fff; padding: 0.3rem 0; }
+  .ga-svg { display: block; font-family: inherit; }
+  .ga-edge { stroke: #B5AA9B; stroke-width: 1.2; }
+  .ga-node rect { fill: #EEF4FB; stroke: #BFD3EA; }
+  .ga-node text { font-size: 12px; font-weight: 700; fill: #1E4E8C; }
+  .ga-node, .ga-leaf { cursor: pointer; }
+  .ga-node.is-sel rect { fill: #9B1C1C; stroke: #9B1C1C; }
+  .ga-node.is-sel text { fill: #fff; }
+  .ga-leaf rect { fill: #fff; stroke: #EFE6D8; }
+  .ga-leaf.is-sel rect { stroke: #9B1C1C; stroke-width: 2; }
+  .ga-leaf.is-mark rect { fill: #DCFCE7; }
+  .ga-cat { font-size: 11px; font-weight: 700; fill: #1E4E8C; }
+  .ga-han { font-size: 21px; fill: #261F1C; }
+  .ga-pin { font-size: 11px; fill: #9B1C1C; }
+  .ga-fn { font-size: 10px; fill: #6E655C; font-style: italic; }
+  .ga-gloss { font-size: 10px; fill: #8C8478; }
+  .ga-bracket { font-size: 0.8rem; color: #544D45; margin-top: 0.3rem; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+  .ga-label { display: block; font-size: 0.75rem; color: #6E655C; margin: 0.6rem 0 0.15rem; }
+  .ga-note { width: 100%; min-height: 3rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+  .ga-newtag { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.5rem; padding: 0.4rem; border: 1px dashed #DDD0BD; border-radius: 0.5rem; font-size: 0.82rem; }
+  .ga-newtag input { flex: 1 1 8rem; min-width: 0; border: 1px solid #DDD0BD; border-radius: 0.4rem; padding: 0.2rem 0.4rem; }
+  .ga-ai { margin-top: 0.5rem; padding: 0.45rem 0.6rem; border-radius: 0.5rem; background: #F5F0FF; font-size: 0.82rem; color: #3B2A66; }
+  .gt-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem; padding: 0.35rem 0.2rem; border-top: 1px solid #F0E8DC; font-size: 0.88rem; }
+  .gt-tools { display: flex; gap: 0.25rem; }
+  .gt-tools .gr-btn { min-height: 1.8rem; padding: 0 0.5rem; }
+  .gt-ai { font-size: 0.7rem; padding: 0 0.35rem; border-radius: 9999px; background: #F5F0FF; color: #3B2A66; }
+  .gt-add { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.4rem 0 0.2rem; }
+  .gt-add input, .gt-add select { flex: 1 1 7rem; min-width: 0; border: 1px solid #DDD0BD; border-radius: 0.4rem; padding: 0.25rem 0.45rem; font-size: 0.82rem; background: #fff; }
 </style>
 
 <h1 class="text-2xl font-bold mb-2">Grammaire
@@ -61,12 +122,20 @@
     Les règles en arbre (chapitre › règle › règle plus fine). Choisissez une règle à gauche : ←/→ la sortent ou la rangent
     sous celle du dessus, ↑/↓ changent l'ordre. Les exemples sont des liens vers les expressions du lexique, les ajouts et les
     segments des transcriptions publiées : ils montrent toujours la phrase à jour. « Mot » = ce que la règle illustre dans la
-    phrase (surligné). Page privée pour l'instant.
+    phrase (surligné). « Analyser » : la phrase mot à mot (catégorie, fonction, glose), puis en groupes emboîtés (l'arbre) ;
+    l'analyse vaut pour toutes les règles qui la citent. Le schéma s'écrit avec les abréviations des étiquettes
+    (onglet « Étiquettes ») : <code>GN:sujet + NÉG + V (+ GN:obj)</code> ; on voit alors quels exemples le suivent.
+    Dans la recherche de phrases, tapez les syllabes (m2 sit6) : les caractères sont proposés comme dans la Saisie.
+    Page privée pour l'instant.
   </details>
 </h1>
 
 <div class="gr-page">
   <aside class="gr-box gr-tree">
+    <div class="gr-tabs" role="group" aria-label="Affichage">
+      <button type="button" data-tab="rules" aria-pressed="true">Règles</button>
+      <button type="button" data-tab="tags" aria-pressed="false">Étiquettes</button>
+    </div>
     <div class="gr-tools">
       <button id="gr-new-root" type="button" class="gr-btn">＋ Chapitre</button>
     </div>
@@ -78,13 +147,31 @@
   </section>
 </div>
 
+{% include "hakkadbapp/components/data.html" with pronunciations=pronunciations words=words %}
+<script src="{% static 'hakkadbapp/js/Word.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Sentence.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Dictionary.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/Pronunciation.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/CharacterInput.js' %}"></script>
+<script src="{% static 'hakkadbapp/js/GrammarAnalysis.js' %}"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
   const URLS = { tree: "{% url 'grammar_tree' %}", rule: "{% url 'grammar_rule' %}", example: "{% url 'grammar_example' %}",
-                 sentences: "{% url 'grammar_sentences' %}" };
+                 sentences: "{% url 'grammar_sentences' %}", tags: "{% url 'grammar_tags' %}", tag: "{% url 'grammar_tag' %}",
+                 analysis: "{% url 'grammar_analysis' %}", analysisSave: "{% url 'grammar_analysis_save' %}",
+                 analysisAi: "{% url 'grammar_analysis_ai' %}" };
+  const GA = window.GrammarAnalysis;
+  const tags = new GA.TagSet([]);
+  let tab = 'rules';
+  // The analysis being edited: its element is kept across re-renders, unsaved changes included.
+  let editor = null;   // {key, el, instance}
+  const exKey = (e) => `${e.target_type}|${e.target_key}`;
+  // Pinyin -> hanzi suggestions in the sentence search, as on the Saisie page (CharacterInput.js).
+  let dico = null;
+  try { dico = new Dictionary({ containerId: '#pron-list', itemSelector: 'li' }); } catch (e) { dico = null; }
   const KINDS = { expression: 'Expression', addition: 'Ajout', segment: 'Transcription' };
   let rules = [];
   let current = null;
@@ -132,6 +219,7 @@
   function select(id) {
     if (dirty && id !== current && !confirmLeave()) return;
     current = byId(id) ? id : null;
+    if (tab !== 'rules') setTab('rules', false);
     try { localStorage.setItem('hakka-grammar:current', String(current || '')); } catch (e) { /* convenience only */ }
     dirty = false;
     drawTree();
@@ -154,9 +242,11 @@
                       : `<div class="gr-hanzi" lang="zh">${highlight(e.hanzi, e.focus)}</div>
                          ${e.pinyin ? `<div class="gr-pinyin">${esc(e.pinyin)}</div>` : ''}
                          ${e.french ? `<div class="gr-fr">${esc(e.french)}</div>` : ''}`}
+          ${analysisLine(e)}
           <div class="gr-meta">${e.link ? `<a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(where)}</a>` : esc(where)}</div>
         </div>
         <div class="gr-ex-tools">
+          ${e.missing ? '' : `<button type="button" class="gr-btn" data-analyse="${esc(exKey(e))}" title="Analyse linéaire et arbre">${e.analysis ? '🌳 Analyse' : '🌱 Analyser'}</button>`}
           <button type="button" class="gr-btn" data-exact="up" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
           <button type="button" class="gr-btn" data-exact="down" title="Descendre" ${i === n - 1 ? 'disabled' : ''}>↓</button>
           <button type="button" class="gr-btn" data-exact="remove" title="Retirer cet exemple de la règle">✕</button>
@@ -165,11 +255,54 @@
           <input class="gr-focus" data-exfield="focus" value="${esc(e.focus)}" placeholder="Mot" title="Ce que la règle illustre ici (surligné)">
           <input data-exfield="note" value="${esc(e.note)}" placeholder="Note (facultatif)">
         </div>
+        ${editor && editor.key === exKey(e) ? '<div class="gr-ex-editor" data-editor-slot></div>' : ''}
       </li>`;
+  }
+  function analysisLine(e) {
+    const a = e.analysis;
+    const verdict = e.conforms ? (e.conforms.ok ? '<span class="gr-ok">✓ suit le schéma</span>' : '<span class="gr-ko">✗ ne suit pas le schéma</span>') : '';
+    if (!a) return verdict ? `<div class="gr-meta">${verdict}</div>` : '';
+    return `<div class="gr-analysis-line">${GA.linear(a.tokens, tags, e.conforms?.span)} ${verdict}
+      ${a.stale ? '<span class="gr-ko" title="La phrase a changé depuis">⚠ phrase modifiée</span>' : ''}</div>`;
+  }
+  function patternParts(rule) {
+    const parts = rule.pattern_parts || [];
+    if (!parts.length) return '';
+    const label = { tag: 'étiquette', word: 'ce mot', reading: 'cette lecture', any: "n'importe quels mots", unknown: "inconnu : créez l'étiquette ou corrigez" };
+    return `<div class="gr-parts"><span class="gr-meta">Lu :</span>${parts.map((p) =>
+      `<span class="gr-part is-${p.kind}${p.optional ? ' is-opt' : ''}" title="${esc(label[p.kind])}${p.optional ? ' (facultatif)' : ''}">${esc(p.kind === 'tag' ? p.codes.join(' ou ') : p.text)}${p.kind === 'unknown' ? ' ?' : ''}</span>`).join('<span class="gr-meta">+</span>')}</div>`;
+  }
+  function codeChips() {
+    if (!tags.list.length) return "<p class=\"gr-meta\">Pas encore d'étiquettes : onglet « Étiquettes ».</p>";
+    return `<div class="gr-codes" aria-label="Insérer une étiquette dans le schéma">${['category', 'phrase', 'function'].map((kind) =>
+      tags.of(kind).map(({ tag }) => `<button type="button" data-code="${esc(tag.code)}" title="${esc(tag.name || tag.code)}">${esc(tag.code)}</button>`).join('')).join('<span class="gr-meta">·</span>')}</div>`;
+  }
+  function mountEditor() {
+    const slot = $('gr-main').querySelector('[data-editor-slot]');
+    if (editor && slot) slot.replaceWith(editor.el);
+  }
+  function openEditor(key) {
+    if (editor && editor.key === key) { editor = null; drawMain(); return; }
+    const [target_type, ...rest] = key.split('|');
+    const el = document.createElement('div');
+    el.className = 'gr-ex-editor';
+    editor = { key, el };
+    editor.instance = new GA.AnalysisEditor(el, {
+      api: { get: URLS.analysis, save: URLS.analysisSave, ai: URLS.analysisAi, tag: URLS.tag }, call, tags,
+      target: { target_type, target_key: rest.join('|') },
+      onTags: () => {},
+      onSaved: async () => { await call(URLS.tree); drawTree(); drawMain(); },
+      onClose: () => { editor = null; drawMain(); },
+    });
+    drawMain();
   }
 
   function drawMain() {
     const main = $('gr-main');
+    if (tab === 'tags') {
+      new GA.TagPanel(main, { api: { tag: URLS.tag }, call, tags, onTags: () => {} });
+      return;
+    }
     const rule = byId(current);
     if (!rule) {
       main.innerHTML = '<p class="gr-empty">Choisissez une règle, ou créez un premier chapitre (« ＋ Chapitre »).</p>';
@@ -191,7 +324,10 @@
       <label for="gr-title">Titre</label>
       <input id="gr-title" class="gr-title" data-field="title" value="${esc(rule.title)}" maxlength="200">
       <label for="gr-pattern">Schéma</label>
-      <input id="gr-pattern" data-field="pattern" value="${esc(rule.pattern)}" maxlength="300" placeholder="Sujet + ng² + Verbe (+ Complément)">
+      <input id="gr-pattern" data-field="pattern" value="${esc(rule.pattern)}" maxlength="300" placeholder="GN:sujet + NÉG + V (+ GN:obj)">
+      ${patternParts(rule)}
+      <details class="gr-meta"><summary>Insérer une étiquette</summary>${codeChips()}
+        <p>« … » : n'importe quels mots ; « V|ADJ » : l'un ou l'autre ; ( ) : facultatif ; un caractère ou une lecture : ce mot-là.</p></details>
       <label for="gr-explanation">Explication</label>
       <textarea id="gr-explanation" data-field="explanation" placeholder="La règle, ses exceptions, ce qui la distingue du mandarin…">${esc(rule.explanation)}</textarea>
       <div class="gr-row">
@@ -209,12 +345,43 @@
 
       <h2 class="gr-h2">Ajouter des phrases <small>expressions, ajouts, transcriptions</small></h2>
       <form id="gr-find" class="gr-find">
-        <input id="gr-q" type="search" placeholder="唔, ng, « ne pas »…" autocomplete="off" aria-label="Mot, lecture ou sens">
+        <div class="gr-find-wrap">
+          <input id="gr-q" type="search" placeholder="m2 sit6 → 唔食, ng, « ne pas »…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Mot, lecture ou sens">
+          <div id="gr-q-sugg"></div>
+        </div>
         <label><input id="gr-free" type="checkbox"> seulement les phrases d'aucune règle</label>
         <button type="submit" class="gr-btn">Chercher</button>
+        ${rule.pattern_parts?.length ? '<button type="button" class="gr-btn" data-act="schema" title="Les phrases analysées qui suivent ce schéma (enregistré)">Phrases qui suivent le schéma</button>' : ''}
       </form>
       <p id="gr-found-status" class="gr-status"></p>
       <ul id="gr-found" class="gr-list"></ul>`;
+    mountEditor();
+    attachIme($('gr-q'), $('gr-q-sugg'));
+  }
+
+  function attachIme(input, barEl) {
+    if (!dico || !input || typeof SyllableInputModel === 'undefined') return;
+    const model = new SyllableInputModel(dico);
+    const bar = new SuggestionBar(barEl, {
+      anchorTo: input,
+      onSelect: (index) => {
+        const s = model.suggestions[index];
+        if (!s) return;
+        model.replace(s.for, s.pron.simp);
+        input.value = model.text;
+        update();
+      },
+    });
+    const update = () => { model.parse(input.value); bar.render(model.suggestions); };
+    input.addEventListener('input', update);
+    // Tab / Maj+Tab : d'une suggestion à l'autre ; Entrée la choisit ; Échap ferme (comme un clavier chinois).
+    input.addEventListener('keydown', (event) => {
+      if (!bar.active) return;
+      if (event.key === 'Tab') { event.preventDefault(); bar.move(event.shiftKey ? -1 : 1); }
+      else if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); bar.onSelect(bar.highlight); }
+      else if (event.key === 'Escape') { bar.dismiss(); }
+      else if (event.altKey && /^Digit[1-9]$/.test(event.code)) { event.preventDefault(); bar.onSelect(Number(event.code.slice(5)) - 1); }
+    });
   }
 
   async function save() {
@@ -253,6 +420,15 @@
     const rule = byId(current);
     try {
       if (button.id === 'gr-save') return save();
+      if (button.dataset.analyse) { openEditor(button.dataset.analyse); return; }
+      if (button.dataset.code) {
+        const input = $('gr-pattern');
+        const v = input.value.trimEnd();
+        input.value = v && !/[+(]$/.test(v) ? `${v} + ${button.dataset.code}` : `${v}${v ? ' ' : ''}${button.dataset.code}`;
+        dirty = true; status('Modifié, pas encore enregistré.');
+        return;
+      }
+      if (button.dataset.act === 'schema') { await save(); return findSentences(true); }
       if (button.dataset.move) {
         await save();
         await call(URLS.rule, { action: 'move', id: rule.id, direction: button.dataset.move });
@@ -299,32 +475,37 @@
   $('gr-main').addEventListener('submit', async (event) => {
     if (event.target.id !== 'gr-find') return;
     event.preventDefault();
+    findSentences(false);
+  });
+  async function findSentences(schema) {
     const q = $('gr-q').value.trim();
     const free = $('gr-free').checked;
     $('gr-found-status').textContent = 'Recherche…';
     try {
-      const data = await call(`${URLS.sentences}?q=${encodeURIComponent(q)}${free ? '&libres=1' : ''}`);
+      const data = await call(`${URLS.sentences}?q=${encodeURIComponent(q)}${free ? '&libres=1' : ''}${schema ? `&schema=${current}` : ''}`);
       found = data.items;
       const rule = byId(current);
       const linked = new Set(rule.examples.map((e) => `${e.target_type}|${e.target_key}`));
       const focus = /[㐀-鿿]/.test(q) ? q : '';
       $('gr-found-status').textContent = data.items.length
         ? `${data.count} phrase${data.count > 1 ? 's' : ''}${data.count > data.items.length ? ` (les ${data.items.length} premières)` : ''}.`
-        : (q || free ? 'Aucune phrase trouvée.' : 'Tapez un mot, une lecture ou un sens.');
+        : (schema ? 'Aucune phrase analysée ne suit ce schéma.' : q || free ? 'Aucune phrase trouvée.' : 'Tapez un mot, une lecture ou un sens.');
       $('gr-found').innerHTML = found.map((s, i) => `<li class="gr-ex">
           <div>
             <div class="gr-hanzi" lang="zh">${highlight(s.hanzi, focus)}</div>
             ${s.pinyin ? `<div class="gr-pinyin">${esc(s.pinyin)}</div>` : ''}
             ${s.french ? `<div class="gr-fr">${esc(s.french)}</div>` : ''}
             <div class="gr-meta"><a href="${esc(s.link)}" target="_blank" rel="noopener">${esc([KINDS[s.target_type], s.detail].join(' · '))}</a></div>
+            ${s.tokens ? `<div class="gr-analysis-line">${GA.linear(s.tokens, tags, s.span)}</div>` : ''}
             ${s.rules.length ? `<div class="gr-cited">déjà dans : ${s.rules.map(esc).join(', ')}</div>` : ''}
+            ${s.analysed && !s.tokens ? '<div class="gr-cited">🌳 analysée</div>' : ''}
           </div>
           <div class="gr-ex-tools">${linked.has(`${s.target_type}|${s.target_key}`)
             ? '<span class="gr-meta">✓ exemple</span>'
             : `<button type="button" class="gr-btn" data-add="${i}">＋ Exemple</button>`}</div>
         </li>`).join('');
     } catch (err) { $('gr-found-status').textContent = err.message; }
-  });
+  }
 
   // ---- start ----------------------------------------------------------------------------------
   $('gr-new-root').addEventListener('click', async () => {
@@ -337,7 +518,19 @@
   });
   window.addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 
-  call(URLS.tree).then(() => { if (!byId(current)) current = null; drawTree(); drawMain(); })
+  function setTab(name, redraw = true) {
+    if (name === 'tags' && dirty) save();
+    tab = name;
+    document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === name)));
+    if (redraw) drawMain();
+  }
+  document.querySelector('.gr-tabs').addEventListener('click', (event) => {
+    const b = event.target.closest('[data-tab]');
+    if (b) setTab(b.dataset.tab);
+  });
+
+  Promise.all([call(URLS.tree), call(URLS.tags).then((d) => tags.set(d.tags))])
+    .then(() => { if (!byId(current)) current = null; drawTree(); drawMain(); })
     .catch((err) => { $('gr-tree').innerHTML = `<p class="gr-empty">Échec du chargement : ${esc(err.message)}</p>`; });
 })();
 </script>

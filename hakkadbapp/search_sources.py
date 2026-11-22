@@ -141,7 +141,9 @@ def _build_lexicon():
         ws = [by_id[wid] for _pos, wid in sorted(in_expr[e.id]) if wid in by_id]
         hanzi = (e.text or "").replace(" ", "") or "".join(w["hanzi"] for w in ws)
         expressions.append({"id": e.id, "platform_id": e.platform_id or "", "hanzi": hanzi, "pinyin": " ".join(w["pinyin"] for w in ws),
-                            "french": e.french or "", "english": e.english or ""})
+                            "french": e.french or "", "english": e.english or "",
+                            # Ses mots, séparés (le découpage de l'analyse, grammar_analysis.segment).
+                            "spaced": e.text or " ".join(w["hanzi"] for w in ws)})
     return {"words": words, "expressions": expressions}
 
 

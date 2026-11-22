@@ -666,3 +666,65 @@ class GrammarExample(models.Model):
 
     def __str__(self):
         return f"{self.rule} : {self.label or self.target_key}"
+
+
+class GrammarTag(models.Model):
+    """A label of the « Grammaire » analyses (grammar_analysis.py), defined
+    as the work goes: a word category (N, V, Nég…), a phrase category (GN,
+    GV, P…) or a syntactic function (sujet, objet…). `parent`: a finer one
+    under a broader one (V › V de mouvement): a schema asking for V accepts
+    it. `status` proposed: suggested by the AI, not yet accepted."""
+    KIND_CATEGORY = "category"
+    KIND_PHRASE = "phrase"
+    KIND_FUNCTION = "function"
+    KIND_CHOICES = [(KIND_CATEGORY, "Catégorie de mot"), (KIND_PHRASE, "Groupe"), (KIND_FUNCTION, "Fonction")]
+    STATUS_OK = "ok"
+    STATUS_PROPOSED = "proposed"
+    STATUS_CHOICES = [(STATUS_OK, "Retenue"), (STATUS_PROPOSED, "Proposée par l'IA")]
+
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    code = models.CharField(max_length=20)
+    name = models.CharField(max_length=100, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    parent = models.ForeignKey("self", related_name="children", on_delete=models.SET_NULL, null=True, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_OK)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["kind", "position", "id"]
+        constraints = [models.UniqueConstraint(fields=["kind", "code"], name="one_tag_code_per_kind")]
+
+    def __str__(self):
+        return f"{self.code} ({self.get_kind_display()})"
+
+
+class SentenceAnalysis(models.Model):
+    """The analysis of one sentence (same targets as GrammarExample), shared
+    by every rule that quotes it. Linear: `tokens`, the words in order,
+    [{t: hanzi, p: pinyin, c: category tag id, f: function tag id, g: gloss}].
+    Tree: `groups`, the constituents as spans of tokens,
+    [{s: first token, e: after the last, c: phrase tag id, f: function tag id}]
+    -- nested, never crossing (grammar_analysis.check). `text`: the sentence's
+    hanzi when analysed, to tell when it has changed since."""
+    SOURCE_MANUAL = "manual"
+    SOURCE_AI = "ai"
+    SOURCE_CHOICES = [(SOURCE_MANUAL, "Manuelle"), (SOURCE_AI, "Proposée par l'IA, revue")]
+
+    target_type = models.CharField(max_length=12, choices=GrammarExample.TARGET_CHOICES)
+    target_key = models.CharField(max_length=80)
+    text = models.CharField(max_length=400, blank=True, default="")
+    label = models.CharField(max_length=400, blank=True, default="")
+    tokens = models.JSONField(default=list)
+    groups = models.JSONField(default=list)
+    note = models.TextField(blank=True, default="")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="+", on_delete=models.SET_NULL, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["target_type", "target_key"], name="one_analysis_per_sentence")]
+
+    def __str__(self):
+        return self.label or self.target_key
