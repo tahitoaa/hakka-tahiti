@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from . import ask_ai
-from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, grammar, grammar_analysis, grammar_import, hakkadict, importer, platform_corrections, recordings, rey, search_sources, sources, surprising_readings, visas
+from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, grammar, grammar_analysis, grammar_corpus, grammar_import, hakkadict, importer, platform_corrections, recordings, rey, search_sources, sources, surprising_readings, visas
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -56,6 +56,10 @@ urlpatterns = [
     path("api/grammaire/analyse/enregistrer", grammar_analysis.api_save_analysis, name="grammar_analysis_save"),
     path("api/grammaire/analyse/ia", grammar_analysis.api_ai_analysis, name="grammar_analysis_ai"),
     path("api/grammaire/importer", grammar_import.api_import, name="grammar_import"),
+    path("api/grammaire/corpus", grammar_corpus.api_corpus, name="grammar_corpus"),
+    path("api/grammaire/corpus/saisir", grammar_corpus.api_enter, name="grammar_enter"),
+    path("api/grammaire/induites", grammar_corpus.api_induced, name="grammar_induced"),
+    path("api/grammaire/induites/creer", grammar_corpus.api_create_induced, name="grammar_induced_create"),
     # path("browse", views.browse, name="browse"),
     path("converter/", views.pinyin_converter, name="pinyin_converter"),
     path("transcripter/", views.transcripter, name="transcripter"),

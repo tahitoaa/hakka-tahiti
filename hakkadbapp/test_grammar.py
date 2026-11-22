@@ -268,3 +268,77 @@ class ImportTests(TestCase):
         self.assertEqual(post("run")["new_rules"], 0)
         self.assertEqual(GrammarRule.objects.count(), count)
         self.assertEqual(grammar_import.seed()["chapters"][0]["title"], GrammarRule.objects.filter(parent=None).first().title)
+
+
+@unittest.skipUnless(SQLITE, "réglages de test (SQLite) seulement")
+class CorpusTests(TestCase):
+    """Le parcours d'analyse et les règles induites (grammar_corpus.py)."""
+    databases = {"default"} if SQLITE else set()
+
+    def setUp(self):
+        search_sources._cache.clear()
+        self.client.force_login(User.objects.create_superuser("owner", password="x"))
+        self.client.post(reverse("grammar_tag"), json.dumps({"action": "seed"}), content_type="application/json")
+        self.a = LexiconAddition.objects.create(kind="expression", status="review", hanzi="佢 唔 來", pinyin="ki2 m2 loi2",
+                                                french="il ne vient pas")
+        self.b = LexiconAddition.objects.create(kind="expression", status="review", hanzi="我 唔 食", pinyin="ngai1 m2 shit6",
+                                                french="je ne mange pas")
+
+    def post(self, name, **body):
+        return self.client.post(reverse(name), json.dumps(body), content_type="application/json")
+
+    def tag(self, code):
+        return GrammarTag.objects.get(code=code).id
+
+    def analyse(self, addition, words):
+        tokens = [{"t": t, "p": "", "c": self.tag(c)} for t, c in words]
+        groups = [{"s": 0, "e": 1, "c": self.tag("GN"), "f": self.tag("sujet")}, {"s": 1, "e": 3, "c": self.tag("GV")},
+                  {"s": 0, "e": 3, "c": self.tag("P")}]
+        self.assertEqual(self.post("grammar_analysis_save", action="save", target_type="addition",
+                                   target_key=str(addition.id), tokens=tokens, groups=groups).status_code, 200)
+
+    def test_corpus_states_and_documents(self):
+        self.analyse(self.a, [("佢", "PRO"), ("唔", "NÉG"), ("來", "V")])
+        data = self.client.get(reverse("grammar_corpus"), {"etat": "todo", "source": "addition"}).json()
+        self.assertEqual([s["target_key"] for s in data["items"]], [str(self.b.id)])
+        self.assertEqual(data["counts"]["done"], 1)
+        self.assertGreater(data["counts"]["document"], 20)          # the notebook sentences not in the corpus
+        docs = self.client.get(reverse("grammar_corpus"), {"source": "document", "q": "冇"}).json()["items"]
+        self.assertTrue(all("冇" in d["hanzi"] for d in docs) and docs)
+
+    def test_enter_a_notebook_sentence(self):
+        rule = GrammarRule.objects.create(title="La négation au passé 冇 + V")
+        out = self.post("grammar_enter", hanzi="佢冇來", french="Il n'est pas venu.", source="Cahier de grammaire",
+                        rule=rule.title).json()
+        addition = LexiconAddition.objects.get(id=out["id"])
+        self.assertEqual((addition.status, addition.kind, addition.french), ("draft", "expression", "Il n'est pas venu."))
+        self.assertEqual(out["rule"], rule.title)
+        self.assertEqual(list(rule.examples.values_list("target_key", flat=True)), [str(addition.id)])
+        # Now in the corpus: no longer « à saisir », and not entered twice.
+        self.assertEqual(self.post("grammar_enter", hanzi="佢冇來").status_code, 409)
+        docs = self.client.get(reverse("grammar_corpus"), {"source": "document", "q": "佢冇來"}).json()["items"]
+        self.assertNotIn("佢冇來", [d["hanzi"] for d in docs])
+
+    def test_induced_rules(self):
+        self.analyse(self.a, [("佢", "PRO"), ("唔", "NÉG"), ("來", "V")])
+        self.analyse(self.b, [("我", "PRO"), ("唔", "NÉG"), ("食", "V")])
+        data = self.client.get(reverse("grammar_induced")).json()
+        by = {(p["lhs"], p["pattern"]): p for p in data["productions"]}
+        self.assertEqual(by[("P", "GN:sujet + GV")]["count"], 2)
+        self.assertEqual(by[("GV", "NÉG + V")]["count"], 2)
+        self.assertEqual(by[("GN:sujet", "PRO")]["count"], 2)       # a one-word group
+        words = self.client.get(reverse("grammar_induced"), {"mots": "1"}).json()
+        self.assertIn(("GV", "唔 + V"), {(p["lhs"], p["pattern"]) for p in words["productions"]})
+        inventory = {t["tag"]: dict(t["words"]) for t in data["inventory"]}
+        self.assertEqual(inventory["NÉG"], {"唔": 2})
+        p = by[("GV", "NÉG + V")]
+        made = self.post("grammar_induced_create", pattern=p["pattern"], title="La négation 唔", parent=None,
+                         examples=p["examples"]).json()
+        rule = GrammarRule.objects.get(id=made["id"])
+        self.assertEqual((rule.parent.title, rule.pattern, rule.examples.count()), ("Règles induites", "NÉG + V", 2))
+        # Known now: the construction points at its rule, and the examples follow the schema.
+        again = {(x["lhs"], x["pattern"]): x for x in self.client.get(reverse("grammar_induced")).json()["productions"]}
+        self.assertEqual(again[("GV", "NÉG + V")]["rule"]["id"], rule.id)
+        examples = [r for r in self.client.get(reverse("grammar_tree"), HTTP_ACCEPT="application/json").json()["rules"]
+                    if r["id"] == rule.id][0]["examples"]
+        self.assertTrue(all(e["conforms"]["ok"] for e in examples))

@@ -55,8 +55,8 @@
   .gr-find label { font-size: 0.8rem; color: #544D45; display: inline-flex; gap: 0.3rem; align-items: center; }
   .gr-cited { font-size: 0.72rem; color: #6E655C; }
   .gr-empty { padding: 1rem; color: #8C8478; font-size: 0.9rem; }
-  .gr-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.5rem; }
-  .gr-tabs button { flex: 1; min-height: 2.1rem; border-radius: 0.5rem; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; color: #544D45; }
+  .gr-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
+  .gr-tabs button { flex: 1 1 4.5rem; min-height: 2.1rem; border-radius: 0.5rem; border: 1px solid #DDD0BD; background: #fff; font-size: 0.85rem; color: #544D45; }
   .gr-tabs button[aria-pressed="true"] { background: #9B1C1C; border-color: #9B1C1C; color: #fff; font-weight: 700; }
   .gr-find-wrap { position: relative; flex: 1 1 12rem; min-width: 0; display: flex; }
   .gr-find-wrap input { flex: 1; }
@@ -112,6 +112,26 @@
   .ga-hint { flex-basis: 100%; font-size: 0.78rem; color: #544D45; }
   .ga-test { color: #1F5F3A; font-size: 0.78rem; }
   .ga-ud { font-size: 0.68rem; padding: 0 0.3rem; border-radius: 0.3rem; background: #EEF4FB; color: #1E4E8C; white-space: nowrap; }
+  .ga-steps { font-size: 0.75rem; color: #6E655C; margin: 0.4rem 0 0; }
+  .gc-guide { margin-bottom: 0.6rem; padding: 0.5rem 0.7rem; border: 1px solid #E8DFD2; border-radius: 0.6rem; background: #FFFCF7; font-size: 0.86rem; }
+  .gc-guide summary { cursor: pointer; }
+  .gc-steps { margin: 0.5rem 0 0.3rem 1.1rem; list-style: decimal; display: grid; gap: 0.35rem; line-height: 1.45; }
+  .gc-steps ul { list-style: disc; margin: 0.2rem 0 0 1rem; }
+  .gc-filters select { min-height: 2.3rem; border: 1px solid #DDD0BD; border-radius: 0.5rem; padding: 0 0.4rem; background: #fff; font-size: 0.85rem; max-width: 100%; }
+  .gc-state { font-size: 0.7rem; padding: 0 0.4rem; border-radius: 9999px; background: #F6EFE4; color: #6E655C; white-space: nowrap; }
+  .gc-state.is-done { background: #DCFCE7; color: #1F7A3A; }
+  .gc-state.is-stale { background: #FDE7E7; color: #9B1C1C; }
+  .gc-state.is-document { background: #F5F0FF; color: #3B2A66; }
+  .gi-row { padding: 0.5rem 0.2rem; border-top: 1px solid #F0E8DC; }
+  .gi-head { display: flex; flex-wrap: wrap; gap: 0.3rem 0.6rem; align-items: center; }
+  .gi-rule { font-family: ui-monospace, monospace; font-size: 0.88rem; color: #1E4E8C; overflow-wrap: anywhere; }
+  .gi-create { display: flex; flex-wrap: wrap; gap: 0.3rem; flex: 1 1 18rem; }
+  .gi-create input { flex: 1 1 10rem; min-width: 0; border: 1px solid #DDD0BD; border-radius: 0.4rem; padding: 0.15rem 0.4rem; font-size: 0.8rem; }
+  .gi-create select { max-width: 11rem; border: 1px solid #DDD0BD; border-radius: 0.4rem; font-size: 0.8rem; background: #fff; }
+  .gi-ex { padding: 0.3rem 0; border-top: 1px dashed #F0E8DC; }
+  .gi-inv { padding: 0.3rem 0; border-top: 1px solid #F0E8DC; font-size: 0.9rem; overflow-wrap: anywhere; }
+  .gi-word { display: inline-block; margin: 0 0.15rem; font-size: 1.05rem; }
+  .gi-word sub { font-size: 0.6rem; color: #8C8478; }
   .gt-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem; padding: 0.35rem 0.2rem; border-top: 1px solid #F0E8DC; font-size: 0.88rem; }
   .gt-tools { display: flex; gap: 0.25rem; }
   .gt-tools .gr-btn { min-height: 1.8rem; padding: 0 0.5rem; }
@@ -137,6 +157,8 @@
   <aside class="gr-box gr-tree">
     <div class="gr-tabs" role="group" aria-label="Affichage">
       <button type="button" data-tab="rules" aria-pressed="true">Règles</button>
+      <button type="button" data-tab="corpus" aria-pressed="false" title="Le parcours : les phrases à analyser, avec les consignes">Analyser</button>
+      <button type="button" data-tab="induced" aria-pressed="false" title="Les constructions relevées dans les analyses">Induites</button>
       <button type="button" data-tab="tags" aria-pressed="false">Étiquettes</button>
     </div>
     <div class="gr-tools">
@@ -167,10 +189,14 @@
   const URLS = { tree: "{% url 'grammar_tree' %}", rule: "{% url 'grammar_rule' %}", example: "{% url 'grammar_example' %}",
                  sentences: "{% url 'grammar_sentences' %}", tags: "{% url 'grammar_tags' %}", tag: "{% url 'grammar_tag' %}",
                  analysis: "{% url 'grammar_analysis' %}", analysisSave: "{% url 'grammar_analysis_save' %}",
-                 analysisAi: "{% url 'grammar_analysis_ai' %}", import: "{% url 'grammar_import' %}" };
+                 analysisAi: "{% url 'grammar_analysis_ai' %}", import: "{% url 'grammar_import' %}",
+                 corpus: "{% url 'grammar_corpus' %}", enter: "{% url 'grammar_enter' %}",
+                 induced: "{% url 'grammar_induced' %}", inducedCreate: "{% url 'grammar_induced_create' %}" };
   const GA = window.GrammarAnalysis;
   const tags = new GA.TagSet([]);
   let tab = 'rules';
+  let corpusPanel = null;   // the « Analyser » tab, kept with its open analysis
+  let treeStale = false;    // analyses saved there: the rules' examples to reload
   // The analysis being edited: its element is kept across re-renders, unsaved changes included.
   let editor = null;   // {key, el, instance}
   const exKey = (e) => `${e.target_type}|${e.target_key}`;
@@ -306,6 +332,26 @@
     const main = $('gr-main');
     if (tab === 'tags') {
       new GA.TagPanel(main, { api: { tag: URLS.tag }, call, tags, onTags: () => {} });
+      return;
+    }
+    if (tab === 'corpus') {
+      // Kept while the tab is shown: an analysis in progress survives a redraw of the tree.
+      if (!corpusPanel) {
+        const el = document.createElement('div');
+        corpusPanel = new GA.CorpusPanel(el, {
+          api: { corpus: URLS.corpus, enter: URLS.enter, analysis: URLS.analysis, save: URLS.analysisSave, ai: URLS.analysisAi, tag: URLS.tag },
+          call, tags, attachIme, onChanged: () => { treeStale = true; },
+        });
+      }
+      main.replaceChildren(corpusPanel.container);
+      return;
+    }
+    if (tab === 'induced') {
+      new GA.InducedPanel(main, {
+        api: { induced: URLS.induced, create: URLS.inducedCreate }, call,
+        chapters: () => children(null).map((r) => ({ id: r.id, title: r.title })),
+        onCreated: async (id) => { await call(URLS.tree); setTab('rules', false); select(id); },
+      });
       return;
     }
     const rule = byId(current);
@@ -550,8 +596,10 @@
     button.disabled = false;
   });
 
-  function setTab(name, redraw = true) {
-    if (name === 'tags' && dirty) save();
+  async function setTab(name, redraw = true) {
+    if (name !== 'rules' && dirty) save();
+    if (name !== 'corpus') corpusPanel = null;
+    if (name === 'rules' && treeStale) { treeStale = false; await call(URLS.tree); drawTree(); }
     tab = name;
     document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === name)));
     if (redraw) drawMain();

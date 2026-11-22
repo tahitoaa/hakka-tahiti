@@ -169,8 +169,8 @@
     class AnalysisEditor {
         /** `api`: {get, save, ai, tag}; `call(url, body)` (la page) ; `tags`: TagSet ;
          *  `onTags(list)`, `onSaved()`, `onClose()`. */
-        constructor(container, { api, call, tags, target, onTags, onSaved, onClose }) {
-            Object.assign(this, { container, api, call, tags, target, onTags, onSaved, onClose });
+        constructor(container, { api, call, tags, target, onTags, onSaved, onClose, onNext }) {
+            Object.assign(this, { container, api, call, tags, target, onTags, onSaved, onClose, onNext });
             this.tokens = [];
             this.groups = [];
             this.selection = null;     // [premier, dernier] mot sélectionné
@@ -250,6 +250,8 @@
                     <span class="gr-meta">${this.rules.length > 1 ? `Analyse commune aux règles : ${this.rules.map(esc).join(', ')}` : 'L\'analyse vaut pour toutes les règles qui citent cette phrase.'}</span>
                   </div>
                   ${stale}
+                  <p class="ga-steps">① découpage (✂ ⊕) · ② catégorie de chaque mot, d'après son test 🔎 · ③ gloses ·
+                    ④ groupes, des plus petits aux plus grands (GN, GP, puis GV, puis P) · ⑤ fonctions des groupes · ⑥ commentaire</p>
                   <h3 class="ga-h3">Analyse linéaire</h3>
                   <div class="ga-tokens">${this.tokens.map((t, i) => this.tokenHtml(t, i)).join('')}</div>
                   <div class="ga-bar">${bar}</div>
@@ -261,6 +263,7 @@
                   <textarea id="ga-note" class="ga-note" placeholder="Ce que cette phrase montre, un doute…">${esc(this.note)}</textarea>
                   <div class="gr-row">
                     <button type="button" class="gr-btn gr-btn-main" data-ga="save">Enregistrer l'analyse</button>
+                    ${this.onNext ? '<button type="button" class="gr-btn gr-btn-main" data-ga="save-next">Enregistrer et suivante ▶</button>' : ''}
                     ${this.aiEnabled ? '<button type="button" class="gr-btn" data-ga="ai" title="Catégories, fonctions et groupes proposés par l\'IA, à revoir avant d\'enregistrer">✨ Proposer avec l\'IA</button>' : ''}
                     ${this.saved ? '<button type="button" class="gr-btn" data-ga="erase">Effacer l\'analyse</button>' : ''}
                     <button type="button" class="gr-btn" data-ga="close">Fermer</button>
@@ -368,6 +371,7 @@
                 else if (act === 'create-tag') { await this.createTag(); }
                 else if (act === 'cancel-tag') { this.pendingField = null; }
                 else if (act === 'save') { await this.save(); }
+                else if (act === 'save-next') { await this.save(); this.onNext?.(); return; }
                 else if (act === 'ai') { await this.askAi(button); return; }
                 else if (act === 'erase') {
                     if (button.dataset.armed !== '1') { button.dataset.armed = '1'; button.textContent = 'Effacer pour toutes les règles ?'; return; }
@@ -595,5 +599,263 @@
         }
     }
 
-    global.GrammarAnalysis = { TagSet, AnalysisEditor, TagPanel, drawTree, bracketed, linear, structure };
+
+    // ---- Les consignes d'analyse ------------------------------------------------------------------
+    const GUIDE = `
+      <ol class="gc-steps">
+        <li><b>Lire la phrase et sa traduction.</b> Si la lecture ou la traduction manque ou semble fausse, corrigez-la
+          d'abord dans la Saisie (lien sous la phrase) : l'analyse se fait sur une phrase sûre.</li>
+        <li><b>Vérifier le découpage.</b> Un mot = une entrée du lexique (屋家 reste entier). Les particules sont des mots à part
+          (倒, 過, 嘅, 無). ✂ coupe un mot en caractères, ⊕ le joint au suivant.</li>
+        <li><b>Donner une catégorie à chaque mot</b> en appliquant son test 🔎 (ce que le mot accepte autour de lui),
+          pas sa traduction : « manger » est un verbe en français, mais c'est la phrase hakka qui décide. En cas de doute,
+          la catégorie la plus générale et un commentaire.</li>
+        <li><b>Gloser mot à mot</b>, en minuscules (屋家 « maison ») ; pour un mot grammatical, une abréviation en capitales
+          (NÉG, ACC pour l'accompli, EXP pour l'expérience, Q pour la question, POSS) — à la manière des règles de Leipzig.</li>
+        <li><b>Grouper, des plus petits groupes aux plus grands</b> : d'abord les groupes nominaux (démonstratif ou numéral
+          + classificateur + nom ; qualifiant + 嘅 + nom), les groupes prépositionnels (coverbe + groupe nominal), puis le
+          groupe verbal (négation, adverbes, verbe, aspect, objet), enfin la phrase P. Un groupe est toujours dans un autre
+          ou à côté, jamais à cheval.</li>
+        <li><b>Donner les fonctions aux groupes</b> plutôt qu'aux mots : sujet, objet, complément, thème, attribut.
+          Un mot seul qui a une fonction (佢 sujet) peut recevoir directement sa fonction.</li>
+        <li><b>Ce qui est propre au hakka</b> :
+          <ul>
+            <li>le sujet est souvent omis : n'ajoutez pas de mot absent, la phrase est simplement sans sujet ;</li>
+            <li>un thème peut précéder le sujet (豬肉，𠊎唔食) : c'est un groupe à part, fonction « thème » ;</li>
+            <li>plusieurs verbes peuvent se suivre (去店買東西) : deux groupes verbaux côte à côte dans la phrase ;</li>
+            <li>la négation et les marques d'aspect restent dans le groupe verbal ; la particule finale (無, 嘅) se rattache
+              à la phrase P.</li>
+          </ul></li>
+        <li><b>Noter ses doutes</b> dans le commentaire, puis « Enregistrer et suivante ». Les constructions qui reviennent
+          apparaissent dans l'onglet « Induites », où elles deviennent des règles.</li>
+      </ol>
+      <p class="gr-meta">Le plus simple d'abord : les phrases déjà citées par une règle, puis les plus courtes. Une analyse vaut
+        pour toutes les règles qui citent la phrase ; elle se corrige à tout moment.</p>`;
+
+    // ---- Le parcours : les phrases à analyser -----------------------------------------------------
+    const STATE_LABELS = { todo: 'à analyser', done: 'analysée', stale: 'phrase modifiée', document: 'à saisir' };
+    const SOURCE_LABELS = { expression: 'Lexique', addition: 'Ajout', segment: 'Transcription', document: 'Document' };
+
+    class CorpusPanel {
+        /** `api`: {corpus, enter, analysis, save, ai, tag} ; `editorFor(target, el, handlers)`: l'éditeur d'une phrase. */
+        constructor(container, { api, call, tags, attachIme, onChanged }) {
+            Object.assign(this, { container, api, call, tags, attachIme, onChanged });
+            this.filters = { source: '', etat: 'todo', q: '', page: 1 };
+            try { Object.assign(this.filters, JSON.parse(localStorage.getItem('hakka-grammar:corpus') || '{}')); } catch (e) { /* convenience only */ }
+            this.items = [];
+            this.open = null;   // index of the sentence being analysed
+            this.editorEl = null;
+            this.container.addEventListener('click', (e) => this.onClick(e));
+            this.container.addEventListener('submit', (e) => { e.preventDefault(); this.filters.page = 1; this.readFilters(); this.load(); });
+            this.container.addEventListener('change', (e) => {
+                if (e.target.matches('.gc-filters select')) { this.filters.page = 1; this.readFilters(); this.load(); }
+            });
+            this.container.addEventListener('toggle', (e) => {
+                if (e.target.classList?.contains('gc-guide')) {
+                    try { localStorage.setItem('hakka-grammar:guide', e.target.open ? '1' : '0'); } catch (err) { /* convenience only */ }
+                }
+            }, true);
+            this.load();
+        }
+
+        readFilters() {
+            const f = this.container.querySelector('.gc-filters');
+            if (!f) return;
+            this.filters.source = f.querySelector('[name=source]').value;
+            this.filters.etat = f.querySelector('[name=etat]').value;
+            this.filters.q = f.querySelector('[name=q]').value.trim();
+            try { localStorage.setItem('hakka-grammar:corpus', JSON.stringify({ ...this.filters, page: 1 })); } catch (e) { /* convenience only */ }
+        }
+
+        async load(then = null) {
+            const f = this.filters;
+            this.status = 'Chargement…';
+            this.render();
+            try {
+                const data = await this.call(`${this.api.corpus}?source=${encodeURIComponent(f.source)}&etat=${encodeURIComponent(f.etat)}&q=${encodeURIComponent(f.q)}&page=${f.page}`);
+                Object.assign(this, { items: data.items, counts: data.counts, count: data.count, page: data.page, pages: data.pages });
+                this.status = '';
+                this.open = null;
+                this.editorEl = null;
+            } catch (err) { this.status = err.message; }
+            this.render();
+            then?.();
+        }
+
+        render() {
+            const f = this.filters;
+            const c = this.counts || {};
+            let guideOpen = !(c.done || c.stale);
+            try { const g = localStorage.getItem('hakka-grammar:guide'); if (g !== null) guideOpen = g === '1'; } catch (e) { /* convenience only */ }
+            const opt = (value, label, cur) => `<option value="${value}"${value === cur ? ' selected' : ''}>${label}</option>`;
+            this.container.innerHTML = `
+              <div class="gc">
+                <details class="gc-guide"${guideOpen ? ' open' : ''}><summary><b>Consignes : analyser une phrase, pas à pas</b></summary>${GUIDE}</details>
+                <form class="gc-filters gr-find">
+                  <select name="source" aria-label="Source">${opt('', 'Toutes les sources', f.source)}${opt('expression', 'Expressions du lexique', f.source)}
+                    ${opt('addition', 'Ajouts (Saisie)', f.source)}${opt('segment', 'Transcriptions', f.source)}${opt('document', 'Documents (à saisir)', f.source)}</select>
+                  <select name="etat" aria-label="État">${opt('', 'Tous les états', f.etat)}${opt('todo', 'À analyser', f.etat)}${opt('done', 'Analysées', f.etat)}
+                    ${opt('stale', 'Phrase modifiée depuis', f.etat)}${opt('document', 'À saisir', f.etat)}</select>
+                  <div class="gr-find-wrap"><input name="q" type="search" value="${esc(f.q)}" placeholder="m2 sit6, 唔, « manger »…" autocomplete="off"
+                    autocapitalize="off" spellcheck="false" aria-label="Mot, lecture ou sens"><div class="gc-sugg"></div></div>
+                  <button type="submit" class="gr-btn">Filtrer</button>
+                </form>
+                <p class="gr-meta">${c.all !== undefined ? `<b>${c.done || 0}</b> analysée(s) · <b>${c.todo || 0}</b> à analyser · ${c.stale || 0} modifiée(s) depuis · ${c.document || 0} phrase(s) de documents à saisir — ${this.count} dans cette liste` : ''}
+                  <span class="gr-status">${esc(this.status || '')}</span></p>
+                <ul class="gr-list">${this.items.map((s, i) => this.itemHtml(s, i)).join('') || (this.status ? '' : '<li class="gr-meta">Aucune phrase avec ces filtres.</li>')}</ul>
+                ${this.pages > 1 ? `<div class="gr-row"><button type="button" class="gr-btn" data-gc="prev" ${this.page <= 1 ? 'disabled' : ''}>‹</button>
+                  <span class="gr-meta">page ${this.page} / ${this.pages}</span>
+                  <button type="button" class="gr-btn" data-gc="next" ${this.page >= this.pages ? 'disabled' : ''}>›</button></div>` : ''}
+              </div>`;
+            this.attachIme?.(this.container.querySelector('[name=q]'), this.container.querySelector('.gc-sugg'));
+            if (this.editorEl) this.container.querySelector('[data-gc-slot]')?.replaceWith(this.editorEl);
+        }
+
+        itemHtml(s, i) {
+            const action = s.state === 'document'
+                ? `<button type="button" class="gr-btn" data-gc="enter" data-i="${i}" title="Crée un brouillon d'expression dans la Saisie">＋ Saisir</button>`
+                : `<button type="button" class="gr-btn${s.state === 'done' ? '' : ' gr-btn-main'}" data-gc="analyse" data-i="${i}">${s.state === 'done' ? '🌳 Revoir' : '🌱 Analyser'}</button>`;
+            const meta = [SOURCE_LABELS[s.target_type] || s.source, s.detail].filter(Boolean).join(' · ');
+            return `<li class="gr-ex">
+                <div>
+                  <div class="gr-hanzi" lang="zh">${esc(s.hanzi)}</div>
+                  ${s.pinyin ? `<div class="gr-pinyin">${esc(s.pinyin)}</div>` : ''}
+                  ${s.french ? `<div class="gr-fr">${esc(s.french)}</div>` : ''}
+                  <div class="gr-meta">${s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(meta)}</a>` : esc(meta)}
+                    ${s.rules?.length ? ` · règle : ${s.rules.map(esc).join(', ')}` : ''}</div>
+                  ${s.note ? `<div class="gr-status">${s.note}</div>` : ''}
+                </div>
+                <div class="gr-ex-tools"><span class="gc-state is-${s.state}">${STATE_LABELS[s.state]}</span>${action}</div>
+                ${this.open === i ? '<div class="gr-ex-editor" data-gc-slot></div>' : ''}
+              </li>`;
+        }
+
+        analyse(i) {
+            const s = this.items[i];
+            if (!s || s.state === 'document') return;
+            this.open = i;
+            this.editorEl = document.createElement('div');
+            this.editorEl.className = 'gr-ex-editor';
+            new AnalysisEditor(this.editorEl, {
+                api: { get: this.api.analysis, save: this.api.save, ai: this.api.ai, tag: this.api.tag },
+                call: this.call, tags: this.tags, target: { target_type: s.target_type, target_key: s.target_key },
+                onSaved: () => { s.state = 'done'; this.onChanged?.(); },
+                onClose: () => { this.open = null; this.editorEl = null; this.render(); },
+                onNext: () => this.next(i),
+            });
+            this.render();
+            this.editorEl.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        }
+
+        /** La phrase suivante à analyser : dans la liste, sinon à la page d'après. */
+        next(i) {
+            const j = this.items.findIndex((s, k) => k > i && (s.state === 'todo' || s.state === 'stale'));
+            if (j >= 0) { this.analyse(j); return; }
+            if (this.page < this.pages) {
+                this.filters.page = this.page + 1;
+                this.load(() => { const k = this.items.findIndex((s) => s.state === 'todo' || s.state === 'stale'); if (k >= 0) this.analyse(k); });
+                return;
+            }
+            this.open = null;
+            this.editorEl = null;
+            this.status = 'Plus de phrase à analyser dans cette liste.';
+            this.render();
+        }
+
+        async onClick(e) {
+            const b = e.target.closest('[data-gc]');
+            if (!b) return;
+            const act = b.dataset.gc;
+            const i = Number(b.dataset.i);
+            if (act === 'prev' || act === 'next') { this.filters.page = this.page + (act === 'next' ? 1 : -1); this.load(); return; }
+            if (act === 'analyse') { this.analyse(i); return; }
+            if (act === 'enter') {
+                const s = this.items[i];
+                b.disabled = true;
+                try {
+                    const data = await this.call(this.api.enter, { hanzi: s.hanzi, french: s.french, source: s.source, rule: s.rule || '' });
+                    Object.assign(s, { target_type: data.target_type, target_key: data.target_key, state: 'todo', link: data.link,
+                        detail: `brouillon de la Saisie · ${s.detail}`,
+                        note: `Brouillon créé${data.rule ? `, exemple de « ${esc(data.rule)} »` : ''}. ${data.missing_reading ? 'Lecture incomplète : ' : ''}<a href="${esc(data.link)}" target="_blank" rel="noopener">compléter dans la Saisie</a>, puis analyser.` });
+                    this.onChanged?.();
+                } catch (err) { s.note = esc(err.message); }
+                this.render();
+            }
+        }
+    }
+
+    // ---- Les règles induites ----------------------------------------------------------------------
+    class InducedPanel {
+        /** `chapters()`: [{id, title}] (les règles de premier niveau) ; `onCreated(id)`. */
+        constructor(container, { api, call, chapters, onCreated }) {
+            Object.assign(this, { container, api, call, chapters, onCreated });
+            this.words = true;
+            this.container.addEventListener('click', (e) => this.onClick(e));
+            this.container.addEventListener('change', (e) => { if (e.target.id === 'gi-words') { this.words = e.target.checked; this.load(); } });
+            this.load();
+        }
+
+        async load() {
+            this.container.innerHTML = '<p class="gr-meta">Lecture des analyses…</p>';
+            try {
+                this.data = await this.call(`${this.api.induced}${this.words ? '?mots=1' : ''}`);
+                this.render();
+            } catch (err) { this.container.innerHTML = `<p class="gr-status is-error">${esc(err.message)}</p>`; }
+        }
+
+        render(message = '') {
+            const d = this.data;
+            const chapterOptions = this.chapters().map((c) => `<option value="${c.id}"${c.title === 'Règles induites' ? ' selected' : ''}>${esc(c.title)}</option>`).join('');
+            this.container.innerHTML = `
+              <div class="gi">
+                <p class="gr-meta">Ce que vos ${d.analyses} analyse(s) montrent, sans rien supposer d'autre : chaque groupe d'un arbre donne une
+                  construction (GV → NÉG + V), comptée sur toutes les phrases. Une construction qui revient est une règle candidate :
+                  « Créer la règle » en fait une règle (brouillon) avec ce schéma et ses phrases comme exemples.</p>
+                <label class="gr-meta"><input id="gi-words" type="checkbox"${this.words ? ' checked' : ''}> montrer les mots des catégories fermées
+                  (唔 + V et 冇 + V plutôt que NÉG + V)</label>
+                <span class="gr-status">${esc(message)}</span>
+                <h2 class="gr-h2">Constructions <small>${d.productions.length}</small></h2>
+                ${d.productions.length ? `<ul class="gr-list">${d.productions.map((p, i) => `
+                  <li class="gi-row">
+                    <div class="gi-head"><b class="gi-rule">${esc(p.lhs)} → ${esc(p.pattern)}</b>
+                      <span class="gr-meta">${p.count} fois${p.sentences !== p.count ? `, ${p.sentences} phrase(s)` : ''}</span>
+                      ${p.rule ? `<span class="gr-ok">règle : <a href="#" data-gi="go" data-id="${p.rule.id}">${esc(p.rule.title)}</a></span>`
+                               : `<span class="gi-create"><input data-gi-title="${i}" value="${esc(p.lhs === '(phrase)' ? p.pattern : `${p.lhs} : ${p.pattern}`)}" aria-label="Titre de la règle">
+                                  <select data-gi-parent="${i}" aria-label="Chapitre"><option value="">Règles induites</option>${chapterOptions}</select>
+                                  <button type="button" class="gr-btn" data-gi="create" data-i="${i}">Créer la règle</button></span>`}
+                    </div>
+                    ${p.cited_by.length ? `<div class="gr-cited">phrases déjà citées par : ${p.cited_by.map(esc).join(', ')}</div>` : ''}
+                    <details><summary class="gr-meta">les phrases</summary><ul class="gr-list">${p.examples.map((e) => `
+                      <li class="gi-ex"><span class="gr-hanzi" lang="zh">${esc(e.hanzi)}</span> <span class="gr-fr">${esc(e.french)}</span>
+                        <div class="ga-bracket">${esc(e.bracketed)}</div></li>`).join('')}</ul></details>
+                  </li>`).join('')}</ul>` : '<p class="gr-meta">Pas encore de groupes dans les analyses : groupez des mots dans l\'onglet « Analyser ».</p>'}
+                <h2 class="gr-h2">Inventaire des catégories <small>les mots rangés sous chaque étiquette</small></h2>
+                ${d.inventory.map((t) => `<div class="gi-inv"><b>${esc(t.tag)}</b>${t.name ? ` <span class="gr-meta">${esc(t.name)}</span>` : ''}
+                  <span class="gr-meta">(${t.count})</span> ${t.words.map(([w, n]) => `<span class="gi-word" lang="zh">${esc(w)}<sub>${n}</sub></span>`).join(' ')}</div>`).join('')
+                  || '<p class="gr-meta">Aucun mot catégorisé pour l\'instant.</p>'}
+              </div>`;
+        }
+
+        async onClick(e) {
+            const b = e.target.closest('[data-gi]');
+            if (!b) return;
+            e.preventDefault();
+            if (b.dataset.gi === 'go') { this.onCreated?.(Number(b.dataset.id)); return; }
+            const i = Number(b.dataset.i);
+            const p = this.data.productions[i];
+            const parent = this.container.querySelector(`[data-gi-parent="${i}"]`).value;
+            b.disabled = true;
+            try {
+                const data = await this.call(this.api.create, {
+                    pattern: p.pattern, title: this.container.querySelector(`[data-gi-title="${i}"]`).value,
+                    parent: parent ? Number(parent) : null,
+                    examples: p.examples.map(({ target_type, target_key }) => ({ target_type, target_key })),
+                });
+                p.rule = { id: data.id, title: this.container.querySelector(`[data-gi-title="${i}"]`).value };
+                this.render('Règle créée.');
+            } catch (err) { this.render(err.message); }
+        }
+    }
+
+    global.GrammarAnalysis = { TagSet, AnalysisEditor, TagPanel, CorpusPanel, InducedPanel, GUIDE, drawTree, bracketed, linear, structure };
 })(typeof window !== 'undefined' ? window : globalThis);

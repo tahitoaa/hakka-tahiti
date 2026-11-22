@@ -19,6 +19,10 @@ Liste des demandes en cours. Les propositions d'amélioration sont dans
   42 phrases du cahier à saisir). Reste : saisir les phrases du cahier (en brouillons
   Saisie ?), propositions de règles par l'IA, export vers `hakka-grammar`, ouverture
   aux éditeurs, aide « repères » (références, questionnaire).
+  22/11 : repères des étiquettes (tests, UD) déployés ; parcours d'analyse (onglet « Analyser »,
+  consignes pas à pas, « Enregistrer et suivante », phrases des documents « à saisir » → brouillon
+  Saisie) et règles induites (onglet « Induites » : constructions comptées, inventaire des catégories,
+  « Créer la règle ») commités, pas déployés.
 
 ## En attente d'une action ou d'une décision
 
