@@ -234,6 +234,51 @@ class AnalysisTests(TestCase):
         self.assertEqual(out["tokens"][1]["c"], self.tag("NÉGX"))
         # The crossing group (0–2 against 1–3) is dropped.
         self.assertEqual([(g["s"], g["e"]) for g in out["groups"]], [(0, 1), (1, 3)])
+        # A pronoun the AI left with its own function becomes a one-word GN.
+        out = ga.apply_proposal({
+            "words": [{"category": "PRO", "function": "sujet", "gloss": "il"}, {"category": "V", "function": "", "gloss": "venir"}],
+            "groups": [], "new_tags": [], "explanation": "", "confidence": "haute"},
+            ga.check(tokens[::2], [], ga.Tags())[0], ga.Tags())
+        self.assertIsNone(out["tokens"][0]["f"])
+        self.assertEqual(out["groups"], [{"s": 0, "e": 1, "c": self.tag("GN"), "f": self.tag("sujet")}])
+
+    def test_functions_go_to_groups(self):
+        """Consigne : les fonctions aux groupes ; un nom ou pronom seul devient un GN d'un mot."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        self.post("grammar_tag", action="seed")
+        tags = ga.Tags()
+        T = self.tag
+        tokens = [{"t": "佢", "c": T("PRO"), "f": T("sujet")}, {"t": "好", "c": T("ADV"), "f": T("mod")},
+                  {"t": "食", "c": T("V"), "f": None}, {"t": "飯", "c": T("N"), "f": T("obj")}]
+        # 飯 is already alone in a group without a function: the function moves up to it.
+        groups = [{"s": 3, "e": 4, "c": T("GN"), "f": None}]
+        new_tokens, new_groups, changed, left = ga.wrap_word_functions(tokens, groups, tags)
+        self.assertEqual(changed, [0, 3])
+        self.assertEqual(left, [(1, "ni nom ni pronom")])          # the adverb is only reported
+        self.assertEqual([t["f"] for t in new_tokens], [None, T("mod"), None, None])
+        self.assertEqual(new_groups, [{"s": 0, "e": 1, "c": T("GN"), "f": T("sujet")},
+                                      {"s": 3, "e": 4, "c": T("GN"), "f": T("obj")}])
+        self.assertEqual(tokens[0]["f"], T("sujet"))                # the input is left untouched
+        # A group that already has another function is not overwritten.
+        _t, _g, changed, left = ga.wrap_word_functions(tokens[:1], [{"s": 0, "e": 1, "c": T("GN"), "f": T("obj")}], tags)
+        self.assertEqual((changed, left), ([], [(0, "son groupe a déjà une autre fonction")]))
+
+        # The command: a preview writes nothing, --appliquer saves.
+        target = GrammarExample.TARGET_CHOICES[0][0]
+        a = SentenceAnalysis.objects.create(target_type=target, target_key="1", text="佢好食飯", tokens=tokens, groups=groups)
+        out = StringIO()
+        call_command("grammaire_fonctions_aux_groupes", stdout=out)
+        self.assertIn("[GN:sujet 佢/PRO]", out.getvalue())
+        self.assertIn("rien d'écrit", out.getvalue())
+        self.assertEqual(SentenceAnalysis.objects.get(id=a.id).tokens[0]["f"], T("sujet"))
+        call_command("grammaire_fonctions_aux_groupes", "--appliquer", stdout=StringIO())
+        a.refresh_from_db()
+        self.assertIsNone(a.tokens[0]["f"])
+        self.assertEqual([(g["s"], g["e"], g["f"]) for g in a.groups], [(0, 1, T("sujet")), (3, 4, T("obj"))])
+        # The schema now finds the pronoun subject.
+        self.assertIsNotNone(ga.match(ga.parse_pattern("GN:sujet + … + V", tags), a.tokens, a.groups, tags))
 
 
 @unittest.skipUnless(SQLITE, "réglages de test (SQLite) seulement")

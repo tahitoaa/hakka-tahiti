@@ -616,11 +616,18 @@
           + classificateur + nom ; qualifiant + 嘅 + nom), les groupes prépositionnels (coverbe + groupe nominal), puis le
           groupe verbal (négation, adverbes, verbe, aspect, objet), enfin la phrase P. Un groupe est toujours dans un autre
           ou à côté, jamais à cheval.</li>
-        <li><b>Donner les fonctions aux groupes</b> plutôt qu'aux mots : sujet, objet, complément, thème, attribut.
-          Un mot seul qui a une fonction (佢 sujet) peut recevoir directement sa fonction.</li>
+        <li><b>Donner les fonctions aux groupes, jamais aux mots.</b> Le mot porte sa catégorie (PRO, N, V…), le groupe
+          porte sa fonction (sujet, objet, thème, attribut, complément). Un mot seul qui remplit une fonction forme un
+          groupe à lui seul : 佢 sujet s'écrit [GN:sujet 佢/PRO], 𠊎 objet [GN:obj 𠊎/PRO], un nom nu 狗 sujet
+          [GN:sujet 狗/N]. Pourquoi : le schéma d'une règle (GN:sujet + GV) ne reconnaît que des groupes ; un pronom
+          laissé seul n'y est pas trouvé, et les règles induites se dédoublent (PRO:sujet + GV à côté de GN:sujet + GV).</li>
         <li><b>Ce qui est propre au hakka</b> :
           <ul>
-            <li>le sujet est souvent omis : n'ajoutez pas de mot absent, la phrase est simplement sans sujet ;</li>
+            <li>les pronoms (𠊎, 你 / 爾, 佢 et leurs pluriels en 兜 : 𠊎兜) sont toujours un groupe nominal complet, la
+              fonction sur ce GN ;</li>
+            <li>le possessif (吾, 若, ou pronom + 嘅) détermine le nom : il reste à l'intérieur du GN qu'il détermine, avec
+              la fonction « dét » ;</li>
+            <li>le sujet est souvent omis : n'ajoutez pas de mot absent ni de GN vide, la phrase est simplement sans sujet ;</li>
             <li>un thème peut précéder le sujet (豬肉，𠊎唔食) : c'est un groupe à part, fonction « thème » ;</li>
             <li>plusieurs verbes peuvent se suivre (去店買東西) : deux groupes verbaux côte à côte dans la phrase ;</li>
             <li>la négation et les marques d'aspect restent dans le groupe verbal ; la particule finale (無, 嘅) se rattache

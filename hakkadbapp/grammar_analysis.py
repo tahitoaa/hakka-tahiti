@@ -403,6 +403,49 @@ def bracketed(tokens, groups, tags):
     return text.replace(" ]", "]")
 
 
+def wrap_word_functions(tokens, groups, tags):
+    """La consigne « les fonctions aux groupes, jamais aux mots » appliquée à
+    une analyse : un nom ou un pronom (N, PRO et ce qui les précise) qui porte
+    lui-même une fonction devient un groupe nominal d'un seul mot,
+    [GN:sujet 佢/PRO], et le mot ne garde que sa catégorie. S'il est déjà seul
+    dans un groupe, la fonction passe à ce groupe.
+
+    Renvoie (tokens, groups, changés, laissés) : `changés` les indices des mots
+    repris, `laissés` [(indice, raison)] ceux qu'on ne touche pas (autre
+    catégorie, fonction différente déjà sur son groupe) — à revoir à la main.
+    Sans étiquette GN, rien n'est changé. Les listes reçues ne sont pas modifiées."""
+    gn = tags.find("GN", {GrammarTag.KIND_PHRASE})
+    nominal = set()
+    for code in ("N", "PRO"):
+        t = tags.find(code, {GrammarTag.KIND_CATEGORY})
+        if t:
+            nominal |= tags.below(t.id)
+    tokens = [dict(t) for t in tokens]
+    groups = [dict(g) for g in groups]
+    changed, left = [], []
+    if gn is None:
+        return tokens, groups, changed, [(i, "pas d'étiquette GN") for i, t in enumerate(tokens) if t.get("f")]
+    for i, t in enumerate(tokens):
+        if not t.get("f"):
+            continue
+        if t.get("c") not in nominal:
+            left.append((i, "ni nom ni pronom"))
+            continue
+        alone = next((g for g in groups if g["s"] == i and g["e"] == i + 1), None)
+        if alone is None:
+            groups.append({"s": i, "e": i + 1, "c": gn.id, "f": t["f"]})
+        elif alone.get("f") not in (None, t["f"]):
+            left.append((i, "son groupe a déjà une autre fonction"))
+            continue
+        else:
+            alone["f"] = t["f"]
+            alone["c"] = alone.get("c") or gn.id
+        t["f"] = None
+        changed.append(i)
+    groups.sort(key=lambda g: (g["s"], -g["e"]))
+    return tokens, groups, changed, left
+
+
 # ---- Le schéma d'une règle -----------------------------------------------------------------------
 
 def parse_pattern(pattern, tags):
@@ -717,8 +760,8 @@ def api_save_analysis(request):
 # ---- L'IA : une proposition d'analyse ------------------------------------------------------------
 
 AI_PROMPT = """You help a French-speaking linguist write a grammar of the Hakka spoken by the Chinese community of Tahiti (French Polynesia). You analyse one example sentence at a time, in two ways:
-- linear: the sentence's words in order, each with its word category, its syntactic function when it has one on its own, and a short French gloss;
-- constituents: the groups of neighbouring words (noun phrase, verb phrase, the whole sentence…), nested and never overlapping, each with its phrase category and its function.
+- linear: the sentence's words in order, each with its word category and a short French gloss (function: null — functions belong to groups);
+- constituents: the groups of neighbouring words (noun phrase, verb phrase, the whole sentence…), nested and never overlapping, each with its phrase category and its function. A word that fills a function on its own forms a one-word group: a pronoun or bare noun subject is a noun phrase of one word with the function "sujet" ([GN:sujet 佢/PRO]), never a word carrying the function itself.
 
 Use the linguist's own labels, given with their codes. Use a code only for its own kind (word category, phrase, function). Prefer an existing label whenever one fits, even roughly; propose a new one in new_tags only when none fits, with a short French name and a one-sentence French description saying what it covers. A new label's code is short (2 to 6 letters, French abbreviations like the existing ones).
 
@@ -858,6 +901,9 @@ def apply_proposal(data, tokens, tags):
         if not isinstance(check(out_tokens, candidate, tags), str):
             groups = candidate
     _tokens, groups = check(out_tokens, groups, tags)
+    # La consigne « les fonctions aux groupes » : un nom ou pronom que l'IA
+    # aurait laissé avec sa fonction devient un GN d'un mot.
+    out_tokens, groups, _changed, _left = wrap_word_functions(out_tokens, groups, tags)
     return {"tokens": out_tokens, "groups": groups, "new_tags": created, "tags": tags_json(),
             "explanation": _clean(data.get("explanation"), 1000),
             "confidence": data.get("confidence") if data.get("confidence") in ("haute", "moyenne", "basse") else "basse"}
