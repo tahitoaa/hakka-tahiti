@@ -387,3 +387,44 @@ class CorpusTests(TestCase):
         empty = GrammarRule.objects.create(title="Vide")
         with mock.patch.object(ai, "ai_enabled", return_value=True):
             self.assertEqual(self.post("grammar_rule_ai", id=empty.id, kind="learner").status_code, 400)
+
+
+# ---- Export au format d'échange tumu-kin (grammar_exchange.py) ---------------------------------------
+
+@unittest.skipUnless(SQLITE, "réglages de test (SQLite) seulement")
+class ExchangeTests(TestCase):
+    databases = {"default"} if SQLITE else set()
+
+    def test_export(self):
+        from .grammar_exchange import export_grammar
+        search_sources._cache.clear()
+        v = GrammarTag.objects.create(kind="category", code="V", name="verbe", equivalent="VERB")
+        GrammarTag.objects.create(kind="category", code="Vmvt", name="verbe de mouvement", parent=v)
+        neg = GrammarTag.objects.create(kind="category", code="NÉG", name="négation")
+        gv = GrammarTag.objects.create(kind="phrase", code="GV", name="groupe verbal")
+        chapter = GrammarRule.objects.create(title="La négation", position=0)
+        rule = GrammarRule.objects.create(title="Au présent", parent=chapter, pattern='"唔" + V', position=0)
+        addition = LexiconAddition.objects.create(kind="expression", status="review", hanzi="唔 來",
+                                                  pinyin="m2 loi2", french="ne pas venir")
+        GrammarExample.objects.create(rule=rule, target_type="addition", target_key=str(addition.id), focus="唔")
+        GrammarExample.objects.create(rule=rule, target_type="segment", target_key=f"{uuid.uuid4()}@5", label="佢唔去")
+        SentenceAnalysis.objects.create(target_type="addition", target_key=str(addition.id), text="唔來",
+                                        tokens=[{"t": "唔", "p": "m2", "c": neg.id, "f": None, "g": ""},
+                                                {"t": "來", "p": "loi2", "c": v.id, "f": None, "g": "venir"}],
+                                        groups=[{"s": 0, "e": 2, "c": gv.id, "f": None}])
+        data = export_grammar()
+        json.dumps(data)  # sérialisable tel quel
+        self.assertEqual((data["format"], data["version"], data["language"]), ("tumu-kin/grammaire", 1, "hak"))
+        tags = {t["code"]: t for t in data["tags"]}
+        self.assertEqual(tags["Vmvt"]["parent"], "V")
+        self.assertEqual(tags["V"]["equivalent"], "VERB")
+        self.assertEqual([r["title"] for r in data["rules"]], ["La négation", "Au présent"])
+        self.assertEqual(data["rules"][1]["parent"], data["rules"][0]["id"])
+        self.assertEqual(data["rules"][1]["examples"][0], {"sentence": f"addition:{addition.id}", "focus": "唔", "note": ""})
+        sentences = {s["id"]: s for s in data["sentences"]}
+        self.assertEqual(sentences[f"addition:{addition.id}"]["translation"], "ne pas venir")
+        missing = next(s for s in data["sentences"] if s["id"].startswith("segment:"))
+        self.assertEqual(missing["text"], "佢唔去")  # disparue : son texte du jour du lien
+        analysis = data["analyses"][0]
+        self.assertEqual([t["c"] for t in analysis["tokens"]], ["NÉG", "V"])
+        self.assertEqual(analysis["groups"], [{"s": 0, "e": 2, "c": "GV", "f": None}])
