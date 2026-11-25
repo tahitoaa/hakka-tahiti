@@ -213,7 +213,7 @@ test("a dictionary reading is shown in its own spelling when that's the display 
   context.Romanization.set("baoan");
   assert.equal(ka.displayPinyin(), "ka¹", "display system Bao'an: the dictionary's own spelling");
   context.Romanization.set("mciver");
-  assert.equal(ka.displayPinyin(), "ka¹", "display system McIver: Wenfa ga1 converted (McIver also writes ka)");
+  assert.equal(ka.displayPinyin(), "ka", "display system McIver: Wenfa ga1 converted, McIver's tone 1 has no accent");
 });
 
 // --- McIver index: same dictionary mode, another source ---------------------

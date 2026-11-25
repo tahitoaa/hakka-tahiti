@@ -45,7 +45,7 @@ from hakkadbapp.models import Pronunciation
 
 APP_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = APP_DIR / "static" / "hakkadbapp" / "data"
-SUPERSCRIPT = {"1": "¹", "2": "²", "3": "³", "5": "⁵", "7": "⁷", "8": "⁸"}
+SUPERSCRIPT = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸"}
 
 # One entry per dictionary of build_dict_index: its compact file, the system
 # written into romanization.json, and its initials (longest first) to split
@@ -68,6 +68,30 @@ SOURCES = {
         # apart from ts/tsh/s/ng as McIver writes them.
         "initials": ["tsh", "chh", "ts", "ch", "sh", "kh", "ph", "th", "ng", "ny",
                      "p", "m", "f", "v", "t", "n", "l", "k", "h", "s", "j", "y", "w"],
+        # Ses tons en accents (build_dict_index) : 1 et 7 sans accent, 2 circonflexe,
+        # 3 aigu, 5 grave, 8 aigu ; sur la 1re voyelle (sauf i- médian).
+        "tone_marks": {"1": "", "2": "̂", "3": "́", "5": "̀", "7": "", "8": "́"},
+        "tone_mark_on": "main",
+    },
+    "rey": {
+        "db": True,
+        "label": "Rey",
+        "source": "Charles Rey, Dictionnaire chinois-français, dialecte hac-ka (1926) -- mapping déduit automatiquement "
+                  "des pages lues (ReyPage)",
+        "name": "pages lues de Rey 1926",
+        # Romanisation française : tch = zh, ch = sh, ts' = c, gn = ng(i), -c = -k, ou = u.
+        "initials": ["tch'", "tch", "ts'", "ts", "tj", "tz", "ch", "gn", "ng", "k'", "p'", "t'",
+                     "k", "p", "t", "m", "n", "l", "s", "h", "f", "v", "y"],
+        # Ses tons en accents (source_rules.REY_TONES), sur la dernière voyelle.
+        "tone_marks": {"1": "̄", "2": "̂", "3": "̀", "4": "́", "5": "̆", "6": "̑"},
+        "tone_mark_on": "last",
+        # Corrections à la main du vote :
+        # - Wenfa 5 (yinru) vote pour le circonflexe (2) : l'IA lit l'accent
+        #   circonflexe renversé de Rey (6) comme un circonflexe ; Wenfa 6 -> 5 (brève).
+        # - c est l'aspirée de z, comme q : ts' ; em, en, iet, io : votes trop
+        #   faibles (1 ou 2 caractères, ou moins d'un tiers), gardés tels quels.
+        "fixes": {"tones": {"5": "6"}, "initials": {"c": "ts'"},
+                  "finals": {"em": "em", "en": "en", "iet": "iet", "io": "io"}},
     },
 }
 MIN_OVERRIDE_SUPPORT = 2     # characters needed before a syllable override is created
@@ -122,6 +146,9 @@ class Command(BaseCommand):
         maps = self.vote(pairs)
         self.stdout.write(f"Étape 2 : {len(pairs)} paires lecture-à-lecture (polyphones inclus).")
 
+        for key, fixed in self.spec.get("fixes", {}).items():
+            maps[key].update(fixed)
+
         # Steps 3-5: whole-syllable overrides, then attested spellings for input.
         maps["syllables"] = self.overrides(pairs, maps)
         maps["input_syllables"] = self.input_syllables(pairs, maps)
@@ -162,6 +189,12 @@ class Command(BaseCommand):
         return {c: sorted(r) for c, r in readings.items()}
 
     def load_source(self):
+        if self.spec.get("db"):
+            # Pages de Rey lues : {caractère simplifié: [(syllabe, ton, pages, rare)]} ;
+            # les lectures vues une seule fois (« rare ») ne votent pas.
+            from hakkadbapp.source_rules import _load_rey
+            return {c: sorted({(s, t) for s, t, _p, low in r if not low and t})
+                    for c, r in _load_rey().items() if any(not low and t for _s, t, _p, low in r)}
         data = json.loads((DATA_DIR / self.spec["file"]).read_text(encoding="utf-8"))
         readings = defaultdict(set)
         for row in data["prons"]:
@@ -291,6 +324,8 @@ class Command(BaseCommand):
             "syllables": maps["syllables"],
             "input_tones": input_tones,
             "input_syllables": maps["input_syllables"],
+            **({"tone_marks": {t: self.spec["tone_marks"].get(bt, "") for t, bt in sorted(maps["tones"].items())},
+                "tone_mark_on": self.spec.get("tone_mark_on", "main")} if self.spec.get("tone_marks") else {}),
         }
 
     # -- output -----------------------------------------------------------

@@ -113,8 +113,10 @@ test("McIver: ng before non-i finals stays ng (ngai2 = 我), ny before i, both t
   const { Romanization } = load();
   assert.ok(has(Romanization.toStored("ngai2", "mciver"), "ng", "ai", "2"));
   assert.ok(has(Romanization.toStored("nyin2", "mciver"), "ng", "in", "2"));
-  assert.equal(Romanization.convert("ng", "ai", "2", "mciver"), "ngai²");
-  assert.equal(Romanization.convert("ng", "in", "2", "mciver"), "nyin²");
+  assert.equal(Romanization.convert("ng", "ai", "2", "mciver"), "ngâi");
+  assert.equal(Romanization.convert("ng", "in", "2", "mciver"), "nyîn");
+  assert.equal(Romanization.sourceSpelling("kai", "5", "mciver"), "kài", "McIver's own reading, with its accent");
+  assert.equal(Romanization.sourceSpelling("kai", "5", "baoan"), null, "Bao'an keeps its digits");
 });
 
 test("McIver: attested spellings outside the mapping are typable (chi1 finds Wenfa ji1)", () => {

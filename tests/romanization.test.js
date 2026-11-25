@@ -188,3 +188,22 @@ test("fromPinyin() keeps a «…» block as written", () => {
   const R = loadRomanization(MINI);
   assert.equal(R.fromPinyin("ba1 «ba ma'a»", "b"), "pɑ˥ «ba ma'a»");
 });
+
+test("tone_marks: the tone as an accent on the vowel (McIver: main vowel, Rey: last one)", () => {
+  const R = loadRomanization({
+    default_system: "a",
+    tones: { "1": "¹", "2": "²", "": "" },
+    systems: [
+      { id: "a", label: "A", initials: {}, finals: {} },
+      { id: "m", label: "M", tone_marks: { "1": "", "2": "́" }, tone_mark_on: "main", initials: {}, finals: {} },
+      { id: "r", label: "R", tone_marks: { "1": "̄", "2": "̂" }, tone_mark_on: "last", initials: {}, finals: {} },
+    ],
+  });
+  assert.equal(R.convert("k", "ai", "2", "m"), "kái");
+  assert.equal(R.convert("p", "iang", "2", "m"), "piáng");
+  assert.equal(R.convert("k", "ai", "1", "m"), "kai");
+  assert.equal(R.convert("k", "ai", "2", "r"), "kaî");
+  assert.equal(R.convert("y", "a", "1", "r"), "yā");
+  assert.equal(R.convert("ng", "", "2", "m"), "ńg");
+  assert.equal(R.convert("k", "ai", "", "r"), "kai");
+});

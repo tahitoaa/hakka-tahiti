@@ -16,7 +16,9 @@ from django.utils.html import format_html_join
 
 CONFIG_PATH = Path(__file__).with_name("romanization.json")
 
-_SYSTEM_KEYS = {"id", "label", "source", "initials", "finals", "tones", "rules", "syllables", "input_tones", "input_syllables"}
+_SYSTEM_KEYS = {"id", "label", "source", "initials", "finals", "tones", "rules", "syllables", "input_tones", "input_syllables",
+                "tone_marks", "tone_mark_on"}
+_MARK_MODES = ("main", "last")
 _WHEN_KEYS = {"initial", "final", "final_startswith", "final_not"}
 _THEN_KEYS = {"initial", "final"}
 
@@ -64,7 +66,12 @@ def validate(config):
             fail(where, f"clé(s) inconnue(s) {sorted(unknown)}")
         if not system.get("label"):
             fail(where, "'label' manquant")
-        for key in ("initials", "finals", "tones", "syllables"):
+        if system.get("tone_mark_on", "main") not in _MARK_MODES:
+            fail(f"{where}.tone_mark_on", f"doit valoir {' ou '.join(_MARK_MODES)}")
+        for k, v in _public(system.get("tone_marks", {})).items():
+            if not isinstance(v, str) or any(not unicodedata.combining(c) for c in v):
+                fail(f"{where}.tone_marks['{k}']", "doit être un accent combinant (ex. \"\u0301\"), ou \"\" pour aucun")
+        for key in ("initials", "finals", "tones", "syllables", "tone_marks"):
             table = system.get(key, {})
             if not isinstance(table, dict):
                 fail(f"{where}.{key}", "doit être un objet")
@@ -173,9 +180,40 @@ def _matches(when, initial, final):
     return True
 
 
-def romanize(initial, final, tone="", system_id=None):
+_MARK_VOWELS = {"main": "aeiouṳ", "last": "aeiouyṳ"}
+
+
+def place_tone_mark(syllable, mark, mode="main"):
+    """Puts the combining `mark` on the syllable's vowel, as the old
+    dictionaries write their tones (McIver kài, Rey yŏc):
+    - "main" (McIver): the first vowel of the first group of vowels, except a
+      medial i- before another vowel (piáng, chhiú, shûi, kài);
+    - "last" (Rey, y counted as a vowel): the last vowel of that group
+      (haî, tch'aô, tchoūng, yā).
+    No vowel (m, ng): on the first letter. Same algorithm as Romanization.js."""
+    if not mark or not syllable:
+        return syllable
+    vowels = _MARK_VOWELS.get(mode, _MARK_VOWELS["main"])
+    start = next((n for n, c in enumerate(syllable) if c in vowels), None)
+    if start is None:
+        at = 0
+    else:
+        end = start
+        while end + 1 < len(syllable) and syllable[end + 1] in vowels:
+            end += 1
+        if mode == "last":
+            at = end
+        else:
+            at = start + 1 if end > start and syllable[start] == "i" else start
+    return unicodedata.normalize("NFC", syllable[:at + 1] + mark + syllable[at + 1:])
+
+
+def romanize(initial, final, tone="", system_id=None, marks=True):
     """One stored syllable (Wenfa initial/final/tone) -> display string in
-    `system_id`. Algorithm documented in romanization.json's `_readme`."""
+    `system_id`. Algorithm documented in romanization.json's `_readme`.
+    A system with `tone_marks` writes the tone as an accent on the vowel;
+    marks=False gives its tone digit instead (to sit next to the
+    dictionary's own readings, which are stored with digits)."""
     system = get_system(system_id)
     initial = initial or ""
     final = final or ""
@@ -183,18 +221,21 @@ def romanize(initial, final, tone="", system_id=None):
 
     tones = {**_public(load_config().get("tones", {})), **_public(system.get("tones", {}))}
     tone_str = tones.get(tone, tone)
+    tone_marks = _public(system.get("tone_marks", {}))
+    with_mark = marks and tone in tone_marks
 
     syllable = _public(system.get("syllables", {})).get(f"{initial}+{final}")
-    if syllable is not None:
-        return syllable + tone_str
-
-    out_i = system.get("initials", {}).get(initial, initial)
-    out_f = system.get("finals", {}).get(final, final)
-    for rule in system.get("rules", []):
-        if _matches(rule["when"], initial, final):
-            out_i = rule["then"].get("initial", out_i)
-            out_f = rule["then"].get("final", out_f)
-    return out_i + out_f + tone_str
+    if syllable is None:
+        out_i = system.get("initials", {}).get(initial, initial)
+        out_f = system.get("finals", {}).get(final, final)
+        for rule in system.get("rules", []):
+            if _matches(rule["when"], initial, final):
+                out_i = rule["then"].get("initial", out_i)
+                out_f = rule["then"].get("final", out_f)
+        syllable = out_i + out_f
+    if with_mark:
+        return place_tone_mark(syllable, tone_marks[tone], system.get("tone_mark_on", "main"))
+    return syllable + tone_str
 
 
 def romanize_all_html(initial, final, tone=""):

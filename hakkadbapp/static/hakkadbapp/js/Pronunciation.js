@@ -149,7 +149,8 @@ class SourcePronunciation extends Pronunciation {
     displayPinyin() {
         const R = typeof Romanization !== 'undefined' && Romanization.systems().length ? Romanization : null;
         const stored = this.storedReading();
-        if (!R || !stored || R.current() === this.system) return this.abstractPinyin();
+        if (R && R.current() === this.system) return R.sourceSpelling(this.initial, this.tone, this.system) ?? this.abstractPinyin();
+        if (!R || !stored) return this.abstractPinyin();
         return Pronunciation.format(stored.initial, stored.final, stored.tone);
     }
 

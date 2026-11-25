@@ -105,7 +105,7 @@ def compare_char(char, wenfa_readings):
         entry = {**source, "readings": [], "per_wenfa": [], "expected": []}
         # What the mapping predicts for each Wenfa reading, in the source's spelling.
         for i, f, t in wenfa_readings:
-            entry["expected"].append(romanization.romanize(i, f, t, source["system"]))
+            entry["expected"].append(romanization.romanize(i, f, t, source["system"], marks=False))
         if not readings:
             entry["status"] = "absent"
             entry["per_wenfa"] = ["absent"] * len(wenfa_readings)

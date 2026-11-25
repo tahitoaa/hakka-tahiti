@@ -16,6 +16,10 @@
     "     Conditions possibles (toutes doivent être vraies) : initial, final (liste ou",
     "     valeur), final_startswith (préfixe ou liste), final_not (liste).",
     "  4. enfin le ton : tones[T] (le 'tones' du système, sinon celui du haut du fichier).",
+    "     Avec 'tone_marks' (ex. McIver, Rey), le ton s'écrit plutôt en accent sur la voyelle :",
+    "     tone_marks[T] (accent combinant, \"\" = sans accent) ; 'tone_mark_on' dit où :",
+    "     \"main\" = 1re voyelle, sauf un i- médian (piáng, kài), \"last\" = dernière voyelle",
+    "     du groupe, y compris y (haî, tchoūng, yā). Les chiffres de 'tones' servent à la saisie.",
     "",
     "Saisie dans un autre système (menu « Saisie en… » d'Écrire / Transcrire) : la conversion",
     "est inversée automatiquement à partir des tables ci-dessus. 'input_tones' (facultatif)",
@@ -197,7 +201,11 @@
         "tshon": ["ch+on"], "tshong": ["ch+ong"], "tshung": ["ch+ung"], "tsi": ["j+i"], "tsin": ["j+in"],
         "tsui": ["z+oi"], "tsun": ["zh+un"], "tsṳ": ["k+io", "z+u"], "yok": ["ng+ia"], "yong": ["n+iong"],
         "yu": ["l+uk"]
-      }
+      },
+      "tone_marks": {
+        "1": "", "2": "̂", "3": "́", "4": "̀", "5": "", "6": "́"
+      },
+      "tone_mark_on": "main"
     },
 
     {
@@ -241,6 +249,66 @@
         "t'ui": ["d+ui"], "tang": ["t+in"], "ts'ak": ["l+ak"], "ts'ap": ["z+ap"], "ts'i": ["j+i"],
         "ts'iam": ["j+iam"], "tsat": ["z+ak"], "tset": ["z+ap"], "tsi": ["sh+it"], "tsiu": ["ch+eu"]
       }
+    },
+
+    {
+      "id": "rey",
+      "label": "Rey",
+      "source": "Charles Rey, Dictionnaire chinois-français, dialecte hac-ka (1926) -- mapping déduit automatiquement des pages lues (ReyPage)",
+      "_comment": "GÉNÉRÉ par `manage.py derive_source_mapping rey` à partir de 588 paires de lectures (lexique Wenfa x pages lues de Rey 1926). Les tons sont lexicaux : le ton 4 Wenfa correspond à ⁵ ou ³ selon le caractère, d'où des erreurs inévitables (voir le rapport).",
+      "initials": {
+        "": "", "b": "p", "c": "ts'", "ch": "tch'", "d": "t", "f": "f", "g": "k", "h": "h", "j": "ts",
+        "k": "k'", "l": "l", "m": "m", "n": "n", "ng": "ng", "p": "p'", "q": "ts'", "s": "s", "sh": "ch",
+        "t": "t'", "w": "v", "x": "s", "y": "y", "z": "ts", "zh": "tch"
+      },
+      "finals": {
+        "": "", "a": "a", "ai": "ai", "ak": "ac", "am": "am", "an": "an", "ang": "ang", "ao": "ao",
+        "ap": "ap", "at": "at", "e": "e", "ei": "ei", "em": "em", "en": "en", "ep": "ep", "et": "et",
+        "eu": "eou", "i": "i", "ia": "ia", "iak": "iak", "iam": "iam", "iang": "iang", "iao": "iao",
+        "iap": "iap", "ien": "ien", "iet": "iet", "im": "im", "in": "in", "io": "io", "iok": "ioc",
+        "iong": "iong", "ip": "ip", "it": "it", "iu": "iou", "iuk": "iouc", "iun": "ioun", "iung": "ioung",
+        "o": "o", "oi": "oi", "ok": "oc", "on": "on", "ong": "ong", "ot": "ot", "u": "ou", "ui": "oui",
+        "uk": "ouc", "un": "oun", "ung": "oung", "uo": "ouo", "uong": "uong", "ut": "out", "ü": "e"
+      },
+      "tones": {
+        "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁶", "6": "⁵", "": ""
+      },
+      "rules": [],
+      "syllables": {
+        "ch+a": "ts'a", "ch+o": "ts'o", "g+ai": "kiai", "g+on": "kouon", "j+in": "tchin", "l+iong": "leong",
+        "m+ui": "mi", "ng+i": "gni", "ng+in": "gnin", "ng+iun": "nioun", "s+en": "chin", "sh+i": "che",
+        "w+ui": "vi", "y+en": "yan", "y+i": "y", "y+in": "yn", "z+u": "tchou", "z+ung": "tchoung"
+      },
+      "input_tones": {
+        "1": ["1"], "2": ["2", "5"], "3": ["3"], "4": ["4"], "5": ["5", "6"]
+      },
+      "input_syllables": {
+        "cham": ["s+ap"], "chan": ["sh+en"], "chao": ["s+ao"], "chat": ["s+et"], "chin": ["sh+ang"],
+        "choe": ["sh+oi"], "chou": ["s+u"], "choun": ["s+un"], "gnet": ["ng+iet"], "gnip": ["ng+ip"],
+        "gnit": ["ng+it"], "hiet": ["h+et"], "hong": ["s+ong"], "k'at": ["g+at", "k+em"], "k'ian": ["k+ien"],
+        "k'io": ["k+eu"], "k'ouai": ["k+ai"], "k'out": ["f+ut"], "ka": ["k+io"], "kang": ["b+un", "g+ong"],
+        "ki": ["g+it"], "kian": ["g+an", "g+ien"], "kiang": ["h+am"], "kiap": ["g+ap"], "kin": ["g+ien"],
+        "kon": ["g+on", "g+un"], "koua": ["g+a"], "kouan": ["g+an"], "kouet": ["g+et"], "kouong": ["g+ong"],
+        "leou": ["l+iu"], "lien": ["m+en"], "lin": ["l+ang"], "liouc": ["l+uk"], "lioung": ["l+ung"],
+        "lo": ["l+u"], "mac": ["l+a"], "met": ["m+i", "m+it"], "moc": ["m+o"],
+        "moe": ["m+en", "m+oi", "m+ui"], "nan": ["l+an"], "nao": ["l+ao"], "nem": ["l+em"], "nen": ["l+en"],
+        "ng": ["ng+i"], "ngoe": ["ng+oi"], "nian": ["ng+an", "ng+ien"], "niao": ["ng+iao", "w+u"],
+        "niong": ["l+iong"], "niou": ["ng+iu"], "niouc": ["ng+iuk"], "no": ["l+o"], "p'a": ["m+ak"],
+        "p'ien": ["p+en"], "p'iet": ["p+et"], "p'oi": ["b+oi"], "p'ou": ["b+u"], "pan": ["m+en"],
+        "pi": ["b+ui"], "pien": ["b+en"], "pou": ["m+u"], "sang": ["s+en"], "si": ["g+a"], "siet": ["s+et"],
+        "sot": ["ch+at"], "t'ao": ["d+ao"], "t'i": ["d+i", "t+ai"], "t'ien": ["t+en"], "tch'a": ["ch+a"],
+        "tch'im": ["q+im"], "tch'oc": ["z+ok"], "tch'ou": ["sh+u"], "tcha": ["z+a"], "tchac": ["z+ak"],
+        "tchang": ["z+ang"], "tchao": ["z+ao"], "tche": ["j+i"], "tchip": ["j+ip"], "tchon": ["z+on"],
+        "tchong": ["z+ong"], "tchoui": ["t+ui"], "ten": ["t+en"], "teou": ["g+ao"], "tje": ["j+i", "z+ü"],
+        "ts'en": ["ch+en"], "ts'oc": ["ch+am"], "ts'on": ["ch+on"], "ts'ong": ["ch+ong"],
+        "ts'oung": ["ch+ung"], "tsap": ["z+ak"], "tse": ["c+ü"], "tsin": ["j+in"], "tsoc": ["z+uk"],
+        "tsoui": ["z+oi"], "tze": ["z+ai", "z+u"], "voe": ["w+oi"], "vou": ["m+o"], "vouon": ["w+on"],
+        "ym": ["y+im"], "yoc": ["ng+ia"], "yt": ["y+it"]
+      },
+      "tone_marks": {
+        "1": "̄", "2": "̂", "3": "̀", "4": "́", "5": "̑", "6": "̆"
+      },
+      "tone_mark_on": "last"
     }
   ]
 }
