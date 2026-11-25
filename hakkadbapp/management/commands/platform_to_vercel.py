@@ -7,7 +7,10 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from openpyxl import Workbook
 
-from hakkadbapp.management.commands.export import find_latest_dated_corpus_dir
+# Not export.py's own copy: importing export.py loads fonts from a fixed
+# path at import time, which crashes on the deployed site, and the page
+# « Analyse du lexique » runs this import too (platform_upload.py).
+from hakkadbapp.expression_mesh import find_latest_dated_corpus_dir
 from hakkadbapp.management.commands.import_expressions_v2 import import_expressions_from_df
 from hakkadbapp.management.commands.import_words_v2 import import_words_from_df
 
@@ -179,6 +182,68 @@ def write_sheet(workbook, sheet_name, headers, rows):
         sheet.append([row.get(h, "") for h in headers])
 
 
+def build_rows(words, expressions, themes):
+    """(word rows, expression rows) in the GONG HAKKA sheet layout, each
+    with its platform_id, from the platform's three corpus dicts."""
+    theme_map = {
+        theme_id: (payload.get("translations", {}) or {}).get("primary", theme_id)
+        for theme_id, payload in themes.items()
+    }
+
+    # word_row/expression_row don't see the dict key themselves -- stashed
+    # onto the row right after, as "platform_id", so it survives the sort
+    # below and rides along into the DataFrame handed to the importer.
+    word_rows = []
+    for platform_id, payload in words.items():
+        row = word_row(payload, theme_map)
+        row["platform_id"] = platform_id
+        word_rows.append(row)
+    word_rows.sort(key=lambda r: r["SINOGRAMME"])
+
+    known_word_pinyin = known_word_pinyin_map(words)
+    expression_rows = []
+    for platform_id, payload in expressions.items():
+        row = expression_row(payload, theme_map, known_word_pinyin)
+        row["platform_id"] = platform_id
+        expression_rows.append(row)
+    expression_rows.sort(key=lambda r: r["SINOGRAMME"])
+
+    return word_rows, expression_rows
+
+
+def run_import(words, expressions, themes, source, rows=None):
+    """Wipes and rebuilds Word/Expression/Pronunciation from the platform's
+    corpus dicts, in one transaction, and stores the snapshot on a Traces
+    row (platform_data). `source`: where the corpus came from (a folder, a
+    zip's name). Used by the command (--yes) and by the page « Analyse du
+    lexique » (platform_upload.py)."""
+    word_rows, expression_rows = rows or build_rows(words, expressions, themes)
+    words_df = pd.DataFrame(word_rows, columns=MOTS_HEADERS + ["platform_id"])
+    expressions_df = pd.DataFrame(expression_rows, columns=EXPRESSIONS_HEADERS + ["platform_id"])
+
+    # Stashed on the Traces row created below so any deployed view can
+    # query the exact platform snapshot this import ran against -- e_reo_json/
+    # itself only exists on a developer's machine, never on Vercel.
+    platform_data = {"corpus_dir": str(source), "words": words, "expressions": expressions, "themes": themes}
+
+    with transaction.atomic():
+        # Remarks and AI settings on lexicon items (ReviewComment,
+        # AITarget) point at Word/Expression pks, which the reset
+        # renumbers: remember each one's platform_id, re-point after.
+        pinned = Command.lexicon_targets()
+        word_result = import_words_from_df(
+            words_df, reset=True, traces_details=f"Source: platform_to_vercel ({source})",
+            platform_data=platform_data,
+        )
+        expression_result = import_expressions_from_df(expressions_df, reset=True)
+        moved, orphaned = Command.repoint_lexicon_targets(pinned)
+    return {
+        "words": word_result["rows_imported"], "pronunciations": word_result["pronunciations"],
+        "expressions": expression_result["rows_imported"], "moved": moved, "orphaned": orphaned,
+        "word_logs": list(word_result["logs"]), "unknown_tokens": list(expression_result["unknown_tokens"]),
+    }
+
+
 class Command(BaseCommand):
     help = (
         "Read a platform reference corpus (../e_reo_json/<dd_mm_yyyy>/ -- "
@@ -274,28 +339,7 @@ class Command(BaseCommand):
         expressions = self.load_json(corpus_dir / "expressionCorpus.json")
         themes = self.load_json(corpus_dir / "themeCorpus.json")
 
-        theme_map = {
-            theme_id: (payload.get("translations", {}) or {}).get("primary", theme_id)
-            for theme_id, payload in themes.items()
-        }
-
-        # word_row/expression_row don't see the dict key themselves -- stashed
-        # onto the row right after, as "platform_id", so it survives the sort
-        # below and rides along into the DataFrame handed to the importer.
-        word_rows = []
-        for platform_id, payload in words.items():
-            row = word_row(payload, theme_map)
-            row["platform_id"] = platform_id
-            word_rows.append(row)
-        word_rows.sort(key=lambda r: r["SINOGRAMME"])
-
-        known_word_pinyin = known_word_pinyin_map(words)
-        expression_rows = []
-        for platform_id, payload in expressions.items():
-            row = expression_row(payload, theme_map, known_word_pinyin)
-            row["platform_id"] = platform_id
-            expression_rows.append(row)
-        expression_rows.sort(key=lambda r: r["SINOGRAMME"])
+        word_rows, expression_rows = build_rows(words, expressions, themes)
 
         # Written unconditionally: an audit trail of exactly what will be (or
         # would have been) imported, in the same shape a human reviewing the
@@ -335,50 +379,26 @@ class Command(BaseCommand):
         # docstring), and a plain-identifier extra column doesn't disturb
         # parse_words_df/normalize_expressions_df's positional access to the
         # other (non-identifier) header names via itertuples/iterrows.
-        words_df = pd.DataFrame(word_rows, columns=MOTS_HEADERS + ["platform_id"])
-        expressions_df = pd.DataFrame(expression_rows, columns=EXPRESSIONS_HEADERS + ["platform_id"])
-
         self.stdout.write(self.style.WARNING(
             "Importing into the Vercel DB -- Word/Expression/Pronunciation tables will be wiped and rebuilt."
         ))
-        # Stashed on the Traces row created below so any deployed view can
-        # query the exact platform snapshot this import ran against -- e_reo_json/
-        # itself only exists on a developer's machine, never on Vercel.
-        platform_data = {
-            "corpus_dir": str(corpus_dir),
-            "words": words,
-            "expressions": expressions,
-            "themes": themes,
-        }
-
-        with transaction.atomic():
-            # Remarks and AI settings on lexicon items (ReviewComment,
-            # AITarget) point at Word/Expression pks, which the reset
-            # renumbers: remember each one's platform_id, re-point after.
-            pinned = self.lexicon_targets()
-            word_result = import_words_from_df(
-                words_df, reset=True, traces_details=f"Source: platform_to_vercel ({corpus_dir})",
-                platform_data=platform_data,
-            )
-            expression_result = import_expressions_from_df(expressions_df, reset=True)
-            moved, orphaned = self.repoint_lexicon_targets(pinned)
+        result = run_import(words, expressions, themes, str(corpus_dir), rows=(word_rows, expression_rows))
         self.stdout.write(self.style.SUCCESS(
-            f"Remarques / réglages IA du lexique rattachés : {moved} ; sans mot correspondant (laissés tels quels) : {orphaned}"
+            f"Remarques / réglages IA du lexique rattachés : {result['moved']} ; sans mot correspondant (laissés tels quels) : {result['orphaned']}"
         ))
-
         self.stdout.write(self.style.SUCCESS(
-            f"Words imported: {word_result['rows_imported']} | Pronunciations: {word_result['pronunciations']}"
+            f"Words imported: {result['words']} | Pronunciations: {result['pronunciations']}"
         ))
-        self.stdout.write(self.style.SUCCESS(f"Expressions imported: {expression_result['rows_imported']}"))
+        self.stdout.write(self.style.SUCCESS(f"Expressions imported: {result['expressions']}"))
 
-        if word_result["logs"]:
+        if result["word_logs"]:
             self.stdout.write(self.style.WARNING("Word import errors/skips:"))
-            for line in word_result["logs"]:
+            for line in result["word_logs"]:
                 self.stdout.write(line)
 
-        if expression_result["unknown_tokens"]:
+        if result["unknown_tokens"]:
             self.stdout.write(self.style.WARNING("Unknown tokens in expressions:"))
-            for line in expression_result["unknown_tokens"]:
+            for line in result["unknown_tokens"]:
                 self.stdout.write(line)
 
     @staticmethod
