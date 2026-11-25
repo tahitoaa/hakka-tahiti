@@ -67,6 +67,41 @@ var Romanization = (function () {
         return true;
     }
 
+    var MARK_VOWELS = { main: 'aeiouṳ', last: 'aeiouyṳ' };
+
+    /** The combining `mark` on the syllable's vowel (McIver kài, Rey yŏc).
+     *  Mirrors romanization.place_tone_mark(). */
+    function placeToneMark(syllable, mark, mode) {
+        if (!mark || !syllable) return syllable;
+        var vowels = MARK_VOWELS[mode] || MARK_VOWELS.main;
+        var start = -1;
+        for (var n = 0; n < syllable.length; n++) {
+            if (vowels.indexOf(syllable.charAt(n)) !== -1) { start = n; break; }
+        }
+        var at = 0;
+        if (start !== -1) {
+            var end = start;
+            while (end + 1 < syllable.length && vowels.indexOf(syllable.charAt(end + 1)) !== -1) end++;
+            if (mode === 'last') at = end;
+            else at = end > start && syllable.charAt(start) === 'i' ? start + 1 : start;
+        }
+        return (syllable.slice(0, at + 1) + mark + syllable.slice(at + 1)).normalize('NFC');
+    }
+
+    /** A reading spelled in `systemId` itself (a dictionary's own reading,
+     *  tone as its digit) -> written with that system's tone accents, or
+     *  null when the system has no tone_marks (its digit is kept). */
+    function sourceSpelling(syllable, tone, systemId) {
+        var system = getSystem(systemId);
+        var marks = pub(system && system.tone_marks);
+        if (!Object.keys(marks).length) return null;
+        var stored = exactStoredTones(String(tone || ''), systemId).filter(function (t) {
+            return Object.prototype.hasOwnProperty.call(marks, t);
+        })[0];
+        if (stored === undefined) return tone ? null : syllable;
+        return placeToneMark(syllable, marks[stored], system.tone_mark_on || 'main');
+    }
+
     /** One stored syllable -> display string. Mirrors romanization.romanize(). */
     function convert(initial, final, tone, systemId) {
         initial = initial || '';
@@ -77,21 +112,28 @@ var Romanization = (function () {
 
         var tones = Object.assign({}, pub(config.tones), pub(system.tones));
         var toneStr = Object.prototype.hasOwnProperty.call(tones, tone) ? tones[tone] : tone;
+        var marks = pub(system.tone_marks);
+        var withMark = Object.prototype.hasOwnProperty.call(marks, tone);
 
         var syllables = pub(system.syllables);
         var key = initial + '+' + final;
-        if (Object.prototype.hasOwnProperty.call(syllables, key)) return syllables[key] + toneStr;
-
-        var initials = system.initials || {};
-        var finals = system.finals || {};
-        var outI = Object.prototype.hasOwnProperty.call(initials, initial) ? initials[initial] : initial;
-        var outF = Object.prototype.hasOwnProperty.call(finals, final) ? finals[final] : final;
-        (system.rules || []).forEach(function (rule) {
-            if (!matches(rule.when, initial, final)) return;
-            if (rule.then.initial !== undefined) outI = rule.then.initial;
-            if (rule.then.final !== undefined) outF = rule.then.final;
-        });
-        return outI + outF + toneStr;
+        var syllable;
+        if (Object.prototype.hasOwnProperty.call(syllables, key)) {
+            syllable = syllables[key];
+        } else {
+            var initials = system.initials || {};
+            var finals = system.finals || {};
+            var outI = Object.prototype.hasOwnProperty.call(initials, initial) ? initials[initial] : initial;
+            var outF = Object.prototype.hasOwnProperty.call(finals, final) ? finals[final] : final;
+            (system.rules || []).forEach(function (rule) {
+                if (!matches(rule.when, initial, final)) return;
+                if (rule.then.initial !== undefined) outI = rule.then.initial;
+                if (rule.then.final !== undefined) outF = rule.then.final;
+            });
+            syllable = outI + outF;
+        }
+        if (withMark) return placeToneMark(syllable, marks[tone], system.tone_mark_on || 'main');
+        return syllable + toneStr;
     }
 
     function getInventory() {
@@ -415,6 +457,8 @@ var Romanization = (function () {
         systems: function () { return config ? config.systems : []; },
         version: function () { return config ? config._version : ''; },
         convert: convert,
+        placeToneMark: placeToneMark,
+        sourceSpelling: sourceSpelling,
         splitSyllable: splitSyllable,
         fromPinyin: fromPinyin,
         refresh: refresh,
