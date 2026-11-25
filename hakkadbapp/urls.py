@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from . import ask_ai
-from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, grammar, grammar_analysis, grammar_corpus, grammar_import, hakkadict, importer, platform_corrections, recordings, rey, search_sources, sources, surprising_readings, visas
+from . import addition_duplicates, addition_merge, additions, ai, assistant, char_review, grammar, grammar_analysis, grammar_corpus, grammar_import, hakkadict, importer, platform_corrections, recordings, recordings_package, rey, search_sources, sources, surprising_readings, visas
 # urls.py
 from django.urls import path, re_path
 from django.contrib.auth import views as auth_views
@@ -108,6 +108,7 @@ urlpatterns = [
     path("corrections-ereo/", platform_corrections.page, name="platform_corrections"),
     path("api/corrections-ereo", platform_corrections.api, name="api_platform_corrections"),
     path("a-enregistrer/", recordings.page, name="recordings"),
+    path("api/a-enregistrer/paquet", recordings_package.package, name="recordings_package"),
     path("api/ajouts/", additions.additions_api, name="additions_api"),
     path("api/ajouts/lot", additions.additions_bulk, name="additions_bulk"),
     path("api/ajouts/caracteres", char_review.api_characters, name="additions_characters"),
