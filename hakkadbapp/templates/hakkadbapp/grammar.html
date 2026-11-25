@@ -64,7 +64,7 @@
   .gr-parts { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.3rem; align-items: center; }
   .gr-part { font-size: 0.75rem; padding: 0.05rem 0.45rem; border-radius: 9999px; border: 1px solid #DDD0BD; background: #FBF6EE; }
   .gr-part.is-tag { background: #EEF4FB; border-color: #BFD3EA; color: #1E4E8C; }
-  .gr-part.is-word, .gr-part.is-reading { background: #fef3c7; border-color: #F0D78A; }
+  .gr-part.is-word, .gr-part.is-quoted, .gr-part.is-reading { background: #fef3c7; border-color: #F0D78A; }
   .gr-part.is-unknown { background: #fff; border-style: dashed; border-color: #9B1C1C; color: #9B1C1C; }
   .gr-part.is-opt { opacity: 0.75; font-style: italic; }
   .gr-codes { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.3rem; }
@@ -321,7 +321,7 @@
   function patternParts(rule) {
     const parts = rule.pattern_parts || [];
     if (!parts.length) return '';
-    const label = { tag: 'étiquette', word: 'ce mot', reading: 'cette lecture', any: "n'importe quels mots", unknown: "inconnu : créez l'étiquette ou corrigez" };
+    const label = { tag: 'étiquette', word: 'ce mot', quoted: 'ce mot', reading: 'cette lecture', any: "n'importe quels mots", unknown: "inconnu : créez l'étiquette ou corrigez" };
     return `<div class="gr-parts"><span class="gr-meta">Lu :</span>${parts.map((p) =>
       `<span class="gr-part is-${p.kind}${p.optional ? ' is-opt' : ''}" title="${esc(label[p.kind])}${p.optional ? ' (facultatif)' : ''}">${esc(p.kind === 'tag' ? p.codes.join(' ou ') : p.text)}${p.kind === 'unknown' ? ' ?' : ''}</span>`).join('<span class="gr-meta">+</span>')}</div>`;
   }

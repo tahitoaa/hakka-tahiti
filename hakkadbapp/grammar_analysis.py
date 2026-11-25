@@ -28,6 +28,7 @@ Privé : le propriétaire du site seulement (owner_required).
 import json
 import logging
 import re
+import unicodedata
 from collections import Counter, defaultdict
 
 from django.db import transaction
@@ -407,11 +408,13 @@ def bracketed(tokens, groups, tags):
 
 def parse_pattern(pattern, tags):
     """« GN:sujet + Nég + V (+ GN:objet) » -> les éléments, dans l'ordre :
-    [{text, kind: tag|word|reading|any|unknown, optional, tags: [[ids…] par
-    alternative], ...}]. « … » : n'importe quels mots ; « V|ADJ » : l'un ou
-    l'autre ; ( ) : facultatif ; un caractère ou une lecture : ce mot-là."""
+    [{text, kind: tag|quoted|word|reading|any|unknown, optional, tags: [[ids…]
+    par alternative], ...}]. « … » : n'importe quels mots ; « V|ADJ » : l'un
+    ou l'autre ; ( ) : facultatif ; un mot entre guillemets ("唔", "'ua"), un
+    caractère ou une lecture : ce mot-là. Même lecture que parsePattern dans
+    le module commun tumu-kin (vendor/tumu-kin)."""
     parts, depth = [], 0
-    for piece in re.findall(r"\(|\)|\+|[^()+]+", pattern or ""):
+    for piece in re.findall(r'"[^"]*"|«[^»]*»|“[^”]*”|\(|\)|\+|[^()+"«“]+', pattern or ""):
         if piece == "(":
             depth += 1
         elif piece == ")":
@@ -421,10 +424,23 @@ def parse_pattern(pattern, tags):
     return parts
 
 
+QUOTED = re.compile(r'^["«“]\s*(.+?)\s*["»”]$')
+
+
+def word_key(text):
+    """Un mot cité, comparable : minuscules, apostrophes droites ; les accents
+    comptent (tumu-kin : wordKey)."""
+    text = unicodedata.normalize("NFC", text or "")
+    return "".join(re.sub(r"[’‘ʻ]", "'", text).lower().split())
+
+
 def _element(text, optional, tags):
     base = {"text": text, "optional": optional}
     if text in ("…", "...", "*"):
         return {**base, "kind": "any"}
+    quoted = QUOTED.match(text)
+    if quoted:
+        return {**base, "kind": "quoted", "value": word_key(quoted.group(1))}
     if HAN.search(text):
         return {**base, "kind": "word", "value": "".join(HAN.findall(text))}
     alternatives = []
@@ -494,12 +510,18 @@ def _reading(text, toned):
 
 
 def _word_ends(element, tokens, start):
-    """Les fins possibles d'un caractère ou d'une lecture à partir du mot `start`."""
+    """Les fins possibles d'un mot cité, d'un caractère ou d'une lecture à partir du mot `start`."""
+    kind = element["kind"]
     toned = bool(re.search(r"\d", element["value"]))
-    target = element["value"] if element["kind"] == "word" else _reading(element["value"], toned)
+    target = _reading(element["value"], toned) if kind == "reading" else element["value"]
     ends, text = [], ""
     for j in range(start, len(tokens)):
-        text += "".join(HAN.findall(tokens[j]["t"])) if element["kind"] == "word" else _reading(tokens[j]["p"], toned)
+        if kind == "word":
+            text += "".join(HAN.findall(tokens[j]["t"]))
+        elif kind == "quoted":
+            text += word_key(tokens[j]["t"])
+        else:
+            text += _reading(tokens[j].get("p"), toned)
         if text == target:
             ends.append(j + 1)
         if not target.startswith(text) or not text:
@@ -532,7 +554,7 @@ def match(parts, tokens, groups, tags):
         if element["kind"] == "any":
             for j in range(i + 1, n + 1):
                 out += ends(k + 1, j)
-        elif element["kind"] in ("word", "reading"):
+        elif element["kind"] in ("word", "reading", "quoted"):
             for j in _word_ends(element, tokens, i):
                 out += ends(k + 1, j)
         elif i < n:

@@ -141,6 +141,11 @@ class PatternTests(SimpleTestCase):
         self.assertIsNone(self.match("V + NÉG"))
         self.assertIsNone(self.match("GV:sujet"))
         self.assertEqual(self.match("PRO|V + NÉG"), (0, 2))
+        # Mots cités entre guillemets (format commun tumu-kin) : toutes les langues.
+        self.assertEqual(self.match('"唔" + V'), (1, 3))
+        self.assertEqual(self.match('«唔來» + …'), (1, 3))
+        self.assertIsNone(self.match('"來" + NÉG'))
+        self.assertEqual([p["kind"] for p in ga.parse_pattern("\"'ua\" + V", _tags())], ["quoted", "tag"])
 
     def test_check(self):
         tags = _tags()
