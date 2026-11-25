@@ -377,7 +377,11 @@
      *  {rule, text, start, end, children}) -> une analyse {tokens, groups}.
      *  `map(rule)` dit ce qu'est une règle : null (rien : on la traverse), ou
      *  {category} (une règle de mot : tout son texte devient un mot de cette
-     *  catégorie), ou {phrase?, function?} (un groupe). Les textes trouvés hors
+     *  catégorie), ou {phrase?, function?} (un groupe), ou {ignore: true}
+     *  (on laisse de côté tout ce qu'elle couvre : un commentaire…). En plus,
+     *  {literals} : la catégorie des textes écrits en dur dans la grammaire
+     *  sous cette règle (« haere » dans crenau5), sans écraser les règles de
+     *  mot qu'elle contient ; la règle la plus intérieure l'emporte. Les textes trouvés hors
      *  d'une règle de mot (particules écrites dans la grammaire) deviennent
      *  des mots sans catégorie, un par mot séparé d'espaces. Deux groupes sur
      *  les mêmes mots (Sujet > GN) n'en font qu'un : le plus intérieur garde
@@ -389,15 +393,16 @@
         const tokens = [];
         const groups = [];
         const push = (t, c) => { if (t && !skip(t)) tokens.push({ t, p: '', c: c ?? null, f: null, g: '' }); };
-        const visit = (node) => {
+        const visit = (node, literal = null) => {
             if (node === null || node === undefined) return;
-            if (typeof node === 'string') { node.split(/\s+/).forEach((w) => push(w, null)); return; }
-            if (Array.isArray(node)) { node.forEach(visit); return; }
+            if (typeof node === 'string') { node.split(/\s+/).forEach((w) => push(w, literal)); return; }
+            if (Array.isArray(node)) { node.forEach((child) => visit(child, literal)); return; }
             if (typeof node !== 'object' || !('rule' in node)) return;
             const role = map(node.rule) || null;
+            if (role && role.ignore) return;
             if (role && role.category !== undefined) { push(wordText(node, role.category), role.category); return; }
             const s = tokens.length;
-            visit(node.children);
+            visit(node.children, role && role.literals !== undefined ? role.literals : literal);
             const e = tokens.length;
             if (!role || e <= s || (role.phrase === undefined && role.function === undefined)) return;
             const same = groups.find((g) => g.s === s && g.e === e);
