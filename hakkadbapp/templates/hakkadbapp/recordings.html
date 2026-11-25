@@ -1,5 +1,4 @@
 {% extends "hakkadbapp/base.html" %}
-{% load static %}
 {% block content %}
 <style>
   .rec-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: #fff; }
@@ -39,22 +38,6 @@
                   font-weight: 700; font-size: 0.9rem; }
   .rec-export-btn { min-height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; border: 1px solid #DDD0BD; background: #fff;
                     color: #544D45; font-weight: 700; font-size: 0.9rem; }
-  /* « Préparer l'import plateforme » */
-  .rec-pack { width: min(56rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; border: 0; border-radius: 0.75rem; }
-  .rec-pack[open] { display: flex; flex-direction: column; }
-  .rec-pack::backdrop { background: rgb(38 31 28 / .6); }
-  .rec-pack-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem;
-                   background: var(--color-brand, #9B1C1C); color: #fff; font-weight: 700; }
-  .rec-pack-body { overflow-y: auto; padding: 0.5rem 0.9rem; min-height: 0; flex: 1; }
-  .rec-pack-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
-                   padding: 0.6rem 0.9rem; border-top: 1px solid #F0E8DC; font-size: 0.85rem; color: #544D45; }
-  .rec-pack-section { margin: 0.6rem 0; }
-  .rec-pack-section h3 { font-weight: 700; font-size: 0.9rem; color: #3A3430; margin-bottom: 0.25rem; }
-  .rec-pack-section summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #3A3430; }
-  .rec-pack-section ul { list-style: disc; padding-left: 1.2rem; font-size: 0.8rem; color: #544D45; }
-  .rec-pack-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; padding: 0.2rem 0; font-size: 0.85rem; }
-  .rec-pack-all { border-bottom: 1px solid #F0E8DC; padding-bottom: 0.35rem; margin-bottom: 0.2rem; }
-  .rec-pack-label { color: #261F1C; }
   /* Hakka columns: larger and centred. */
   .rec-table td.hanzi, .rec-table td.rec-hk, .rec-table th.rec-hk { text-align: center; }
   .rec-table td.hanzi { font-size: 1.55rem !important; line-height: 1.2; }
@@ -96,15 +79,8 @@
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
     <button type="button" id="rec-show-open" class="rec-show-btn">▶ Diaporama</button>
-    <button type="button" id="rec-export-table" class="rec-export-btn"
-            title="Mots puis expressions (selon la recherche et le thème choisis), en un seul tableau CSV">⤓ Exporter le tableau</button>
     <button type="button" id="rec-export-names" class="rec-export-btn"
             title="Mots puis expressions (selon la recherche et le thème choisis) : un nom de fichier .wav par ligne, numéroté">⤓ Exporter les noms de fichiers</button>
-    {% if is_owner %}
-    <button type="button" id="rec-pack-open" class="rec-export-btn"
-            title="Choisir le dossier des .wav enregistrés : un zip pour la plateforme avec les mots et expressions correspondants (JSON) et leurs audios">📦 Préparer l'import plateforme</button>
-    <input type="file" id="rec-pack-input" webkitdirectory multiple hidden>
-    {% endif %}
   </div>
   <nav class="rec-tabs" role="tablist" aria-label="Que voir">
     <a href="#mots" role="tab" data-rectab="mots">Mots <small>({{ words|length }})</small></a>
@@ -161,20 +137,6 @@
     <button type="button" data-show="1" class="is-next">Suivant →</button>
   </div>
 </dialog>
-{% if is_owner %}
-<dialog class="rec-pack" id="rec-pack" aria-labelledby="rec-pack-title">
-  <div class="rec-pack-head">
-    <span id="rec-pack-title">📦 Import plateforme</span>
-    <button type="button" class="rec-show-close" data-pack="close" aria-label="Fermer">✕</button>
-  </div>
-  <div class="rec-pack-body" data-pack="body"></div>
-  <div class="rec-pack-foot">
-    <span data-pack="status" aria-live="polite"></span>
-    <button type="button" class="rec-show-btn" data-pack="zip" disabled>⤓ Télécharger le zip</button>
-  </div>
-</dialog>
-<script src="{% static 'hakkadbapp/js/RecordingsPackage.js' %}" defer></script>
-{% endif %}
 {{ words|json_script:"rec-words-data" }}
 {{ expressions|json_script:"rec-expressions-data" }}
 
@@ -278,7 +240,7 @@
     show();
   })();
 
-  /* Exports : un seul fichier pour les mots puis les expressions, les lignes
+  /* Export des noms de fichiers : un seul fichier pour les mots puis les expressions, les lignes
      que la recherche et le thème laissent visibles (les deux onglets). */
   (function () {
     const DATA = { mots: JSON.parse(document.getElementById('rec-words-data').textContent),
@@ -294,14 +256,6 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
-    // CSV pour Excel : séparateur « ; », BOM UTF-8 pour les caractères chinois.
-    const cell = (v) => { const t = String(v ?? ''); return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-    document.getElementById('rec-export-table').addEventListener('click', () => {
-      const head = ['N°', 'Type', 'Caractères', 'Pinyin', 'Français', 'Exemple', 'Exemple (français)', 'Thème', 'Fichier', 'Origine'];
-      const lines = rows().map((r, i) => [i + 1, r.type, r.hanzi, r.pinyin, r.french, r.example?.target, r.example?.french,
-                                          r.theme, r.filename, r.origin].map(cell).join(';'));
-      download('﻿' + [head.join(';'), ...lines].join('\r\n') + '\r\n', `a-enregistrer-${today}.csv`, 'text/csv;charset=utf-8');
-    });
     // Les noms de fichiers seuls, un par ligne, numérotés.
     document.getElementById('rec-export-names').addEventListener('click', () => {
       const names = rows().map((r) => r.filename).filter(Boolean);

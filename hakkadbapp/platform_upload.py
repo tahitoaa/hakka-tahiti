@@ -1,6 +1,9 @@
-"""« Analyse du lexique » → « Importer un export de la plateforme »
-(propriétaire seulement) : la commande `platform_to_vercel --yes` lancée
-depuis le site, à partir du zip téléchargé sur la plateforme.
+"""La page « Plateforme » (propriétaire seulement) : les échanges avec e-reo.
+- « Importer un export de la plateforme » : la commande
+  `platform_to_vercel --yes` lancée depuis le site, à partir du zip
+  téléchargé sur la plateforme (ci-dessous) ;
+- « Préparer un zip pour e-reo » : ajouts, corrections et audios
+  (platform_package.py).
 
 Le navigateur ouvre le zip (souvent gros : il contient les audios) et
 n'envoie que ses trois corpus -- wordCorpus.json, expressionCorpus.json,
@@ -14,12 +17,13 @@ Comme la commande : le lexique (Word / Expression / Pronunciation) est
 vidé puis reconstruit, en une transaction, et l'instantané est gardé
 (Traces.platform_data). Garde-fou : un corpus nettement plus petit que
 l'actuel (moins de 80 % des mots ou des expressions) est refusé sans
-« force » -- par exemple le petit zip de « Préparer l'import plateforme »,
-qui n'a que quelques éléments."""
+« force » -- par exemple un zip de « Préparer un zip pour e-reo », qui
+n'a que quelques éléments."""
 import gzip
 import json
 
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .permissions import owner_required
@@ -74,3 +78,23 @@ def import_corpus(request):
     result = run_import(words, expressions, themes, source)
     return JsonResponse({"ok": True, **result,
                          "word_logs": result["word_logs"][:200], "unknown_tokens": result["unknown_tokens"][:200]})
+
+
+@owner_required
+def page(request):
+    from .models import LexiconAddition, ReviewComment
+    from .views import get_latest_platform_snapshot
+
+    snapshot = get_latest_platform_snapshot()
+    data = (snapshot.platform_data or {}) if snapshot else {}
+    words, expressions = data.get("words") or {}, data.get("expressions") or {}
+    additions = sum(1 for pid in LexiconAddition.objects.filter(status=LexiconAddition.STATUS_VALIDATED)
+                    .values_list("platform_id", flat=True) if pid not in words and pid not in expressions)
+    corrections = ReviewComment.objects.filter(
+        target_type__in=[ReviewComment.TARGET_WORD, ReviewComment.TARGET_EXPRESSION],
+        status=ReviewComment.STATUS_TODO).count()
+    return render(request, "hakkadbapp/platform.html", {
+        "title": "Plateforme", "page": "platform", "snapshot": snapshot,
+        "snapshot_source": data.get("corpus_dir", ""), "n_words": len(words), "n_expressions": len(expressions),
+        "n_additions": additions, "n_corrections": corrections,
+    })

@@ -1,5 +1,4 @@
 {% extends "hakkadbapp/base.html" %}
-{% load static %}
 
 {% block content %}
 
@@ -180,28 +179,6 @@
       </table>
     </div>
   </details>
-
-  {% if is_owner %}
-  <details class="drawer" id="plat-up">
-    <summary><span class="chevron">&#9656;</span> Importer un export de la plateforme</summary>
-    <div class="drawer-body">
-      <p class="hint">
-        Comme <span class="mono">platform_to_vercel --yes</span> : choisissez le zip téléchargé sur la plateforme.
-        Seuls <span class="mono">wordCorpus.json</span>, <span class="mono">expressionCorpus.json</span> et
-        <span class="mono">themeCorpus.json</span> en sont lus, les audios ne sont ni lus ni envoyés.
-        Le lexique du site est vidé puis reconstruit ; les notes, remarques, maillages et ajouts sont gardés.
-      </p>
-      <p style="display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.5rem 0">
-        <input type="file" accept=".zip,application/zip">
-        <button type="button" data-up="go" hidden style="min-height:2.25rem; padding:0 .9rem; border-radius:.5rem; background:var(--color-brand,#9B1C1C); color:#fff; font-weight:700">Importer (remplace le lexique)</button>
-        <label data-up="force" hidden><input type="checkbox"> C'est bien l'export complet : importer quand même</label>
-      </p>
-      <p class="hint" data-up="status" aria-live="polite"></p>
-      <details data-up="logbox" hidden><summary>Détails</summary><pre data-up="log" style="white-space:pre-wrap; font-size:.75rem; max-height:16rem; overflow:auto"></pre></details>
-    </div>
-  </details>
-  <script src="{% static 'hakkadbapp/js/PlatformUpload.js' %}" defer></script>
-  {% endif %}
 
   <details class="drawer">
     <summary>

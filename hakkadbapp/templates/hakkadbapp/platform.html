@@ -1,0 +1,97 @@
+{% extends "hakkadbapp/base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .plat-card { background: #fff; border: 1px solid #E8DFD2; border-radius: 0.75rem; padding: 0.9rem 1rem; }
+  .plat-card h3 { font-weight: 700; color: #3A3430; margin-bottom: 0.35rem; }
+  .plat-hint { font-size: 0.85rem; color: #6E655C; }
+  .plat-btn { min-height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; background: var(--color-brand, #9B1C1C); color: #fff;
+              font-weight: 700; font-size: 0.9rem; }
+  .plat-btn:disabled { opacity: 0.45; }
+  .plat-btn-light { background: #fff; color: #544D45; border: 1px solid #DDD0BD; }
+  .plat-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0; }
+  .plat-mono { font-family: ui-monospace, monospace; font-size: 0.8rem; color: #544D45; }
+  /* Formulaire « Préparer un zip pour e-reo » */
+  .plat-dialog { width: min(56rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; border: 0; border-radius: 0.75rem; }
+  .plat-dialog[open] { display: flex; flex-direction: column; }
+  .plat-dialog::backdrop { background: rgb(38 31 28 / .6); }
+  .plat-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem;
+                      background: var(--color-brand, #9B1C1C); color: #fff; font-weight: 700; }
+  .plat-dialog-head button { min-width: 2.5rem; min-height: 2.5rem; border-radius: 9999px; color: #fff; font-size: 1.1rem; }
+  .plat-dialog-body { overflow-y: auto; padding: 0.5rem 0.9rem; min-height: 0; flex: 1; }
+  .plat-dialog-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+                      padding: 0.6rem 0.9rem; border-top: 1px solid #F0E8DC; font-size: 0.85rem; color: #544D45; }
+  .plat-choice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; padding: 0.35rem 0; }
+  .plat-section { margin: 0.6rem 0; }
+  .plat-section h4, .plat-section summary { font-weight: 700; font-size: 0.9rem; color: #3A3430; margin-bottom: 0.25rem; cursor: default; }
+  .plat-section summary { cursor: pointer; }
+  .plat-section ul { list-style: disc; padding-left: 1.2rem; font-size: 0.8rem; color: #544D45; }
+  .plat-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; padding: 0.2rem 0; font-size: 0.85rem; }
+  .plat-item small { color: #8C8478; }
+  .plat-item .plat-change { flex-basis: 100%; padding-left: 1.6rem; font-size: 0.78rem; color: #065f46; }
+  .plat-item .plat-replace { font-size: 0.78rem; color: #991b1b; }
+</style>
+
+<div class="mt-2 w-full max-w-screen-md mx-auto space-y-3">
+  <h2 class="font-display text-xl font-bold text-gray-800">Plateforme e-reo</h2>
+  <p class="plat-hint">
+    {% if snapshot %}Dernier import de la plateforme : le {{ snapshot.timestamp|date:"j F Y à H:i" }}
+    ({{ n_words }} mots, {{ n_expressions }} expressions{% if snapshot_source %}, <span class="plat-mono">{{ snapshot_source }}</span>{% endif %}).
+    {% else %}Aucun import de la plateforme pour l'instant.{% endif %}
+  </p>
+
+  <section class="plat-card" id="plat-up">
+    <h3>⤒ Importer un export de la plateforme</h3>
+    <p class="plat-hint">
+      Le zip téléchargé sur e-reo. Seuls <span class="plat-mono">wordCorpus.json</span>, <span class="plat-mono">expressionCorpus.json</span>
+      et <span class="plat-mono">themeCorpus.json</span> en sont lus ; les audios ne sont ni lus ni envoyés.
+      Le lexique du site est vidé puis reconstruit (comme <span class="plat-mono">platform_to_vercel --yes</span>) ; les notes,
+      remarques, maillages et ajouts sont gardés, et les ajouts reçus par e-reo sont reliés à leur élément.
+    </p>
+    <div class="plat-row">
+      <input type="file" accept=".zip,application/zip">
+      <button type="button" class="plat-btn" data-up="go" hidden>Importer (remplace le lexique)</button>
+      <label data-up="force" hidden><input type="checkbox"> C'est bien l'export complet : importer quand même</label>
+    </div>
+    <p class="plat-hint" data-up="status" aria-live="polite"></p>
+    <details data-up="logbox" hidden><summary class="plat-hint">Détails</summary><pre data-up="log" style="white-space:pre-wrap; font-size:.75rem; max-height:16rem; overflow:auto"></pre></details>
+  </section>
+
+  <section class="plat-card">
+    <h3>⤓ Préparer un zip pour e-reo</h3>
+    <p class="plat-hint">
+      Au format de la plateforme, à importer sur e-reo : au choix les ajouts validés ({{ n_additions }}), les corrections
+      « À faire » ({{ n_corrections }}) et les audios enregistrés (un dossier de .wav nommés comme dans « À enregistrer »).
+    </p>
+    <div class="plat-row"><button type="button" class="plat-btn" id="plat-pack-open">Préparer un zip…</button></div>
+  </section>
+</div>
+
+<dialog class="plat-dialog" id="plat-pack" aria-labelledby="plat-pack-title">
+  <div class="plat-dialog-head">
+    <span id="plat-pack-title">Préparer un zip pour e-reo</span>
+    <button type="button" data-pack="close" aria-label="Fermer">✕</button>
+  </div>
+  <div class="plat-dialog-body">
+    <form data-pack="form">
+      <label class="plat-choice"><input type="checkbox" name="additions" {% if n_additions %}checked{% endif %}>
+        <b>Ajouts validés</b> <small class="plat-hint">pas encore sur la plateforme : {{ n_additions }}</small></label>
+      <label class="plat-choice"><input type="checkbox" name="corrections" {% if n_corrections %}checked{% endif %}>
+        <b>Corrections « À faire »</b> <small class="plat-hint">{{ n_corrections }} ; l'élément de la plateforme, corrigé, avec le même identifiant</small></label>
+      <div class="plat-choice">
+        <button type="button" class="plat-btn plat-btn-light" data-pack="folder">Ajouter les audios d'un dossier…</button>
+        <small class="plat-hint" data-pack="folder-status">aucun dossier choisi</small>
+        <input type="file" data-pack="folder-input" webkitdirectory multiple hidden>
+      </div>
+      <div class="plat-row"><button type="submit" class="plat-btn">Préparer la liste</button></div>
+    </form>
+    <div data-pack="list"></div>
+  </div>
+  <div class="plat-dialog-foot">
+    <span data-pack="status" aria-live="polite"></span>
+    <button type="button" class="plat-btn" data-pack="zip" disabled>⤓ Télécharger le zip</button>
+  </div>
+</dialog>
+<script src="{% static 'hakkadbapp/js/PlatformUpload.js' %}" defer></script>
+<script src="{% static 'hakkadbapp/js/PlatformPackage.js' %}" defer></script>
+{% endblock %}

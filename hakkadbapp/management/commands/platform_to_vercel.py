@@ -237,7 +237,10 @@ def run_import(words, expressions, themes, source, rows=None):
         )
         expression_result = import_expressions_from_df(expressions_df, reset=True)
         moved, orphaned = Command.repoint_lexicon_targets(pinned)
-    return {
+        # Validated additions e-reo received under its own id take that id.
+        from hakkadbapp.platform_package import relink_additions
+        linked = relink_additions(words, expressions)
+    return {"linked": linked,
         "words": word_result["rows_imported"], "pronunciations": word_result["pronunciations"],
         "expressions": expression_result["rows_imported"], "moved": moved, "orphaned": orphaned,
         "word_logs": list(word_result["logs"]), "unknown_tokens": list(expression_result["unknown_tokens"]),
@@ -386,6 +389,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Remarques / réglages IA du lexique rattachés : {result['moved']} ; sans mot correspondant (laissés tels quels) : {result['orphaned']}"
         ))
+        self.stdout.write(self.style.SUCCESS(f"Ajouts validés reliés à leur élément de la plateforme : {result['linked']}"))
         self.stdout.write(self.style.SUCCESS(
             f"Words imported: {result['words']} | Pronunciations: {result['pronunciations']}"
         ))

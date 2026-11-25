@@ -460,6 +460,7 @@
             <li><a href="{% url 'recordings' %}" class="nav-link{% if page == 'recordings' %} is-active{% endif %}">À enregistrer</a></li>
             {% if is_owner %}
             <li><a href="{% url 'grammar' %}" class="nav-link{% if page == 'grammar' %} is-active{% endif %}" title="Règles de grammaire en arbre, illustrées par les expressions et les transcriptions (privé)">Grammaire</a></li>
+            <li><a href="{% url 'platform' %}" class="nav-link{% if page == 'platform' %} is-active{% endif %}" title="Échanges avec e-reo : importer son export, préparer un zip d'ajouts, de corrections et d'audios (privé)">Plateforme</a></li>
             {% endif %}
             <li>
               <details class="nav-user">

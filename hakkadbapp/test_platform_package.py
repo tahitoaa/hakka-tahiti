@@ -1,13 +1,15 @@
-"""« À enregistrer » → « Préparer l'import plateforme » : des noms de
-fichiers .wav aux éléments de la plateforme (recordings_package.build).
+"""Page « Plateforme » → « Préparer un zip pour e-reo » (platform_package) :
+audios d'un dossier, ajouts validés, corrections « À faire » ; et, après un
+import de la plateforme, les ajouts reliés à leur nouvel identifiant.
 
-Run: python manage.py test hakkadbapp.test_recordings_package --settings=hakkadbapp.settings_test
+Run: python manage.py test hakkadbapp.test_platform_package --settings=hakkadbapp.settings_test
 """
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from .audio_names import wav_name
-from .models import LexiconAddition, Traces
-from .recordings_package import build
+from .models import LexiconAddition, ReviewComment, Traces, Word
+from .platform_package import build, relink_additions
 
 PLATFORM = {
     "themes": {"t1": {"translations": {"primary": "Maison", "secondary": "", "target": ""}}},
@@ -63,3 +65,43 @@ class RecordingsPackageTest(TestCase):
         r = build(["oi4.wav"])
         self.assertEqual(len(r["items"]), 2)
         self.assertTrue(any("homophones" in w for w in r["warnings"]))
+
+    def test_additions_without_audio(self):
+        a = LexiconAddition.objects.create(kind="word", status="validated", hanzi="屋下", pinyin="wuk5 ha1", french="chez soi")
+        a.refresh_from_db()
+        self.assertEqual(build()["items"], [])
+        r = build(additions=True)
+        self.assertEqual([(i["id"], i["file"], i["origin"]) for i in r["items"]], [(a.platform_id, "", "addition")])
+
+    def test_todo_corrections_applied_to_the_platform_payload(self):
+        w = Word.objects.create(french="maison", english="house", mandarin="", platform_id="w1")
+        common = dict(target_type="word", target_id=w.id, kind="correction", field="english")
+        ReviewComment.objects.create(**common, current_value="house", proposed_value="home", status="todo")
+        ReviewComment.objects.create(**common, current_value="house", proposed_value="hut", status="open")
+        r = build(corrections=True)
+        [item] = r["items"]
+        self.assertEqual((item["id"], item["origin"]), ("w1", "platform"))
+        self.assertEqual(item["payload"]["translations"]["secondary"], "home")
+        self.assertEqual(item["payload"]["themes"], ["t1"])
+        self.assertEqual(len(item["changes"]), 1)
+        # Le dernier instantané n'est pas modifié.
+        self.assertEqual(Traces.objects.latest("timestamp").platform_data["words"]["w1"]["translations"]["secondary"], "house")
+        # Avec l'audio : la même ligne.
+        r = build(["wuk5ka1.wav"], corrections=True)
+        self.assertEqual([(i["id"], i["file"]) for i in r["items"]], [("w1", "wuk5ka1.wav")])
+
+    def test_additions_relinked_after_a_platform_import(self):
+        a = LexiconAddition.objects.create(kind="word", status="validated", hanzi="屋下", pinyin="wuk5 ha1")
+        e = LexiconAddition.objects.create(kind="expression", status="validated", hanzi="我 爱 屋下 ，", pinyin="ngai2 oi4 wuk5 ha1 ，")
+        words = {**PLATFORM["words"], "new-w": {"translations": {"target": "wuk⁵ha¹ 屋下"}}}
+        expressions = {"new-e": {"translations": {"target": "ngai² oi⁴ wuk⁵ha¹, 我爱屋下，"}}}
+        self.assertEqual(relink_additions(words, expressions), 2)
+        a.refresh_from_db(); e.refresh_from_db()
+        self.assertEqual((a.platform_id, e.platform_id), ("new-w", "new-e"))
+        self.assertEqual(relink_additions(words, expressions), 0)
+
+    def test_page_owner_only(self):
+        self.client.force_login(User.objects.create_user("membre", password="x"))
+        self.assertEqual(self.client.get("/plateforme/").status_code, 403)
+        self.client.force_login(User.objects.create_superuser("tahit", password="x"))
+        self.assertContains(self.client.get("/plateforme/"), "Préparer un zip")
