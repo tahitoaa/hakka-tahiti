@@ -378,18 +378,34 @@
           Trad. / Simp.
         </button>
 
-        <div class="no-print flex items-center bg-black/20 text-white rounded-full px-3 py-1">
-          <label for="pinyin-menu" class="sr-only">Système de transcription</label>
-          <select
-            id="pinyin-menu"
-            class="max-w-[10rem] sm:max-w-[16rem] truncate bg-transparent text-white text-sm focus:outline-none"
-            aria-label="Système de transcription"
-          >
+        <label class="rom-menu no-print" title="Système de transcription du hakka">
+          <span class="rom-menu-icon" aria-hidden="true">拼</span>
+          <select id="pinyin-menu" class="rom-menu-select" aria-label="Système de transcription">
             {% for s in romanization_systems %}
             <option value="{{ s.id }}" title="{{ s.source }}"{% if s.id == romanization_default %} selected{% endif %}>{{ s.label }}</option>
             {% endfor %}
           </select>
-        </div>
+          <svg class="rom-menu-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </label>
+        <style>
+          /* Menu de transcription : pastille comme « Trad. / Simp. » ; la liste
+             déroulée garde un texte sombre sur fond clair (sinon blanc sur blanc). */
+          .rom-menu { position: relative; display: inline-flex; align-items: center; min-height: 2.25rem; border-radius: 9999px;
+                      background: rgb(0 0 0 / .2); color: #fff; transition: background-color .15s; cursor: pointer; }
+          .rom-menu:hover { background: rgb(0 0 0 / .3); }
+          .rom-menu:focus-within { box-shadow: 0 0 0 2px var(--color-brand-gold, #FFBE3B); }
+          .rom-menu-icon { position: absolute; left: 0.45rem; display: grid; place-items: center; width: 1.4rem; height: 1.4rem;
+                           border-radius: 9999px; background: var(--color-brand-gold, #FFBE3B); color: #7F1D1D;
+                           font-size: 0.75rem; font-weight: 700; pointer-events: none; }
+          .rom-menu-select { appearance: none; -webkit-appearance: none; background: transparent; border: 0; color: inherit;
+                             font-size: 0.875rem; font-weight: 600; padding: 0.4rem 2rem 0.4rem 2.2rem; max-width: 11rem;
+                             text-overflow: ellipsis; cursor: pointer; border-radius: 9999px; }
+          .rom-menu-select:focus { outline: none; }
+          .rom-menu-select option { color: #3A3430; background: #fff; font-weight: 500; }
+          .rom-menu-select option:checked { color: #7F1D1D; background: #FDF3E1; font-weight: 700; }
+          .rom-menu-chevron { position: absolute; right: 0.6rem; width: 1rem; height: 1rem; pointer-events: none; opacity: .85; }
+          @media (min-width: 640px) { .rom-menu-select { max-width: 16rem; } }
+        </style>
       </div>
     </div>
   </div>
