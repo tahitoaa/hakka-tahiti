@@ -33,6 +33,7 @@ from .text_to_words import (
 )
 from .illustrations import illustration_for
 from . import expression_mesh
+from .audio_names import wav_name
 from . import word_notes
 from . import pronunciation_sources
 from urllib.parse import urlencode
@@ -672,10 +673,8 @@ def reports(request):
                 tr = payload.get("translations", {}) or {}
                 target = tr.get("target", "")
                 pinyin, hanzi = split_target(target)
-                if kind == "word":
-                    expected_filename = f"{pinyin.translate(SUPERSCRIPT_TO_DIGIT)}.wav" if pinyin else ""
-                else:
-                    expected_filename = f"{hanzi}.wav" if hanzi else ""
+                # Sans aucun signe : voir audio_names.
+                expected_filename = wav_name(pinyin if kind == "word" else hanzi)
                 out.append({
                     "french": tr.get("primary", ""), "target": target,
                     "expected_filename": expected_filename,

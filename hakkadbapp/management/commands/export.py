@@ -14,6 +14,7 @@ from openpyxl import Workbook
 from hakkadbapp.models import Expression, ExpressionWord, Word, WordPronunciation
 import hakkadbapp.json_model as jsonm
 import hakkadbapp.read_themes_corpus
+from hakkadbapp.audio_names import safe_stem
 
 superscript_map = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶"}
 reverse_superscript_map = {v: k for k, v in superscript_map.items()}
@@ -639,7 +640,7 @@ class Command(BaseCommand):
         return None
 
     def build_audio_index(self, audio_dir):
-        index = {"by_name": {}, "by_stem": {}, "path_by_name": {}, "count": 0}
+        index = {"by_name": {}, "by_stem": {}, "by_safe_stem": {}, "path_by_name": {}, "count": 0}
         if not audio_dir:
             return index
 
@@ -656,6 +657,9 @@ class Command(BaseCommand):
                 # Store the first match to keep the export deterministic.
                 index["by_name"].setdefault(lower_name, filename)
                 index["by_stem"].setdefault(lower_stem, filename)
+                # Sans aucun signe (voir audio_names) : les fichiers nommés
+                # d'après la page « À enregistrer » sont retrouvés aussi.
+                index["by_safe_stem"].setdefault(safe_stem(path.stem).lower(), filename)
                 # Keyed by the original-case filename (as returned by
                 # find_audio_filename via by_name/by_stem), so callers that
                 # need the actual file on disk -- e.g. to copy out unmatched
@@ -674,7 +678,8 @@ class Command(BaseCommand):
             return exact
 
         stem = Path(expected_filename).stem.lower()
-        return audio_index["by_stem"].get(stem, "")
+        return (audio_index["by_stem"].get(stem)
+                or audio_index.get("by_safe_stem", {}).get(safe_stem(stem).lower(), ""))
 
     @staticmethod
     def write_xlsx(path, rows):

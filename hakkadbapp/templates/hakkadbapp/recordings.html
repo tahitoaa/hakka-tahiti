@@ -36,6 +36,8 @@
   .rec-show-nav button:disabled { opacity: 0.4; }
   .rec-show-btn { min-height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; background: var(--color-brand, #9B1C1C); color: #fff;
                   font-weight: 700; font-size: 0.9rem; }
+  .rec-export-btn { min-height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; border: 1px solid #DDD0BD; background: #fff;
+                    color: #544D45; font-weight: 700; font-size: 0.9rem; }
   /* Hakka columns: larger and centred. */
   .rec-table td.hanzi, .rec-table td.rec-hk, .rec-table th.rec-hk { text-align: center; }
   .rec-table td.hanzi { font-size: 1.55rem !important; line-height: 1.2; }
@@ -77,6 +79,10 @@
       {% for t in themes %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
     <button type="button" id="rec-show-open" class="rec-show-btn">▶ Diaporama</button>
+    <button type="button" id="rec-export-table" class="rec-export-btn"
+            title="Mots puis expressions (selon la recherche et le thème choisis), en un seul tableau CSV">⤓ Exporter le tableau</button>
+    <button type="button" id="rec-export-names" class="rec-export-btn"
+            title="Mots puis expressions (selon la recherche et le thème choisis) : un nom de fichier .wav par ligne, numéroté">⤓ Exporter les noms de fichiers</button>
   </div>
   <nav class="rec-tabs" role="tablist" aria-label="Que voir">
     <a href="#mots" role="tab" data-rectab="mots">Mots <small>({{ words|length }})</small></a>
@@ -234,6 +240,37 @@
     tabs.forEach((t) => t.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', t.getAttribute('href')); show(); }));
     window.addEventListener('hashchange', show);
     show();
+  })();
+
+  /* Exports : un seul fichier pour les mots puis les expressions, les lignes
+     que la recherche et le thème laissent visibles (les deux onglets). */
+  (function () {
+    const DATA = { mots: JSON.parse(document.getElementById('rec-words-data').textContent),
+                   expressions: JSON.parse(document.getElementById('rec-expressions-data').textContent) };
+    const rows = () => ['mots', 'expressions'].flatMap((name) =>
+      [...document.querySelectorAll(`[data-recpanel="${name}"] tr[data-i]`)]
+        .filter((tr) => !tr.hidden).map((tr) => ({ type: name === 'mots' ? 'Mot' : 'Expression', ...DATA[name][Number(tr.dataset.i)] })));
+    const today = new Date().toISOString().slice(0, 10);
+    const download = (text, name, mime) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    // CSV pour Excel : séparateur « ; », BOM UTF-8 pour les caractères chinois.
+    const cell = (v) => { const t = String(v ?? ''); return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    document.getElementById('rec-export-table').addEventListener('click', () => {
+      const head = ['N°', 'Type', 'Caractères', 'Pinyin', 'Français', 'Exemple', 'Exemple (français)', 'Thème', 'Fichier', 'Origine'];
+      const lines = rows().map((r, i) => [i + 1, r.type, r.hanzi, r.pinyin, r.french, r.example?.target, r.example?.french,
+                                          r.theme, r.filename, r.origin].map(cell).join(';'));
+      download('﻿' + [head.join(';'), ...lines].join('\r\n') + '\r\n', `a-enregistrer-${today}.csv`, 'text/csv;charset=utf-8');
+    });
+    // Les noms de fichiers seuls, un par ligne, numérotés.
+    document.getElementById('rec-export-names').addEventListener('click', () => {
+      const names = rows().map((r) => r.filename).filter(Boolean);
+      download(names.map((n, i) => `${i + 1}. ${n}`).join('\r\n') + '\r\n', `a-enregistrer-fichiers-${today}.txt`, 'text/plain;charset=utf-8');
+    });
   })();
 </script>
 {% endblock %}

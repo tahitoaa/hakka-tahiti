@@ -5,19 +5,15 @@
   appears in, when there is one, to record it in context;
 - expressions: the same, for expressions.
 Each with the file name the platform export expects: digit-tone pinyin for
-a word ("on1lok6.wav"), the hanzi for an expression ("我爱屋家.wav")."""
+a word ("on1lok6.wav"), the hanzi for an expression ("我爱屋家.wav"),
+with no sign at all (see audio_names)."""
 import re
 
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import render
 
+from .audio_names import wav_name
 from .models import Expression, LexiconAddition, Word
-
-
-def _digits(pinyin):
-    from .views import SUPERSCRIPT_TO_DIGIT
-
-    return "".join(str(pinyin or "").split()).translate(SUPERSCRIPT_TO_DIGIT)
 
 
 SYLLABLE_RE = re.compile(r"[a-zA-Züāáǎàēéěèīíǐìōóǒòūúǔù'’]+[0-8¹²³⁴⁵⁶⁷⁸]?")
@@ -71,7 +67,7 @@ def to_record():
         pinyin, hanzi = split_target(tr.get("target", ""))
         words.append({"hanzi": hanzi, "pinyin": pinyin, "french": tr.get("primary", ""),
                       "theme": word_themes.get(platform_id) or "",
-                      "filename": f"{_digits(pinyin)}.wav" if pinyin else "", "origin": "Lexique",
+                      "filename": wav_name(pinyin), "origin": "Lexique",
                       "example": example(payload) or _example_from_lexicon(hanzi, lexicon_expressions)})
     expressions = []
     for platform_id, payload in platform_expressions.items():
@@ -82,7 +78,7 @@ def to_record():
         expressions.append({"hanzi": hanzi, "pinyin": pinyin, "french": tr.get("primary", ""),
                             "furigana": furigana(hanzi, pinyin),
                             "theme": expr_themes.get(platform_id) or "",
-                            "filename": f"{''.join(hanzi.split())}.wav" if hanzi else "", "origin": "Lexique"})
+                            "filename": wav_name(hanzi), "origin": "Lexique"})
     # Validated additions the platform doesn't have yet.
     for a in LexiconAddition.objects.filter(status=LexiconAddition.STATUS_VALIDATED):
         if a.platform_id in platform_words or a.platform_id in platform_expressions:
@@ -90,12 +86,12 @@ def to_record():
         hanzi = "".join(a.hanzi.split())
         if a.kind == LexiconAddition.KIND_WORD:
             words.append({"hanzi": hanzi, "pinyin": "".join(a.pinyin.split()), "french": a.french, "theme": a.themes,
-                          "filename": f"{_digits(a.pinyin)}.wav" if a.pinyin else "", "origin": "Ajout validé",
+                          "filename": wav_name(a.pinyin), "origin": "Ajout validé",
                           "example": _example_from_lexicon(hanzi, lexicon_expressions)})
         else:
             expressions.append({"hanzi": a.hanzi, "pinyin": a.pinyin, "french": a.french, "theme": a.themes,
                                 "furigana": furigana(a.hanzi, a.pinyin),
-                                "filename": f"{hanzi}.wav", "origin": "Ajout validé"})
+                                "filename": wav_name(hanzi), "origin": "Ajout validé"})
     # Priority 1: the lexicon's own entries with no audio; then the
     # validated additions. Within each, by theme.
     words.sort(key=lambda r: (r["origin"] != "Lexique", r["theme"].lower(), r["pinyin"]))
