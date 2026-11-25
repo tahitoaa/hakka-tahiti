@@ -1,0 +1,35 @@
+{
+  "format": "tumu-kin/grammaire",
+  "version": 1,
+  "language": null,
+  "description": "Étiquettes de base recommandées, communes au hakka et au tahitien. Chaque langue reprend ces codes quand la notion est la même et ajoute les siennes (hakka : CL ; tahitien : ART…). Tirées des étiquettes de hakka-tahiti (grammar_analysis.SEED), sans leurs exemples ni leurs tests, propres à chaque langue.",
+  "tags": [
+    { "kind": "category", "code": "N", "name": "nom", "description": "Désigne une personne, une chose, un lieu, une notion.", "tests": "", "equivalent": "NOUN", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "PRO", "name": "pronom", "description": "Tient la place d'un groupe nominal entier.", "tests": "", "equivalent": "PRON", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "V", "name": "verbe", "description": "Exprime une action ou un processus.", "tests": "", "equivalent": "VERB", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "ADJ", "name": "adjectif / verbe d'état", "description": "Exprime une qualité, un état.", "tests": "", "equivalent": "ADJ", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "ADV", "name": "adverbe", "description": "Modifie un verbe, un adjectif ou la phrase : degré, temps, manière.", "tests": "", "equivalent": "ADV", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "NÉG", "name": "négation", "description": "Nie le verbe, l'adjectif ou la phrase.", "tests": "", "equivalent": "ADV (Polarity=Neg)", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "NUM", "name": "numéral", "description": "Un nombre.", "tests": "", "equivalent": "NUM", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "DÉM", "name": "démonstratif", "description": "Montre ce dont on parle (proche, éloigné).", "tests": "", "equivalent": "DET", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "PRÉP", "name": "préposition", "description": "Introduit un groupe nominal et le relie au reste de la phrase.", "tests": "", "equivalent": "ADP", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "ASP", "name": "marque d'aspect", "description": "Dit comment l'action se déroule : accomplie, en cours, habituelle…", "tests": "", "equivalent": "AUX", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "PART", "name": "particule", "description": "Mot-outil qui change la modalité de la phrase : question, constat, insistance.", "tests": "", "equivalent": "PART", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "CONJ", "name": "conjonction", "description": "Relie deux groupes ou deux propositions.", "tests": "", "equivalent": "CCONJ / SCONJ", "parent": null, "status": "ok" },
+    { "kind": "category", "code": "INTERJ", "name": "interjection", "description": "Exclamation, appel, réponse.", "tests": "", "equivalent": "INTJ", "parent": null, "status": "ok" },
+
+    { "kind": "phrase", "code": "P", "name": "phrase", "description": "L'énoncé complet : un sujet (parfois sous-entendu) et ce qu'on en dit.", "tests": "", "equivalent": "root", "parent": null, "status": "ok" },
+    { "kind": "phrase", "code": "GN", "name": "groupe nominal", "description": "Un nom et ce qui le détermine.", "tests": "", "equivalent": "nominal", "parent": null, "status": "ok" },
+    { "kind": "phrase", "code": "GV", "name": "groupe verbal", "description": "Le verbe (ou l'adjectif) avec sa négation, ses marques d'aspect et ses compléments.", "tests": "", "equivalent": "prédicat", "parent": null, "status": "ok" },
+    { "kind": "phrase", "code": "GP", "name": "groupe prépositionnel", "description": "Une préposition et son groupe nominal.", "tests": "", "equivalent": "obl", "parent": null, "status": "ok" },
+
+    { "kind": "function", "code": "sujet", "name": "sujet", "description": "Ce dont on dit quelque chose.", "tests": "", "equivalent": "nsubj", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "préd", "name": "prédicat", "description": "Ce qu'on dit du sujet.", "tests": "", "equivalent": "root", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "obj", "name": "objet (COD)", "description": "Ce sur quoi porte l'action.", "tests": "", "equivalent": "obj", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "attr", "name": "attribut", "description": "Ce que le sujet est.", "tests": "", "equivalent": "root + cop", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "compl", "name": "complément circonstanciel", "description": "Temps, lieu, manière, cause… de l'action.", "tests": "", "equivalent": "obl / advmod", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "dét", "name": "déterminant", "description": "Ce qui détermine un nom : démonstratif, numéral, possesseur…", "tests": "", "equivalent": "det / nummod / nmod:poss", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "mod", "name": "modifieur", "description": "Ce qui qualifie un nom ou un verbe.", "tests": "", "equivalent": "amod / advmod / acl", "parent": null, "status": "ok" },
+    { "kind": "function", "code": "thème", "name": "thème (topique)", "description": "Ce dont on parle, mis en tête de phrase avant le sujet.", "tests": "", "equivalent": "dislocated", "parent": null, "status": "ok" }
+  ]
+}

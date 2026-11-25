@@ -14,31 +14,17 @@
     const KIND_ONE = { category: 'catégorie', phrase: 'groupe', function: 'fonction' };
     const SYLLABLE = /[a-zA-ZÀ-ɏŋεɔ'’]+[0-9¹²³⁴⁵⁶⁷⁸]?/g;
 
+    // Le module commun de grammaire (vendor/tumu-kin, partagé avec tumuparau) :
+    // étiquettes, structure des groupes, dessin de l'arbre, écriture entre
+    // crochets et linéaire. Ici, seulement ce qui est propre à la page.
+    const K = global.TumuKin;
+
     // ---- Les étiquettes ---------------------------------------------------------------------------
-    class TagSet {
-        constructor(list = []) { this.set(list); }
-        set(list) {
-            this.list = list;
-            this.byId = new Map(list.map((t) => [t.id, t]));
-        }
-        code(id) { return this.byId.get(id)?.code || ''; }
-        of(kind) {
-            // Rangées sous leur étiquette générale : V, puis V de mouvement…
-            const mine = this.list.filter((t) => t.kind === kind);
-            const out = [];
-            const walk = (parent, depth) => mine.filter((t) => (t.parent || null) === parent)
-                .forEach((t) => { out.push({ tag: t, depth }); walk(t.id, depth + 1); });
-            walk(null, 0);
-            mine.filter((t) => !out.some((o) => o.tag === t)).forEach((t) => out.push({ tag: t, depth: 0 }));
-            return out;
-        }
+    class TagSet extends K.TagSet {
         options(kind, value, empty = '—') {
             return `<option value="">${empty}</option>` + this.of(kind).map(({ tag, depth }) =>
                 `<option value="${tag.id}"${tag.id === value ? ' selected' : ''} title="${esc([tag.description, tag.tests && `Test : ${tag.tests}`].filter(Boolean).join(' — '))}">${'  '.repeat(depth)}${esc(tag.code)}${tag.name && tag.name !== tag.code ? ` — ${esc(tag.name)}` : ''}${tag.status === 'proposed' ? ' (IA)' : ''}</option>`).join('')
                 + `<option value="new">＋ nouvelle ${KIND_ONE[kind]}…</option>`;
-        }
-        label(item) {
-            return [this.code(item.c), this.code(item.f)].filter(Boolean).join(':');
         }
         /** Les repères d'une étiquette : définition, test, équivalent UD. */
         hint(id) {
@@ -50,115 +36,13 @@
     }
 
     // ---- L'arbre ----------------------------------------------------------------------------------
-    /** Les groupes emboîtés : pour chacun, son parent, ses enfants (mots et
-     *  groupes, dans l'ordre) et sa hauteur (1 au-dessus des mots). */
-    function structure(tokens, groups) {
-        const gs = groups.map((g, index) => ({ ...g, index })).sort((a, b) => a.s - b.s || b.e - a.e);
-        const stack = [];
-        gs.forEach((g) => {
-            while (stack.length && !(stack[stack.length - 1].s <= g.s && g.e <= stack[stack.length - 1].e)) stack.pop();
-            g.parent = stack.length ? stack[stack.length - 1] : null;
-            stack.push(g);
-        });
-        const tokenParent = tokens.map((_t, i) => {
-            let best = null;
-            gs.forEach((g) => { if (g.s <= i && i < g.e && (!best || g.e - g.s <= best.e - best.s)) best = g; });
-            return best;
-        });
-        gs.forEach((g) => {
-            g.children = [
-                ...tokens.map((_t, i) => i).filter((i) => tokenParent[i] === g).map((i) => ({ token: i, s: i })),
-                ...gs.filter((c) => c.parent === g).map((c) => ({ group: c, s: c.s })),
-            ].sort((a, b) => a.s - b.s);
-        });
-        const height = (g) => {
-            if (g.height === undefined) g.height = 1 + Math.max(0, ...g.children.filter((c) => c.group).map((c) => height(c.group)));
-            return g.height;
-        };
-        gs.forEach(height);
-        return { gs, tokenParent, top: Math.max(0, ...gs.map((g) => g.height)) };
-    }
-
-    const textWidth = (text, size) => [...String(text || '')].reduce((w, c) => w + (/[㐀-鿿豈-﫿]/.test(c) ? size : size * 0.58), 0);
-
-    /** L'arbre en SVG : les groupes en haut, les mots en bas (catégorie, mot,
-     *  lecture, fonction, glose). data-group / data-token : touchables. */
-    function drawTree(tokens, groups, tags, { selectedGroup = null, selection = null, mark = null } = {}) {
-        if (!tokens.length) return '';
-        const { gs, top } = structure(tokens, groups);
-        const ROW = 44, PAD = 10;
-        const widths = tokens.map((t) => Math.max(textWidth(t.t, 22), textWidth(t.p, 12), textWidth(tags.code(t.c), 12),
-            textWidth(tags.code(t.f), 11), Math.min(textWidth(t.g, 11), 120), 28) + 18);
-        const xs = [];
-        let x = PAD;
-        widths.forEach((w) => { xs.push(x + w / 2); x += w; });
-        const width = x + PAD;
-        const base = top * ROW + 14;
-        const pos = new Map();
-        const place = (g) => {
-            if (pos.has(g)) return pos.get(g);
-            const ends = g.children.map((c) => (c.group ? place(c.group).x : xs[c.token]));
-            const p = { x: (Math.min(...ends) + Math.max(...ends)) / 2, y: (top - g.height) * ROW + 18 };
-            pos.set(g, p);
-            return p;
-        };
-        gs.forEach(place);
-        const inSel = (i) => selection && selection[0] <= i && i <= selection[1];
-        const inMark = (i) => mark && mark[0] <= i && i < mark[1];
-        let svg = '';
-        gs.forEach((g) => {
-            const p = pos.get(g);
-            g.children.forEach((c) => {
-                const to = c.group ? { x: pos.get(c.group).x, y: pos.get(c.group).y - 13 } : { x: xs[c.token], y: base };
-                svg += `<line x1="${p.x}" y1="${p.y + 5}" x2="${to.x}" y2="${to.y}" class="ga-edge"/>`;
-            });
-        });
-        // Mots seuls (aucun groupe) : un trait discret vers le haut n'a pas de sens ; rien.
-        gs.forEach((g) => {
-            const p = pos.get(g);
-            const label = tags.label(g) || '·';
-            const w = textWidth(label, 13) + 14;
-            svg += `<g class="ga-node${g.index === selectedGroup ? ' is-sel' : ''}" data-group="${g.index}" tabindex="0" role="button" aria-label="Groupe ${esc(label)}">
-                <rect x="${p.x - w / 2}" y="${p.y - 13}" width="${w}" height="19" rx="5"/>
-                <text x="${p.x}" y="${p.y + 1}" text-anchor="middle">${esc(label)}</text></g>`;
-        });
-        tokens.forEach((t, i) => {
-            const cx = xs[i];
-            const cls = ['ga-leaf', inSel(i) ? 'is-sel' : '', inMark(i) ? 'is-mark' : ''].filter(Boolean).join(' ');
-            svg += `<g class="${cls}" data-token="${i}" role="button" tabindex="0" aria-label="${esc(t.t)}">
-                <rect x="${cx - widths[i] / 2 + 3}" y="${base}" width="${widths[i] - 6}" height="86" rx="6"/>
-                <text x="${cx}" y="${base + 14}" text-anchor="middle" class="ga-cat">${esc(tags.code(t.c))}</text>
-                <text x="${cx}" y="${base + 40}" text-anchor="middle" class="ga-han" lang="zh">${esc(t.t)}</text>
-                <text x="${cx}" y="${base + 55}" text-anchor="middle" class="ga-pin">${esc(t.p)}</text>
-                <text x="${cx}" y="${base + 69}" text-anchor="middle" class="ga-fn">${esc(tags.code(t.f))}</text>
-                <text x="${cx}" y="${base + 82}" text-anchor="middle" class="ga-gloss">${esc((t.g || '').slice(0, 24))}</text></g>`;
-        });
-        return `<svg class="ga-svg" width="${width}" height="${base + 92}" viewBox="0 0 ${width} ${base + 92}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
-    }
-
+    const structure = K.structure;
+    /** L'arbre en SVG (tumu-kin), les mots en caractères chinois. */
+    const drawTree = (tokens, groups, tags, options = {}) => K.drawTree(tokens, groups, tags, { lang: 'zh', ...options });
     /** L'arbre en une ligne : [P [GN:sujet 我/PRO] [GV 唔/NÉG 食/V]]. */
-    function bracketed(tokens, groups, tags) {
-        const order = groups.slice().sort((a, b) => a.s - b.s || b.e - a.e);
-        const out = [];
-        const open = [];
-        let gi = 0;
-        tokens.forEach((t, i) => {
-            while (open.length && open[open.length - 1] <= i) { open.pop(); out.push(']'); }
-            while (gi < order.length && order[gi].s === i) { out.push(`[${tags.label(order[gi]) || '·'}`); open.push(order[gi].e); gi++; }
-            out.push(t.t + (tags.label(t) ? `/${tags.label(t)}` : ''));
-        });
-        open.forEach(() => out.push(']'));
-        return out.join(' ').replace(/ \]/g, ']');
-    }
-
+    const bracketed = K.bracketed;
     /** L'analyse en ligne, pour la liste des exemples : 我ᴾᴿᴼ 唔ᴺᴱᴳ 食ⱽ, la partie qui suit le schéma soulignée. */
-    function linear(tokens, tags, mark = null) {
-        return tokens.map((t, i) => {
-            const label = tags.label(t);
-            const on = mark && mark[0] <= i && i < mark[1];
-            return `<span class="ga-lin${on ? ' is-mark' : ''}"><span lang="zh">${esc(t.t)}</span>${label ? `<sub>${esc(label)}</sub>` : ''}</span>`;
-        }).join(' ');
-    }
+    const linear = (tokens, tags, mark = null) => K.linear(tokens, tags, mark, { lang: 'zh' });
 
     function splitReading(pinyin, n) {
         const syl = String(pinyin || '').match(SYLLABLE) || [];

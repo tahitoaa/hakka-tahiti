@@ -1,0 +1,22 @@
+/* tumu-kin : le style de l'arbre (drawTree), de l'écriture entre crochets et
+   de l'écriture linéaire. Repris de la page « Grammaire » de hakka-tahiti
+   (templates/hakkadbapp/grammar.html), qui garde ses propres règles. */
+.ga-tree { overflow-x: auto; border: 1px solid #F0E8DC; border-radius: 0.5rem; background: #fff; padding: 0.3rem 0; }
+.ga-svg { display: block; font-family: inherit; }
+.ga-edge { stroke: #B5AA9B; stroke-width: 1.2; }
+.ga-node rect { fill: #EEF4FB; stroke: #BFD3EA; }
+.ga-node text { font-size: 12px; font-weight: 700; fill: #1E4E8C; }
+.ga-node, .ga-leaf { cursor: pointer; }
+.ga-node.is-sel rect { fill: #9B1C1C; stroke: #9B1C1C; }
+.ga-node.is-sel text { fill: #fff; }
+.ga-leaf rect { fill: #fff; stroke: #EFE6D8; }
+.ga-leaf.is-sel rect { stroke: #9B1C1C; stroke-width: 2; }
+.ga-leaf.is-mark rect { fill: #DCFCE7; }
+.ga-cat { font-size: 11px; font-weight: 700; fill: #1E4E8C; }
+.ga-han { font-size: 21px; fill: #261F1C; }
+.ga-pin { font-size: 11px; fill: #9B1C1C; }
+.ga-fn { font-size: 10px; fill: #6E655C; font-style: italic; }
+.ga-gloss { font-size: 10px; fill: #8C8478; }
+.ga-bracket { font-size: 0.8rem; color: #544D45; margin-top: 0.3rem; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+.ga-lin sub { font-size: 0.62rem; color: #1E4E8C; margin-left: 0.05rem; }
+.ga-lin.is-mark { background: #DCFCE7; border-radius: 0.2rem; }

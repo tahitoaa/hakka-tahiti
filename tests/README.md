@@ -33,6 +33,7 @@ Requires Node 20+ (the built-in test runner). Check with `node --version`.
 | `converter.test.js` | `converter.js` | Just `TextModel`, the one bit of real logic converter.js adds on top of `SyllableInputModel`. See the "What's *not* covered" note below. |
 | `saisie.test.js` | `Saisie.js` (`SaisieEntry`) | The "Saisie" form: syllables typed in "Je tape en" and stored in Wenfa (suggestion picked or character typed), ambiguous readings blocking the save, each word of an expression checked against the lexicon like a Sentence token (known / other reading / already proposed / unknown). |
 | `transcriptDocument.test.js` | `TranscriptDocument.js`, `EafDocument.js` | The segment list of a shared transcription (listening page and PDF): hanzi fallback, times, escaping; and the empty .eaf made from the participants' names (`EafDocument.create`). |
+| `grammarAnalysis.test.js` | `GrammarAnalysis.js` on `vendor/tumu-kin/tumu-kin.js` | The « Grammaire » page on top of the shared grammar module tumu-kin: tree drawn with the words marked `lang="zh"`, bracketed and linear forms, the page's own tag `<select>` options and hints. |
 
 ## How a test works, in plain terms
 
